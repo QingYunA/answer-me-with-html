@@ -9,14 +9,14 @@
       "name": "answer-me-with-html",
       "source": "./",
       "description": "Answer hard questions with a one-page HTML: the model writes a short Markdown draft; the bundled CLI handles templates, SVG auto-layout and an STE controlled-writing check.",
-      "version": "0.4.5",
+      "version": "0.4.6",
       "category": "visualization"
     },
     {
       "name": "answer-me-with-html-always",
       "source": "./plugins/answer-me-with-html-always",
       "description": "Optional always-on mode: reminds the agent every turn to attach a one-page HTML whenever it gives a conclusion, summary, plan or comparison. Requires answer-me-with-html.",
-      "version": "0.4.5",
+      "version": "0.4.6",
       "category": "visualization"
     }
   ]

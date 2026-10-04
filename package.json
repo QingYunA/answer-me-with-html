@@ -1,6 +1,6 @@
 {
   "name": "answer-me-with-html",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "description": "LLM 写 Markdown 内容稿，CLI 秒出零依赖单文件 HTML 解释页（模板 + slot + SVG 自动布局 + STE 受控写作检查）",
   "type": "module",
   "bin": {
