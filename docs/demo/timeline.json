@@ -1,13 +1,15 @@
 {
   "bpm": 120,
   "fps": 30,
-  "total": 24,
+  "total": 35,
   "cuts": [
     4,
     8,
     13,
     19,
-    22
+    22,
+    28,
+    32
   ],
   "data": "pt=6873&st=923&ps=46.4&ss=12.9&n=3&r=3&model=Claude%20Sonnet%205.5"
 }

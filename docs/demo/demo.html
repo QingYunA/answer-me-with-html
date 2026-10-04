@@ -96,6 +96,44 @@
   #s-end .cmd { margin-top: 64px; font: 600 40px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 26px 40px; border: 2px solid #2a2f3a; border-radius: 16px; background: #12151c; min-width: 1020px; }
   #s-end .cmd span { color: #7d8594; }
   #s-end .url { margin-top: 36px; font-size: 34px; color: #9aa3b2; }
+
+  /* ── video ── */
+  #s-video .head { position: absolute; left: 140px; top: 96px; }
+  #s-video .head h2 { margin: 0; font-size: 64px; letter-spacing: -0.025em; }
+  #s-video .head .sub { margin-top: 14px; font-size: 30px; color: #9aa3b2; }
+  #s-video .head .sub code { font: 600 28px ui-monospace, Menlo, monospace; color: #ffb08f; background: #1a1e27; padding: 2px 10px; border-radius: 8px; }
+  #s-video .player { position: absolute; left: 330px; top: 290px; width: 1260px; height: 742px; border: 2px solid #2a2f3a; border-radius: 16px; overflow: hidden; background: #0e1015; box-shadow: 0 40px 120px rgba(0,0,0,.55); transform-origin: 50% 60%; }
+  #s-video .stage { position: absolute; left: 0; right: 0; top: 44px; height: 628px; overflow: hidden; background: radial-gradient(900px 500px at 50% 40%, #151a23 0%, #0e1015 75%); }
+  #s-video .vcam { position: absolute; left: 0; top: 0; width: 1260px; height: 628px; transform-origin: 0 0; }
+  #s-video .scene-title { z-index: 2; position: absolute; left: 44px; top: 30px; font: 26px "Iowan Old Style", Palatino, Georgia, serif; color: #eceff4; }
+  #s-video .scene-title b { font: 500 22px ui-monospace, Menlo, monospace; color: #58c4dd; margin-right: 14px; }
+  #s-video .cap { position: absolute; left: 0; right: 0; bottom: 30px; text-align: center; }
+  #s-video .cap span { display: inline-block; font: 500 28px -apple-system, "Segoe UI", sans-serif; color: #fff; background: rgba(8,10,14,.6); padding: 8px 20px; border-radius: 8px; }
+  #s-video .cap b { color: #f7d96f; font-weight: 600; }
+  #s-video .ctl { white-space: nowrap; position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: #0b0d11; border-top: 1px solid #1d2330; display: flex; align-items: center; gap: 18px; padding: 0 22px; color: #c9d1dc; font: 18px ui-monospace, Menlo, monospace; }
+  #s-video .ctl .btn { width: 40px; height: 34px; border: 1px solid #2a3240; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: 16px; }
+  #s-video .ctl .trk { position: relative; flex: 1; height: 6px; background: #1d2330; border-radius: 3px; }
+  #s-video .ctl .fill { position: absolute; left: 0; top: 0; bottom: 0; background: #58c4dd; border-radius: 3px; }
+  #s-video .ctl .tick { position: absolute; top: -5px; width: 2px; height: 16px; background: #3a4456; }
+  #s-video .wave { display: flex; gap: 4px; align-items: center; height: 26px; }
+  #s-video .wave i { width: 4px; background: #58c4dd; border-radius: 2px; }
+  #s-video svg text { font-family: -apple-system, "Segoe UI", sans-serif; }
+
+  /* ── patch ── */
+  #s-patch .term { position: absolute; left: 90px; top: 250px; width: 760px; border: 2px solid #2a2f3a; border-radius: 18px; overflow: hidden; background: #12151c; box-shadow: 0 30px 90px rgba(0,0,0,.55); }
+  #s-patch .term .tbar { height: 54px; background: #1a1e27; display: flex; align-items: center; gap: 12px; padding: 0 22px; }
+  #s-patch .term .tbar i { width: 15px; height: 15px; border-radius: 50%; background: #3a3f4b; }
+  #s-patch .term .tbody { padding: 30px 34px; font: 25px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d6dae1; }
+  #s-patch .head { position: absolute; left: 90px; top: 96px; }
+  #s-patch .head h2 { margin: 0; font-size: 64px; letter-spacing: -0.025em; }
+  #s-patch .head .sub { margin-top: 14px; font-size: 30px; color: #9aa3b2; }
+  #s-patch .win { left: 900px; top: 230px; width: 930px; height: 700px; }
+  #s-patch .hl { position: absolute; border: 4px solid #d97757; border-radius: 6px; box-shadow: 0 0 0 9999px rgba(11,13,18,.0); pointer-events: none; }
+  #s-patch .badge { position: absolute; font: 700 22px ui-monospace, Menlo, monospace; color: #fff; background: #d97757; padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
+  #s-patch .sweep { position: absolute; background: linear-gradient(90deg, rgba(217,119,87,0) 0%, rgba(217,119,87,.35) 50%, rgba(217,119,87,0) 100%); pointer-events: none; }
+
+  #s-end .langs { margin-top: 30px; display: flex; gap: 16px; }
+  #s-end .langs span { font: 600 26px -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans", sans-serif; color: #c9d1dc; border: 2px solid #2a2f3a; border-radius: 12px; padding: 8px 20px; background: #12151c; }
   #black { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 </style>
 </head>
@@ -112,7 +150,7 @@
     <svg class="logo a" id="t-logo"><use href="#logo"/></svg>
     <h1><span class="a" id="t-h1">Answer me</span><span class="a" id="t-h2">with <span class="accent" style="display:inline">HTML</span></span></h1>
     <div class="underline a" id="t-ul"></div>
-    <div class="tag a" id="t-tag">Ask a hard question.<br>Get a page, not a wall of text.</div>
+    <div class="tag a" id="t-tag">Ask a hard question.<br>Get a page — or a video.</div>
     <div class="pills">
       <div class="pill a" id="t-p1"><b data-r="tok"></b> fewer tokens</div>
       <div class="pill a" id="t-p2"><b data-r="time"></b> faster</div>
@@ -178,12 +216,60 @@
   <div class="col skill a" id="s-r"><div class="who">Answer me with HTML</div><div class="num" id="s-nr"></div><div class="crop" id="s-cr"></div></div>
 </section>
 
+<section class="scene" id="s-video">
+  <div class="head"><h2 class="a" id="v-h">Need more than a page?</h2><div class="sub a" id="v-sub">Ask for a video. <code>am video</code> builds it step by step, with narration.</div></div>
+  <div class="player a" id="v-win">
+    <div class="chrome"><i></i><i></i><i></i><div class="url">~/.answer-me-with-html/videos/TCP-three-way-handshake.html</div></div>
+    <div class="stage">
+      <div class="scene-title"><b>01</b>Both sides wait</div>
+      <div class="vcam" id="v-cam">
+        
+        <svg width="1260" height="628" viewBox="250 62 760 500">
+          <defs><marker id="v-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a9b4c4"/></marker></defs>
+          <g id="v-actors">
+            <line x1="460" y1="182" x2="460" y2="500" stroke="#3a4456" stroke-width="2" stroke-dasharray="6 6"/>
+            <line x1="800" y1="182" x2="800" y2="500" stroke="#3a4456" stroke-width="2" stroke-dasharray="6 6"/>
+            <rect id="v-client" x="375" y="120" width="170" height="62" rx="8" fill="#141922" stroke="#58c4dd" stroke-width="3"/>
+            <text x="460" y="160" text-anchor="middle" font-size="28" font-weight="600" fill="#eceff4">Client</text>
+            <rect id="v-server" x="715" y="120" width="170" height="62" rx="8" fill="#141922" stroke="#58c4dd" stroke-width="3"/>
+            <text id="v-server-t" x="800" y="160" text-anchor="middle" font-size="28" font-weight="600" fill="#eceff4">Server</text>
+          </g>
+          <g id="v-m1"><text x="630" y="240" text-anchor="middle" font-size="26" fill="#eceff4">SYN</text><path id="v-p1" d="M462,262 L796,262" stroke="#a9b4c4" stroke-width="3" fill="none"/></g>
+          <g id="v-m2"><text x="630" y="328" text-anchor="middle" font-size="26" fill="#eceff4">SYN-ACK</text><path id="v-p2" d="M798,350 L464,350" stroke="#a9b4c4" stroke-width="3" fill="none"/></g>
+          <g id="v-m3"><text x="630" y="416" text-anchor="middle" font-size="26" fill="#eceff4">ACK</text><path id="v-p3" d="M462,438 L796,438" stroke="#a9b4c4" stroke-width="3" fill="none"/></g>
+        </svg>
+      </div>
+      <div class="cap"><span id="v-cap"></span></div>
+    </div>
+    <div class="ctl"><div class="btn">❚❚</div><span id="v-time">0:00 / 0:42</span><div class="trk"><div class="fill" id="v-fill"></div><i class="tick" style="left:22%"></i><i class="tick" style="left:51%"></i><i class="tick" style="left:78%"></i></div><div class="wave" id="v-wave"><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+</section>
+
+<section class="scene" id="s-patch">
+  <div class="head"><h2 class="a" id="q-h">Change one panel, not the page.</h2><div class="sub a" id="q-sub">The agent sends only the new panel. The rest stays as it was.</div></div>
+  <div class="term a" id="q-term">
+    <div class="tbar"><i></i><i></i><i></i></div>
+    <div class="tbody">
+      <div class="prompt" style="font-size:27px"><b>&gt;</b> <span id="q-typed"></span><span class="cursor" id="q-cursor" style="height:30px;width:13px"></span></div>
+      <div class="line a" id="q-l1"><span class="bullet">●</span> <span class="tool">Bash</span>(am patch tcp.html --panel C)</div>
+      <div class="dim a" id="q-l2">&nbsp;&nbsp;⎿&nbsp; <span class="ok">✓</span> 1 panel replaced · same file</div>
+    </div>
+  </div>
+  <div class="win a" id="q-win">
+    <div class="chrome"><i></i><i></i><i></i><div class="url">~/.answer-me-with-html/pages/TCP-three-way-handshake.html</div></div>
+    <div class="view"><div class="cam" id="q-cam"><iframe id="f-patch" src="tcp.html"></iframe></div>
+      <div class="sweep" id="q-sweep"></div><div class="hl" id="q-hl"></div><div class="badge" id="q-badge">panel C · rewritten</div>
+    </div>
+  </div>
+</section>
+
 <section class="scene" id="s-end">
   <div class="center">
     <svg class="logo a" id="e-logo"><use href="#logo"/></svg>
     <h1 class="a" id="e-h">Answer me with <span class="accent">HTML</span></h1>
     <div class="cmd a" id="e-cmd"><span>$</span> <span id="e-typed" style="color:#e8ebf0"></span><span class="cursor" id="e-cursor" style="height:42px"></span></div>
     <div class="url a" id="e-url">github.com/QingYunA/answer-me-with-html</div>
+    <div class="langs a" id="e-langs"><span>中文</span><span>English</span><span>日本語</span></div>
   </div>
 </section>
 <div id="black"></div>
@@ -251,6 +337,7 @@
   window.ready = Promise.all([
     prep($('f-title'), 'blueprint', 'light'), prep($('f-blue'), 'blueprint', 'light'),
     prep($('f-card'), 'shadcn', 'light'), prep($('f-dark'), 'shadcn', 'dark'),
+    prep($('f-patch'), 'blueprint', 'light'),
   ]).then(() => document.fonts.ready);
 
   // 镜头：让矩形 r（页面坐标）居中并占满视口的 fill 比例
@@ -370,17 +457,91 @@
       $('s-ten').style.transform = `scale(${lerp(1, 1.25, Math.sin(pop * Math.PI))})`;
     }
 
-    // 6. 收尾 22–24
-    if (scene($('s-end'), t, 22, 24.01, 0.25) > 0) {
-      rise($('e-logo'), t, 22.05);
-      rise($('e-h'), t, 22.2);
-      rise($('e-cmd'), t, 22.4);
-      const cmd = 'npx skills add QingYunA/answer-me-with-html';
-      $('e-typed').textContent = cmd.slice(0, Math.round(cmd.length * prog(t, 22.55, 23.2)));
-      $('e-cursor').style.opacity = Math.floor(t * 2.5) % 2 ? 0.15 : 1;
-      rise($('e-url'), t, 23.25);
+    // 6. 解释视频 22–28：手绘播放器，逐步画出时序图，镜头推近 Server，字幕逐句出现
+    if (scene($('s-video'), t, 22, 28) > 0) {
+      rise($('v-h'), t, 22.05);
+      rise($('v-sub'), t, 22.25);
+      const w = eo(prog(t, 22.2, 22.8));
+      $('v-win').style.opacity = w;
+      $('v-win').style.transform = `translateY(${(1 - w) * 60}px) scale(${lerp(0.96, 1, w) * lerp(1, 1.02, prog(t, 22.8, 28))})`;
+      // 参与者先出现，三条消息依次一笔画出（每条 0.6 s）
+      $('v-actors').style.opacity = eo(prog(t, 22.7, 23.1));
+      const steps = [[1, 23.2], [2, 24.3], [3, 25.4]];
+      for (const [i, s0] of steps) {
+        const p = eio(prog(t, s0, s0 + 0.6));
+        const path = $(`v-p${i}`);
+        const len = 334;
+        path.style.strokeDasharray = `${len}`;
+        path.style.strokeDashoffset = `${len * (1 - p)}`;
+        path.setAttribute('marker-end', p > 0.97 ? 'url(#v-arr)' : '');
+        $(`v-m${i}`).style.opacity = clamp((t - s0) / 0.2);
+      }
+      // 第二句时镜头推近 Server 并高亮，第三句拉回
+      const push = eio(prog(t, 24.2, 24.8)) * (1 - eio(prog(t, 25.3, 25.9)));
+      const s1 = lerp(1, 1.18, push);
+      const fx = 844, fy = 236; // Server 附近在舞台上的坐标（viewBox 裁切放大后）
+      $('v-cam').style.transform = `translate(${(690 - fx * s1) * push}px, ${(290 - fy * s1) * push}px) scale(${s1})`;
+      const hl = push > 0.05;
+      $('v-server').setAttribute('stroke', hl ? '#f7d96f' : '#58c4dd');
+      $('v-server').setAttribute('fill', hl ? 'rgba(247,217,111,0.12)' : '#141922');
+      $('v-server-t').setAttribute('fill', hl ? '#f7d96f' : '#eceff4');
+      // 字幕
+      const caps = [[23.2, 'The client sends a <b>SYN</b> to ask for a connection.'], [24.3, 'The <b>Server</b> answers with a SYN-ACK.'], [25.4, 'One more ACK, and the line is open.']];
+      const cur = caps.filter(([s0]) => t >= s0).pop();
+      $('v-cap').innerHTML = cur ? cur[1] : '';
+      $('v-cap').style.opacity = cur ? clamp((t - cur[0]) / 0.2) : 0;
+      $('v-cap').style.display = cur ? 'inline-block' : 'none';
+      // 进度条、时间与声波
+      const vt = lerp(5.2, 16.8, prog(t, 22.8, 28));
+      $('v-fill').style.width = `${(vt / 42) * 100}%`;
+      $('v-time').textContent = `0:${String(Math.floor(vt)).padStart(2, '0')} / 0:42`;
+      [...$('v-wave').children].forEach((bar, k) => { bar.style.height = `${8 + 16 * Math.abs(Math.sin(t * 9 + k * 1.3))}px`; });
     }
-    $('black').style.opacity = prog(t, 23.55, 24);
+
+    // 7. 只改一个面板 28–32
+    if (scene($('s-patch'), t, 28, 32) > 0 && rects['panel-C']) {
+      rise($('q-h'), t, 28.05);
+      rise($('q-sub'), t, 28.25);
+      rise($('q-term'), t, 28.3, 0.5, 30);
+      const w = eo(prog(t, 28.35, 28.9));
+      $('q-win').style.opacity = w;
+      $('q-win').style.transform = `translateX(${(1 - w) * 80}px)`;
+      const text = 'Show TLS in panel C instead';
+      $('q-typed').textContent = text.slice(0, Math.round(text.length * prog(t, 28.6, 29.3)));
+      $('q-cursor').style.opacity = t < 29.4 ? (Math.floor(t * 2.5) % 2 ? 0.15 : 1) : 0;
+      rise($('q-l1'), t, 29.45, 0.3, 16);
+      rise($('q-l2'), t, 29.95, 0.3, 14);
+      // 页面缩放到窗口宽度，镜头略微推向 C
+      const VWp = 926, s0 = VWp / 1280;
+      const C = rects['panel-C'];
+      // 不缩放，只把页面滚到 C 附近；滚动不超过页底，避免露出空白
+      const z = s0;
+      const cy = C.y + C.h / 2;
+      const ox = 0;
+      const maxScroll = Math.max(0, pageH * z - 652);
+      const oy = -Math.min(maxScroll, Math.max(0, cy * z - 327)) * eio(prog(t, 29.9, 30.6));
+      $('q-cam').style.transform = `translate(${ox}px, ${oy}px) scale(${z})`;
+      const box = { x: ox + C.x * z, y: oy + C.y * z, w: C.w * z, h: C.h * z };
+      const on = eo(prog(t, 30.0, 30.3));
+      Object.assign($('q-hl').style, { left: `${box.x - 6}px`, top: `${box.y - 6}px`, width: `${box.w + 12}px`, height: `${box.h + 12}px`, opacity: on });
+      const sw = prog(t, 30.1, 30.9);
+      Object.assign($('q-sweep').style, { left: `${box.x + (box.w + 200) * sw - 200}px`, top: `${box.y}px`, width: '200px', height: `${box.h}px`, opacity: sw > 0 && sw < 1 ? 1 : 0 });
+      $('q-badge').style.opacity = eo(prog(t, 30.5, 30.8));
+      Object.assign($('q-badge').style, { left: `${box.x + box.w - 250}px`, top: `${box.y - 48}px` });
+    }
+
+    // 8. 收尾 32–35
+    if (scene($('s-end'), t, 32, 35.01, 0.25) > 0) {
+      rise($('e-logo'), t, 32.05);
+      rise($('e-h'), t, 32.2);
+      rise($('e-cmd'), t, 32.4);
+      const cmd = 'npx skills add QingYunA/answer-me-with-html';
+      $('e-typed').textContent = cmd.slice(0, Math.round(cmd.length * prog(t, 32.55, 33.2)));
+      $('e-cursor').style.opacity = Math.floor(t * 2.5) % 2 ? 0.15 : 1;
+      rise($('e-url'), t, 33.25);
+      rise($('e-langs'), t, 33.5);
+    }
+    $('black').style.opacity = prog(t, 34.55, 35);
   };
   window.render(0);
 </script>
