@@ -1,0 +1,103 @@
+name: Bug report
+description: A page, video, patch, writing check or install that does not work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! English or Chinese is fine. 中文、英文都可以。
+
+        The draft is the best reproduction. Every rendered page carries its source: use the **Copy source** (复制源稿) button on the page, then cut it down to the smallest draft that still shows the problem.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+      placeholder: The header of a right-aligned column is left-aligned, while its cells are right-aligned.
+    validations:
+      required: true
+
+  - type: textarea
+    id: draft
+    attributes:
+      label: Draft
+      description: The smallest Markdown draft that reproduces the problem.
+      render: markdown
+      placeholder: |
+        ## A Table
+        | Name | Value |
+        | :--- | ---: |
+        | a | 1 |
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command and output
+      description: The `am` command you ran (or that your agent ran) and its full output, including any error.
+      render: shell
+      placeholder: node am.mjs render draft.md
+
+  - type: upload
+    id: screenshot
+    attributes:
+      label: Screenshot or page
+      description: For visual problems, attach a screenshot or the generated HTML file.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Page (render, components, themes)
+        - Explainer video (am video, MP4 export)
+        - Patch (am patch)
+        - Writing check (STE lint)
+        - Install, update or clean
+        - When the skill triggers
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `am --version`, or the version shown at the bottom of a generated page.
+      placeholder: 0.4.7
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - npx skills add
+        - Claude Code plugin
+        - Claude Code plugin + always-on
+        - Cloned repository
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex
+        - Cursor
+        - Gemini CLI
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and Node.js
+      placeholder: macOS 15 arm64, Node 22.11
+    validations:
+      required: true

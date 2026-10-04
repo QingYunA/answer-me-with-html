@@ -1,0 +1,35 @@
+name: Feature request
+description: A new component, setting or capability
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! English or Chinese is fine. 中文、英文都可以。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to explain or do, and what gets in the way today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work. A sample draft showing the syntax you would like to write helps most.
+      placeholder: |
+        ```image
+        src: architecture.png
+        caption: Request path
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you use now, or other designs you considered.
