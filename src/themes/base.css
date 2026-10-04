@@ -1,4 +1,4 @@
-/* Answer me with HTML base — 只引用主题变量，禁止写死颜色（主题 token 见 themes/index.js） */
+/* Answer me with HTML base — 只引用主题变量，禁止写死颜色（主题 token 见 themes/index.js）。例外：图（flow / sequence）的 var() fallback，取值等于 blueprint 浅色 token，由测试守住。 */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {

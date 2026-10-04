@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDoc, RenderError, detectLang } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
+import { THEMES } from '../src/themes/index.js';
 
 const SRC = `---
 title: 测试页
@@ -51,6 +52,7 @@ test('render: flow / sequence 的 SVG 样式在主题上下文丢失时有 fallb
     '.am-diagram .am-cluster-label', '.am-lifeline', '.am-actor', '.am-note',
     '.am-diagram .am-step',
   ];
+  const tokens = { ...THEMES.blueprint.common, ...THEMES.blueprint.light };
   for (const selector of selectors) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rule = html.match(new RegExp(`${escaped} \\{([^}]+)\\}`))?.[1];
@@ -59,6 +61,9 @@ test('render: flow / sequence 的 SVG 样式在主题上下文丢失时有 fallb
     assert.ok(vars.length > 0);
     for (const [, value] of vars) {
       assert.match(value, /^--[\w-]+,\s*\S/, `${selector} 的 ${value} 需要 fallback`);
+      // 颜色和线宽的 fallback 抄自 blueprint 浅色主题；主题 token 改了，这里必须同步。
+      const [name, fallback] = value.split(/,\s*/);
+      if (/^[#\d]/.test(fallback)) assert.equal(fallback, tokens[name], `${selector} 的 ${name} fallback 要等于 blueprint 浅色 token`);
     }
   }
 });
