@@ -183,6 +183,36 @@ test('cli clean: dry-run 与执行；--days 校验', async () => {
   assert.equal((await run(['clean', '--days', '1.5'])).code, 2);
 });
 
+test('cli clean: 根目录软链接不计入打印数量，预演和执行数量一致', async () => {
+  const outside = mkdtempSync(join(tmpdir(), 'am-hk-cli-outside-'));
+  try {
+    const target = join(outside, 'keep.txt');
+    writeFileSync(target, '外部文件');
+    for (const dir of ['pages', 'videos', 'cache']) {
+      symlinkSync(outside, join(home, dir), process.platform === 'win32' ? 'junction' : 'dir');
+    }
+    const skipped = await run(['clean', '--all', '--dry-run']);
+    assert.equal(skipped.code, 0, skipped.err);
+    assert.match(skipped.out, /将删除 0 个文件，释放 0 KB/);
+    assert.match(skipped.out, /共 0 KB：页面 0 个，视频 0 个，配音缓存 0 KB/);
+
+    // 让 pages 恢复为正常目录，确认打印的数量来自实际纳入清理的文件。
+    rmSync(join(home, 'pages'));
+    const normal = file('pages/old.html', 2048, 45);
+    const dry = await run(['clean', '--all', '--dry-run']);
+    assert.equal(dry.code, 0, dry.err);
+    assert.match(dry.out, /将删除 1 个文件，释放 2 KB/);
+    assert.ok(existsSync(normal), '预演保留正常目录文件');
+    const real = await run(['clean', '--all']);
+    assert.equal(real.code, 0, real.err);
+    assert.match(real.out, /已删除 1 个文件，释放 2 KB/);
+    assert.ok(!existsSync(normal));
+    assert.equal(readFileSync(target, 'utf8'), '外部文件');
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test('cli render: 数据目录过大时在输出末尾附清理提示', async () => {
   file('videos/big.mp4', CLEAN.bigBytes);
   const r = await run(['render', '-'], { stdin: '## A\n文字\n' });
