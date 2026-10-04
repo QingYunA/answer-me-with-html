@@ -77,7 +77,7 @@ function applyOverrides(meta, overrides, choices = CHOICES) {
   }
   return { ...meta, ...Object.fromEntries(set) };
 }
-var VOICES = Object.freeze(["auto", "elevenlabs", "system", "off"]);
+var VOICES = Object.freeze(["auto", "elevenlabs", "local", "system", "off"]);
 var DEFAULT_META = Object.freeze({
   template: "sheet",
   theme: "blueprint",
@@ -4830,6 +4830,10 @@ var SAMPLE_RATE = 22050;
 var ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb";
 var ELEVEN_MODEL = "eleven_multilingual_v2";
 var ELEVEN_TIMEOUT_MS = 6e4;
+var LOCAL_TIMEOUT_MS = 3e5;
+var LOCAL_RATIO = Object.freeze([0.5, 2]);
+var LOCAL_ATTEMPTS = 3;
+var SILENCE = 300;
 var TtsError = class extends Error {
   constructor(message) {
     super(message);
@@ -4844,6 +4848,7 @@ function pickProvider(choice, env, { platform = process.platform, which = hasCom
     if (!env.ELEVENLABS_API_KEY) throw new TtsError("voice=elevenlabs \u9700\u8981\u73AF\u5883\u53D8\u91CF ELEVENLABS_API_KEY");
     return eleven();
   }
+  if (choice === "local") return localSpeech(env);
   if (choice === "system") {
     const p = system();
     if (!p) throw new TtsError("\u6CA1\u6709\u627E\u5230\u7CFB\u7EDF TTS\uFF1AmacOS \u81EA\u5E26 say\uFF1BLinux \u8BF7\u5B89\u88C5 espeak-ng");
@@ -4876,6 +4881,78 @@ function elevenLabs(env) {
       return new Int16Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 2)).slice();
     }
   };
+}
+function localSpeech(env) {
+  if (!env.AM_TTS_URL) throw new TtsError("voice=local \u9700\u8981\u73AF\u5883\u53D8\u91CF AM_TTS_URL\uFF08\u5982 http://127.0.0.1:8000\uFF09");
+  const url = `${env.AM_TTS_URL.replace(/\/+$/, "").replace(/\/v1$/, "")}/v1/audio/speech`;
+  let extra = {};
+  if (env.AM_TTS_EXTRA) {
+    try {
+      extra = JSON.parse(env.AM_TTS_EXTRA);
+    } catch {
+      extra = null;
+    }
+    if (!extra || typeof extra !== "object" || Array.isArray(extra)) throw new TtsError("AM_TTS_EXTRA \u5FC5\u987B\u662F JSON \u5BF9\u8C61");
+  }
+  const attempts = env.AM_TTS_ATTEMPTS ? Number(env.AM_TTS_ATTEMPTS) : LOCAL_ATTEMPTS;
+  if (!Number.isInteger(attempts) || attempts < 1) throw new TtsError("AM_TTS_ATTEMPTS \u5FC5\u987B\u662F\u6B63\u6574\u6570");
+  const body = { ...extra, response_format: "wav", stream: false };
+  delete body.input;
+  if (env.AM_TTS_MODEL) body.model = env.AM_TTS_MODEL;
+  if (env.AM_TTS_VOICE) body.voice = env.AM_TTS_VOICE;
+  const speed = typeof body.speed === "number" && body.speed > 0 ? body.speed : 1;
+  const request = async (text) => {
+    const signal = AbortSignal.timeout(LOCAL_TIMEOUT_MS);
+    const why = (e) => signal.aborted ? `${LOCAL_TIMEOUT_MS / 1e3} \u79D2\u5185\u6CA1\u6709\u5B8C\u6210` : e.message;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...body, input: text }),
+        signal
+      });
+    } catch (e) {
+      throw new TtsError(`\u65E0\u6CD5\u8FDE\u63A5\u672C\u5730 TTS ${url}\uFF1A${why(e)}`);
+    }
+    let buf;
+    try {
+      buf = Buffer.from(await res.arrayBuffer());
+    } catch (e) {
+      throw new TtsError(`\u8BFB\u53D6\u672C\u5730 TTS \u54CD\u5E94\u5931\u8D25\uFF08HTTP ${res.status}\uFF09\uFF1A${why(e)}`);
+    }
+    if (!res.ok) throw new TtsError(`\u672C\u5730 TTS \u8FD4\u56DE ${res.status}\uFF1A${buf.toString("utf8", 0, 200)}`);
+    try {
+      return readWav(buf);
+    } catch (e) {
+      throw new TtsError(`\u672C\u5730 TTS \u8FD4\u56DE\u7684\u97F3\u9891\u65E0\u6CD5\u89E3\u7801\uFF08\u9700\u8981 16 \u4F4D PCM WAV\uFF09\uFF1A${e.message}`);
+    }
+  };
+  return {
+    name: "local",
+    id: `local:${url}:${attempts}:${stableJson(body)}`,
+    concurrency: 1,
+    async synth(text) {
+      const expected = estimateSeconds(text) / speed;
+      let best = null;
+      for (let i = 0; i < attempts; i++) {
+        const samples = trimSilence(await request(text));
+        if (!samples.some((x2) => Math.abs(x2) >= SILENCE)) continue;
+        const ratio = samples.length / SAMPLE_RATE / expected;
+        if (!best || Math.abs(Math.log(ratio)) < Math.abs(Math.log(best.ratio))) best = { samples, ratio };
+        if (ratio >= LOCAL_RATIO[0] && ratio <= LOCAL_RATIO[1]) break;
+      }
+      if (!best) throw new TtsError(`\u672C\u5730 TTS \u8FDE\u7EED ${attempts} \u6B21\u53EA\u8FD4\u56DE\u9759\u97F3`);
+      return best.samples;
+    }
+  };
+}
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((k2) => `${JSON.stringify(k2)}:${stableJson(value[k2])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 function systemVoice(platform, which) {
   if (platform === "darwin" && which("say")) {
@@ -5005,7 +5082,7 @@ function writeCache(file, samples) {
   writeFileSync(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
   renameSync(tmp, file);
 }
-function trimSilence(samples, threshold = 300) {
+function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
   let b = samples.length;
   while (a < b && Math.abs(samples[a]) < threshold) a++;
@@ -5559,7 +5636,7 @@ var CONFIG_KEYS = Object.freeze({
   mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "\u9ED8\u8BA4\u660E\u6697\u6A21\u5F0F" },
   style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE \u5199\u4F5C\u68C0\u67E5\u4E25\u683C\u5EA6" },
   update_check: { type: "bool", default: true, label: "\u6BCF\u5468\u5728\u540E\u53F0\u68C0\u67E5\u4E00\u6B21\u65B0\u7248\u672C\uFF0C\u6709\u65B0\u7248\u672C\u65F6\u63D0\u793A\uFF08\u4E0D\u4F1A\u81EA\u52A8\u66F4\u65B0\uFF09" },
-  voice: { type: "enum", choices: VOICES, default: "auto", label: "\u89C6\u9891\u65C1\u767D\u914D\u97F3\uFF08auto\uFF1A\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF09" }
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "\u89C6\u9891\u65C1\u767D\u914D\u97F3\uFF08auto\uFF1A\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF1Blocal\uFF1AAM_TTS_URL \u6307\u5411\u7684\u672C\u5730\u670D\u52A1\uFF09" }
 });
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
@@ -5693,7 +5770,7 @@ var USAGE = `Answer me with HTML ${VERSION} \u2014 \u628A Markdown \u5185\u5BB9\
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <\u6807\u9898> [file|-] [--from file] [--theme \u2026] [--no-open]
                                                   \u66FF\u6362\u5DF2\u6709\u9875\u9762\u4E2D\u7684\u4E00\u4E2A ## \u9762\u677F\uFF0C\u539F\u5730\u8986\u76D6\u8BE5 HTML
-  am video  <file|->  [-o \u8F93\u51FA\u8DEF\u5F84] [--voice auto|elevenlabs|system|off] [--mp4] [--no-open]
+  am video  <file|->  [-o \u8F93\u51FA\u8DEF\u5F84] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
                       [--theme blueprint|shadcn|3b1b] [--mode light|dark]
                                                   \u628A\u89C6\u9891\u7A3F\u6E32\u67D3\u6210 3b1b \u98CE\u683C\u7684\u89E3\u91CA\u89C6\u9891\u64AD\u653E\u9875\uFF08--mp4 \u53E6\u5B58\u89C6\u9891\u6587\u4EF6\uFF09
   am lint   <file|->  [--style off|80|strict]     \u53EA\u505A STE \u53D7\u63A7\u5199\u4F5C\u68C0\u67E5
@@ -5769,8 +5846,14 @@ Client -> Server: ACK
   \u65C1\u767D\u591A\u4E8E\u6B65\u6570\u65F6\uFF0C\u591A\u51FA\u7684\u524D\u51E0\u53E5\u5F53\u5F00\u573A\u767D\uFF0C\u4E0D\u51FA\u65B0\u5185\u5BB9\u3002
 - \u65C1\u767D\u91CC\u5199 [\u540D\u5B57]\uFF1A\u955C\u5934\u63A8\u8FD1\u540C\u540D\u5143\u7D20\u5E76\u9AD8\u4EAE\uFF0C\u5B57\u5E55\u91CC\u8BE5\u8BCD\u53D8\u9EC4\u3002
 - \u76F8\u90BB\u573A\u666F\u91CC\u540C\u540D\u7684\u8282\u70B9 / \u53C2\u4E0E\u8005\u4F1A\u4ECE\u65E7\u4F4D\u7F6E\u5E73\u6ED1\u79FB\u5230\u65B0\u4F4D\u7F6E\uFF08\u8DE8\u573A\u666F\u53D8\u5F62\uFF09\u3002
-- \u914D\u97F3\uFF1A--voice auto\uFF08\u9ED8\u8BA4\uFF0C\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF09| elevenlabs | system | off\u3002
+- \u914D\u97F3\uFF1A--voice auto\uFF08\u9ED8\u8BA4\uFF0C\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF09| elevenlabs | local | system | off\u3002
   ElevenLabs \u58F0\u97F3\u53EF\u7528\u73AF\u5883\u53D8\u91CF ELEVENLABS_VOICE_ID \u6307\u5B9A\u3002
+  local \u8C03\u7528\u672C\u5730 OpenAI \u517C\u5BB9\u7684\u8BED\u97F3\u670D\u52A1\uFF08POST /v1/audio/speech\uFF0C\u8FD4\u56DE 16 \u4F4D PCM WAV\uFF09\uFF1A
+  AM_TTS_URL\uFF08\u5FC5\u586B\uFF0C\u670D\u52A1\u6839\u5730\u5740\uFF09\u3001AM_TTS_MODEL\u3001AM_TTS_VOICE\uFF08\u670D\u52A1\u6CA1\u6709\u9ED8\u8BA4\u503C\u65F6\u5FC5\u586B\uFF09\uFF0C
+  AM_TTS_EXTRA \u5199\u6A21\u578B\u4E13\u7528\u53C2\u6570\uFF08JSON \u5BF9\u8C61\uFF09\uFF1BAM_TTS_MODEL / AM_TTS_VOICE \u8986\u76D6\u5176\u4E2D\u7684\u540C\u540D\u5B57\u6BB5\uFF0C
+  input\u3001response_format\u3001stream \u603B\u7531 am \u51B3\u5B9A\u3002\u65F6\u957F\u660E\u663E\u4E0D\u5BF9\u7684\u53E5\u5B50\u4F1A\u91CD\u65B0\u5408\u6210\uFF0C
+  \u6BCF\u53E5\u6700\u591A AM_TTS_ATTEMPTS \u6B21\uFF08\u9ED8\u8BA4 3\uFF0C\u8BBE\u4E3A 1 \u5173\u95ED\uFF09\u3002
+  \u4F8B\uFF1AAM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit       AM_TTS_VOICE=vivian am video draft.md --voice local
 - \u8F93\u51FA\u5230 ~/.answer-me-with-html/videos/\uFF1B--mp4 \u53E6\u5B58\u540C\u540D .mp4\uFF08\u9700\u8981 Chrome \u4E0E ffmpeg\uFF0CNode 22+\uFF09\u3002`;
 async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;

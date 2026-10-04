@@ -28,7 +28,7 @@ export function applyOverrides(meta, overrides, choices = CHOICES) {
 }
 
 // 视频旁白配音的可选值（config 的 voice 与 am video --voice 共用）。
-export const VOICES = Object.freeze(['auto', 'elevenlabs', 'system', 'off']);
+export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'off']);
 
 const DEFAULT_META = Object.freeze({
   template: 'sheet',

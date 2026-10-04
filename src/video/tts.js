@@ -1,4 +1,5 @@
 // 旁白配音。降级顺序：ElevenLabs（有 ELEVENLABS_API_KEY 时）→ 系统 TTS（macOS say / Linux espeak-ng）→ 只出字幕。
+// --voice local 改用本地 OpenAI 兼容的 /v1/audio/speech 服务（AM_TTS_URL），只在显式指定时使用。
 // 每句合成结果是 22050 Hz 单声道 16 位 PCM，按文本 + 声音缓存在 AM_HOME/cache/tts/，重复渲染不再合成。
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -7,11 +8,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { detectLang } from '../render.js';
 import { hasCommand } from '../sys.js';
+import { estimateSeconds } from './script.js';
 
 export const SAMPLE_RATE = 22050;
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 const ELEVEN_MODEL = 'eleven_multilingual_v2';
 const ELEVEN_TIMEOUT_MS = 60000;
+const LOCAL_TIMEOUT_MS = 300000;
+// 本地自回归 TTS（如 Qwen3-TTS）偶尔停不下来或提前截断。实际时长 / 估算时长超出这个范围就重试，最多 LOCAL_ATTEMPTS 次。
+const LOCAL_RATIO = Object.freeze([0.5, 2]);
+const LOCAL_ATTEMPTS = 3;
+const SILENCE = 300; // 振幅低于它算静音
 
 export class TtsError extends Error {
   constructor(message) {
@@ -29,6 +36,7 @@ export function pickProvider(choice, env, { platform = process.platform, which =
     if (!env.ELEVENLABS_API_KEY) throw new TtsError('voice=elevenlabs 需要环境变量 ELEVENLABS_API_KEY');
     return eleven();
   }
+  if (choice === 'local') return localSpeech(env);
   if (choice === 'system') {
     const p = system();
     if (!p) throw new TtsError('没有找到系统 TTS：macOS 自带 say；Linux 请安装 espeak-ng');
@@ -62,6 +70,86 @@ function elevenLabs(env) {
       return new Int16Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 2)).slice();
     },
   };
+}
+
+// OpenAI 兼容的语音接口：POST {AM_TTS_URL}/v1/audio/speech，要求返回 16 位 PCM WAV（一次返回整段，不分块流式）。
+// AM_TTS_MODEL / AM_TTS_VOICE 对应请求里的 model / voice；AM_TTS_EXTRA 是一个 JSON 对象，并入请求体（模型专用参数），
+// 但 input / response_format / stream 总由 am 决定。AM_TTS_ATTEMPTS 是每句最多合成次数，默认 3，设为 1 关闭时长检查。
+function localSpeech(env) {
+  if (!env.AM_TTS_URL) throw new TtsError('voice=local 需要环境变量 AM_TTS_URL（如 http://127.0.0.1:8000）');
+  const url = `${env.AM_TTS_URL.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1/audio/speech`;
+  let extra = {};
+  if (env.AM_TTS_EXTRA) {
+    try {
+      extra = JSON.parse(env.AM_TTS_EXTRA);
+    } catch {
+      extra = null;
+    }
+    if (!extra || typeof extra !== 'object' || Array.isArray(extra)) throw new TtsError('AM_TTS_EXTRA 必须是 JSON 对象');
+  }
+  const attempts = env.AM_TTS_ATTEMPTS ? Number(env.AM_TTS_ATTEMPTS) : LOCAL_ATTEMPTS;
+  if (!Number.isInteger(attempts) || attempts < 1) throw new TtsError('AM_TTS_ATTEMPTS 必须是正整数');
+  const body = { ...extra, response_format: 'wav', stream: false };
+  delete body.input;
+  if (env.AM_TTS_MODEL) body.model = env.AM_TTS_MODEL;
+  if (env.AM_TTS_VOICE) body.voice = env.AM_TTS_VOICE;
+  // 请求了变速时，按变速后的语速估算时长，正常的慢速朗读不会被当成失控。
+  const speed = typeof body.speed === 'number' && body.speed > 0 ? body.speed : 1;
+  const request = async (text) => {
+    const signal = AbortSignal.timeout(LOCAL_TIMEOUT_MS);
+    const why = (e) => (signal.aborted ? `${LOCAL_TIMEOUT_MS / 1000} 秒内没有完成` : e.message);
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...body, input: text }),
+        signal,
+      });
+    } catch (e) {
+      throw new TtsError(`无法连接本地 TTS ${url}：${why(e)}`);
+    }
+    let buf;
+    try {
+      buf = Buffer.from(await res.arrayBuffer());
+    } catch (e) {
+      throw new TtsError(`读取本地 TTS 响应失败（HTTP ${res.status}）：${why(e)}`);
+    }
+    if (!res.ok) throw new TtsError(`本地 TTS 返回 ${res.status}：${buf.toString('utf8', 0, 200)}`);
+    try {
+      return readWav(buf);
+    } catch (e) {
+      throw new TtsError(`本地 TTS 返回的音频无法解码（需要 16 位 PCM WAV）：${e.message}`);
+    }
+  };
+  return {
+    name: 'local',
+    id: `local:${url}:${attempts}:${stableJson(body)}`,
+    concurrency: 1,
+    async synth(text) {
+      // 按去掉首尾静音后的长度判断：静音填充不能让截断的句子蒙混过关。空音频和纯静音不算结果。
+      const expected = estimateSeconds(text) / speed;
+      let best = null;
+      for (let i = 0; i < attempts; i++) {
+        const samples = trimSilence(await request(text));
+        if (!samples.some((x) => Math.abs(x) >= SILENCE)) continue;
+        const ratio = samples.length / SAMPLE_RATE / expected;
+        if (!best || Math.abs(Math.log(ratio)) < Math.abs(Math.log(best.ratio))) best = { samples, ratio };
+        if (ratio >= LOCAL_RATIO[0] && ratio <= LOCAL_RATIO[1]) break;
+      }
+      if (!best) throw new TtsError(`本地 TTS 连续 ${attempts} 次只返回静音`);
+      return best.samples;
+    },
+  };
+}
+
+// 键按字母序排列的 JSON，同样的参数换个顺序写也得到同一个缓存键。
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function systemVoice(platform, which) {
@@ -209,7 +297,7 @@ function writeCache(file, samples) {
 }
 
 // 去掉首尾静音，让画面节奏只由真实语音决定。
-export function trimSilence(samples, threshold = 300) {
+export function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
   let b = samples.length;
   while (a < b && Math.abs(samples[a]) < threshold) a++;

@@ -191,6 +191,6 @@ AM_EOF
 - 一个视频 3～6 个场景，每行旁白一两句话。
 - 旁白是要念出来的，写成口语，像当面讲给人听：可以用"你看""那问题来了""我们换个角度看"这类过渡，引号里放人物的"台词"。不要写成说明书腔（"客户端发送 SYN 报文以请求建立连接"）。句长仍受 STE 检查约束。
 - 外观默认跟随配置里的 theme（通常是 blueprint 图纸风）。用户要"3b1b 那种深色风格"时在 frontmatter 写 `theme: 3b1b`。
-- 配音：默认 `--voice auto`，有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统 TTS（macOS say），都没有就只出字幕。用户说"不要声音"时加 `--voice off`。
+- 配音：默认 `--voice auto`，有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统 TTS（macOS say），都没有就只出字幕。用户说"不要声音"时加 `--voice off`。用户在本地部署了 OpenAI 兼容的语音服务并设置了 `AM_TTS_URL` 时，用 `--voice local`。
 - 产物是 `~/.answer-me-with-html/videos/` 下的单文件播放页（音频内嵌）。用户要视频文件时加 `--mp4`，需要本机有 Chrome、ffmpeg 和 Node.js 22+，导出时间约为视频时长的 1.3 倍。
 - 完整语法：`am help video`。终端里回一句话加播放页路径（和 MP4 路径）。

@@ -136,6 +136,162 @@ test('pickProvider: off / elevenlabs / system / auto 的选择与报错', () => 
   assert.equal(pickProvider('auto', {}, { platform: 'linux', which: (c) => c === 'espeak-ng' }).name, 'espeak-ng');
 });
 
+test('pickProvider: local 需要 AM_TTS_URL，AM_TTS_EXTRA 必须是 JSON 对象，auto 不会选 local', () => {
+  assert.throws(() => pickProvider('local', {}), (e) => e instanceof TtsError && /AM_TTS_URL/.test(e.message));
+  assert.throws(() => pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_EXTRA: '[1]' }), /JSON 对象/);
+  assert.throws(() => pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_EXTRA: '{bad' }), /JSON 对象/);
+  assert.equal(pickProvider('local', { AM_TTS_URL: 'http://x' }).name, 'local');
+  assert.equal(pickProvider('auto', { AM_TTS_URL: 'http://x' }, { platform: 'linux', which: () => false }), null);
+});
+
+// 用假的 fetch 依次返回给定秒数的 WAV（或错误响应），记录请求。
+async function withFakeFetch(replies, fn) {
+  const calls = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body) });
+    const r = replies[Math.min(calls.length - 1, replies.length - 1)];
+    if (typeof r === 'number') return new Response(wav(new Int16Array(Math.round(r * SAMPLE_RATE)).fill(1000)));
+    if (r instanceof Response) return r;
+    return new Response(r.text, { status: r.status });
+  };
+  try {
+    return await fn(calls);
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+test('local 配音：请求体合并 AM_TTS_EXTRA，返回 WAV 解码成样本', async () => {
+  const env = { AM_TTS_URL: 'http://127.0.0.1:8000/', AM_TTS_MODEL: 'm', AM_TTS_VOICE: 'v', AM_TTS_EXTRA: '{"repetition_penalty":1.05,"response_format":"mp3"}' };
+  const p = pickProvider('local', env);
+  const expected = estimateSeconds('一句话');
+  await withFakeFetch([expected], async (calls) => {
+    const out = await p.synth('一句话');
+    assert.equal(out.length, Math.round(expected * SAMPLE_RATE));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, 'http://127.0.0.1:8000/v1/audio/speech');
+    assert.deepEqual(calls[0].body, { repetition_penalty: 1.05, response_format: 'wav', stream: false, model: 'm', voice: 'v', input: '一句话' });
+  });
+  assert.notEqual(p.id, pickProvider('local', { ...env, AM_TTS_VOICE: 'w' }).id, '换声音不复用缓存');
+});
+
+test('local 配音：时长失控或截断时重试，最多三次，保留最接近估算的一次', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const text = '这一句旁白大约需要几秒钟才能读完。';
+  const e = estimateSeconds(text);
+  await withFakeFetch([e * 8, e], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 2, '第二次正常就停');
+    assert.equal(out.length, Math.round(e * SAMPLE_RATE));
+  });
+  await withFakeFetch([e * 8, e * 0.1, e * 3], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 3);
+    assert.equal(out.length, Math.round(e * 3 * SAMPLE_RATE), '都不正常时选比例最接近 1 的');
+  });
+});
+
+test('local 配音：服务返回错误或连不上时报 TtsError', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  await withFakeFetch([{ status: 422, text: 'model required' }], async () => {
+    await assert.rejects(p.synth('一句'), (e) => e instanceof TtsError && /422/.test(e.message) && /model required/.test(e.message));
+  });
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('fetch failed'); };
+  try {
+    await assert.rejects(p.synth('一句'), (e) => e instanceof TtsError && /无法连接本地 TTS/.test(e.message));
+  } finally {
+    globalThis.fetch = real;
+  }
+});
+
+test('local 配音：input / response_format / stream 不能被 AM_TTS_EXTRA 覆盖；URL 末尾的 /v1 不会重复', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://h:1/v1/', AM_TTS_MODEL: 'm', AM_TTS_EXTRA: '{"stream":true,"input":"x","model":"a","response_format":"mp3"}' });
+  await withFakeFetch([estimateSeconds('一句')], async (calls) => {
+    await p.synth('一句');
+    assert.equal(calls[0].url, 'http://h:1/v1/audio/speech');
+    assert.deepEqual(calls[0].body, { stream: false, input: '一句', model: 'm', response_format: 'wav' });
+  });
+});
+
+test('local 配音：缓存键与参数顺序无关，也不受 AM_TTS_EXTRA 里的 input 影响', () => {
+  const id = (extra) => pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_EXTRA: extra }).id;
+  assert.equal(id('{"a":1,"b":{"d":2,"c":3}}'), id('{"b":{"c":3,"d":2},"a":1}'));
+  assert.equal(id('{"a":1,"input":"x"}'), id('{"a":1}'));
+  assert.notEqual(id('{"a":1}'), id('{"a":2}'));
+});
+
+test('local 配音：按去掉首尾静音后的长度判断，静音填充的截断音频会重试', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const text = '这一句旁白大约需要几秒钟才能读完。';
+  const e = estimateSeconds(text);
+  const padded = new Int16Array(Math.round(e * SAMPLE_RATE));
+  padded.fill(1000, 0, Math.round(0.1 * e * SAMPLE_RATE));
+  await withFakeFetch([new Response(wav(padded)), e], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 2);
+    assert.ok(out.length >= Math.round(e * SAMPLE_RATE));
+  });
+});
+
+test('local 配音：AM_TTS_EXTRA 里的 speed 调整估算时长；AM_TTS_ATTEMPTS=1 关闭重试', async () => {
+  const text = '这一句旁白大约需要几秒钟才能读完。';
+  const e = estimateSeconds(text);
+  const slow = pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_EXTRA: '{"speed":0.25}' });
+  await withFakeFetch([e * 4], async (calls) => {
+    await slow.synth(text);
+    assert.equal(calls.length, 1, '四分之一语速的正常朗读不算失控');
+  });
+  const once = pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_ATTEMPTS: '1' });
+  await withFakeFetch([e * 8, e], async (calls) => {
+    await once.synth(text);
+    assert.equal(calls.length, 1);
+  });
+  assert.throws(() => pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_ATTEMPTS: '0' }), /正整数/);
+});
+
+test('local 配音：响应体中途断开、音频不是 16 位 PCM WAV 时都报 TtsError', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const broken = new Response(new ReadableStream({ start(c) { c.error(new TypeError('terminated')); } }));
+  await withFakeFetch([broken], async () => {
+    await assert.rejects(p.synth('一句'), (e) => e instanceof TtsError && /terminated/.test(e.message));
+  });
+  const pcm24 = wav(new Int16Array(100));
+  pcm24.writeUInt16LE(24, 34);
+  await withFakeFetch([new Response(pcm24)], async () => {
+    await assert.rejects(p.synth('一句'), (e) => e instanceof TtsError && /16 位 PCM WAV/.test(e.message));
+  });
+});
+
+test('local 配音：空音频或纯静音不算结果，全部如此时报 TtsError；有声的那次被采用', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const e = estimateSeconds('一句');
+  const silent = () => new Response(wav(new Int16Array(5 * SAMPLE_RATE)));
+  await withFakeFetch([new Response(wav(new Int16Array(0))), silent(), silent()], async (calls) => {
+    await assert.rejects(p.synth('一句'), (err) => err instanceof TtsError && /静音/.test(err.message));
+    assert.equal(calls.length, 3);
+  });
+  await withFakeFetch([silent(), e * 3], async (calls) => {
+    const out = await p.synth('一句');
+    assert.equal(calls.length, 3, '比例 3 不在范围内，继续重试');
+    assert.ok(out.length >= Math.round(e * 3 * SAMPLE_RATE), '采用有声的结果而不是静音');
+  });
+});
+
+test('local 配音：重试次数不同，缓存键也不同', () => {
+  const id = (n) => pickProvider('local', { AM_TTS_URL: 'http://x', AM_TTS_ATTEMPTS: n }).id;
+  assert.notEqual(id('1'), id('3'));
+});
+
+test('local 配音：收到响应头后读取失败时保留 HTTP 状态码', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const broken = new Response(new ReadableStream({ start(c) { c.error(new TypeError('terminated')); } }), { status: 500 });
+  await withFakeFetch([broken], async () => {
+    await assert.rejects(p.synth('一句'), (e) => e instanceof TtsError && /HTTP 500/.test(e.message) && /terminated/.test(e.message));
+  });
+});
+
 test('pickMacVoices: 名字很长只隔一个空格时也能认出，优先婷婷 / Samantha', () => {
   const out = [
     'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',

@@ -135,6 +135,7 @@ Server -> Client: SYN-ACK
 - **Camera focus.** `[Server]` in the narration pushes the camera toward that node and highlights it. The diagram never leaves the frame.
 - **Objects carry over.** A node with the same name in the next scene glides to its new place instead of cutting.
 - **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set, the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English, Kyoko for Japanese), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
+- **Local voice.** `--voice local` uses an OpenAI-compatible `POST /v1/audio/speech` server you run yourself that returns 16-bit PCM WAV, such as [mlx-audio](https://github.com/Blaizzy/mlx-audio) with Qwen3-TTS. Set `AM_TTS_URL` to the server root; set `AM_TTS_MODEL` and `AM_TTS_VOICE` unless the server has defaults. `AM_TTS_EXTRA` is a JSON object of model-specific options merged into each request; `AM_TTS_MODEL` and `AM_TTS_VOICE` override the same fields in it, and `am` always sets `input`, `response_format` and `stream`. A clip much shorter or longer than its text suggests is generated again, up to `AM_TTS_ATTEMPTS` tries (default 3; 1 turns the check off). Example: `AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit AM_TTS_VOICE=vivian am video draft.md --voice local`.
 - **Same look as the pages.** Videos use the blueprint drawing style by default: a ruled frame and lettered sheet heads. Write `theme: 3b1b` for the dark 3Blue1Brown look. `theme: shadcn` and `mode: dark` also work.
 - **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine. Export takes about 1.3 times the video length.
 
@@ -158,7 +159,7 @@ Change settings with a slash command. There are no config files to edit by hand.
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
 | `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
-| `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `system` or `off` |
+| `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
 
