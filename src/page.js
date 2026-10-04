@@ -3,7 +3,7 @@
 import { esc } from './svg/text.js';
 
 const SOURCE_OPEN = '<textarea id="am-source"';
-const SOURCE_RE = /^<textarea id="am-source"[^>]*>([\s\S]*?)<\/textarea>/;
+const SOURCE_RE = new RegExp(`^${SOURCE_OPEN}[^>]*>([\\s\\S]*?)<\\/textarea>`);
 const AUDIO_OPEN = '<audio id="amv-audio"';
 
 // lang 传入时已是 html lang 值（如 zh-CN）。
@@ -17,7 +17,7 @@ export function audioTag(wav) {
 
 // 必须是页面最后一个 textarea，紧跟在可选的 audioTag 之后。
 export function sourceTag(source) {
-  return `<textarea id="am-source" hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
+  return `${SOURCE_OPEN} hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
 }
 
 // 读回信封：{ source, video, template, theme, mode, style, voiced }。没有源稿时 source 为 null。

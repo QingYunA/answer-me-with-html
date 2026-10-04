@@ -9,7 +9,6 @@ import { detectLang } from '../render.js';
 import { hasCommand } from '../sys.js';
 
 export const SAMPLE_RATE = 22050;
-export const VOICES = ['auto', 'elevenlabs', 'system', 'off'];
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
 const ELEVEN_MODEL = 'eleven_multilingual_v2';
 const ELEVEN_TIMEOUT_MS = 60000;

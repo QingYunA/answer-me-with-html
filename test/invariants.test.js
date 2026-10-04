@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 
 const EXAMPLES = new URL('../examples/', import.meta.url);
-const HOMES = { none: null, cfg: { theme: 'shadcn', mode: 'dark' } };
+const HOMES = { none: null, cfg: { theme: 'shadcn', mode: 'dark', style: 'off' } };
 
 let dir;
 before(() => {
@@ -35,8 +35,10 @@ async function run(args, home, stdin = '') {
   return { code, err };
 }
 
-// 页面里的生成时间精确到分钟，跨分钟时会变；比较前抹掉。
-const stable = (html) => html.replace(/\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?/g, '<time>');
+// 生成时间精确到分钟，跨分钟时会变；比较前只抹掉页脚 / 播放条的生成时间和视频片头的 DATE 格。
+const stable = (html) => html
+  .replace(/(Answer me with HTML [\d.]+ · )\d{4}-\d{2}-\d{2} \d{2}:\d{2}/g, '$1<time>')
+  .replace(/(<b>DATE<\/b><span>)\d{4}-\d{2}-\d{2}/, '$1<time>');
 
 // 第一个 ## 面板的标题与原文。
 function firstPanel(source) {

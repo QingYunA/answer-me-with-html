@@ -4,8 +4,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { CHOICES } from './parse.js';
-import { VOICES } from './video/tts.js';
+import { CHOICES, VOICES } from './parse.js';
 
 export class ConfigError extends Error {
   constructor(message) {

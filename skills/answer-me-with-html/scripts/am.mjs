@@ -77,6 +77,7 @@ function applyOverrides(meta, overrides, choices = CHOICES) {
   }
   return { ...meta, ...Object.fromEntries(set) };
 }
+var VOICES = Object.freeze(["auto", "elevenlabs", "system", "off"]);
 var DEFAULT_META = Object.freeze({
   template: "sheet",
   theme: "blueprint",
@@ -4573,7 +4574,7 @@ function checkUnit(text, line, kind, out) {
 
 // src/page.js
 var SOURCE_OPEN = '<textarea id="am-source"';
-var SOURCE_RE = /^<textarea id="am-source"[^>]*>([\s\S]*?)<\/textarea>/;
+var SOURCE_RE = new RegExp(`^${SOURCE_OPEN}[^>]*>([\\s\\S]*?)<\\/textarea>`);
 var AUDIO_OPEN = '<audio id="amv-audio"';
 function rootTag({ lang, theme, mode, style, video = false }) {
   return `<html lang="${lang}" data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${video ? " data-video" : ""}>`;
@@ -4582,7 +4583,7 @@ function audioTag(wav2) {
   return `${AUDIO_OPEN} preload="auto" src="data:audio/wav;base64,${wav2.toString("base64")}"></audio>`;
 }
 function sourceTag(source) {
-  return `<textarea id="am-source" hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
+  return `${SOURCE_OPEN} hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
 }
 function readPage(html) {
   const s = String(html);
@@ -4826,7 +4827,6 @@ function hasCommand(cmd) {
 
 // src/video/tts.js
 var SAMPLE_RATE = 22050;
-var VOICES = ["auto", "elevenlabs", "system", "off"];
 var ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb";
 var ELEVEN_MODEL = "eleven_multilingual_v2";
 var ELEVEN_TIMEOUT_MS = 6e4;
