@@ -359,3 +359,9 @@ test('e2e: 以 - 开头的旁白不会被系统 TTS 当成选项', { skip: !E2E 
   const [clip] = await synthAll(['-v 这句以连字符开头'], p, {});
   assert.ok(clip.length / SAMPLE_RATE > 0.5);
 });
+
+test('播放页：变形时用"先汇总再设置"的方式隐藏元素，不会被下一场的变形覆盖', async () => {
+  const { VIDEO_JS } = await import('../src/assets.js');
+  assert.match(VIDEO_JS, /const hidden = new Set\(\)/);
+  assert.doesNotMatch(VIDEO_JS, /m\.to\.style\.visibility =/);
+});
