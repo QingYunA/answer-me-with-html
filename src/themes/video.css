@@ -99,7 +99,7 @@ html[data-theme="3b1b"] .amv-scene-meta { display: none; }
 /* ── 片头 ── */
 .amv-scene--title { display: grid; place-items: center; text-align: center; }
 .amv-title-wrap { max-width: 1500px; display: flex; flex-direction: column; align-items: center; }
-.amv-title { margin: 0; font: 700 96px/1.15 var(--v-title-font); color: var(--ink); letter-spacing: -0.01em; }
+.amv-title { margin: 0; font: 700 96px/1.15 var(--v-title-font); color: var(--ink); letter-spacing: -0.01em; text-wrap: balance; }
 .amv-subtitle { margin: 26px 0 0; font: 36px var(--v-title-font); color: var(--accent); }
 .amv-intro { margin-top: 36px; font-size: 28px; color: var(--ink-2); }
 .amv-titleblock {

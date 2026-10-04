@@ -152,7 +152,7 @@
   };
   const IDENT = { s: 1, x: 0, y: 0 };
   // 推近但不裁切：放大后整张图仍要留在标题与字幕之间的安全区里。
-  const SAFE = { left: 60, right: W - 60, top: 140, bottom: H - 150 };
+  const SAFE = { left: 60, right: W - 60, top: 150, bottom: H - 200 }; // 下边留出字幕的位置
   function focusCam(r, sc) {
     const fit = sc.querySelector('.amv-fit');
     const c = fit ? rectOf(fit) : { x: 0, y: 0, w: W, h: H };
@@ -216,19 +216,23 @@
   }
 
   // 跨场景变形：切换期间用替身从旧位置移到新位置，真身暂时隐藏。
+  // 一个元素可能既是上一场变形的终点、又是下一场变形的起点；先汇总"该藏"的元素再统一设置，避免互相覆盖。
+  const morphed = [...new Set(morphs.flatMap((m) => [m.from, m.to]))];
   function drawMorphs(t) {
+    const hidden = new Set();
     for (const m of morphs) {
       const s0 = segs[m.scene].start;
       const during = t >= s0 && t < s0 + T;
-      const p = ease((t - s0) / T);
       m.ghost.style.display = during ? '' : 'none';
       if (during) {
+        const p = ease((t - s0) / T);
         m.ghost.style.transform = `translate(${lerp(m.a.x, m.b.x, p)}px, ${lerp(m.a.y, m.b.y, p)}px) scale(${lerp(m.a.s, m.b.s, p)})`;
+        hidden.add(m.from);
       }
-      m.from.style.visibility = during ? 'hidden' : '';
-      m.to.style.visibility = t < s0 + T ? 'hidden' : '';
+      if (t < s0 + T) hidden.add(m.to);
       m.to.style.opacity = 1;
     }
+    for (const el of morphed) el.style.visibility = hidden.has(el) ? 'hidden' : '';
   }
 
   // 镜头与高亮：在上一个镜头位置和当前目标之间插值。
