@@ -20,7 +20,9 @@
     "build": "node scripts/build.mjs",
     "test": "node --test --test-timeout=120000 test/*.test.js",
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"test/**\" --test-coverage-exclude=\"skills/**\" --test-coverage-lines=85 --test-coverage-functions=85 --test-coverage-branches=80 test/*.test.js",
-    "smoke:install": "node scripts/smoke-install.mjs"
+    "smoke:install": "node scripts/smoke-install.mjs",
+    "snapshot": "node scripts/snapshot.mjs",
+    "release": "node scripts/release.mjs"
   },
   "keywords": [
     "llm",

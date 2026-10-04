@@ -1,0 +1,33 @@
+# Contributing
+
+Setup and test commands are in the README's [Development](README.md#development) section.
+
+## Ground rules
+
+- **`skills/answer-me-with-html/scripts/am.mjs` is generated.** Edit `src/`, then run `npm run build` and commit both. CI fails when the bundle is stale. On a merge or rebase conflict in `am.mjs`, take either side and rebuild; never merge it by hand.
+- **The page format lives in `src/page.js`.** It writes the root `<html>` settings, the narration `<audio>` and the trailing `#am-source`, and `readPage()` reads them back for `am patch`. A new page setting goes in both places.
+- **Refactors keep the HTML byte-identical.** `npm run snapshot [ref]` renders 336 render / video / patch combinations with a fixed clock and compares them with `ref` (default `origin/main`). Any difference must be intended and called out in the PR.
+- **Plugin installs copy the whole repository.** Keep large or personal files (videos, GIFs, `docs/social/`) out of git.
+
+## Pull requests
+
+- One topic per PR. Commit messages follow Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`, `chore:`).
+- Write the PR description in English: what changed, why, and how you verified it.
+- `npm test` must pass and the bundle must be rebuilt.
+
+### Reviewing a contributor PR (maintainers)
+
+1. Check out the PR head in a separate worktree: `git fetch origin pull/<n>/head:pr-<n> && git worktree add /tmp/pr-<n> pr-<n>`.
+2. Review the diff against the PR base (`git diff origin/main...pr-<n>`), never against your current branch.
+3. In the worktree: `npm ci`, `npm run build` (the bundle must not change), `npm test`, and `npm run snapshot` when `src/` changed.
+4. To finish a PR on the contributor's branch, push to their fork. GitHub rejects the push if the PR touches `.github/workflows/` and your token lacks the `workflow` scope; open a carrier PR from a branch in this repository instead.
+5. Comment in English, then remove the worktree.
+
+## Releasing
+
+A release is a version bump merged to `main`. All installs read `main`: `npx skills update` takes the latest commit, and `claude plugin update` only updates when the version changes.
+
+1. `npm run release -- <x.y.z>` writes the version to all five manifests and rebuilds the bundle. `test/install.test.js` checks that they agree.
+2. Run `npm test` and `npm run smoke:install`, then open and merge a `chore: release <x.y.z>` PR.
+3. Tag the merge commit and publish the GitHub Release:
+   `git tag -a v<x.y.z> <sha> -m v<x.y.z> && git push origin v<x.y.z> && gh release create v<x.y.z> --verify-tag --notes-file <notes>`.

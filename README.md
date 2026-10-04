@@ -354,7 +354,10 @@ npm test          # run the tests
 AM_E2E=1 npm test # also run end-to-end video tests (system TTS, Chrome, ffmpeg)
 npm run smoke:install # install for real with npx skills and validate the plugin manifests (needs network)
 npm run build     # after changing src/, rebuild skills/answer-me-with-html/scripts/am.mjs
+npm run snapshot  # compare rendered HTML with origin/main (refactors must not change it)
 ```
+
+Maintainer conventions (generated bundle, page format, snapshot checks, reviewing PRs, releasing) are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 There are two runtime dependencies: [marked](https://github.com/markedjs/marked) parses Markdown and [@dagrejs/dagre](https://github.com/dagrejs/dagre) lays out flow charts. Both are bundled into `am.mjs`.
 

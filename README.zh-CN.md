@@ -354,7 +354,10 @@ npm test          # 跑测试
 AM_E2E=1 npm test # 连同视频端到端测试一起跑（需要系统 TTS、Chrome、ffmpeg）
 npm run smoke:install # 用 npx skills 真实安装一次，并校验插件清单（需要联网）
 npm run build     # 改了 src/ 之后，重新打包 skills/answer-me-with-html/scripts/am.mjs
+npm run snapshot  # 与 origin/main 对比生成的 HTML（重构不能改变它）
 ```
+
+维护约定（生成的打包文件、页面格式、快照比对、审 PR、发版）见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 运行时依赖只有两个：[marked](https://github.com/markedjs/marked) 负责解析 Markdown，[@dagrejs/dagre](https://github.com/dagrejs/dagre) 负责流程图布局。打包时它们会被一起打进 `am.mjs`。
 
