@@ -20,7 +20,8 @@
 
   const copyBtn = document.querySelector('[data-am="copy"]');
   copyBtn?.addEventListener('click', async () => {
-    const text = document.getElementById('am-source').value;
+    const nodes = document.querySelectorAll('#am-source');
+    const text = nodes[nodes.length - 1]?.value ?? '';
     try {
       await navigator.clipboard.writeText(text);
     } catch {

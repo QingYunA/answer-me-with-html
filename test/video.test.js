@@ -267,6 +267,36 @@ test('cli video: 配音方式写在输出里；无效 voice 报错', async () =>
   assert.match(bad.err, /voice 的值 "robot" 无效/);
 });
 
+test('cli patch: 视频页改一幕后仍是视频页', async () => {
+  const vid = `---
+title: 补丁视频
+---
+## 第一幕
+- 旧画面
+> 旧旁白。
+
+## 第二幕
+- 保留
+> 第二句。
+`;
+  const made = await run(['video', '-', '-o', 'vid.html', '--voice', 'off'], { stdin: vid });
+  assert.equal(made.code, 0, made.err);
+  const before = readFileSync(join(dir, 'vid.html'), 'utf8');
+  assert.match(before, /\sdata-video/);
+  assert.match(before, /class="amv-scene/);
+
+  const patched = await run(['patch', 'vid.html', '--panel', '第一幕'], {
+    stdin: '## 第一幕\n- 新画面\n> 新旁白。\n',
+  });
+  assert.equal(patched.code, 0, patched.err);
+  const after = readFileSync(join(dir, 'vid.html'), 'utf8');
+  assert.match(after, /\sdata-video/);
+  assert.match(after, /class="amv-scene/);
+  assert.match(after, /新画面|新旁白/);
+  assert.doesNotMatch(after, /<main class="am-(sheet|doc)/);
+  assert.doesNotMatch(after, /旧画面/);
+});
+
 test('cli help video / config voice', async () => {
   assert.match((await run(['help', 'video'])).out, /视频稿格式/);
   const set = await run(['config', 'set', 'voice', 'off']);
