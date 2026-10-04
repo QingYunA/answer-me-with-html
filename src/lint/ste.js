@@ -5,7 +5,7 @@
 
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES } from './wordlist.zh.js';
-import { isCJK, KANA_RE } from '../svg/text.js';
+import { isCJK, isJapanese } from '../svg/text.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
 const MAX_SENTENCES = 6;
@@ -94,7 +94,7 @@ function lintMarkdown(text, startLine, out) {
 // 检查一段文字（列表项 / 单元格 / 段落中的一行），返回句子数。
 function checkUnit(text, line, kind, out) {
   const sentences = splitSentences(text);
-  const ja = KANA_RE.test(text);
+  const ja = isJapanese(text);
   for (const s of sentences) {
     const { lang, count } = sentenceLength(s);
     const limit = LIMITS[lang][kind];
@@ -113,7 +113,7 @@ function checkUnit(text, line, kind, out) {
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {
-    if (KANA_RE.test(s)) continue;
+    if (isJapanese(s)) continue;
     if ((s.match(/的/g) ?? []).length >= 3) out.push({ line, rule: 'de-chain', message: `"的"字连用：${s}`, suggestion: '拆句或删去多余的"的"' });
   }
   for (const c of ja ? [] : ZH_CLICHES) {

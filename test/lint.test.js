@@ -91,3 +91,10 @@ test('formatWarning: 行号 + 规则 + 信息 + 建议', () => {
   const s = formatWarning({ line: 4, rule: 'word', message: '不推荐 "utilize"', suggestion: 'use' });
   assert.equal(s, 'L4 [word] 不推荐 "utilize" → use');
 });
+
+test('中文句子里夹一个片假名词，仍按中文规则检查', async () => {
+  const { lintDoc } = await import('../src/lint/ste.js');
+  const { parseDoc } = await import('../src/parse.js');
+  const w = lintDoc(parseDoc('## A\n我们的团队的项目的《ワンピース》很重要。\n'));
+  assert.ok(w.some((x) => x.rule === 'de-chain'));
+});

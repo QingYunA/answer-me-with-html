@@ -152,3 +152,16 @@ test('sheet: 自动拉宽体现在渲染结果里', () => {
   const { html } = renderDoc('---\ncols: 2\n---\n## A {span=2}\nx\n## B\ny\n## C {span=2}\nz');
   assert.match(html, /id="panel-B" style="grid-column: span 2"/);
 });
+
+test('detectLang: 中文里引用一个片假名词仍判为中文；假名占比高时判为日文', async () => {
+  const { detectLang } = await import('../src/render.js');
+  assert.equal(detectLang('这部动画叫《ワンピース》，讲的是海贼的故事，主角想成为海贼王。'), 'zh');
+  assert.equal(detectLang('基本的には具体的で効果的な手順を説明します。'), 'ja');
+});
+
+test('isJapanese: 只有片假名的中文短句不算日文；带平假名的日文短句算', async () => {
+  const { isJapanese } = await import('../src/svg/text.js');
+  assert.equal(isJapanese('我们的项目的《ワンピース》很重要。'), false);
+  assert.equal(isJapanese('今日は天気がいいです。'), true);
+  assert.equal(isJapanese('東京へ行く。'), true);
+});

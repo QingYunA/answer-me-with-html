@@ -6,7 +6,7 @@ import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
 import { lintDoc } from './lint/ste.js';
-import { esc, isCJK, KANA_RE } from './svg/text.js';
+import { esc, isCJK, isJapanese } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
 
 
@@ -59,7 +59,7 @@ export function detectLang(text) {
     else if (/[a-z]/i.test(ch)) latin++;
   }
   if (cjk * 3 < latin) return 'en';
-  return KANA_RE.test(String(text)) ? 'ja' : 'zh';
+  return isJapanese(text) ? 'ja' : 'zh';
 }
 
 export function renderDoc(source, overrides = {}, defaults = {}) {

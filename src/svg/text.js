@@ -5,8 +5,22 @@ const CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 const NARROW = new Set([...'iljtfrI.,:;|!\'`()[]{}']);
 const WIDE = new Set([...'mwMWOQGD@%&']);
 
-// 平假名、片假名只出现在日文里，中文稿件不会有。
+// 平假名、片假名。
 export const KANA_RE = /[\u3040-\u30ff]/;
+// 判断日文看平假名：日文句子几乎都带平假名助词与词尾（の、は、を、です），
+// 中文引用外来词时出现的基本只有片假名（如《ワンピース》），不能据此判为日文。
+const HIRAGANA_RE = /[\u3040-\u309f]/;
+const HIRAGANA_SHARE = 0.05; // 片假名为主的日文短标题（TCP の3ウェイ…）也能认出
+
+export function isJapanese(text) {
+  let hira = 0;
+  let cjk = 0;
+  for (const ch of String(text)) {
+    if (HIRAGANA_RE.test(ch)) hira++;
+    if (CJK_RE.test(ch)) cjk++;
+  }
+  return hira > 0 && hira / cjk >= HIRAGANA_SHARE;
+}
 
 export function isCJK(ch) {
   return CJK_RE.test(ch);
