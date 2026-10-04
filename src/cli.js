@@ -229,6 +229,7 @@ const PATCH_HELP = `原地替换已渲染页面中的一个面板
 - --panel 匹配 ## 小节的标题、字母 ID，或 "ID 标题"。
 - 新稿件从 stdin 或 --from / 第二个文件参数读取：可带 ## 标题，也可只写面板正文。
 - 用现有 renderer 重渲后覆盖同一个 HTML 路径，不另写带时间戳的新文件。
+- 沿用原页面的模板、主题、明暗和 STE style（生成时记在页面根标签上）。之后改了配置，旧页面 patch 不会跟随；要换就加 --theme / --mode / --style。
 - 找不到该面板，或页面没有 #am-source，退出码非 0 且不改文件。`;
 
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {

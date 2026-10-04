@@ -262,17 +262,17 @@ Utilize the tool.
 保留。
 `;
 
-test('cli patch: 沿用页面 data-style，不回落到配置 strict', async () => {
+test('cli patch: 沿用页面 data-style，不回落到配置 strict', async (t) => {
   assert.equal((await run(['render', '-', '-o', 'style-off.html', '--style', 'off'], { stdin: STE_BAD })).code, 0);
   assert.match(readFileSync(join(dir, 'style-off.html'), 'utf8'), /data-style="off"/);
   assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  t.after(() => run(['config', 'reset', 'style']));
   const r = await run(['patch', 'style-off.html', '--panel', '乙'], { stdin: '新文。\n' });
   assert.equal(r.code, 0, r.err);
   const html = readFileSync(join(dir, 'style-off.html'), 'utf8');
   assert.match(html, /data-style="off"/);
   assert.match(html, /新文/);
   assert.match(html, /Utilize the tool/);
-  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
 });
 
 test('cli patch: 本次 --style 优先于页面记录的 style', async () => {
@@ -284,7 +284,7 @@ test('cli patch: 本次 --style 优先于页面记录的 style', async () => {
   assert.equal(readFileSync(join(dir, 'style-cli.html'), 'utf8'), before, 'strict 失败时不得改文件');
 });
 
-test('cli patch: 旧页没有 data-style 时，frontmatter style 仍优先于配置', async () => {
+test('cli patch: 旧页没有 data-style 时，frontmatter style 仍优先于配置', async (t) => {
   const src = `---
 title: 旧页
 style: off
@@ -301,12 +301,12 @@ Utilize the tool.
   writeFileSync(join(dir, 'old-style.html'), stripped);
   assert.doesNotMatch(stripped.match(/<html\b[^>]*>/)[0], /data-style/);
   assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  t.after(() => run(['config', 'reset', 'style']));
   const r = await run(['patch', 'old-style.html', '--panel', '乙'], { stdin: '新文。\n' });
   assert.equal(r.code, 0, r.err);
   const html = readFileSync(join(dir, 'old-style.html'), 'utf8');
   assert.match(html, /新文/);
   assert.match(html, /data-style="off"/);
-  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
 });
 
 test('cli patch: 正文假 data-video 不得把图纸页当成视频', async () => {
@@ -390,16 +390,16 @@ const VIDEO_STE_BAD = `## 甲
 > 第二句旁白。
 `;
 
-test('cli patch: 视频页同样沿用 data-style，不回落到配置 strict', async () => {
+test('cli patch: 视频页同样沿用 data-style，不回落到配置 strict', async (t) => {
   assert.equal((await run(['video', '-', '--voice', 'off', '--style', 'off', '-o', 'vstyle.html'], { stdin: VIDEO_STE_BAD })).code, 0);
   assert.match(readFileSync(join(dir, 'vstyle.html'), 'utf8'), /data-style="off"/);
   assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  t.after(() => run(['config', 'reset', 'style']));
   const r = await run(['patch', 'vstyle.html', '--panel', '乙', '--voice', 'off'], { stdin: '> 新旁白。\n- 新画面\n' });
   assert.equal(r.code, 0, r.err);
   const html = readFileSync(join(dir, 'vstyle.html'), 'utf8');
   assert.match(html, /data-style="off"/);
   assert.match(html, /新旁白|新画面/);
-  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
 });
 
 test('cli patch: 视频页本次 --style 优先于页面记录的 style', async () => {

@@ -101,7 +101,7 @@ node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" patch page.html --panel "面板标题"
 AM_EOF
 ````
 
-`--panel` 匹配标题、字母 ID 或 `ID 标题`。找不到该面板或页面没有 `#am-source` 时不要改文件。完整用法：`am help patch`。
+`--panel` 匹配标题、字母 ID 或 `ID 标题`。找不到该面板或页面没有 `#am-source` 时不要改文件。patch 沿用原页面的主题、明暗和 STE style；要换就加 `--theme` / `--mode` / `--style`。完整用法：`am help patch`。
 
 ## 3. 稿件格式速查
 
