@@ -202,3 +202,11 @@ test('isJapanese: 只有片假名的中文短句不算日文；带平假名的�
   assert.equal(isJapanese('今日は天気がいいです。'), true);
   assert.equal(isJapanese('東京へ行く。'), true);
 });
+
+test('表格：右对齐 / 居中列的表头跟随 align，不被 th 的默认左对齐压掉（#28）', () => {
+  const { html } = renderDoc('## A\n| 名 | 数 | 中 |\n| :--- | ---: | :---: |\n| a | 1 | x |\n');
+  assert.match(html, /<th align="right">数<\/th>/);
+  assert.match(html, /<th align="center">中<\/th>/);
+  assert.match(html, /\.am-md th\[align="right"\] \{ text-align: right; \}/);
+  assert.match(html, /\.am-md th\[align="center"\] \{ text-align: center; \}/);
+});

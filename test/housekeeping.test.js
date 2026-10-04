@@ -58,36 +58,67 @@ test('clean: --dry-run 不删除；--all 删除全部页面和视频', () => {
   assert.ok(!existsSync(fresh));
 });
 
-for (const dir of ['pages', 'videos', 'cache']) {
-  test(`usage / clean: 跳过 ${dir} 根目录软链接，保留外部文件`, () => {
-    const outside = mkdtempSync(join(tmpdir(), 'am-hk-outside-'));
-    try {
-      const target = join(outside, 'nested', 'keep.txt');
-      mkdirSync(join(outside, 'nested'));
-      writeFileSync(target, '外部文件');
-      const old = (NOW - 40 * DAY) / 1000;
-      utimesSync(target, old, old);
-      const link = join(home, dir);
-      symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
-      const normalDir = dir === 'pages' ? 'videos' : 'pages';
-      const normal = file(`${normalDir}/old.html`, 10, 40);
+const ROOTS = ['pages', 'videos', 'cache'];
+const otherRoot = (dir) => (dir === 'pages' ? 'videos' : 'pages');
+const skipWin = process.platform === 'win32' ? 'Windows 创建文件软链接需要特权' : false;
 
-      assert.deepEqual(usage(home)[dir], { count: 0, bytes: 0 });
-      assert.equal(usage(home).total, 10, '正常目录继续统计');
-      for (const all of [false, true]) {
-        assert.deepEqual(clean(home, { all, dryRun: true, now: NOW }), { files: 1, bytes: 10 });
-        assert.equal(readFileSync(target, 'utf8'), '外部文件');
-        assert.ok(existsSync(normal), 'dry-run 保留正常目录文件');
-      }
-      assert.equal(readState(home).lastClean, undefined, 'dry-run 不改变清理状态');
-      assert.deepEqual(clean(home, { now: NOW }), { files: 1, bytes: 10 });
-      assert.ok(!existsSync(normal), '正常目录继续按年龄清理');
-      assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 0, bytes: 0 });
+// 外部目录里放一个 40 天前的文件，再把 home/<dir> 换成指向它的软链接（Windows 用 junction）。测试结束自动删除外部目录。
+function linkRoot(t, dir) {
+  const outside = mkdtempSync(join(tmpdir(), 'am-hk-outside-'));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  const target = join(outside, 'nested', 'keep.txt');
+  mkdirSync(join(outside, 'nested'));
+  writeFileSync(target, '外部文件');
+  const old = (NOW - 40 * DAY) / 1000;
+  utimesSync(target, old, old);
+  const link = join(home, dir);
+  symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+  return { target, link };
+}
+
+for (const dir of ROOTS) {
+  test(`usage: 跳过 ${dir} 根目录软链接，正常目录继续统计`, (t) => {
+    linkRoot(t, dir);
+    file(`${otherRoot(dir)}/old.html`, 10, 40);
+    assert.deepEqual(usage(home)[dir], { count: 0, bytes: 0 });
+    assert.equal(usage(home).total, 10);
+  });
+
+  test(`clean: 跳过 ${dir} 根目录软链接，保留外部文件和链接`, (t) => {
+    const { target, link } = linkRoot(t, dir);
+    const normal = file(`${otherRoot(dir)}/old.html`, 10, 40);
+    for (const all of [false, true]) {
+      assert.deepEqual(clean(home, { all, dryRun: true, now: NOW }), { files: 1, bytes: 10 });
       assert.equal(readFileSync(target, 'utf8'), '外部文件');
-      assert.ok(lstatSync(link).isSymbolicLink(), '清理保留链接本身');
-    } finally {
-      rmSync(outside, { recursive: true, force: true });
+      assert.ok(existsSync(normal), 'dry-run 保留正常目录文件');
     }
+    assert.equal(readState(home).lastClean, undefined, 'dry-run 不改变清理状态');
+    assert.deepEqual(clean(home, { now: NOW }), { files: 1, bytes: 10 });
+    assert.ok(!existsSync(normal), '正常目录继续按年龄清理');
+    assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 0, bytes: 0 });
+    assert.equal(readFileSync(target, 'utf8'), '外部文件');
+    assert.ok(lstatSync(link).isSymbolicLink(), '清理保留链接本身');
+  });
+
+  test(`usage / clean: ${dir} 根目录是悬空软链接时不抛错，保留链接`, { skip: skipWin }, () => {
+    const link = join(home, dir);
+    symlinkSync(join(home, 'nowhere'), link);
+    assert.deepEqual(usage(home)[dir], { count: 0, bytes: 0 });
+    assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 0, bytes: 0 });
+    assert.ok(lstatSync(link).isSymbolicLink(), '清理保留链接本身');
+  });
+
+  test(`usage / clean: ${dir} 根目录是指向普通文件的软链接时跳过，保留该文件`, { skip: skipWin }, (t) => {
+    const outside = mkdtempSync(join(tmpdir(), 'am-hk-outside-'));
+    t.after(() => rmSync(outside, { recursive: true, force: true }));
+    const target = join(outside, 'keep.txt');
+    writeFileSync(target, '外部文件');
+    const old = (NOW - 40 * DAY) / 1000;
+    utimesSync(target, old, old);
+    symlinkSync(target, join(home, dir));
+    assert.deepEqual(usage(home)[dir], { count: 0, bytes: 0 });
+    assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 0, bytes: 0 });
+    assert.equal(readFileSync(target, 'utf8'), '外部文件');
   });
 }
 
@@ -251,8 +282,7 @@ test('readState / writeState: 坏文件当作空状态；写入后不留临时�
   assert.deepEqual(readdirSync(home).filter((f) => f.startsWith('state')), ['state.json']);
 });
 
-test('usage / clean: 跳过悬空软链接，不抛错', async () => {
-  const { symlinkSync } = await import('node:fs');
+test('usage / clean: 跳过悬空软链接，不抛错', () => {
   file('pages/a.html', 10, 40);
   symlinkSync(join(home, 'nowhere'), join(home, 'pages', 'dangling.html'));
   assert.equal(usage(home).pages.count, 1);
