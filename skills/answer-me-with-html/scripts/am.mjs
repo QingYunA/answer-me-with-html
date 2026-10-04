@@ -68,6 +68,15 @@ var CHOICES = Object.freeze({
   style: ["off", "80", "strict"],
   mode: ["auto", "light", "dark"]
 });
+function applyOverrides(meta, overrides, choices = CHOICES) {
+  const set = Object.entries(overrides).filter(([, v]) => v !== void 0);
+  for (const [key, value] of set) {
+    if (choices[key] && !choices[key].includes(String(value))) {
+      throw new ParseError(`${key} \u7684\u503C "${value}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${choices[key].join(" | ")}`, 0);
+    }
+  }
+  return { ...meta, ...Object.fromEntries(set) };
+}
 var DEFAULT_META = Object.freeze({
   template: "sheet",
   theme: "blueprint",
@@ -4649,14 +4658,8 @@ function detectLang(text) {
   return isJapanese(text) ? "ja" : "zh";
 }
 function renderDoc(source, overrides = {}, defaults2 = {}) {
-  const doc2 = parseDoc(source, { defaults: defaults2 });
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === void 0) continue;
-    if (CHOICES[key] && !CHOICES[key].includes(String(value))) {
-      throw new ParseError(`${key} \u7684\u503C "${value}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${CHOICES[key].join(" | ")}`, 0);
-    }
-    doc2.meta[key] = value;
-  }
+  const parsed = parseDoc(source, { defaults: defaults2 });
+  const doc2 = { ...parsed, meta: applyOverrides(parsed.meta, overrides) };
   if (doc2.meta.template === "video") throw new ParseError("template: video \u662F\u89C6\u9891\u7A3F\uFF0C\u8BF7\u7528 am video \u6E32\u67D3", 0);
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
@@ -5046,7 +5049,7 @@ var UI2 = {
 };
 async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress } = {}) {
   const video = parseVideo(source, { defaults: defaults2 });
-  const meta = applyOverrides(video.meta, overrides);
+  const meta = applyOverrides(video.meta, overrides, { ...CHOICES, theme: VIDEO_THEMES });
   const warnings = meta.style === "off" ? [] : lintDoc(video.doc).filter((w) => w.rule !== "paragraph-length");
   if (meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const beats = allBeats(video);
@@ -5059,16 +5062,6 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const lang = meta.lang || detectLang(source);
   const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, source });
   return { html, wav: wav2, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
-}
-function applyOverrides(meta, overrides) {
-  const allowed = { ...CHOICES, theme: VIDEO_THEMES };
-  const set = Object.entries(overrides).filter(([, v]) => v !== void 0);
-  for (const [key, value] of set) {
-    if (allowed[key] && !allowed[key].includes(String(value))) {
-      throw new ParseError(`${key} \u7684\u503C "${value}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${allowed[key].join(" | ")}`, 0);
-    }
-  }
-  return { ...meta, ...Object.fromEntries(set) };
 }
 async function voiceBeats(beats, provider, cacheDir, onProgress) {
   if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
@@ -5560,7 +5553,7 @@ var CONFIG_KEYS = Object.freeze({
   mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "\u9ED8\u8BA4\u660E\u6697\u6A21\u5F0F" },
   style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE \u5199\u4F5C\u68C0\u67E5\u4E25\u683C\u5EA6" },
   update_check: { type: "bool", default: true, label: "\u6BCF\u5468\u5728\u540E\u53F0\u68C0\u67E5\u4E00\u6B21\u65B0\u7248\u672C\uFF0C\u6709\u65B0\u7248\u672C\u65F6\u63D0\u793A\uFF08\u4E0D\u4F1A\u81EA\u52A8\u66F4\u65B0\uFF09" },
-  voice: { type: "enum", choices: ["auto", "elevenlabs", "system", "off"], default: "auto", label: "\u89C6\u9891\u65C1\u767D\u914D\u97F3\uFF08auto\uFF1A\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF09" }
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "\u89C6\u9891\u65C1\u767D\u914D\u97F3\uFF08auto\uFF1A\u6709 ELEVENLABS_API_KEY \u7528 ElevenLabs\uFF0C\u5426\u5219\u7528\u7CFB\u7EDF TTS\uFF09" }
 });
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
@@ -5950,10 +5943,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   try {
     if (video) {
       const voice = opts.voice ?? (page.voiced ? config.values.voice : "off");
-      if (!VOICES.includes(voice)) {
-        fail(`\u2717 voice \u7684\u503C "${voice}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${VOICES.join(" | ")}`);
-        return 2;
-      }
+      if (!validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
       result = renderDoc(patched, overrides, { theme, mode, style });
@@ -5972,10 +5962,7 @@ async function cmdVideo(src, opts, ctx) {
   const { fail } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
-  if (!VOICES.includes(voice)) {
-    fail(`\u2717 voice \u7684\u503C "${voice}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${VOICES.join(" | ")}`);
-    return 2;
-  }
+  if (!validVoice(voice, fail)) return 2;
   let result;
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
@@ -5988,6 +5975,11 @@ async function cmdVideo(src, opts, ctx) {
   emit(result, file, ctx);
   if (opts.mp4 && !await exportVideoMp4(file, result.wav, ctx)) return 1;
   return finish(file, opts, config, ctx);
+}
+function validVoice(voice, fail) {
+  if (VOICES.includes(voice)) return true;
+  fail(`\u2717 voice \u7684\u503C "${voice}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${VOICES.join(" | ")}`);
+  return false;
 }
 async function buildVideo(src, voice, opts, config, { fail, env, io }) {
   const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);

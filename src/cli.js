@@ -286,10 +286,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     if (video) {
       // 原页用 --voice off 出的无声视频，patch 时不要按配置重配音，除非用户显式传 --voice。
       const voice = opts.voice ?? (page.voiced ? config.values.voice : 'off');
-      if (!VOICES.includes(voice)) {
-        fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
-        return 2;
-      }
+      if (!validVoice(voice, fail)) return 2;
       // 视频页同样沿用原页面的主题、明暗与 STE 严格度（例如 3b1b / --style off），本次命令行参数优先。
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
@@ -310,10 +307,7 @@ async function cmdVideo(src, opts, ctx) {
   const { fail } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
-  if (!VOICES.includes(voice)) {
-    fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
-    return 2;
-  }
+  if (!validVoice(voice, fail)) return 2;
   let result;
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
@@ -326,6 +320,12 @@ async function cmdVideo(src, opts, ctx) {
   emit(result, file, ctx);
   if (opts.mp4 && !(await exportVideoMp4(file, result.wav, ctx))) return 1;
   return finish(file, opts, config, ctx);
+}
+
+function validVoice(voice, fail) {
+  if (VOICES.includes(voice)) return true;
+  fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
+  return false;
 }
 
 async function buildVideo(src, voice, opts, config, { fail, env, io }) {

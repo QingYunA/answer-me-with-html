@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDoc, ParseError } from '../src/parse.js';
+import { parseDoc, ParseError, applyOverrides } from '../src/parse.js';
 
 const SAMPLE = `---
 template: sheet
@@ -113,4 +113,11 @@ test('CRLF 换行也能正确解析', () => {
   const doc = parseDoc('---\r\ntitle: T\r\n---\r\n## A\r\n内容\r\n');
   assert.equal(doc.meta.title, 'T');
   assert.equal(doc.panels[0].blocks[0].text.trim(), '内容');
+});
+
+test('applyOverrides: 校验取值、忽略 undefined、返回新对象', () => {
+  const meta = Object.freeze({ theme: 'blueprint', mode: 'auto', title: 'T' });
+  assert.deepEqual(applyOverrides(meta, { theme: 'shadcn', mode: undefined }), { theme: 'shadcn', mode: 'auto', title: 'T' });
+  assert.throws(() => applyOverrides(meta, { theme: '3b1b' }), /theme 的值 "3b1b" 无效/);
+  assert.equal(applyOverrides(meta, { theme: '3b1b' }, { theme: ['3b1b'] }).theme, '3b1b');
 });

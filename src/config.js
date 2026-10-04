@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { CHOICES } from './parse.js';
+import { VOICES } from './video/tts.js';
 
 export class ConfigError extends Error {
   constructor(message) {
@@ -20,7 +21,7 @@ export const CONFIG_KEYS = Object.freeze({
   mode: { type: 'enum', choices: CHOICES.mode, default: 'auto', label: '默认明暗模式' },
   style: { type: 'enum', choices: CHOICES.style, default: '80', label: 'STE 写作检查严格度' },
   update_check: { type: 'bool', default: true, label: '每周在后台检查一次新版本，有新版本时提示（不会自动更新）' },
-  voice: { type: 'enum', choices: ['auto', 'elevenlabs', 'system', 'off'], default: 'auto', label: '视频旁白配音（auto：有 ELEVENLABS_API_KEY 用 ElevenLabs，否则用系统 TTS）' },
+  voice: { type: 'enum', choices: VOICES, default: 'auto', label: '视频旁白配音（auto：有 ELEVENLABS_API_KEY 用 ElevenLabs，否则用系统 TTS）' },
 });
 
 const TRUE = new Set(['on', 'true', 'yes', '1', '开', '开启', '打开']);

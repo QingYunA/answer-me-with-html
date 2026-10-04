@@ -16,6 +16,17 @@ export const CHOICES = Object.freeze({
   mode: ['auto', 'light', 'dark'],
 });
 
+// 命令行参数覆盖稿件与配置里的设置：校验取值，返回新的 meta，不改动原对象。值为 undefined 的键忽略。
+export function applyOverrides(meta, overrides, choices = CHOICES) {
+  const set = Object.entries(overrides).filter(([, v]) => v !== undefined);
+  for (const [key, value] of set) {
+    if (choices[key] && !choices[key].includes(String(value))) {
+      throw new ParseError(`${key} 的值 "${value}" 无效，可选：${choices[key].join(' | ')}`, 0);
+    }
+  }
+  return { ...meta, ...Object.fromEntries(set) };
+}
+
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
   theme: 'blueprint',

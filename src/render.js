@@ -1,6 +1,6 @@
 // 稿件 → 单文件 HTML。流程：parse → STE lint → 渲染面板（markdown / 组件 / raw）→ 套模板 → 内联 CSS 与运行时。
 
-import { parseDoc, ParseError, CHOICES } from './parse.js';
+import { parseDoc, ParseError, applyOverrides } from './parse.js';
 import { md } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
@@ -64,14 +64,8 @@ export function detectLang(text) {
 }
 
 export function renderDoc(source, overrides = {}, defaults = {}) {
-  const doc = parseDoc(source, { defaults });
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === undefined) continue;
-    if (CHOICES[key] && !CHOICES[key].includes(String(value))) {
-      throw new ParseError(`${key} 的值 "${value}" 无效，可选：${CHOICES[key].join(' | ')}`, 0);
-    }
-    doc.meta[key] = value;
-  }
+  const parsed = parseDoc(source, { defaults });
+  const doc = { ...parsed, meta: applyOverrides(parsed.meta, overrides) };
   if (doc.meta.template === 'video') throw new ParseError('template: video 是视频稿，请用 am video 渲染', 0);
 
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc);

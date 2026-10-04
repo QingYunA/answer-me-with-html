@@ -7,7 +7,7 @@ import { esc } from '../svg/text.js';
 import { VERSION, VIDEO_CSS, VIDEO_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats, VIDEO_THEMES } from './script.js';
-import { CHOICES, ParseError } from '../parse.js';
+import { CHOICES, applyOverrides } from '../parse.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 
 const UI = {
@@ -19,7 +19,7 @@ const UI = {
 // provider 为 null 时只出字幕，时长按字数估算。
 export async function renderVideo(source, { provider = null, cacheDir, defaults = {}, overrides = {}, onProgress } = {}) {
   const video = parseVideo(source, { defaults });
-  const meta = applyOverrides(video.meta, overrides);
+  const meta = applyOverrides(video.meta, overrides, { ...CHOICES, theme: VIDEO_THEMES });
 
   // 旁白每行是一拍，连续多行不算"超长段落"。
   const warnings = meta.style === 'off' ? [] : lintDoc(video.doc).filter((w) => w.rule !== 'paragraph-length');
@@ -36,18 +36,6 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const lang = meta.lang || detectLang(source);
   const html = shell({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav, source });
   return { html, wav, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
-}
-
-// 命令行参数优先于稿件与配置；返回新的 meta，不改动原对象。
-function applyOverrides(meta, overrides) {
-  const allowed = { ...CHOICES, theme: VIDEO_THEMES };
-  const set = Object.entries(overrides).filter(([, v]) => v !== undefined);
-  for (const [key, value] of set) {
-    if (allowed[key] && !allowed[key].includes(String(value))) {
-      throw new ParseError(`${key} 的值 "${value}" 无效，可选：${allowed[key].join(' | ')}`, 0);
-    }
-  }
-  return { ...meta, ...Object.fromEntries(set) };
 }
 
 // 有配音时每拍时长取音频长度；否则按字数估算。
