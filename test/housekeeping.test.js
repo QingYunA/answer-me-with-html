@@ -1,6 +1,6 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, existsSync, readFileSync, symlinkSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -57,6 +57,39 @@ test('clean: --dry-run 不删除；--all 删除全部页面和视频', () => {
   clean(home, { all: true, now: NOW });
   assert.ok(!existsSync(fresh));
 });
+
+for (const dir of ['pages', 'videos', 'cache']) {
+  test(`usage / clean: 跳过 ${dir} 根目录软链接，保留外部文件`, () => {
+    const outside = mkdtempSync(join(tmpdir(), 'am-hk-outside-'));
+    try {
+      const target = join(outside, 'nested', 'keep.txt');
+      mkdirSync(join(outside, 'nested'));
+      writeFileSync(target, '外部文件');
+      const old = (NOW - 40 * DAY) / 1000;
+      utimesSync(target, old, old);
+      const link = join(home, dir);
+      symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+      const normalDir = dir === 'pages' ? 'videos' : 'pages';
+      const normal = file(`${normalDir}/old.html`, 10, 40);
+
+      assert.deepEqual(usage(home)[dir], { count: 0, bytes: 0 });
+      assert.equal(usage(home).total, 10, '正常目录继续统计');
+      for (const all of [false, true]) {
+        assert.deepEqual(clean(home, { all, dryRun: true, now: NOW }), { files: 1, bytes: 10 });
+        assert.equal(readFileSync(target, 'utf8'), '外部文件');
+        assert.ok(existsSync(normal), 'dry-run 保留正常目录文件');
+      }
+      assert.equal(readState(home).lastClean, undefined, 'dry-run 不改变清理状态');
+      assert.deepEqual(clean(home, { now: NOW }), { files: 1, bytes: 10 });
+      assert.ok(!existsSync(normal), '正常目录继续按年龄清理');
+      assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 0, bytes: 0 });
+      assert.equal(readFileSync(target, 'utf8'), '外部文件');
+      assert.ok(lstatSync(link).isSymbolicLink(), '清理保留链接本身');
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+}
 
 test('cleanHint: 超过 200 MB 或久未清理且超过 20 MB 时提示，7 天内不重复', () => {
   const use = (total) => ({ total, pages: { count: 1, bytes: 0 }, videos: { count: 0, bytes: total }, cache: { bytes: 0 } });

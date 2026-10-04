@@ -5344,7 +5344,7 @@ function connect(url) {
 }
 
 // src/housekeeping.js
-import { readdirSync, lstatSync, rmSync as rmSync3, existsSync as existsSync3 } from "node:fs";
+import { readdirSync, lstatSync, rmSync as rmSync3 } from "node:fs";
 import { join as join4 } from "node:path";
 
 // src/state.js
@@ -5445,8 +5445,14 @@ var CLEAN = Object.freeze({
 });
 var DIRS2 = ["pages", "videos", "cache"];
 function walk(dir) {
-  if (!existsSync3(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  let entries;
+  try {
+    if (!lstatSync(dir).isDirectory()) return [];
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.flatMap((e) => {
     const p = join4(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
@@ -5508,7 +5514,7 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
 }
 
 // src/config.js
-import { readFileSync as readFileSync3, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync4 } from "node:fs";
+import { readFileSync as readFileSync3, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync3 } from "node:fs";
 import { homedir } from "node:os";
 import { join as join5, dirname } from "node:path";
 var ConfigError = class extends Error {
@@ -5551,7 +5557,7 @@ function coerce2(key, raw) {
 }
 function readStored(env) {
   const file = configPath(env);
-  if (!existsSync4(file)) return { stored: {} };
+  if (!existsSync3(file)) return { stored: {} };
   try {
     const data = JSON.parse(readFileSync3(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };

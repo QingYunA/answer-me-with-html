@@ -1,6 +1,6 @@
 // 数据目录维护：用量统计、am clean、清理提示；渲染后汇总清理与更新两类提示。
 // 提示只打印给 Agent 看（以 "! " 开头的一行），由 Agent 询问用户要不要处理；CLI 从不自动删除。
-import { readdirSync, lstatSync, rmSync, existsSync } from 'node:fs';
+import { readdirSync, lstatSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
@@ -16,8 +16,15 @@ const DIRS = ['pages', 'videos', 'cache'];
 
 // 列出目录下的普通文件。软链接、读不了的条目直接跳过，统计不因个别文件出错而失败。
 function walk(dir) {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  let entries;
+  try {
+    // 根入口也可能是软链接；lstat 不跟随链接，避免清理目标目录里的外部文件。
+    if (!lstatSync(dir).isDirectory()) return [];
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.flatMap((e) => {
     const p = join(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
