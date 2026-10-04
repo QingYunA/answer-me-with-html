@@ -65,7 +65,11 @@ export function themeCss() {
 }
 
 // [data-theme][data-mode] 让选择器比各主题（含视频的 3b1b）更具体，放在哪里都能生效。
-const JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { '--font-sans': JA_SANS, '--v-title-font': JA_SERIF });
+// 只有 3b1b 的视频标题用衬线体，其余主题的标题跟随 --head-font，所以衬线只覆盖 3b1b。
+const JA_FONT_CSS = [
+  block('html[lang="ja"][data-theme][data-mode]', { '--font-sans': JA_SANS }),
+  block('html[lang="ja"][data-theme="3b1b"][data-mode]', { '--v-title-font': JA_SERIF }),
+].join('\n');
 
 export function pageCss() {
   return `${themeCss()}\n\n${BASE_CSS}`;

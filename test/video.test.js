@@ -211,6 +211,18 @@ test('视频主题：默认 blueprint 浅色；稿件可写 3b1b；命令行参�
   assert.throws(() => renderDoc('---\ntheme: 3b1b\n---\n## A\n文字\n'), ParseError, '页面不支持 3b1b');
 });
 
+test('视频字体：日文 3b1b 标题用日文衬线体，其他主题的标题不被覆盖', async () => {
+  const JA = '## 概要\n> 接続は3回のやりとりで行う。\n';
+  const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${JA}`);
+  const rule = dark.html.match(/html\[lang="ja"\]\[data-theme="3b1b"\]\[data-mode\] \{[^}]*\}/)?.[0];
+  assert.ok(rule, '3b1b 有日文标题字体规则');
+  assert.ok(rule.indexOf('"Hiragino Mincho ProN"') < rule.indexOf('"Songti SC"'));
+  assert.doesNotMatch(rule, /--font-sans/, '衬线规则只管标题');
+  const generic = dark.html.match(/html\[lang="ja"\]\[data-theme\]\[data-mode\] \{[^}]*\}/)?.[0];
+  assert.ok(generic, '有通用日文字体规则');
+  assert.doesNotMatch(generic, /--v-title-font/, '通用规则不改标题字体');
+});
+
 test('renderDoc: template video 提示改用 am video', () => {
   assert.throws(() => renderDoc('---\ntemplate: video\n---\n## A\n文字\n'), (e) => e instanceof ParseError && /am video/.test(e.message));
 });

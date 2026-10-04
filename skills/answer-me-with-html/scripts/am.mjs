@@ -226,7 +226,7 @@ function coerce(key, value) {
   return value;
 }
 
-// node_modules/marked/lib/marked.esm.js
+// ../../../Users/mac/cyq/Code/开源/answer-me-with-html/node_modules/marked/lib/marked.esm.js
 function I() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -2098,7 +2098,7 @@ function layout({ participants: ps, steps }, { num, id }) {
   return `${svgOpen(width, height, `\u65F6\u5E8F\u56FE\uFF1A${ps.join("\u3001")}`)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
-// node_modules/@dagrejs/dagre/dist/dagre.esm.js
+// ../../../Users/mac/cyq/Code/开源/answer-me-with-html/node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
 var In = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Sn = (e, n) => {
@@ -4388,7 +4388,10 @@ ${block(`${sel}[data-mode="auto"]`, t.dark)}
 
 ${JA_FONT_CSS}`;
 }
-var JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { "--font-sans": JA_SANS, "--v-title-font": JA_SERIF });
+var JA_FONT_CSS = [
+  block('html[lang="ja"][data-theme][data-mode]', { "--font-sans": JA_SANS }),
+  block('html[lang="ja"][data-theme="3b1b"][data-mode]', { "--v-title-font": JA_SERIF })
+].join("\n");
 function pageCss() {
   return `${themeCss()}
 
