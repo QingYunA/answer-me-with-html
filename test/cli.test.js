@@ -43,6 +43,25 @@ test('cli render: 从 stdin 读取，写入 AM_HOME/pages，打印路径与统�
   assert.match(r.out, /STE ✓ 0 条警告/);
 });
 
+test('cli render: 默认文件名由注入的时钟决定；按配置调用注入的 open', async () => {
+  const opened = [];
+  const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const call = (args) => main(args, {
+    stdout: sink().stream, stderr: sink().stream, stdin: Readable.from([GOOD]),
+    env: { AM_HOME: dir, AM_NO_UPDATE_CHECK: '1' }, cwd: dir, now: () => now, open: (f) => opened.push(f),
+  });
+  assert.equal(await call(['render', '-']), 0);
+  assert.deepEqual(opened, [join(dir, 'pages', 'CLI-测试-20260102-030405.html')]);
+  assert.equal(await call(['render', '-', '--no-open']), 0);
+  assert.equal(opened.length, 1, '--no-open 时不打开');
+});
+
+test('cli video: 摘要行带主题', async () => {
+  const r = await run(['video', '-', '--voice', 'off', '--theme', 'shadcn'], { stdin: '---\ntitle: V\n---\n## A\n> 一句。\n' });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /video · shadcn · 1 场景 · 1 句旁白/);
+});
+
 test('cli render: 文件参数 + -o + 主题覆盖', async () => {
   writeFileSync(join(dir, 'in.md'), GOOD);
   const r = await run(['render', 'in.md', '-o', 'out/x.html', '--theme', 'shadcn']);

@@ -5862,7 +5862,7 @@ function shouldOpen(opts, env, config) {
   return config.open !== false;
 }
 function cmdRender(src, opts, ctx) {
-  const { print, fail, env } = ctx;
+  const { fail } = ctx;
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
@@ -5871,11 +5871,8 @@ function cmdRender(src, opts, ctx) {
   } catch (e) {
     return reportError(e, fail);
   }
-  const file = writeOutput(result.html, "pages", result.meta.title, opts, ctx);
-  const comps = Object.entries(result.stats.components).map(([k2, v]) => `${k2}\xD7${v}`).join(" ");
-  print(`\u2713 ${file}`);
-  print(`  ${result.meta.template} \xB7 ${result.meta.theme} \xB7 ${result.stats.panels} \u9762\u677F${comps ? ` \xB7 ${comps}` : ""}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  const file = outputPath("pages", result.meta.title, opts, ctx);
+  emit(result, file, ctx);
   return finish(file, opts, config, ctx);
 }
 var PATCH_HELP = `\u539F\u5730\u66FF\u6362\u5DF2\u6E32\u67D3\u9875\u9762\u4E2D\u7684\u4E00\u4E2A\u9762\u677F
@@ -5892,7 +5889,7 @@ var PATCH_HELP = `\u539F\u5730\u66FF\u6362\u5DF2\u6E32\u67D3\u9875\u9762\u4E2D\u
 - \u6CBF\u7528\u539F\u9875\u9762\u7684\u6A21\u677F\u3001\u4E3B\u9898\u3001\u660E\u6697\u548C STE style\uFF08\u751F\u6210\u65F6\u8BB0\u5728\u9875\u9762\u6839\u6807\u7B7E\u4E0A\uFF09\u3002\u4E4B\u540E\u6539\u4E86\u914D\u7F6E\uFF0C\u65E7\u9875\u9762 patch \u4E0D\u4F1A\u8DDF\u968F\uFF1B\u8981\u6362\u5C31\u52A0 --theme / --mode / --style\u3002
 - \u627E\u4E0D\u5230\u8BE5\u9762\u677F\uFF0C\u6216\u9875\u9762\u6CA1\u6709 #am-source\uFF0C\u9000\u51FA\u7801\u975E 0 \u4E14\u4E0D\u6539\u6587\u4EF6\u3002`;
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
-  const { print, fail, io } = ctx;
+  const { fail, io } = ctx;
   if (!htmlArg || htmlArg === "-") {
     fail(htmlArg ? "\u2717 patch \u9700\u8981\u5DF2\u6709 HTML \u6587\u4EF6\u8DEF\u5F84\uFF0C\u4E0D\u80FD\u4ECE stdin \u8BFB\u9875\u9762" : "\u2717 \u7F3A\u5C11 HTML \u6587\u4EF6\u8DEF\u5F84");
     return 2;
@@ -5960,15 +5957,11 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  writeFileSync5(file, result.html);
-  const comps = Object.entries(result.stats.components).map(([k2, v]) => `${k2}\xD7${v}`).join(" ");
-  print(`\u2713 ${file}`);
-  print(video ? `  video \xB7 ${result.meta.theme} \xB7 ${result.stats.panels} \u573A\u666F \xB7 ${result.beats} \u53E5\u65C1\u767D \xB7 ${result.duration.toFixed(1)}s \xB7 \u914D\u97F3\uFF1A${result.voiceName}\uFF08\u540C\u540D MP4 \u4E0D\u4F1A\u81EA\u52A8\u66F4\u65B0\uFF0C\u9700\u8981\u65F6\u7528 am video --mp4 \u91CD\u65B0\u5BFC\u51FA\uFF09` : `  ${result.meta.template} \xB7 ${result.meta.theme} \xB7 ${result.stats.panels} \u9762\u677F${comps ? ` \xB7 ${comps}` : ""}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  emit(result, file, ctx, video ? "\uFF08\u540C\u540D MP4 \u4E0D\u4F1A\u81EA\u52A8\u66F4\u65B0\uFF0C\u9700\u8981\u65F6\u7528 am video --mp4 \u91CD\u65B0\u5BFC\u51FA\uFF09" : "");
   return finish(file, opts, config, ctx);
 }
 async function cmdVideo(src, opts, ctx) {
-  const { print, fail } = ctx;
+  const { fail } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
   if (!VOICES.includes(voice)) {
@@ -5983,10 +5976,8 @@ async function cmdVideo(src, opts, ctx) {
     fail(`\u2717 \u914D\u97F3\u5931\u8D25\uFF1A${e.message}\u3002\u53EF\u52A0 --voice off \u53EA\u51FA\u5B57\u5E55`);
     return 1;
   }
-  const file = writeOutput(result.html, "videos", result.meta.title, opts, ctx);
-  print(`\u2713 ${file}`);
-  print(`  video \xB7 ${result.stats.panels} \u573A\u666F \xB7 ${result.beats} \u53E5\u65C1\u767D \xB7 ${result.duration.toFixed(1)}s \xB7 \u914D\u97F3\uFF1A${result.voiceName}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  const file = outputPath("videos", result.meta.title, opts, ctx);
+  emit(result, file, ctx);
   if (opts.mp4 && !await exportVideoMp4(file, result.wav, ctx)) return 1;
   return finish(file, opts, config, ctx);
 }
@@ -6019,15 +6010,28 @@ function loadConfig({ fail, env }) {
   if (config.warning) fail(`! ${config.warning}`);
   return config;
 }
-function writeOutput(html, dir, title, opts, { env, io }) {
-  const file = opts.out ? resolve(io.cwd ?? process.cwd(), opts.out) : join6(amHome(env), dir, `${slug(title)}-${stamp()}.html`);
+function outputPath(dir, title, opts, { env, io }) {
+  if (opts.out) return resolve(io.cwd ?? process.cwd(), opts.out);
+  return join6(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+}
+function emit(result, file, { print }, note = "") {
   mkdirSync4(dirname2(file), { recursive: true });
-  writeFileSync5(file, html);
-  return file;
+  writeFileSync5(file, result.html);
+  print(`\u2713 ${file}`);
+  print(`  ${summaryLine(result)}${note}`);
+  printWarnings(result.warnings, print, result.meta.style);
+}
+function summaryLine(result) {
+  const { meta, stats } = result;
+  if (result.beats !== void 0) {
+    return `video \xB7 ${meta.theme} \xB7 ${stats.panels} \u573A\u666F \xB7 ${result.beats} \u53E5\u65C1\u767D \xB7 ${result.duration.toFixed(1)}s \xB7 \u914D\u97F3\uFF1A${result.voiceName}`;
+  }
+  const comps = Object.entries(stats.components).map(([k2, v]) => `${k2}\xD7${v}`).join(" ");
+  return `${meta.template} \xB7 ${meta.theme} \xB7 ${stats.panels} \u9762\u677F${comps ? ` \xB7 ${comps}` : ""}`;
 }
 function finish(file, opts, config, ctx) {
   printHints(config, ctx);
-  if (shouldOpen(opts, ctx.env, config.values)) openFile(file);
+  if (shouldOpen(opts, ctx.env, config.values)) (ctx.io.open ?? openFile)(file);
   return 0;
 }
 function printHints(config, { env, io, print }) {
@@ -6173,7 +6177,7 @@ function slug(title) {
   const s = String(title || "page").trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
   return s || "page";
 }
-function stamp(d = /* @__PURE__ */ new Date()) {
+function stamp(d) {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }

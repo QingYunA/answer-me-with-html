@@ -201,7 +201,7 @@ export function shouldOpen(opts, env, config) {
 }
 
 function cmdRender(src, opts, ctx) {
-  const { print, fail, env } = ctx;
+  const { fail } = ctx;
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
@@ -210,11 +210,8 @@ function cmdRender(src, opts, ctx) {
   } catch (e) {
     return reportError(e, fail);
   }
-  const file = writeOutput(result.html, 'pages', result.meta.title, opts, ctx);
-  const comps = Object.entries(result.stats.components).map(([k, v]) => `${k}×${v}`).join(' ');
-  print(`✓ ${file}`);
-  print(`  ${result.meta.template} · ${result.meta.theme} · ${result.stats.panels} 面板${comps ? ` · ${comps}` : ''}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  const file = outputPath('pages', result.meta.title, opts, ctx);
+  emit(result, file, ctx);
   return finish(file, opts, config, ctx);
 }
 
@@ -233,7 +230,7 @@ const PATCH_HELP = `原地替换已渲染页面中的一个面板
 - 找不到该面板，或页面没有 #am-source，退出码非 0 且不改文件。`;
 
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
-  const { print, fail, io } = ctx;
+  const { fail, io } = ctx;
   if (!htmlArg || htmlArg === '-') {
     fail(htmlArg ? '✗ patch 需要已有 HTML 文件路径，不能从 stdin 读页面' : '✗ 缺少 HTML 文件路径');
     return 2;
@@ -305,18 +302,12 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  writeFileSync(file, result.html);
-  const comps = Object.entries(result.stats.components).map(([k, v]) => `${k}×${v}`).join(' ');
-  print(`✓ ${file}`);
-  print(video
-    ? `  video · ${result.meta.theme} · ${result.stats.panels} 场景 · ${result.beats} 句旁白 · ${result.duration.toFixed(1)}s · 配音：${result.voiceName}（同名 MP4 不会自动更新，需要时用 am video --mp4 重新导出）`
-    : `  ${result.meta.template} · ${result.meta.theme} · ${result.stats.panels} 面板${comps ? ` · ${comps}` : ''}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  emit(result, file, ctx, video ? '（同名 MP4 不会自动更新，需要时用 am video --mp4 重新导出）' : '');
   return finish(file, opts, config, ctx);
 }
 
 async function cmdVideo(src, opts, ctx) {
-  const { print, fail } = ctx;
+  const { fail } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
   if (!VOICES.includes(voice)) {
@@ -331,10 +322,8 @@ async function cmdVideo(src, opts, ctx) {
     fail(`✗ 配音失败：${e.message}。可加 --voice off 只出字幕`);
     return 1;
   }
-  const file = writeOutput(result.html, 'videos', result.meta.title, opts, ctx);
-  print(`✓ ${file}`);
-  print(`  video · ${result.stats.panels} 场景 · ${result.beats} 句旁白 · ${result.duration.toFixed(1)}s · 配音：${result.voiceName}`);
-  printWarnings(result.warnings, print, result.meta.style);
+  const file = outputPath('videos', result.meta.title, opts, ctx);
+  emit(result, file, ctx);
   if (opts.mp4 && !(await exportVideoMp4(file, result.wav, ctx))) return 1;
   return finish(file, opts, config, ctx);
 }
@@ -371,20 +360,34 @@ function loadConfig({ fail, env }) {
   return config;
 }
 
-// 写出页面：-o 指定时写到该路径，否则写进数据目录的 pages/ 或 videos/。
-function writeOutput(html, dir, title, opts, { env, io }) {
-  const file = opts.out
-    ? resolve(io.cwd ?? process.cwd(), opts.out)
-    : join(amHome(env), dir, `${slug(title)}-${stamp()}.html`);
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, html);
-  return file;
+// 输出路径：-o 指定时用该路径，否则放进数据目录的 pages/ 或 videos/。io.now 可注入时钟。
+function outputPath(dir, title, opts, { env, io }) {
+  if (opts.out) return resolve(io.cwd ?? process.cwd(), opts.out);
+  return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 
-// 渲染成功后的收尾：打印维护提示，按配置打开浏览器。
+// 写出页面，打印路径、一行摘要（note 接在摘要后）和写作警告。render / video / patch 共用。
+function emit(result, file, { print }, note = '') {
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, result.html);
+  print(`✓ ${file}`);
+  print(`  ${summaryLine(result)}${note}`);
+  printWarnings(result.warnings, print, result.meta.style);
+}
+
+function summaryLine(result) {
+  const { meta, stats } = result;
+  if (result.beats !== undefined) {
+    return `video · ${meta.theme} · ${stats.panels} 场景 · ${result.beats} 句旁白 · ${result.duration.toFixed(1)}s · 配音：${result.voiceName}`;
+  }
+  const comps = Object.entries(stats.components).map(([k, v]) => `${k}×${v}`).join(' ');
+  return `${meta.template} · ${meta.theme} · ${stats.panels} 面板${comps ? ` · ${comps}` : ''}`;
+}
+
+// 渲染成功后的收尾：打印维护提示，按配置打开浏览器。io.open 可注入打开方式。
 function finish(file, opts, config, ctx) {
   printHints(config, ctx);
-  if (shouldOpen(opts, ctx.env, config.values)) openFile(file);
+  if (shouldOpen(opts, ctx.env, config.values)) (ctx.io.open ?? openFile)(file);
   return 0;
 }
 
@@ -535,7 +538,7 @@ function slug(title) {
   return s || 'page';
 }
 
-function stamp(d = new Date()) {
+function stamp(d) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
