@@ -120,6 +120,15 @@ test('render: 日文稿件使用日文界面文案与 lang="ja"', () => {
   assert.doesNotMatch(html, /复制源稿/);
 });
 
+test('render: 日文页面的字体把日文字体排在中文字体前面', () => {
+  const { html } = renderDoc('# TCP の接続\n## A 概要\n接続は3回のやりとりで行う。');
+  const rule = html.match(/html\[lang="ja"\]\[data-theme\]\[data-mode\] \{[^}]*\}/)?.[0];
+  assert.ok(rule, '有日文字体规则');
+  const fonts = rule.match(/--font-sans: ([^;]*);/)[1];
+  assert.ok(fonts.indexOf('"Hiragino Sans"') < fonts.indexOf('"PingFang SC"'));
+  assert.ok(fonts.indexOf('"Yu Gothic"') < fonts.indexOf('"Microsoft YaHei"'));
+});
+
 test('render: 统计面板与组件数量', () => {
   const { stats } = renderDoc(SRC);
   assert.equal(stats.panels, 2);

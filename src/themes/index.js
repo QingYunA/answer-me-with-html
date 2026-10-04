@@ -5,6 +5,9 @@ import { BASE_CSS } from '../assets.js';
 
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
 const MONO = 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace';
+// 日文页面：日文字体排在中文字体前面。点名的中文字体会盖过 lang="ja"，汉字会用中文字形（直、込）。
+const JA_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
+const JA_SERIF = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
 
 const shared = { '--font-sans': SANS, '--font-mono': MONO };
 
@@ -58,8 +61,11 @@ export function themeCss() {
       block(`${sel}[data-mode="dark"]`, t.dark),
       `@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, t.dark)}\n}`,
     ].join('\n');
-  }).join('\n\n');
+  }).join('\n\n') + `\n\n${JA_FONT_CSS}`;
 }
+
+// [data-theme][data-mode] 让选择器比各主题（含视频的 3b1b）更具体，放在哪里都能生效。
+const JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { '--font-sans': JA_SANS, '--v-title-font': JA_SERIF });
 
 export function pageCss() {
   return `${themeCss()}\n\n${BASE_CSS}`;

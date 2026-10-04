@@ -4278,6 +4278,8 @@ var TEMPLATES = { sheet, doc };
 // src/themes/index.js
 var SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
 var MONO = 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace';
+var JA_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
+var JA_SERIF = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
 var shared = { "--font-sans": SANS, "--font-mono": MONO };
 var THEMES = Object.freeze({
   blueprint: {
@@ -4382,8 +4384,11 @@ function themeCss() {
 ${block(`${sel}[data-mode="auto"]`, t.dark)}
 }`
     ].join("\n");
-  }).join("\n\n");
+  }).join("\n\n") + `
+
+${JA_FONT_CSS}`;
 }
+var JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { "--font-sans": JA_SANS, "--v-title-font": JA_SERIF });
 function pageCss() {
   return `${themeCss()}
 
