@@ -16,7 +16,8 @@ import { exportMp4, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, CONFIG_KEYS, ConfigError } from './config.js';
-import { extractSource, replacePanel, pageSettings, isVideoPage, PatchError } from './patch.js';
+import { replacePanel, PatchError } from './patch.js';
+import { readPage } from './page.js';
 
 const MAX_LISTED_WARNINGS = 20;
 
@@ -248,7 +249,8 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     fail(`✗ 无法读取 HTML：${e.message}`);
     return 2;
   }
-  const source = extractSource(html);
+  const page = readPage(html);
+  const { source, video } = page;
   if (source == null) {
     fail('✗ 页面里没有 #am-source，无法取回源稿');
     return 1;
@@ -273,8 +275,6 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const { theme, mode, style } = config.values;
   // 沿用原页面的模板、主题、明暗与 STE 严格度（生成时可能用过 --theme / --style 等参数）；本次命令行参数优先。
   // 视频页必须走 renderVideo，不能交给 renderDoc。
-  const page = pageSettings(html);
-  const video = isVideoPage(html);
   const overrides = {
     template: video ? undefined : (opts.template ?? page.template),
     theme: opts.theme ?? page.theme,
@@ -285,7 +285,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   try {
     if (video) {
       // 原页用 --voice off 出的无声视频，patch 时不要按配置重配音，除非用户显式传 --voice。
-      const voice = opts.voice ?? (html.includes('<audio id="amv-audio"') ? config.values.voice : 'off');
+      const voice = opts.voice ?? (page.voiced ? config.values.voice : 'off');
       if (!VOICES.includes(voice)) {
         fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
         return 2;

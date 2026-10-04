@@ -5,7 +5,15 @@ import { createContext, runInContext } from 'node:vm';
 import { renderDoc } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
 import { parseDoc } from '../src/parse.js';
-import { extractSource, replacePanel, findPanel, isVideoPage, PatchError } from '../src/patch.js';
+import { replacePanel, findPanel, PatchError } from '../src/patch.js';
+import { readPage } from '../src/page.js';
+
+const extractSource = (html) => readPage(html).source;
+const isVideoPage = (html) => readPage(html).video;
+const pageSettings = (html) => {
+  const { template, theme, mode, style } = readPage(html);
+  return { template, theme, mode, style };
+};
 
 const SRC = `---
 title: Patch 测试
@@ -103,7 +111,6 @@ test('copy-source control: 正文假 #am-source 不能盖过文末真实源稿',
 test('isVideoPage / pageSettings: 视频页带 data-video', async () => {
   const { html } = await renderVideo('## 第一幕\n- 画面\n> 旁白。\n');
   assert.equal(isVideoPage(html), true);
-  const { pageSettings } = await import('../src/patch.js');
   const settings = pageSettings(html);
   assert.equal(settings.template, 'video');
   assert.match(settings.theme, /blueprint|shadcn|3b1b/);
@@ -111,7 +118,6 @@ test('isVideoPage / pageSettings: 视频页带 data-video', async () => {
 });
 
 test('isVideoPage: 正文里的 <html data-video> 不算视频页', async () => {
-  const { pageSettings } = await import('../src/patch.js');
   const src = `---
 title: 图纸
 ---
@@ -127,7 +133,6 @@ title: 图纸
 });
 
 test('pageSettings: 正文里的 <main class="am-doc"> 不算 doc', async () => {
-  const { pageSettings } = await import('../src/patch.js');
   const src = `---
 title: 图纸
 ---
@@ -171,7 +176,6 @@ test('replacePanel: 找不到面板或稿件为空时抛错', () => {
 });
 
 test('pageSettings: 从页面读回模板、主题、明暗与 STE style', async () => {
-  const { pageSettings } = await import('../src/patch.js');
   const { html } = renderDoc('---\ntemplate: doc\ntheme: shadcn\nmode: dark\n---\n## A 一\n文字\n');
   assert.deepEqual(pageSettings(html), { template: 'doc', theme: 'shadcn', mode: 'dark', style: '80' });
   assert.deepEqual(pageSettings('<p>no</p>'), { template: undefined, theme: undefined, mode: undefined, style: undefined });
@@ -180,4 +184,22 @@ test('pageSettings: 从页面读回模板、主题、明暗与 STE style', async
   assert.equal(pageSettings(off.html).style, 'off');
   const video = await renderVideo('## 第一幕\n- 画面\n> 旁白。\n', { overrides: { style: 'strict' } });
   assert.equal(pageSettings(video.html).style, 'strict');
+});
+
+test('readPage: 写出的信封原样读回（页面与视频，有无配音）', async () => {
+  const source = '---\ntitle: 信封 <&"\'>\n---\n## A 面板\n> 一句。\n';
+  const doc = renderDoc(source, { theme: 'shadcn', mode: 'dark', template: 'doc' });
+  assert.deepEqual(readPage(doc.html), { source, video: false, template: 'doc', theme: 'shadcn', mode: 'dark', style: '80', voiced: false });
+  const silent = await renderVideo(source, { overrides: { theme: '3b1b' } });
+  assert.deepEqual(readPage(silent.html), { source, video: true, template: 'video', theme: '3b1b', mode: 'dark', style: '80', voiced: false });
+  const provider = { name: 'fake', id: 'fake', concurrency: 1, synth: async () => new Int16Array(1600).fill(1000) };
+  const voiced = await renderVideo(source, { provider });
+  assert.equal(readPage(voiced.html).voiced, true);
+});
+
+test('readPage: 正文里的假 <audio id="amv-audio"> 不算有配音', async () => {
+  const source = '## A\n```html\n<audio id="amv-audio"></audio>\n```\n> 一句。\n';
+  const { html } = await renderVideo(source, {});
+  assert.ok(html.includes('<audio id="amv-audio"'));
+  assert.equal(readPage(html).voiced, false);
 });

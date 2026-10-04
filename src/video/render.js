@@ -5,6 +5,7 @@ import { pageCss } from '../themes/index.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
 import { VERSION, VIDEO_CSS, VIDEO_JS } from '../assets.js';
+import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats, VIDEO_THEMES } from './script.js';
 import { CHOICES, ParseError } from '../parse.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
@@ -122,7 +123,7 @@ function shell({ meta, lang, scenesHtml, data, wav, source }) {
   const ui = UI[lang] ?? UI.zh;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light'}" data-style="${esc(meta.style)}" data-video>
+${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light', style: meta.style, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -152,8 +153,8 @@ ${scenesHtml}
 <span class="amv-brand">Answer me with HTML ${VERSION} · ${esc(timestamp())}</span>
 </div>
 <script type="application/json" id="amv-data">${json}</script>
-${wav ? `<audio id="amv-audio" preload="auto" src="data:audio/wav;base64,${wav.toString('base64')}"></audio>` : ''}
-<textarea id="am-source" hidden readonly aria-hidden="true">${esc(source)}</textarea>
+${wav ? audioTag(wav) : ''}
+${sourceTag(source)}
 <script>
 ${VIDEO_JS}</script>
 </body>
