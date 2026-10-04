@@ -1577,6 +1577,7 @@ function mdInline(text) {
 var CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 var NARROW = /* @__PURE__ */ new Set([..."iljtfrI.,:;|!'`()[]{}"]);
 var WIDE = /* @__PURE__ */ new Set([..."mwMWOQGD@%&"]);
+var KANA_RE = /[\u3040-\u30ff]/;
 function isCJK(ch) {
   return CJK_RE.test(ch);
 }
@@ -4514,6 +4515,7 @@ function lintMarkdown(text, startLine, out) {
 }
 function checkUnit(text, line, kind, out) {
   const sentences = splitSentences(text);
+  const ja = KANA_RE.test(text);
   for (const s of sentences) {
     const { lang, count } = sentenceLength(s);
     const limit = LIMITS[lang][kind];
@@ -4528,13 +4530,14 @@ function checkUnit(text, line, kind, out) {
   }
   const lexical = [
     ...EN_RE.flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `\u4E0D\u63A8\u8350 "${m[0]}"`, suggestion }))),
-    ...ZH_LIGHT_VERBS.flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `\u865A\u52A8\u8BCD "${m[0]}"\uFF08${label}\uFF09`, suggestion: `\u76F4\u63A5\u7528\u300C${m[1]}\u300D` })))
+    ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `\u865A\u52A8\u8BCD "${m[0]}"\uFF08${label}\uFF09`, suggestion: `\u76F4\u63A5\u7528\u300C${m[1]}\u300D` })))
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {
+    if (KANA_RE.test(s)) continue;
     if ((s.match(/的/g) ?? []).length >= 3) out.push({ line, rule: "de-chain", message: `"\u7684"\u5B57\u8FDE\u7528\uFF1A${s}`, suggestion: '\u62C6\u53E5\u6216\u5220\u53BB\u591A\u4F59\u7684"\u7684"' });
   }
-  for (const c of ZH_CLICHES) {
+  for (const c of ja ? [] : ZH_CLICHES) {
     if (text.includes(c)) out.push({ line, rule: "cliche", message: `\u5957\u8BDD "${c}"`, suggestion: "\u5220\u9664\uFF0C\u6216\u6362\u6210\u5177\u4F53\u4E8B\u5B9E" });
   }
   return sentences.length;
@@ -4569,8 +4572,17 @@ var UI = {
     mode: { auto: "Mode: Auto", light: "Mode: Light", dark: "Mode: Dark" },
     copy: "Copy source",
     done: "Copied \u2713"
+  },
+  ja: {
+    theme: { blueprint: "\u30C6\u30FC\u30DE\uFF1A\u56F3\u9762", shadcn: "\u30C6\u30FC\u30DE\uFF1A\u30AB\u30FC\u30C9" },
+    mode: { auto: "\u8868\u793A\uFF1A\u81EA\u52D5", light: "\u8868\u793A\uFF1A\u30E9\u30A4\u30C8", dark: "\u8868\u793A\uFF1A\u30C0\u30FC\u30AF" },
+    copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
+    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713"
   }
 };
+function htmlLang(lang) {
+  return lang === "zh" ? "zh-CN" : lang === "ja" ? "ja" : "en";
+}
 function detectLang(text) {
   let cjk = 0;
   let latin = 0;
@@ -4578,7 +4590,8 @@ function detectLang(text) {
     if (isCJK(ch)) cjk++;
     else if (/[a-z]/i.test(ch)) latin++;
   }
-  return cjk * 3 >= latin ? "zh" : "en";
+  if (cjk * 3 < latin) return "en";
+  return KANA_RE.test(String(text)) ? "ja" : "zh";
 }
 function renderDoc(source, overrides = {}, defaults2 = {}) {
   const doc2 = parseDoc(source, { defaults: defaults2 });
@@ -4630,7 +4643,7 @@ function timestamp(d = /* @__PURE__ */ new Date()) {
 function shell({ meta, lang, body, source }) {
   const ui = UI[lang] ?? UI.zh;
   return `<!doctype html>
-<html lang="${lang === "zh" ? "zh-CN" : "en"}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -4811,7 +4824,7 @@ function systemVoice(platform, which) {
     const voices = macVoices();
     return {
       name: "say",
-      id: `say:${voices.zh}:${voices.en}`,
+      id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
         const v = voices[detectLang(text)];
@@ -4826,7 +4839,7 @@ function systemVoice(platform, which) {
       id: "espeak-ng",
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
-        await run("espeak-ng", ["-v", detectLang(text) === "zh" ? "cmn" : "en-us", "-w", file, "-f", textFile(file, text)]);
+        await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[detectLang(text)] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
         return readWav(readFileSync(file));
       })
     };
@@ -4842,7 +4855,8 @@ function pickMacVoices(out) {
   const pick = (prefer, locale) => prefer.map((p) => list.find((v) => v.locale === locale && base(v.name) === p)).find(Boolean)?.name;
   return {
     zh: pick(["Tingting", "Ting-Ting", "Lilian", "Reed", "Flo", "Eddy"], "zh_CN"),
-    en: pick(["Samantha", "Alex", "Ava", "Allison", "Reed", "Flo", "Eddy"], "en_US")
+    en: pick(["Samantha", "Alex", "Ava", "Allison", "Reed", "Flo", "Eddy"], "en_US"),
+    ja: pick(["Kyoko", "Otoya", "Eddy", "Flo"], "ja_JP")
   };
 }
 function run(cmd, args) {
@@ -4972,7 +4986,8 @@ function wav(samples) {
 // src/video/render.js
 var UI2 = {
   zh: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282" },
-  en: { play: "Play", pause: "Pause", chapters: "Chapters" }
+  en: { play: "Play", pause: "Pause", chapters: "Chapters" },
+  ja: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
 };
 async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress } = {}) {
   const video = parseVideo(source, { defaults: defaults2 });
@@ -5061,7 +5076,7 @@ function shell2({ meta, lang, scenesHtml, data, wav: wav2, source }) {
   const ui = UI2[lang] ?? UI2.zh;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return `<!doctype html>
-<html lang="${lang === "zh" ? "zh-CN" : "en"}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light"}" data-video>
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light"}" data-video>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

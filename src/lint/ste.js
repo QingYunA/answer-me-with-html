@@ -1,10 +1,11 @@
 // STE 受控写作检查（只约束稿件里的说明文字）。
 // 规则：句长、段长、非推荐词、英文被动语态、中文虚动词 / "的"字连用 / 套话。全部为警告，严格度由 style 决定。
+// 含假名的日文只查句长与段长：日文的"的"是后缀（基本的、具体的），不是中文的结构助词。
 // 跳过：代码与行内代码、~~删除线~~（反例展示）、含 no 状态的表格行、标题、除 callout 外的组件。
 
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES } from './wordlist.zh.js';
-import { isCJK } from '../svg/text.js';
+import { isCJK, KANA_RE } from '../svg/text.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
 const MAX_SENTENCES = 6;
@@ -93,6 +94,7 @@ function lintMarkdown(text, startLine, out) {
 // 检查一段文字（列表项 / 单元格 / 段落中的一行），返回句子数。
 function checkUnit(text, line, kind, out) {
   const sentences = splitSentences(text);
+  const ja = KANA_RE.test(text);
   for (const s of sentences) {
     const { lang, count } = sentenceLength(s);
     const limit = LIMITS[lang][kind];
@@ -107,13 +109,14 @@ function checkUnit(text, line, kind, out) {
   }
   const lexical = [
     ...EN_RE.flatMap(({ re, suggestion }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `不推荐 "${m[0]}"`, suggestion }))),
-    ...ZH_LIGHT_VERBS.flatMap(({ re, label }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `虚动词 "${m[0]}"（${label}）`, suggestion: `直接用「${m[1]}」` }))),
+    ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re, label }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `虚动词 "${m[0]}"（${label}）`, suggestion: `直接用「${m[1]}」` }))),
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {
+    if (KANA_RE.test(s)) continue;
     if ((s.match(/的/g) ?? []).length >= 3) out.push({ line, rule: 'de-chain', message: `"的"字连用：${s}`, suggestion: '拆句或删去多余的"的"' });
   }
-  for (const c of ZH_CLICHES) {
+  for (const c of ja ? [] : ZH_CLICHES) {
     if (text.includes(c)) out.push({ line, rule: 'cliche', message: `套话 "${c}"`, suggestion: '删除，或换成具体事实' });
   }
   return sentences.length;

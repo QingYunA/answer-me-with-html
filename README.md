@@ -134,7 +134,7 @@ Server -> Client: SYN-ACK
 - **Spoken narration.** The agent writes narration the way a person explains things out loud, not like a manual.
 - **Camera focus.** `[Server]` in the narration pushes the camera toward that node and highlights it. The diagram never leaves the frame.
 - **Objects carry over.** A node with the same name in the next scene glides to its new place instead of cutting.
-- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set, the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
+- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set, the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English, Kyoko for Japanese), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
 - **Same look as the pages.** Videos use the blueprint drawing style by default: a ruled frame and lettered sheet heads. Write `theme: 3b1b` for the dark 3Blue1Brown look. `theme: shadcn` and `mode: dark` also work.
 - **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine. Export takes about 1.3 times the video length.
 
@@ -341,6 +341,7 @@ Answer me with HTML turns the parts a machine can check into an English and Chin
 - **Length:** Steps stay under 20 English words or 35 Chinese characters. Descriptions stay under 25 words or 45 characters. Paragraphs have at most 6 sentences.
 - **Words:** Prefer common words: "use", not "utilize"; "before", not "prior to". In Chinese, drop empty verbs: write 优化, not 进行优化.
 - **Style:** Flags English passive voice, three or more 的 in one sentence, and stock phrases such as 赋能 and 闭环.
+- **Japanese:** A draft with kana is treated as Japanese: the page buttons are in Japanese and the page gets `lang="ja"`. Only the length rules apply, with the Chinese character limits. Write `lang: ja` in the draft to force it.
 
 Set the strictness with `/answer-me-with-html:config style strict`, or per page with `style:` in the draft.
 

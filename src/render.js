@@ -6,7 +6,7 @@ import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
 import { lintDoc } from './lint/ste.js';
-import { esc, isCJK } from './svg/text.js';
+import { esc, isCJK, KANA_RE } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
 
 
@@ -39,7 +39,17 @@ export const UI = {
     mode: { auto: 'Mode: Auto', light: 'Mode: Light', dark: 'Mode: Dark' },
     copy: 'Copy source', done: 'Copied ✓',
   },
+  ja: {
+    theme: { blueprint: 'テーマ：図面', shadcn: 'テーマ：カード' },
+    mode: { auto: '表示：自動', light: '表示：ライト', dark: '表示：ダーク' },
+    copy: '原稿をコピー', done: 'コピーしました ✓',
+  },
 };
+
+// <html lang> 的值。
+export function htmlLang(lang) {
+  return lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja' : 'en';
+}
 
 export function detectLang(text) {
   let cjk = 0;
@@ -48,7 +58,8 @@ export function detectLang(text) {
     if (isCJK(ch)) cjk++;
     else if (/[a-z]/i.test(ch)) latin++;
   }
-  return cjk * 3 >= latin ? 'zh' : 'en';
+  if (cjk * 3 < latin) return 'en';
+  return KANA_RE.test(String(text)) ? 'ja' : 'zh';
 }
 
 export function renderDoc(source, overrides = {}, defaults = {}) {
@@ -107,7 +118,7 @@ export function timestamp(d = new Date()) {
 function shell({ meta, lang, body, source }) {
   const ui = UI[lang] ?? UI.zh;
   return `<!doctype html>
-<html lang="${lang === 'zh' ? 'zh-CN' : 'en'}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

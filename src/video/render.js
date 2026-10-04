@@ -1,6 +1,6 @@
 // 视频稿 → 单文件播放页。画面复用页面组件；时间轴由每句旁白的音频时长（或估算时长）决定；
 // 播放页里的 render(t) 是确定性的：同一时刻永远画出同一帧，导出 MP4 时逐帧调用它。
-import { renderBlocks, detectLang, LintError, timestamp } from '../render.js';
+import { renderBlocks, detectLang, htmlLang, LintError, timestamp } from '../render.js';
 import { pageCss } from '../themes/index.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
@@ -12,6 +12,7 @@ import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 const UI = {
   zh: { play: '播放', pause: '暂停', chapters: '章节' },
   en: { play: 'Play', pause: 'Pause', chapters: 'Chapters' },
+  ja: { play: '再生', pause: '一時停止', chapters: '章' },
 };
 
 // provider 为 null 时只出字幕，时长按字数估算。
@@ -121,7 +122,7 @@ function shell({ meta, lang, scenesHtml, data, wav, source }) {
   const ui = UI[lang] ?? UI.zh;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-<html lang="${lang === 'zh' ? 'zh-CN' : 'en'}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light'}" data-video>
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light'}" data-video>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

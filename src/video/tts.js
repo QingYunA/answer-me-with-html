@@ -70,7 +70,7 @@ function systemVoice(platform, which) {
     const voices = macVoices();
     return {
       name: 'say',
-      id: `say:${voices.zh}:${voices.en}`,
+      id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
         const v = voices[detectLang(text)];
@@ -85,7 +85,7 @@ function systemVoice(platform, which) {
       id: 'espeak-ng',
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
-        await run('espeak-ng', ['-v', detectLang(text) === 'zh' ? 'cmn' : 'en-us', '-w', file, '-f', textFile(file, text)]);
+        await run('espeak-ng', ['-v', ({ zh: 'cmn', ja: 'ja' })[detectLang(text)] ?? 'en-us', '-w', file, '-f', textFile(file, text)]);
         return readWav(readFileSync(file));
       }),
     };
@@ -106,6 +106,7 @@ export function pickMacVoices(out) {
   return {
     zh: pick(['Tingting', 'Ting-Ting', 'Lilian', 'Reed', 'Flo', 'Eddy'], 'zh_CN'),
     en: pick(['Samantha', 'Alex', 'Ava', 'Allison', 'Reed', 'Flo', 'Eddy'], 'en_US'),
+    ja: pick(['Kyoko', 'Otoya', 'Eddy', 'Flo'], 'ja_JP'),
   };
 }
 

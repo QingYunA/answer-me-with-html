@@ -57,6 +57,8 @@ test('中文虚动词：进行优化 → 优化；进行中不误报', () => {
 
 test('中文“的”字连用与套话', () => {
   assert.deepEqual(rules(lint('## A\n我的朋友的同事的电脑坏了。')), ['de-chain']);
+  assert.deepEqual(rules(lint('## A\n基本的には具体的で効果的な手順を選ぶ。')), []);
+  assert.deepEqual(rules(lint('## A\nこの文はとても長くて、四十五文字をこえるようにわざと言葉をたくさん足して書いた説明の文章になっている。')), ['sentence-length'], '日文仍查句长');
   assert.deepEqual(rules(lint('## A\n这一步至关重要。')), ['cliche']);
 });
 

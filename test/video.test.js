@@ -143,8 +143,17 @@ test('pickMacVoices: 名字很长只隔一个空格时也能认出，优先婷�
     'Albert              en_US    # Hello! My name is Albert.',
     'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
   ].join('\n');
-  assert.deepEqual(pickMacVoices(out), { zh: 'Tingting (中文（中国大陆）)', en: 'Samantha (英语（美国）)' });
-  assert.deepEqual(pickMacVoices('Reed (中文（中国大陆）)  zh_CN  # x'), { zh: 'Reed (中文（中国大陆）)', en: undefined });
+  assert.deepEqual(pickMacVoices(out), { zh: 'Tingting (中文（中国大陆）)', en: 'Samantha (英语（美国）)', ja: undefined });
+  assert.deepEqual(pickMacVoices('Reed (中文（中国大陆）)  zh_CN  # x'), { zh: 'Reed (中文（中国大陆）)', en: undefined, ja: undefined });
+});
+
+test('pickMacVoices: 日文优先 Kyoko', () => {
+  const out = [
+    'Eddy (日本語（日本）)      ja_JP    # こんにちは! 私の名前はEddyです。',
+    'Kyoko               ja_JP    # こんにちは! 私の名前はKyokoです。',
+  ].join('\n');
+  assert.equal(pickMacVoices(out).ja, 'Kyoko');
+  assert.equal(pickMacVoices(out.split('\n')[0]).ja, 'Eddy (日本語（日本）)');
 });
 
 // ── 渲染 ──

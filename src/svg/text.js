@@ -5,6 +5,9 @@ const CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 const NARROW = new Set([...'iljtfrI.,:;|!\'`()[]{}']);
 const WIDE = new Set([...'mwMWOQGD@%&']);
 
+// 平假名、片假名只出现在日文里，中文稿件不会有。
+export const KANA_RE = /[\u3040-\u30ff]/;
+
 export function isCJK(ch) {
   return CJK_RE.test(ch);
 }

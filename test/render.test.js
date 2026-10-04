@@ -105,6 +105,21 @@ test('detectLang: 中文占比判断', () => {
   assert.equal(detectLang('all english words here'), 'en');
 });
 
+test('detectLang: 含假名的 CJK 稿件判为日文', () => {
+  assert.equal(detectLang('TCP の3ウェイハンドシェイク'), 'ja');
+  assert.equal(detectLang('接続は3回のやりとりで行う'), 'ja');
+  assert.equal(detectLang('三次握手建立连接'), 'zh');
+  assert.equal(detectLang('a long english sentence with one あ'), 'en');
+});
+
+test('render: 日文稿件使用日文界面文案与 lang="ja"', () => {
+  const { html } = renderDoc('# TCP の接続\n## A 概要\n接続は3回のやりとりで行う。');
+  assert.match(html, /<html lang="ja"/);
+  assert.match(html, /原稿をコピー/);
+  assert.match(html, /テーマ：図面/);
+  assert.doesNotMatch(html, /复制源稿/);
+});
+
 test('render: 统计面板与组件数量', () => {
   const { stats } = renderDoc(SRC);
   assert.equal(stats.panels, 2);
