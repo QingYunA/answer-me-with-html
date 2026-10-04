@@ -40,6 +40,14 @@ test('frontmatter: SKILL.md 的 description 不超过 Claude Code 的 1536 字�
   }
 });
 
+test('frontmatter: SKILL.md 的 description 不超过 Agent Skills 规范的 1024 字符上限', () => {
+  // 超限时严格的宿主（如 zcode）会整个丢弃 skill，且没有可见报错（见 issue #23）。
+  for (const dir of readdirSync(join(ROOT, 'skills'))) {
+    const len = [...frontmatter(join('skills', dir, 'SKILL.md')).description].length;
+    assert.ok(len <= 1024, `${dir}: description 共 ${len} 字符，规范上限是 1024`);
+  }
+});
+
 test('frontmatter: SKILL.md 的 name 与目录名一致', () => {
   for (const dir of readdirSync(join(ROOT, 'skills'))) {
     assert.equal(frontmatter(join('skills', dir, 'SKILL.md')).name, dir);

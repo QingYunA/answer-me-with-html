@@ -2,19 +2,17 @@
 name: answer-me-with-html
 argument-hint: "[config [键 值] | clean | update]"
 description: >-
-  When an answer is complex, renders it as a one-page visual HTML explainer: the model writes only
-  a short extended-Markdown draft; the bundled CLI handles templates, components, SVG auto-layout
-  and an STE controlled-writing check, producing a single-file page in one call. Also use it when
-  the user asks for an explainer video ("3b1b style video", "make a video", "做个视频", "讲成视频"): the
-  same draft format plus narration lines renders an animated, narrated player page and optionally
-  an MP4. Also use it when the user says `/answer-me-with-html config` or wants to change settings
-  (auto-open browser, always-on mode, default theme). Use it proactively, without being asked,
-  when the answer involves any of: 3+ interrelated concepts; a flow / protocol / architecture with
-  branches or multiple actors; a comparison or trade-off across 3+ dimensions; a hierarchy
-  (directories, modules, taxonomies); an evolution or phases; or the user says "explain how it
-  works / I don’t get it / draw a diagram / explain this codebase / explain visually / 讲讲原理 / 没看懂
-  / 画个图 / 用 HTML 讲". Do not use for: short Q&A (clear in under ~150 words), commands to copy and
-  run immediately, pure code changes, or when the user asks for plain text.
+  Renders a complex answer as a one-page visual HTML explainer: the model writes a short Markdown
+  draft and the bundled CLI builds a single page (templates, SVG auto-layout, STE writing check).
+  Also for explainer videos ("3b1b style video", "make a video", "做个视频", "讲成视频"): the same draft
+  plus narration lines renders a narrated player page, optionally an MP4. Also for
+  `/answer-me-with-html config` or settings (auto-open, always-on mode, default theme). Use
+  proactively, without being asked, when the answer involves: 3+ interrelated concepts; a flow /
+  protocol / architecture with branches or multiple actors; a comparison or trade-off across 3+
+  dimensions; a hierarchy (directories, modules, taxonomies); an evolution or phases; or the user
+  says "explain how it works / I don’t get it / draw a diagram / explain this codebase / explain
+  visually / 讲讲原理 / 没看懂 / 画个图 / 用 HTML 讲". Do not use for: short Q&A (clear in under ~150 words),
+  commands to copy and run, pure code changes, or plain-text requests.
 ---
 
 # Answer me with HTML：用一页 HTML 回答复杂问题
