@@ -220,22 +220,23 @@ html[data-theme="shadcn"] .am-kv { border-color: var(--line); border-radius: var
 
 /* ── 图（flow / sequence）───────────────── */
 .am-diagram { margin: 0; overflow-x: auto; text-align: center; }
-.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans); }
-.am-diagram text { fill: var(--ink); font-size: 13px; }
-.am-node-shape { fill: var(--paper); stroke: var(--line); stroke-width: var(--bw); }
-.am-node--hi .am-node-shape { fill: var(--accent-bg); stroke: var(--accent); }
-.am-node--hi text { fill: var(--accent); font-weight: 600; }
-.am-edge { fill: none; stroke: var(--ink-2); stroke-width: 1.3; }
+/* 嵌入预览可能丢失 html[data-theme]；fallback 保持图可读，已定义的主题变量仍优先。 */
+.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
+.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }
+.am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }
+.am-node--hi .am-node-shape { fill: var(--accent-bg, #e4ecf8); stroke: var(--accent, #1d5fbf); }
+.am-node--hi text { fill: var(--accent, #1d5fbf); font-weight: 600; }
+.am-edge { fill: none; stroke: var(--ink-2, #4b5260); stroke-width: 1.3; }
 .am-edge--dashed { stroke-dasharray: 5 4; }
-.am-arrow { fill: var(--ink-2); }
-.am-edge-label rect { fill: var(--paper); }
-.am-diagram .am-edge-label text { fill: var(--accent); font-size: 11.5px; }
-.am-cluster { fill: var(--fill); stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 4 3; }
-.am-diagram .am-cluster-label { fill: var(--ink-2); font: 11px var(--font-mono); }
-.am-lifeline { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 4 4; }
-.am-actor { fill: var(--paper); stroke: var(--line); stroke-width: var(--bw); }
-.am-note { fill: var(--warn-bg); stroke: var(--warn); stroke-width: 1; }
-.am-diagram .am-step { fill: var(--ink-3); font: 10px var(--font-mono); }
+.am-arrow { fill: var(--ink-2, #4b5260); }
+.am-edge-label rect { fill: var(--paper, #ffffff); }
+.am-diagram .am-edge-label text { fill: var(--accent, #1d5fbf); font-size: 11.5px; }
+.am-cluster { fill: var(--fill, #f3f5f8); stroke: var(--line-2, #d6dae1); stroke-width: 1; stroke-dasharray: 4 3; }
+.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }
+.am-lifeline { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 4 4; }
+.am-actor { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }
+.am-note { fill: var(--warn-bg, #fdf3e2); stroke: var(--warn, #a8620a); stroke-width: 1; }
+.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }
 
 /* ── doc 线性讲解 ────────────────────────── */
 .am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
