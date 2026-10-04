@@ -252,6 +252,63 @@ test('cli patch: 沿用原页面的主题与模板；本次 --theme 优先', asy
   assert.match(readFileSync(join(dir, 'keep.html'), 'utf8'), /data-theme="blueprint"/);
 });
 
+const STE_BAD = `---
+title: 关检查
+---
+## A 甲
+Utilize the tool.
+
+## B 乙
+保留。
+`;
+
+test('cli patch: 沿用页面 data-style，不回落到配置 strict', async () => {
+  assert.equal((await run(['render', '-', '-o', 'style-off.html', '--style', 'off'], { stdin: STE_BAD })).code, 0);
+  assert.match(readFileSync(join(dir, 'style-off.html'), 'utf8'), /data-style="off"/);
+  assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  const r = await run(['patch', 'style-off.html', '--panel', '乙'], { stdin: '新文。\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'style-off.html'), 'utf8');
+  assert.match(html, /data-style="off"/);
+  assert.match(html, /新文/);
+  assert.match(html, /Utilize the tool/);
+  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
+});
+
+test('cli patch: 本次 --style 优先于页面记录的 style', async () => {
+  assert.equal((await run(['render', '-', '-o', 'style-cli.html', '--style', 'off'], { stdin: STE_BAD })).code, 0);
+  const before = readFileSync(join(dir, 'style-cli.html'), 'utf8');
+  const r = await run(['patch', 'style-cli.html', '--panel', '乙', '--style', 'strict'], { stdin: '新文。\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /STE 检查未通过/);
+  assert.equal(readFileSync(join(dir, 'style-cli.html'), 'utf8'), before, 'strict 失败时不得改文件');
+});
+
+test('cli patch: 旧页没有 data-style 时，frontmatter style 仍优先于配置', async () => {
+  const src = `---
+title: 旧页
+style: off
+---
+## A 甲
+Utilize the tool.
+
+## B 乙
+保留。
+`;
+  assert.equal((await run(['render', '-', '-o', 'old-style.html'], { stdin: src })).code, 0);
+  const stripped = readFileSync(join(dir, 'old-style.html'), 'utf8')
+    .replace(/<html\b[^>]*>/, (tag) => tag.replace(/\sdata-style="[^"]*"/, ''));
+  writeFileSync(join(dir, 'old-style.html'), stripped);
+  assert.doesNotMatch(stripped.match(/<html\b[^>]*>/)[0], /data-style/);
+  assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  const r = await run(['patch', 'old-style.html', '--panel', '乙'], { stdin: '新文。\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'old-style.html'), 'utf8');
+  assert.match(html, /新文/);
+  assert.match(html, /data-style="off"/);
+  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
+});
+
 test('cli patch: 正文假 data-video 不得把图纸页当成视频', async () => {
   const src = `---
 title: 假视频
@@ -320,6 +377,36 @@ test('cli patch: 视频页沿用原主题（3b1b），输出视频摘要', async
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /video · 3b1b · 1 场景 · 1 句旁白/);
   const html = readFileSync(join(dir, 'v3b.html'), 'utf8');
-  assert.match(html, /data-theme="3b1b" data-mode="dark" data-video/);
+  assert.match(html, /data-theme="3b1b" data-mode="dark" data-style="80" data-video/);
   assert.match(html, /新旁白/);
+});
+
+const VIDEO_STE_BAD = `## 甲
+- 画面
+> 我们对系统进行优化。
+
+## 乙
+- 另一画面
+> 第二句旁白。
+`;
+
+test('cli patch: 视频页同样沿用 data-style，不回落到配置 strict', async () => {
+  assert.equal((await run(['video', '-', '--voice', 'off', '--style', 'off', '-o', 'vstyle.html'], { stdin: VIDEO_STE_BAD })).code, 0);
+  assert.match(readFileSync(join(dir, 'vstyle.html'), 'utf8'), /data-style="off"/);
+  assert.equal((await run(['config', 'set', 'style', 'strict'])).code, 0);
+  const r = await run(['patch', 'vstyle.html', '--panel', '乙', '--voice', 'off'], { stdin: '> 新旁白。\n- 新画面\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'vstyle.html'), 'utf8');
+  assert.match(html, /data-style="off"/);
+  assert.match(html, /新旁白|新画面/);
+  assert.equal((await run(['config', 'reset', 'style'])).code, 0);
+});
+
+test('cli patch: 视频页本次 --style 优先于页面记录的 style', async () => {
+  assert.equal((await run(['video', '-', '--voice', 'off', '--style', 'off', '-o', 'vstyle-cli.html'], { stdin: VIDEO_STE_BAD })).code, 0);
+  const before = readFileSync(join(dir, 'vstyle-cli.html'), 'utf8');
+  const r = await run(['patch', 'vstyle-cli.html', '--panel', '乙', '--voice', 'off', '--style', 'strict'], { stdin: '> 新旁白。\n- 新画面\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /STE 检查未通过/);
+  assert.equal(readFileSync(join(dir, 'vstyle-cli.html'), 'utf8'), before, 'strict 失败时不得改文件');
 });

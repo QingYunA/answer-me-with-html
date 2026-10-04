@@ -200,7 +200,7 @@ test('renderVideo: 多行旁白不算超长段落；strict 下其他问题照常
 
 test('视频主题：默认 blueprint 浅色；稿件可写 3b1b；命令行参数优先', async () => {
   const def = await renderVideo(SRC);
-  assert.match(def.html, /data-theme="blueprint" data-mode="light" data-video/);
+  assert.match(def.html, /data-theme="blueprint" data-mode="light" data-style="80" data-video/);
   assert.match(def.html, /class="amv-sheet"/, '图纸外框');
   assert.match(def.html, /SHEET 01 \/ 02/);
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${SRC.split('---\n').slice(2).join('---\n')}`);

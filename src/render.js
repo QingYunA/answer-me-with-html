@@ -118,7 +118,7 @@ export function timestamp(d = new Date()) {
 function shell({ meta, lang, body, source }) {
   const ui = UI[lang] ?? UI.zh;
   return `<!doctype html>
-<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}" data-style="${esc(meta.style)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

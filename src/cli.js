@@ -273,7 +273,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   }
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
-  // 沿用原页面的模板、主题与明暗（生成时可能用过 --theme 等参数）；本次命令行参数优先。
+  // 沿用原页面的模板、主题、明暗与 STE 严格度（生成时可能用过 --theme / --style 等参数）；本次命令行参数优先。
   // 视频页必须走 renderVideo，不能交给 renderDoc。
   const page = pageSettings(html);
   const video = isVideoPage(html);
@@ -281,7 +281,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     template: video ? undefined : (opts.template ?? page.template),
     theme: opts.theme ?? page.theme,
     mode: opts.mode ?? page.mode,
-    style: opts.style,
+    style: opts.style ?? page.style,
   };
   let result;
   try {
@@ -292,8 +292,8 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
         fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
         return 2;
       }
-      // 视频页同样沿用原页面的主题与明暗（例如 3b1b），本次命令行参数优先。
-      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode }, config, ctx);
+      // 视频页同样沿用原页面的主题、明暗与 STE 严格度（例如 3b1b / --style off），本次命令行参数优先。
+      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
       result = renderDoc(patched, overrides, { theme, mode, style });
     }

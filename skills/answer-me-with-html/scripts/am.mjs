@@ -4654,7 +4654,7 @@ function timestamp(d = /* @__PURE__ */ new Date()) {
 function shell({ meta, lang, body, source }) {
   const ui = UI[lang] ?? UI.zh;
   return `<!doctype html>
-<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}">
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${esc(meta.mode)}" data-style="${esc(meta.style)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -5087,7 +5087,7 @@ function shell2({ meta, lang, scenesHtml, data, wav: wav2, source }) {
   const ui = UI2[lang] ?? UI2.zh;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return `<!doctype html>
-<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light"}" data-video>
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light"}" data-style="${esc(meta.style)}" data-video>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -5652,7 +5652,7 @@ function pageSettings(html) {
   const attr = (name) => root.match(new RegExp(`\\s${name}="([^"]+)"`))?.[1];
   const main2 = s.match(/<main class="am-(doc|sheet)\b/);
   const template = isVideoPage(html) ? "video" : main2?.[1];
-  return { template, theme: attr("data-theme"), mode: attr("data-mode") };
+  return { template, theme: attr("data-theme"), mode: attr("data-mode"), style: attr("data-style") };
 }
 function replacePanel(source, query, replacement) {
   const doc2 = parseDoc(source);
@@ -5930,7 +5930,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     template: video ? void 0 : opts.template ?? page.template,
     theme: opts.theme ?? page.theme,
     mode: opts.mode ?? page.mode,
-    style: opts.style
+    style: opts.style ?? page.style
   };
   let result;
   try {
@@ -5940,7 +5940,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
         fail(`\u2717 voice \u7684\u503C "${voice}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${VOICES.join(" | ")}`);
         return 2;
       }
-      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode }, config, ctx);
+      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
       result = renderDoc(patched, overrides, { theme, mode, style });
     }

@@ -170,9 +170,14 @@ test('replacePanel: 找不到面板或稿件为空时抛错', () => {
   assert.throws(() => replacePanel(SRC, '流程', '## A 一\na\n## B 二\nb\n'), /只包含一个/);
 });
 
-test('pageSettings: 从页面读回模板、主题与明暗', async () => {
+test('pageSettings: 从页面读回模板、主题、明暗与 STE style', async () => {
   const { pageSettings } = await import('../src/patch.js');
   const { html } = renderDoc('---\ntemplate: doc\ntheme: shadcn\nmode: dark\n---\n## A 一\n文字\n');
-  assert.deepEqual(pageSettings(html), { template: 'doc', theme: 'shadcn', mode: 'dark' });
-  assert.deepEqual(pageSettings('<p>no</p>'), { template: undefined, theme: undefined, mode: undefined });
+  assert.deepEqual(pageSettings(html), { template: 'doc', theme: 'shadcn', mode: 'dark', style: '80' });
+  assert.deepEqual(pageSettings('<p>no</p>'), { template: undefined, theme: undefined, mode: undefined, style: undefined });
+
+  const off = renderDoc('---\ntitle: 关检查\n---\n## A 一\n文字\n', { style: 'off' });
+  assert.equal(pageSettings(off.html).style, 'off');
+  const video = await renderVideo('## 第一幕\n- 画面\n> 旁白。\n', { overrides: { style: 'strict' } });
+  assert.equal(pageSettings(video.html).style, 'strict');
 });

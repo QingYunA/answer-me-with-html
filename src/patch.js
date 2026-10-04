@@ -78,7 +78,7 @@ function asSinglePanelMarkdown(replacement) {
   return { text, looksLikeHeading };
 }
 
-// 读回原页面的模板、主题与明暗，重渲时沿用（生成时可能用过 --theme 等命令行参数）。
+// 读回原页面的模板、主题、明暗与 STE 严格度，重渲时沿用（生成时可能用过 --theme / --style 等命令行参数）。
 // 正文里的 <main class="am-doc"> 不算；只认页面根上最先出现的那一枚。
 export function pageSettings(html) {
   const s = String(html);
@@ -86,7 +86,7 @@ export function pageSettings(html) {
   const attr = (name) => root.match(new RegExp(`\\s${name}="([^"]+)"`))?.[1];
   const main = s.match(/<main class="am-(doc|sheet)\b/);
   const template = isVideoPage(html) ? 'video' : main?.[1];
-  return { template, theme: attr('data-theme'), mode: attr('data-mode') };
+  return { template, theme: attr('data-theme'), mode: attr('data-mode'), style: attr('data-style') };
 }
 
 export function replacePanel(source, query, replacement) {

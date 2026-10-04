@@ -122,7 +122,7 @@ function shell({ meta, lang, scenesHtml, data, wav, source }) {
   const ui = UI[lang] ?? UI.zh;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light'}" data-video>
+<html lang="${htmlLang(lang)}" data-theme="${esc(meta.theme)}" data-mode="${meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light'}" data-style="${esc(meta.style)}" data-video>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

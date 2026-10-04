@@ -28,7 +28,7 @@ print("<x>")
 test('render: 产出完整单文件 HTML，带主题属性与 viewport', () => {
   const { html, meta } = renderDoc(SRC);
   assert.match(html, /^<!doctype html>/);
-  assert.match(html, /<html lang="zh-CN" data-theme="blueprint" data-mode="auto">/);
+  assert.match(html, /<html lang="zh-CN" data-theme="blueprint" data-mode="auto" data-style="80">/);
   assert.match(html, /name="viewport"/);
   assert.equal(meta.template, 'sheet');
 });
