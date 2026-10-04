@@ -87,6 +87,9 @@ html[data-theme="shadcn"] .am-panel-head { border-bottom-width: 1px; }
   text-align: left; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;
   padding: 6px 10px; border-bottom: 1px solid var(--line-2);
 }
+/* th 的 text-align: left 会压过 Markdown 对齐语法生成的 align 属性，右对齐和居中列要显式还原。 */
+.am-md th[align="right"] { text-align: right; }
+.am-md th[align="center"] { text-align: center; }
 .am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
 .am-md tbody tr:nth-child(even) td { background: var(--fill); }
 .am-table-wrap { overflow-x: auto; }
