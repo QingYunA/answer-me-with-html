@@ -5579,8 +5579,11 @@ function extractSource(html) {
   if (!m) return null;
   return unescapeHtml(m[1]);
 }
+function rootHtmlTag(html) {
+  return String(html).match(/<html\b[^>]*>/)?.[0] ?? "";
+}
 function isVideoPage(html) {
-  return /<html\b[^>]*\sdata-video\b/.test(String(html));
+  return /\sdata-video\b/.test(rootHtmlTag(html));
 }
 function unescapeHtml(s) {
   return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
@@ -5619,8 +5622,11 @@ ${text}`);
   return { text, looksLikeHeading };
 }
 function pageSettings(html) {
-  const attr = (name) => String(html).match(new RegExp(`<html[^>]*\\s${name}="([^"]+)"`))?.[1];
-  const template = isVideoPage(html) ? "video" : /<main class="am-doc\b/.test(html) ? "doc" : /<main class="am-sheet\b/.test(html) ? "sheet" : void 0;
+  const s = String(html);
+  const root = rootHtmlTag(s);
+  const attr = (name) => root.match(new RegExp(`\\s${name}="([^"]+)"`))?.[1];
+  const main2 = s.match(/<main class="am-(doc|sheet)\b/);
+  const template = isVideoPage(html) ? "video" : main2?.[1];
   return { template, theme: attr("data-theme"), mode: attr("data-mode") };
 }
 function replacePanel(source, query, replacement) {
@@ -5904,7 +5910,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
-      const voice = opts.voice ?? config.values.voice;
+      const voice = opts.voice ?? (html.includes('<audio id="amv-audio"') ? config.values.voice : "off");
       if (!VOICES.includes(voice)) {
         fail(`\u2717 voice \u7684\u503C "${voice}" \u65E0\u6548\uFF0C\u53EF\u9009\uFF1A${VOICES.join(" | ")}`);
         return 2;

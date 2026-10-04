@@ -110,6 +110,38 @@ test('isVideoPage / pageSettings: 视频页带 data-video', async () => {
   assert.equal(isVideoPage('<html><body>no</body></html>'), false);
 });
 
+test('isVideoPage: 正文里的 <html data-video> 不算视频页', async () => {
+  const { pageSettings } = await import('../src/patch.js');
+  const src = `---
+title: 图纸
+---
+## A 说明
+\`\`\`html
+<html lang="zh-CN" data-theme="blueprint" data-mode="light" data-video>
+\`\`\`
+`;
+  const { html } = renderDoc(src);
+  assert.match(html, /<html\b[^>]*\sdata-video\b/, '正文应保留这段标记');
+  assert.equal(isVideoPage(html), false);
+  assert.equal(pageSettings(html).template, 'sheet');
+});
+
+test('pageSettings: 正文里的 <main class="am-doc"> 不算 doc', async () => {
+  const { pageSettings } = await import('../src/patch.js');
+  const src = `---
+title: 图纸
+---
+## A 说明
+\`\`\`html
+<main class="am-doc">假目录</main>
+\`\`\`
+`;
+  const { html } = renderDoc(src);
+  assert.match(html, /<main class="am-doc"/, '正文应保留这段标记');
+  assert.match(html, /<main class="am-sheet"/);
+  assert.equal(pageSettings(html).template, 'sheet');
+});
+
 test('replacePanel: 只替换匹配的 ## 面板，其余小节原文不变', () => {
   const next = replacePanel(SRC, '流程', '## A 流程\n新的流程说明。\n');
   assert.match(next, /新的流程说明/);

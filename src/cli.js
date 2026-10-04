@@ -286,7 +286,8 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
-      const voice = opts.voice ?? config.values.voice;
+      // 原页用 --voice off 出的无声视频，patch 时不要按配置重配音，除非用户显式传 --voice。
+      const voice = opts.voice ?? (html.includes('<audio id="amv-audio"') ? config.values.voice : 'off');
       if (!VOICES.includes(voice)) {
         fail(`✗ voice 的值 "${voice}" 无效，可选：${VOICES.join(' | ')}`);
         return 2;
