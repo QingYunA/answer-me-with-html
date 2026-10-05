@@ -12,7 +12,7 @@ import { estimateSeconds } from './script.js';
 
 export const SAMPLE_RATE = 22050;
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
-const ELEVEN_DEFAULT_MODEL = 'eleven_v4';
+const ELEVEN_DEFAULT_MODEL = 'eleven_v4_turbo';
 const ELEVEN_TIMEOUT_MS = 60000;
 const LOCAL_TIMEOUT_MS = 300000;
 // Local autoregressive TTS (e.g. Qwen3-TTS) sometimes fails to stop or cuts off early. When actual / estimated duration falls outside this range, retry, at most LOCAL_ATTEMPTS times.

@@ -566,7 +566,7 @@ test('am patch: a voiced video keeps its voice instead of switching to the confi
   assert.match(readFileSync(file, 'utf8'), /data-voice="local"/);
 });
 
-test('ElevenLabs: 默认用 eleven_v4，ELEVENLABS_MODEL_ID 可以换模型，缓存键随模型变化', async () => {
+test('ElevenLabs: 默认用 eleven_v4_turbo，ELEVENLABS_MODEL_ID 可以换模型，缓存键随模型变化', async () => {
   const realFetch = globalThis.fetch;
   const bodies = [];
   globalThis.fetch = async (url, init) => {
@@ -579,8 +579,8 @@ test('ElevenLabs: 默认用 eleven_v4，ELEVENLABS_MODEL_ID 可以换模型，�
     const flash = pickProvider('elevenlabs', { ...base, ELEVENLABS_MODEL_ID: 'eleven_flash_v2_5' });
     await def.synth('你好');
     await flash.synth('你好');
-    assert.deepEqual(bodies.map((b) => b.model_id), ['eleven_v4', 'eleven_flash_v2_5']);
-    assert.match(def.id, /:eleven_v4$/);
+    assert.deepEqual(bodies.map((b) => b.model_id), ['eleven_v4_turbo', 'eleven_flash_v2_5']);
+    assert.match(def.id, /:eleven_v4_turbo$/);
     assert.notEqual(def.id, flash.id);
   } finally {
     globalThis.fetch = realFetch;
