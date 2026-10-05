@@ -4849,7 +4849,7 @@ function hasCommand(cmd) {
 // src/video/tts.js
 var SAMPLE_RATE = 22050;
 var ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb";
-var ELEVEN_MODEL = "eleven_multilingual_v2";
+var ELEVEN_DEFAULT_MODEL = "eleven_v4";
 var ELEVEN_TIMEOUT_MS = 6e4;
 var LOCAL_TIMEOUT_MS = 3e5;
 var LOCAL_RATIO = Object.freeze([0.5, 2]);
@@ -4880,10 +4880,11 @@ function pickProvider(choice, env, { platform = process.platform, which = hasCom
 }
 function elevenLabs(env) {
   const voice = env.ELEVENLABS_VOICE_ID || ELEVEN_DEFAULT_VOICE;
+  const model = env.ELEVENLABS_MODEL_ID || ELEVEN_DEFAULT_MODEL;
   return {
     name: "elevenlabs",
     voice: "elevenlabs",
-    id: `elevenlabs:${voice}:${ELEVEN_MODEL}`,
+    id: `elevenlabs:${voice}:${model}`,
     concurrency: 2,
     async synth(text) {
       const url = `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=pcm_${SAMPLE_RATE}`;
@@ -4892,7 +4893,7 @@ function elevenLabs(env) {
         res = await fetch(url, {
           method: "POST",
           headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "content-type": "application/json" },
-          body: JSON.stringify({ text, model_id: ELEVEN_MODEL }),
+          body: JSON.stringify({ text, model_id: model }),
           signal: AbortSignal.timeout(ELEVEN_TIMEOUT_MS)
         });
       } catch (e) {
@@ -5874,7 +5875,7 @@ Client -> Server: ACK
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
 - Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
-  Set the ElevenLabs voice with the ELEVENLABS_VOICE_ID environment variable.
+  Set the ElevenLabs voice with ELEVENLABS_VOICE_ID and the model with ELEVENLABS_MODEL_ID (default eleven_v4).
   local calls a local OpenAI-compatible speech service (POST /v1/audio/speech, returns 16-bit PCM WAV):
   AM_TTS_URL (required, service base URL), AM_TTS_MODEL, AM_TTS_VOICE (required when the service has no default),
   AM_TTS_API_KEY is sent as a Bearer token when set; AM_TTS_EXTRA holds model-specific parameters (a JSON object); AM_TTS_MODEL / AM_TTS_VOICE override the same fields in it,

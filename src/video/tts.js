@@ -12,7 +12,7 @@ import { estimateSeconds } from './script.js';
 
 export const SAMPLE_RATE = 22050;
 const ELEVEN_DEFAULT_VOICE = 'JBFqnCBsd6RMkjVDRZzb';
-const ELEVEN_MODEL = 'eleven_multilingual_v2';
+const ELEVEN_DEFAULT_MODEL = 'eleven_v4';
 const ELEVEN_TIMEOUT_MS = 60000;
 const LOCAL_TIMEOUT_MS = 300000;
 // Local autoregressive TTS (e.g. Qwen3-TTS) sometimes fails to stop or cuts off early. When actual / estimated duration falls outside this range, retry, at most LOCAL_ATTEMPTS times.
@@ -48,10 +48,11 @@ export function pickProvider(choice, env, { platform = process.platform, which =
 
 function elevenLabs(env) {
   const voice = env.ELEVENLABS_VOICE_ID || ELEVEN_DEFAULT_VOICE;
+  const model = env.ELEVENLABS_MODEL_ID || ELEVEN_DEFAULT_MODEL;
   return {
     name: 'elevenlabs',
     voice: 'elevenlabs',
-    id: `elevenlabs:${voice}:${ELEVEN_MODEL}`,
+    id: `elevenlabs:${voice}:${model}`,
     concurrency: 2,
     async synth(text) {
       const url = `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=pcm_${SAMPLE_RATE}`;
@@ -60,7 +61,7 @@ function elevenLabs(env) {
         res = await fetch(url, {
           method: 'POST',
           headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, 'content-type': 'application/json' },
-          body: JSON.stringify({ text, model_id: ELEVEN_MODEL }),
+          body: JSON.stringify({ text, model_id: model }),
           signal: AbortSignal.timeout(ELEVEN_TIMEOUT_MS),
         });
       } catch (e) {
