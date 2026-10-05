@@ -73,10 +73,11 @@ This installs the skill only. It works the same way, but there are no slash comm
 For a skill install:
 
 ```bash
-node ~/.agents/skills/answer-me-with-html/scripts/am.mjs --version
+dir=$(ls -d ~/.agents/skills/answer-me-with-html ~/.claude/skills/answer-me-with-html 2>/dev/null | head -1)
+node "$dir/scripts/am.mjs" --version
 ```
 
-If the installer printed another path, use that one. Then use the skill to make a page that explains the TCP three-way handshake, with `--no-open` so no browser window pops up.
+Claude Code keeps the skill in `~/.claude/skills`; most other agents read `~/.agents/skills`. The first line finds whichever exists. Then use the skill to make a page that explains the TCP three-way handshake, with `--no-open` so no browser window pops up.
 
 For a plugin install, the skill loads after the reload. Run `claude plugin list` and check that it is enabled. Do not wait for the reload.
 
