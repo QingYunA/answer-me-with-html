@@ -296,7 +296,7 @@ A -> B: label
 ````
 
 - Every `## ` heading is a panel. The letters A, B, C are optional and added for you.
-- `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar.
+- `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. A panel with no `span` that holds a table of 4+ columns or a wide diagram is widened automatically; write `span` to override.
 - When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup.
 
 Full syntax for a component: `am help <component>`.

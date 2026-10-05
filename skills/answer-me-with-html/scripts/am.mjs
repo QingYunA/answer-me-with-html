@@ -4251,10 +4251,30 @@ function fillRows(panels, cols) {
     return span + fill;
   });
 }
+var WIDE_TABLE_COLS = 4;
+var TABLE_COLS_PER_SPAN = 2;
+var DIAGRAM_PX_PER_SPAN = 560;
+var CELL_SEP = /(?<!\\)\|/;
+var DELIMITER_ROW = /^\|[\s:|-]+\|?$/;
+function tableColumns(blocks) {
+  const counts = blocks.filter((b) => b.type === "md").flatMap((b) => {
+    const lines = b.text.split("\n").map((l3) => l3.trim());
+    return lines.flatMap((l3, i) => l3.startsWith("|") && DELIMITER_ROW.test(lines[i + 1] ?? "") ? [l3.split(CELL_SEP).length - 2] : []);
+  });
+  return Math.max(0, ...counts);
+}
+var svgWidth = (html) => Math.max(0, ...[...html.matchAll(/<svg\b[^>]*?\swidth="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1])));
+function minSpan(panel) {
+  const tableCols = tableColumns(panel.blocks ?? []);
+  const byTable = tableCols >= WIDE_TABLE_COLS ? Math.ceil(tableCols / TABLE_COLS_PER_SPAN) : 1;
+  const byDiagram = Math.ceil(svgWidth(panel.html ?? "") / DIAGRAM_PX_PER_SPAN);
+  return Math.max(1, byTable, byDiagram);
+}
 function sheet({ meta, introHtml, panels }) {
   const cols = Math.max(1, Math.min(Number(meta.cols) || 3, 12));
-  const spans = fillRows(panels, cols);
-  const placed = panels.map((p, i) => ({ ...p, attrs: { ...p.attrs, span: spans[i] } }));
+  const sized = panels.map((p) => p.attrs.span === void 0 && minSpan(p) > 1 ? { ...p, attrs: { ...p.attrs, span: Math.min(minSpan(p), cols) } } : p);
+  const spans = fillRows(sized, cols);
+  const placed = sized.map((p, i) => ({ ...p, attrs: { ...p.attrs, span: spans[i] } }));
   const nums = Array.from({ length: 8 }, (_2, i) => i + 1);
   const letters = ["A", "B", "C", "D"];
   return `<main class="am-sheet">
@@ -5732,7 +5752,7 @@ A -> B
 <div>\u4EFB\u610F\u5185\u5BB9</div>
 \`\`\`
 
-- "## " \u5F00\u542F\u4E00\u4E2A\u9762\u677F\uFF1B\u5B57\u6BCD ID \u53EF\u7701\u7565\uFF08\u81EA\u52A8\u5206\u914D A\u3001B\u3001C\u2026\uFF09\u3002span \u8BA9\u9762\u677F\u8DE8\u5217\u3002
+- "## " \u5F00\u542F\u4E00\u4E2A\u9762\u677F\uFF1B\u5B57\u6BCD ID \u53EF\u7701\u7565\uFF08\u81EA\u52A8\u5206\u914D A\u3001B\u3001C\u2026\uFF09\u3002span \u8BA9\u9762\u677F\u8DE8\u5217\uFF1B\u6CA1\u5199 span \u65F6\uFF0C4 \u5217\u4EE5\u4E0A\u7684\u8868\u683C\u548C\u5BBD\u56FE\u4F1A\u81EA\u52A8\u52A0\u5BBD\u3002
 - \u7EC4\u4EF6\u5217\u8868\u89C1 am list\uFF1B\u5355\u4E2A\u7EC4\u4EF6\u8BED\u6CD5\u89C1 am help <\u7EC4\u4EF6\u540D>\u3002`;
 var RAW_HELP = `LANG \u2014 \u539F\u6837\u5D4C\u5165\uFF08\u9003\u751F\u53E3\uFF09
 
