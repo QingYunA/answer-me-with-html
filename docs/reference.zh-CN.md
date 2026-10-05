@@ -7,7 +7,7 @@
 ````markdown
 ---
 template: sheet        # sheet 是多面板网格（默认），doc 是单栏长文加目录
-theme: blueprint       # blueprint 或 shadcn
+theme: blueprint       # blueprint、shadcn，或你自己的主题
 title: 页面标题
 subtitle: 一句话说明
 cols: 3                # sheet 的列数
@@ -55,6 +55,28 @@ AM_EOF
 
 页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。
 
+## 自定义主题
+
+在 `~/.answer-me-with-html/themes/` 里放 JSON 文件，一个文件就是一个主题，文件名就是主题名：`themes/notes.json` 对应主题 `notes`。选择方式和内置主题相同：在稿件里写 `theme: notes`，或者用 `--theme notes`、`am config set theme notes`。Agent 写的稿件不变，所以自定义主题不会给每次回答增加成本。
+
+```json
+{
+  "label": { "zh": "笔记", "en": "Notes", "ja": "ノート" },
+  "tokens": {
+    "common": { "--font-sans": "\"IBM Plex Sans\", \"Noto Sans CJK SC\"" },
+    "light": { "--bg": "#f7f5ef", "--paper": "#fffdf8", "--ink": "#1f1d1a" },
+    "dark": { "--bg": "#14130f", "--paper": "#1c1b17", "--ink": "#eeeae0" }
+  },
+  "css": "& .am-panel-head { letter-spacing: 0.01em; }"
+}
+```
+
+- 亮色和暗色都要写全所有颜色变量。`am help theme` 会列出这些变量，并给出完整格式。
+- 字体只能写本机已安装的字体。系统会自动加上默认字体作为回退，没装这些字体的读者也能正常阅读。
+- `css` 里每条选择器都以 `&` 开头。`&` 代表主题的根节点，这样这些规则只在这个主题下生效。
+- 每个页面都内嵌了内置主题和它自己的主题，所以换一台电脑也能打开。
+- `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，并生成两页包含全部组件的样张。
+
 ## 更新与清理
 
 **更新**：需要手动更新，但有新版本时会提醒你。工具每周在后台向 GitHub 查询一次最新版本号，只读这一个数字，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。关掉提醒：`/answer-me-with-html:config update_check off`。
@@ -68,4 +90,4 @@ AM_EOF
 **清理**：页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录超过 200 MB，或超过 20 MB 且 30 天没清理过，Agent 会问你要不要清理，每周最多问一次。没有你的同意，什么都不会删。
 
 - `/answer-me-with-html:clean`（插件），或者直接说"清理一下页面"：先预演，再问你。
-- `am clean`：删除 30 天前的页面和视频，清空配音缓存。`--days N` 改天数，`--all` 删除全部页面和视频，`--dry-run` 只看不删。配置始终保留。如果 `pages`、`videos` 或 `cache` 本身是软链接，会被跳过：`am clean` 不会碰链接指向的文件，用量统计和清理提示也不再计入。如果这些目录无法遍历（比如没有读权限），同样会被跳过：其中的文件不计入用量统计和清理提示，显示的大小可能低于实际占用，清理也不会删除它们。
+- `am clean`：删除 30 天前的页面和视频，清空配音缓存。`--days N` 改天数，`--all` 删除全部页面和视频，`--dry-run` 只看不删。配置和主题始终保留。如果 `pages`、`videos` 或 `cache` 本身是软链接，会被跳过：`am clean` 不会碰链接指向的文件，用量统计和清理提示也不再计入。如果这些目录无法遍历（比如没有读权限），同样会被跳过：其中的文件不计入用量统计和清理提示，显示的大小可能低于实际占用，清理也不会删除它们。

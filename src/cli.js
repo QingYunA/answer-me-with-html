@@ -1,21 +1,23 @@
-// am CLI: render / patch / lint / list / help. main() takes injected streams and environment variables, for testing.
+// am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, basename } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
 import { COMPONENTS } from './components/index.js';
-import { themes, themeNames } from './themes/registry.js';
+import { themeNames, getTheme, loadThemes } from './themes/registry.js';
+import { readThemeFile } from './themes/user.js';
+import { checkColors, COLOR_TOKENS } from './themes/check.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
-import { amHome, readConfig, setConfig, resetConfig, CONFIG_KEYS, ConfigError } from './config.js';
+import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 
@@ -34,8 +36,9 @@ Usage:
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
+  am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|video|patch]          show component syntax / page draft format / video draft format / patch usage
+  am help [component|format|video|patch|theme]    show component syntax / page draft format / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -158,15 +161,19 @@ export async function main(argv, io = {}) {
   if (opts.version) return print(VERSION), 0;
   if (opts.help || !cmd) return print(USAGE), 0;
 
+  // The built-in themes plus the user's theme files, read once per command.
+  const themes = loadThemes(amHome(env));
+  const ctx = { print, fail, env, io, themes };
   switch (cmd) {
-    case 'render': return withSource(arg, io, fail, (src) => cmdRender(src, opts, { print, fail, env, io }));
-    case 'patch': return cmdPatch(arg, rest[0], opts, { print, fail, env, io });
-    case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, { print, fail, env, io }));
+    case 'render': return withSource(arg, io, fail, (src) => cmdRender(src, opts, ctx));
+    case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
+    case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
-    case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), { print, fail, env });
+    case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
+    case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
     case 'clean': return cmdClean(opts, { print, fail, env });
     case '__update-check': return (await runUpdateCheck(amHome(env))) ? 0 : 1;
-    case 'list': return cmdList(print), 0;
+    case 'list': return cmdList(ctx), 0;
     case 'help': return cmdHelp(arg, { print, fail });
     default:
       fail(`✗ Unknown command "${cmd}"\n\n${USAGE}`);
@@ -214,7 +221,7 @@ function cmdRender(src, opts, ctx) {
   const { theme, mode, style } = config.values;
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -236,6 +243,35 @@ Usage:
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
+
+const THEME_HELP = `Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
+
+The file name is the theme name: themes/notes.json is theme "notes" (lowercase letters, digits and -; not a built-in name).
+Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am config set theme notes. The draft does not change.
+
+{
+  "label": "Notes",
+  "tokens": {
+    "common": { "--radius": "6px", "--font-sans": "\\"IBM Plex Sans\\", \\"Noto Sans CJK SC\\"" },
+    "light": { "--bg": "#f7f5ef", "--paper": "#fffdf8", "--ink": "#1f1d1a", ... },
+    "dark": { "--bg": "#14130f", "--paper": "#1c1b17", "--ink": "#eeeae0", ... }
+  },
+  "css": "& .am-panel-head { letter-spacing: 0.01em; }",
+  "video": { "tokens": { "light": { "--v-stage": "#fffdf8" } }, "css": "& .amv-title { font-weight: 500; }" }
+}
+
+- label: the name on the page's theme button: a string, or an object with zh / en / ja strings.
+- tokens: light and dark must each set every color: ${COLOR_TOKENS.join(' ')}.
+  common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
+- Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.
+- css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
+- video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
+- A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
+- A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
+
+am theme check <name|file.json> [--no-open]
+- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1).
+- Exits with 1 when there is an error. Without errors it renders two specimen pages (light, dark) with every component.`;
 
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const { fail, io } = ctx;
@@ -278,6 +314,12 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     fail(`✗ ${e.message}`);
     return 1;
   }
+  // A page made with a user theme that is no longer installed is not restyled silently.
+  const problem = ctx.themes.problem(page.theme, video ? 'video' : 'page');
+  if (problem && !opts.theme) {
+    fail(`✗ The page uses theme "${page.theme}", which is not installed or cannot be used (${problem}); add --theme <name> to pick another`);
+    return 1;
+  }
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   // Keep the original page's template, theme, mode and STE strictness (it may have been made with --theme / --style etc.); this command's arguments win.
@@ -298,7 +340,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -336,7 +378,7 @@ function validVoice(voice, fail) {
   return false;
 }
 
-async function buildVideo(src, voice, opts, config, { fail, env, io }) {
+async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   const provider = io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
@@ -344,6 +386,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io }) {
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     onProgress: (msg) => fail(`  ${msg}`),
+    themes,
   });
   return { ...result, voiceName: provider ? provider.name : 'none (captions only)' };
 }
@@ -362,10 +405,16 @@ async function exportVideoMp4(file, wav, { print, fail, env }) {
   return true;
 }
 
-function loadConfig({ fail, env }) {
-  const config = readConfig(env);
+function loadConfig({ fail, env, themes }) {
+  themeWarnings({ fail, themes });
+  const config = readConfig(env, themes);
   if (config.warning) fail(`! ${config.warning}`);
   return config;
+}
+
+// Theme files that were skipped, once per command.
+function themeWarnings({ fail, themes }) {
+  themes.warnings.forEach((w) => fail(`! ${w}`));
 }
 
 // Output path: the -o path when given, otherwise pages/ or videos/ in the data directory. io.now can inject a clock.
@@ -479,17 +528,17 @@ function reportError(e, fail) {
 
 const showValue = (v) => (typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
 
-function cmdConfig(args, { print, fail, env }) {
+function cmdConfig(args, { print, fail, env, themes }) {
   const [action, key, value] = args;
   try {
     if (action === 'set') {
       if (key === undefined || value === undefined) throw new ConfigError('Usage: am config set <key> <value>');
-      print(`✓ ${key} = ${showValue(setConfig(key, value, env))}`);
+      print(`✓ ${key} = ${showValue(setConfig(key, value, env, themes))}`);
       return 0;
     }
     if (action === 'get') {
       if (!CONFIG_KEYS[key]) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(' | ')}`);
-      print(showValue(readConfig(env).values[key]));
+      print(showValue(readConfig(env, themes).values[key]));
       return 0;
     }
     if (action === 'reset') {
@@ -503,12 +552,13 @@ function cmdConfig(args, { print, fail, env }) {
     fail(`✗ ${e.message}`);
     return 2;
   }
-  const { values, stored, warning, path } = readConfig(env);
+  themeWarnings({ fail, themes });
+  const { values, stored, warning, path } = readConfig(env, themes);
   if (warning) fail(`! ${warning}`);
   print(`Config file: ${path}`);
   for (const [k, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k in stored ? '*' : ' ';
-    const options = spec.type === 'bool' ? 'on | off' : spec.choices.join(' | ');
+    const options = spec.type === 'bool' ? 'on | off' : configChoices(k, themes).join(' | ');
     print(`${mark} ${k.padEnd(13)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== '0') print('Note: the AM_NO_OPEN environment variable is set and overrides the open setting.');
@@ -516,17 +566,68 @@ function cmdConfig(args, { print, fail, env }) {
   return 0;
 }
 
-function cmdList(print) {
+function cmdList({ print, fail, themes }) {
+  themeWarnings({ fail, themes });
   print('Templates (template):');
   print('  sheet   blueprint board: a grid of letter-numbered panels, for a one-screen overview (default)');
   print('  doc     linear explainer: one-column reading, with contents when there are 3+ panels');
   print('  video   explainer video: render with am video, see am help video');
   print('\nThemes (theme):');
-  for (const t of themes('video')) print(`  ${t.name.padEnd(10)}${t.summary}${t.scope.includes('page') ? '' : ' (video only)'}`);
+  const note = (t) => (t.user ? ' (yours)' : t.scope.includes('page') ? '' : ' (video only)');
+  for (const t of themes.list('video')) print(`  ${t.name.padEnd(10)}${t.summary}${note(t)}`);
   print('\nComponents (fence language):');
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print('  html/svg  embed as-is (escape hatch)');
   print('\nSyntax: am help <component>; draft format: am help format');
+}
+
+// Every component's example plus a table, so one page shows how a theme looks on all of them.
+function specimenDraft(name, mode) {
+  const sections = [...COMPONENTS.values()].map((c) => `## ${c.name}\n${c.example}`);
+  const table = '## table\n| Check | Status |\n|---|---|\n| Approved | ok passes |\n| Rejected | no fails |\n| Pending | warn needs a look |';
+  return `---\ntitle: Theme ${name} (${mode})\nlang: en\n---\n${[...sections, table].join('\n\n')}\n`;
+}
+
+function cmdTheme(action, target, opts, ctx) {
+  const { print, fail, env, io } = ctx;
+  if (action !== 'check' || !target) {
+    fail('✗ Usage: am theme check <name|file.json>');
+    return 2;
+  }
+  const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
+  const path = isFile ? resolve(io.cwd ?? process.cwd(), target) : join(amHome(env), 'themes', `${target}.json`);
+  const name = isFile ? basename(path).replace(/\.json$/i, '') : target;
+  let theme;
+  let errors = [];
+  if (!isFile && getTheme(name)) {
+    theme = getTheme(name);
+  } else if (existsSync(path)) {
+    ({ theme, errors } = readThemeFile(path, themeNames('video')));
+  } else {
+    fail(`✗ No theme named "${target}": ${path} does not exist`);
+    return 2;
+  }
+  const tokens = theme?.tokens ?? theme?.video?.tokens;
+  const colors = tokens ? checkColors({ tokens }) : { errors: [], warnings: [] };
+  const all = [...errors, ...colors.errors];
+  all.forEach((e) => print(`✗ ${e}`));
+  colors.warnings.forEach((w) => print(`! ${w}`));
+  print(`${name}: ${all.length} error${all.length === 1 ? '' : 's'}, ${colors.warnings.length} warning${colors.warnings.length === 1 ? '' : 's'}`);
+  if (all.length) return 1;
+  if (!theme.scope.includes('page')) return 0;
+
+  const themes = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
+  const files = ['light', 'dark'].map((mode) => {
+    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes });
+    const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, result.html);
+    print(`✓ ${file}`);
+    return file;
+  });
+  const config = readConfig(env, themes);
+  if (shouldOpen(opts, env, config.values)) files.forEach((f) => (io.open ?? openFile)(f));
+  return 0;
 }
 
 function cmdHelp(name, { print, fail }) {
@@ -534,10 +635,11 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'format') return print(FORMAT), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
+  if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, video, patch`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

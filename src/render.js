@@ -1,11 +1,11 @@
 // Draft → single-file HTML. Pipeline: parse → STE lint → render panels (markdown / components / raw) → apply template → inline CSS and runtime.
 
-import { parseDoc, ParseError, applyOverrides } from './parse.js';
+import { parseDoc, ParseError, applyOverrides, CHOICES } from './parse.js';
 import { md } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
-import { themes } from './themes/registry.js';
+import { BUILTIN } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc, isCJK, isJapanese } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
@@ -67,10 +67,14 @@ export function detectLang(text) {
   return isJapanese(text) ? 'ja' : 'zh';
 }
 
-export function renderDoc(source, overrides = {}, defaults = {}) {
-  const parsed = parseDoc(source, { defaults });
-  const doc = { ...parsed, meta: applyOverrides(parsed.meta, overrides) };
+// themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
+export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN } = {}) {
+  const choices = { theme: themes.choices('page') };
+  const parsed = parseDoc(source, { defaults, choices });
+  const doc = { ...parsed, meta: applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices }) };
   if (doc.meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
+  const problem = themes.problem(doc.meta.theme, 'page');
+  if (problem) throw new ParseError(problem, 0);
 
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
@@ -82,7 +86,7 @@ export function renderDoc(source, overrides = {}, defaults = {}) {
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
-  const html = shell({ meta: doc.meta, lang, body, source });
+  const html = shell({ meta: doc.meta, lang, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
   return { html, warnings, stats, meta: doc.meta };
 }
 
@@ -115,10 +119,10 @@ export function timestamp(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function shell({ meta, lang, body, source }) {
+function shell({ meta, lang, body, source, embedded }) {
   const key = UI[lang] ? lang : 'zh';
   const ui = UI[key];
-  const themeLabels = Object.fromEntries(themes('page').map((t) => [t.name, ui.themePrefix + t.label[key]]));
+  const themeLabels = Object.fromEntries(embedded.map((t) => [t.name, ui.themePrefix + t.label[key]]));
   return `<!doctype html>
 ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
@@ -127,7 +131,7 @@ ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: met
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss()}
+${pageCss(embedded)}
 </style>
 </head>
 <body>

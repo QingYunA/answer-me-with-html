@@ -7,7 +7,7 @@
 ````markdown
 ---
 template: sheet        # sheet = grid of panels (default), doc = one column with a table of contents
-theme: blueprint       # blueprint or shadcn
+theme: blueprint       # blueprint, shadcn, or your own theme
 title: Page title
 subtitle: One line
 cols: 3                # columns for sheet
@@ -55,6 +55,28 @@ AM_EOF
 
 Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them.
 
+## Your own theme
+
+Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name is the theme name, so `themes/notes.json` is the theme `notes`. Pick it like a built-in theme: `theme: notes` in the draft, `--theme notes`, or `am config set theme notes`. The agent writes the same draft, so a theme adds nothing to each answer.
+
+```json
+{
+  "label": "Notes",
+  "tokens": {
+    "common": { "--font-sans": "\"IBM Plex Sans\", \"Noto Sans CJK SC\"" },
+    "light": { "--bg": "#f7f5ef", "--paper": "#fffdf8", "--ink": "#1f1d1a" },
+    "dark": { "--bg": "#14130f", "--paper": "#1c1b17", "--ink": "#eeeae0" }
+  },
+  "css": "& .am-panel-head { letter-spacing: 0.01em; }"
+}
+```
+
+- Light and dark must each set every color variable. `am help theme` lists them and shows the whole format.
+- Name installed fonts only. The default fonts are added as the fallback, so a reader without your fonts still gets readable text.
+- In `css`, start every selector with `&`. It stands for the theme's root, so the rules apply only under this theme.
+- Each page carries the built-in themes plus its own theme, so it still opens on any machine.
+- `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, and renders two specimen pages with every component.
+
 ## Updating and cleaning up
 
 **Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` from GitHub to read the latest version number. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Turn this off with `/answer-me-with-html:config update_check off`.
@@ -68,4 +90,4 @@ Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move th
 **Cleaning up.** Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
 
 - `/answer-me-with-html:clean` (plugin), or say "clean up the pages", previews first and then asks.
-- `am clean` deletes pages and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
+- `am clean` deletes pages and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.

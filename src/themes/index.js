@@ -26,16 +26,21 @@ const scoped = (css, sel) => css.replace(/&/g, sel);
 // [data-theme][data-mode] makes the selector more specific than every theme's tokens, so it works wherever it is placed.
 const JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { '--font-sans': JA_SANS });
 
-export function pageCss() {
-  const list = themes('page');
+// A theme that sets its own sans font keeps it on Japanese pages: same selector shape as JA_FONT_CSS plus the theme name, so it wins.
+const ownJaFont = (t) => block(`html[lang="ja"][data-theme="${t.name}"][data-mode]`, { '--font-sans': t.tokens.common['--font-sans'] });
+
+// list: the page themes the page carries (default: the built-in ones).
+export function pageCss(list = themes('page')) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), JA_FONT_CSS, BASE_CSS, ...decorations].join('\n\n');
+  const jaFonts = list.filter((t) => t.ownFont).map(ownJaFont);
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), JA_FONT_CSS, ...jaFonts, BASE_CSS, ...decorations].join('\n\n');
 }
 
-export function videoCss() {
-  const parts = themes('video').filter((t) => t.video).flatMap((t) => [
+// list: the video themes the player carries (default: the built-in ones).
+export function videoCss(list = themes('video')) {
+  const parts = list.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : '',
     t.video.css ? scoped(t.video.css, videoSel(t)) : '',
   ]).filter(Boolean);
-  return [pageCss(), VIDEO_CSS, ...parts].join('\n\n');
+  return [pageCss(list.filter((t) => t.scope.includes('page'))), VIDEO_CSS, ...parts].join('\n\n');
 }

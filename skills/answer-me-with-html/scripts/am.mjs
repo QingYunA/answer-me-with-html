@@ -3,7 +3,7 @@
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync5, mkdirSync as mkdirSync4 } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync5, mkdirSync as mkdirSync4, existsSync as existsSync5 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.4.9";
@@ -134,7 +134,7 @@ html[data-export] .amv-stage { left: 0; top: 0; transform: none !important; }
 var VIDEO_JS = "(() => {\n  const D = JSON.parse(document.getElementById('amv-data').textContent);\n  const W = 1920;\n  const H = 1080;\n  const T = 0.9;     // scene transition, matches TIMING.transition\n  const R = 0.6;     // one step appearing\n  const CAM = 0.8;   // camera move\n  const root = document.documentElement;\n  const stage = document.querySelector('.amv-stage');\n  const camera = document.querySelector('.amv-camera');\n  const overlay = document.querySelector('.amv-overlay');\n  const caption = document.querySelector('.amv-caption span');\n  const scenes = [...document.querySelectorAll('.amv-scene')];\n  const segs = D.segments;\n  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));\n  const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };\n  const lerp = (a, b, p) => a + (b - a) * p;\n  const STEP_SEL = '.am-tl-item, .am-lim, .am-seg, tbody tr, .am-kv-cell, .am-md > ul > li, .am-md > ol > li, .am-md > p, .am-md > blockquote, .am-callout';\n\n  // \u2500\u2500 1. Fit each scene's content to the frame \u2500\u2500\n  for (const sc of scenes) {\n    const fit = sc.querySelector('.amv-fit');\n    if (!fit || !fit.children.length) continue;\n    const s = Math.min(1600 / fit.offsetWidth, 740 / fit.offsetHeight, 3.4);\n    fit.style.transform = `scale(${s})`;\n  }\n\n  // Scene titles sit outside the camera, so they stay put when it zooms.\n  const heads = scenes.map((sc) => {\n    const h = sc.querySelector('.amv-scene-head');\n    if (h) stage.insertBefore(h, camera.nextSibling);\n    return h;\n  });\n\n  // Measure elements in stage coordinates (the camera is the identity transform here).\n  const sr = stage.getBoundingClientRect();\n  const k = sr.width / W;\n  const rectOf = (el) => {\n    const r = el.getBoundingClientRect();\n    return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k, w: r.width / k, h: r.height / k };\n  };\n\n  // \u2500\u2500 2. Steps: group by data-step when a component sets it, else one step per row / item \u2500\u2500\n  const items = [];   // { el, at, paths: [{ el, len }] }\n  scenes.forEach((sc, i) => {\n    if (i === 0) return;\n    const groups = [];\n    for (const block of sc.querySelectorAll('.amv-fit > *')) {\n      const marked = [...block.querySelectorAll('[data-step]')];\n      if (marked.length) {\n        const by = new Map();\n        for (const el of marked) {\n          const n = Number(el.dataset.step);\n          if (!by.has(n)) by.set(n, []);\n          by.get(n).push(el);\n        }\n        [...by.keys()].sort((a, b) => a - b).forEach((n) => groups.push(by.get(n)));\n      } else {\n        const found = [...block.querySelectorAll(STEP_SEL)].filter((el) => !el.parentElement.closest(STEP_SEL));\n        if (found.length) found.forEach((el) => groups.push([el]));\n        else groups.push([block]);\n      }\n    }\n    const beats = segs[i].beats;\n    const S = groups.length;\n    const B = beats.length;\n    const perBeat = new Map();\n    groups.forEach((g, gi) => {\n      // With more beats than steps, the extra beats open the scene: steps align to the last beats.\n      const b = S <= B ? gi + (B - S) : Math.floor((gi * B) / S);\n      const rank = perBeat.get(b) ?? 0;\n      perBeat.set(b, rank + 1);\n      const beat = beats[b];\n      const count = S <= B ? 1 : Math.ceil(S / B) || 1;\n      const slot = Math.min(0.45, (beat.end - beat.start) / count);\n      for (const el of g) {\n        const paths = (el.matches('path.am-edge') ? [el] : [...el.querySelectorAll('path.am-edge')])\n          .filter((p) => !p.classList.contains('am-edge--dashed'))\n          .map((p) => ({ el: p, len: p.getTotalLength() }));\n        items.push({ el, scene: i, at: beat.start + rank * slot, paths });\n      }\n    });\n  });\n\n  // \u2500\u2500 3. Morphs: elements with the same data-key in consecutive scenes \u2500\u2500\n  const morphs = [];  // { scene, from, to, ghost, a, b }\n  const keyed = (sc) => {\n    const m = new Map();\n    for (const el of sc.querySelectorAll('[data-key]')) if (!m.has(el.dataset.key)) m.set(el.dataset.key, el);\n    return m;\n  };\n  for (let i = 2; i < scenes.length; i++) {\n    const prev = keyed(scenes[i - 1]);\n    for (const [key, to] of keyed(scenes[i])) {\n      const from = prev.get(key);\n      // Morph only like with like (SVG to SVG, HTML to HTML); otherwise the shapes do not match.\n      if (!from || (from instanceof SVGElement) !== (to instanceof SVGElement)) continue;\n      try {\n        const ghost = makeGhost(from);\n        overlay.append(ghost.node);\n        morphs.push({ scene: i, from, to, ghost: ghost.node, a: ghost.place(rectOf(from)), b: ghost.place(rectOf(to)) });\n      } catch {\n        // Morphs are a nicety: skip an element whose measurement fails; playback is unaffected.\n      }\n    }\n  }\n  const carried = new Set(morphs.map((m) => m.to));\n\n  function makeGhost(el) {\n    const wrap = document.createElement('div');\n    const host = el.closest('.am-diagram, .am-tree, .am-timeline, .am-kv, .am-limits');\n    wrap.className = `amv-ghost ${host ? host.className : ''}`;\n    if (el instanceof SVGGraphicsElement) {\n      const bb = el.getBBox();\n      const pad = 4;\n      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');\n      svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`);\n      svg.setAttribute('width', bb.width + pad * 2);\n      svg.setAttribute('height', bb.height + pad * 2);\n      const clone = el.cloneNode(true);\n      clone.removeAttribute('style');\n      svg.append(clone);\n      wrap.append(svg);\n      return {\n        node: wrap,\n        place: (r) => {\n          const s = r.w / (bb.width || 1);\n          return { x: r.x - pad * s, y: r.y - pad * s, s };\n        },\n      };\n    }\n    const clone = el.cloneNode(true);\n    clone.removeAttribute('style');\n    clone.querySelectorAll('[data-key], ul').forEach((n) => n.remove());\n    const box = document.createElement(el.tagName === 'LI' ? 'ul' : 'div');\n    box.className = el.tagName === 'LI' ? 'am-tree-list' : '';\n    box.style.margin = '0';\n    box.append(clone);\n    wrap.append(box);\n    wrap.style.width = `${el.offsetWidth}px`;\n    const w0 = el.offsetWidth || 1;\n    return { node: wrap, place: (r) => ({ x: r.x, y: r.y, s: r.w / w0 }) };\n  }\n\n  // \u2500\u2500 4. Camera: the element named by [name] in the narration \u2500\u2500\n  const findKey = (sc, key) => {\n    const all = [...sc.querySelectorAll('[data-key]')];\n    const norm = (s) => s.replace(/[`*]/g, '').trim().toLowerCase();\n    return all.find((el) => norm(el.dataset.key) === norm(key))\n      ?? all.find((el) => norm(el.dataset.key).includes(norm(key)))\n      ?? [...sc.querySelectorAll(`${STEP_SEL}, text`)].find((el) => norm(el.textContent).includes(norm(key)));\n  };\n  const IDENT = { s: 1, x: 0, y: 0 };\n  // Zoom without cropping: the whole diagram must stay in the safe area between title and captions.\n  const SAFE = { left: 60, right: W - 60, top: 150, bottom: H - 200 }; // leave room for captions at the bottom\n  function focusCam(r, sc) {\n    const fit = sc.querySelector('.amv-fit');\n    const c = fit ? rectOf(fit) : { x: 0, y: 0, w: W, h: H };\n    const room = Math.min((SAFE.right - SAFE.left) / c.w, (SAFE.bottom - SAFE.top) / c.h);\n    const s = clamp(Math.min(0.5 * W / r.w, 0.42 * H / r.h, room, 1.4), 1, 1.4);\n    const fitAxis = (want, lo, hi, a, b) => (s * (b - a) <= hi - lo ? clamp(want, lo - s * a, hi - s * b) : want);\n    return {\n      s,\n      x: fitAxis(W / 2 - s * (r.x + r.w / 2), SAFE.left, SAFE.right, c.x, c.x + c.w),\n      y: fitAxis(H * 0.5 - s * (r.y + r.h / 2), SAFE.top, SAFE.bottom, c.y, c.y + c.h),\n    };\n  }\n  const camEvents = [];   // { t, cam, hl }\n  segs.forEach((seg, i) => {\n    camEvents.push({ t: seg.start, cam: IDENT, hl: null });\n    seg.beats.forEach((b) => {\n      const el = b.focus ? findKey(scenes[i], b.focus) : null;\n      let cam = IDENT;\n      if (el) cam = focusCam(rectOf(el), scenes[i]);\n      camEvents.push({ t: b.start, cam, hl: el });\n    });\n  });\n  const hlTargets = new Set(camEvents.map((e) => e.hl).filter(Boolean));\n\n  // Scene and title fades. Titles never overlap: the old one fades out in the first half of the transition, the new one fades in in the second half.\n  const show = (el, op) => {\n    el.style.opacity = op;\n    el.style.visibility = op > 0 ? 'visible' : 'hidden';\n  };\n  function drawScenes(t) {\n    scenes.forEach((sc, i) => {\n      const seg = segs[i];\n      const next = segs[i + 1];\n      const before = t < seg.start;\n      const fadeIn = i === 0 ? ease(t / 0.8) : ease((t - seg.start) / T);\n      const fadeOut = next ? 1 - ease((t - next.start) / T) : 1;\n      show(sc, before ? 0 : Math.min(fadeIn, fadeOut));\n      if (!heads[i]) return;\n      const hin = ease((t - seg.start - T / 2) / (T / 2));\n      const hout = next ? 1 - ease((t - next.start) / (T / 2)) : 1;\n      show(heads[i], before ? 0 : Math.min(hin, hout));\n    });\n  }\n\n  // Steps appear: edges draw in one stroke, other elements fade in and rise slightly.\n  function drawSteps(t) {\n    for (const it of items) {\n      if (carried.has(it.el)) continue;\n      const p = ease((t - it.at) / R);\n      it.el.style.opacity = clamp((t - it.at) / 0.25);\n      if (!it.paths.length) {\n        it.el.style.transform = p < 1 ? `translateY(${(1 - p) * 14}px)` : '';\n        continue;\n      }\n      for (const { el, len } of it.paths) {\n        el.style.strokeDasharray = `${len}`;\n        el.style.strokeDashoffset = `${len * (1 - p)}`;\n        el.style.markerEnd = p < 0.97 ? 'none' : '';\n      }\n    }\n  }\n\n  // Morphs: during the transition a stand-in moves from the old to the new position while the real elements are hidden.\n  // An element can end one morph and start the next; collect the elements to hide first, then apply, so the two do not overwrite each other.\n  const morphed = [...new Set(morphs.flatMap((m) => [m.from, m.to]))];\n  function drawMorphs(t) {\n    const hidden = new Set();\n    for (const m of morphs) {\n      const s0 = segs[m.scene].start;\n      const during = t >= s0 && t < s0 + T;\n      m.ghost.style.display = during ? '' : 'none';\n      if (during) {\n        const p = ease((t - s0) / T);\n        m.ghost.style.transform = `translate(${lerp(m.a.x, m.b.x, p)}px, ${lerp(m.a.y, m.b.y, p)}px) scale(${lerp(m.a.s, m.b.s, p)})`;\n        hidden.add(m.from);\n      }\n      if (t < s0 + T) hidden.add(m.to);\n      m.to.style.opacity = 1;\n    }\n    for (const el of morphed) el.style.visibility = hidden.has(el) ? 'hidden' : '';\n  }\n\n  // Camera and highlight: interpolate between the previous camera position and the current target.\n  function drawCamera(t) {\n    const ev = camEvents.findLastIndex((e) => t >= e.t);\n    const e = ev >= 0 ? camEvents[ev] : null;\n    const prev = ev > 0 ? camEvents[ev - 1].cam : IDENT;\n    const p = e ? ease((t - e.t) / CAM) : 0;\n    const to = e ? e.cam : IDENT;\n    camera.style.transform = `translate(${lerp(prev.x, to.x, p)}px, ${lerp(prev.y, to.y, p)}px) scale(${lerp(prev.s, to.s, p)})`;\n    for (const el of hlTargets) el.classList.toggle('amv-hl', el === e?.hl);\n  }\n\n  function drawCaption(t) {\n    const cur = segs.findLastIndex((s) => t >= s.start);\n    const beats = cur >= 0 ? segs[cur].beats : [];\n    const b = beats.find((x) => t >= x.start && t < x.end + 0.3);\n    const html = b ? b.html : '';\n    if (caption.dataset.html !== html) {\n      caption.innerHTML = html;\n      caption.dataset.html = html;\n    }\n    caption.style.opacity = b ? clamp((t - b.start) / 0.2) : 0;\n  }\n\n  // \u2500\u2500 5. Deterministic rendering: the same time always draws the same frame \u2500\u2500\n  function render(time) {\n    const t = clamp(time, 0, D.duration);\n    drawScenes(t);\n    drawSteps(t);\n    drawMorphs(t);\n    drawCamera(t);\n    drawCaption(t);\n    updateUi(t);\n  }\n\n  // \u2500\u2500 6. Player \u2500\u2500\n  const audio = document.getElementById('amv-audio');\n  const seek = document.querySelector('.amv-seek');\n  const timeEl = document.querySelector('.amv-time');\n  const toggleBtn = document.querySelector('[data-amv=\"toggle\"]');\n  const bigPlay = document.querySelector('.amv-bigplay');\n  const marks = document.querySelector('.amv-marks');\n  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;\n  seek.max = D.duration;\n  segs.slice(1).forEach((s) => {\n    const m = document.createElement('i');\n    m.style.left = `${(s.start / D.duration) * 100}%`;\n    m.title = s.title;\n    marks.append(m);\n  });\n\n  let playing = false;\n  let base = 0;\n  let t0 = 0;\n  const now = () => (!playing ? base : audio ? audio.currentTime : base + (performance.now() - t0) / 1000);\n\n  function updateUi(t) {\n    if (document.activeElement !== seek) seek.value = t;\n    timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;\n  }\n\n  function play() {\n    if (base >= D.duration - 0.05) base = 0;\n    playing = true;\n    bigPlay.hidden = true;\n    toggleBtn.textContent = '\u275A\u275A';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.pause);\n    if (audio) {\n      audio.currentTime = base;\n      audio.play().catch(() => {});\n    } else {\n      t0 = performance.now();\n    }\n    requestAnimationFrame(tick);\n  }\n\n  function pause() {\n    base = now();\n    playing = false;\n    audio?.pause();\n    toggleBtn.textContent = '\u25B6';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.play);\n  }\n\n  function seekTo(x) {\n    base = clamp(x, 0, D.duration);\n    if (audio) audio.currentTime = base;\n    t0 = performance.now();\n    render(base);\n  }\n\n  function tick() {\n    if (!playing) return;\n    const t = now();\n    if (t >= D.duration) {\n      pause();\n      base = D.duration;\n      render(D.duration);\n      return;\n    }\n    render(t);\n    requestAnimationFrame(tick);\n  }\n\n  const toggle = () => (playing ? pause() : play());\n  toggleBtn.addEventListener('click', toggle);\n  bigPlay.addEventListener('click', play);\n  stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });\n  seek.addEventListener('input', () => seekTo(Number(seek.value)));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === ' ') { e.preventDefault(); toggle(); }\n    if (e.key === 'ArrowRight') seekTo(now() + 5);\n    if (e.key === 'ArrowLeft') seekTo(now() - 5);\n  });\n  audio?.addEventListener('ended', () => { pause(); base = D.duration; });\n\n  function fitStage() {\n    if (root.hasAttribute('data-export')) return;\n    const vp = stage.parentElement;\n    const s = Math.min(vp.clientWidth / W, vp.clientHeight / H);\n    stage.style.transform = `translate(-50%, -50%) scale(${s})`;\n  }\n  window.addEventListener('resize', fitStage);\n\n  // Export: place the stage 1:1 at the top left and call render(t) frame by frame.\n  window.render = render;\n  window.__amv = {\n    duration: D.duration,\n    fps: D.fps,\n    exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },\n  };\n  fitStage();\n  // Poster: show the fully faded-in title card, but playback still starts at 0.\n  render(Math.min(1, segs[0].end));\n  updateUi(0);\n})();\n";
 
 // src/cli.js
-import { join as join6, resolve, dirname as dirname2 } from "node:path";
+import { join as join7, resolve, dirname as dirname2, basename as basename2 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/themes/fonts.js
@@ -337,11 +337,242 @@ var b1b_default = {
   }
 };
 
+// src/themes/user.js
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
+
+// src/themes/color.js
+var HEX = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+var FN = /^(rgba?|hsla?)\(\s*([^)]*)\)$/i;
+function parseColor(value) {
+  const v = String(value).trim();
+  const hex = v.match(HEX);
+  if (hex) {
+    let h3 = hex[1];
+    if (h3.length <= 4) h3 = [...h3].map((c) => c + c).join("");
+    const n = [0, 2, 4, 6].map((i) => parseInt(h3.slice(i, i + 2) || "ff", 16));
+    return [n[0], n[1], n[2], n[3] / 255];
+  }
+  const fn3 = v.match(FN);
+  if (!fn3) return null;
+  const parts = fn3[2].split(/[\s,/]+/).filter(Boolean);
+  if (parts.length < 3 || parts.length > 4) return null;
+  const num = (s2, scale) => s2.endsWith("%") ? parseFloat(s2) / 100 * scale : parseFloat(s2);
+  const alpha = parts[3] === void 0 ? 1 : num(parts[3], 1);
+  if (fn3[1].toLowerCase().startsWith("rgb")) {
+    const rgb = parts.slice(0, 3).map((s2) => num(s2, 255));
+    return [...rgb, alpha].some(Number.isNaN) ? null : [...rgb, alpha];
+  }
+  const [h2, s, l3] = [parseFloat(parts[0]), num(parts[1], 1), num(parts[2], 1)];
+  if ([h2, s, l3, alpha].some(Number.isNaN)) return null;
+  const k2 = (n) => (n + h2 / 30) % 12;
+  const f2 = (n) => l3 - s * Math.min(l3, 1 - l3) * Math.max(-1, Math.min(k2(n) - 3, 9 - k2(n), 1));
+  return [f2(0) * 255, f2(8) * 255, f2(4) * 255, alpha];
+}
+var over = ([r, g, b, a], [br2, bg, bb]) => [r * a + br2 * (1 - a), g * a + bg * (1 - a), b * a + bb * (1 - a), 1];
+var luminance = ([r, g, b]) => {
+  const c = [r, g, b].map((x2) => x2 / 255).map((x2) => x2 <= 0.03928 ? x2 / 12.92 : ((x2 + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+};
+function contrast(fg, bg, base = [255, 255, 255, 1]) {
+  const back = over(bg, base);
+  const [x2, y2] = [luminance(over(fg, back)), luminance(back)];
+  return (Math.max(x2, y2) + 0.05) / (Math.min(x2, y2) + 0.05);
+}
+
+// src/themes/check.js
+var NAME = /^[a-z0-9][a-z0-9-]*$/;
+var COLOR_TOKENS = Object.freeze([
+  "--bg",
+  "--paper",
+  "--ink",
+  "--ink-2",
+  "--ink-3",
+  "--line",
+  "--line-2",
+  "--fill",
+  "--accent",
+  "--accent-bg",
+  "--ok",
+  "--ok-bg",
+  "--err",
+  "--err-bg",
+  "--warn",
+  "--warn-bg",
+  "--head-bg",
+  "--head-fg"
+]);
+var LANGS = ["zh", "en", "ja"];
+var UNSAFE_VALUE = /[;{}<]/;
+function normalizeTheme(name, data, builtinNames = []) {
+  const errors = [];
+  if (!NAME.test(name)) errors.push(`the name "${name}" must use lowercase letters, digits and -`);
+  if (builtinNames.includes(name)) errors.push(`"${name}" is a built-in theme; rename the file`);
+  if (!data || typeof data !== "object" || Array.isArray(data)) return { theme: null, errors: [...errors, "the file must hold a JSON object"] };
+  const tokens = data.tokens ?? {};
+  const group = (where, g) => {
+    if (g === void 0) return {};
+    if (!g || typeof g !== "object" || Array.isArray(g)) {
+      errors.push(`${where} must be an object of CSS variables`);
+      return {};
+    }
+    for (const [k2, v] of Object.entries(g)) {
+      if (!k2.startsWith("--")) errors.push(`${where}: "${k2}" must start with --`);
+      else if (typeof v !== "string" || UNSAFE_VALUE.test(v)) errors.push(`${where}: ${k2} must be a string without ; { } <`);
+    }
+    return g;
+  };
+  const common = group("tokens.common", tokens.common);
+  const light = group("tokens.light", tokens.light);
+  const dark = group("tokens.dark", tokens.dark);
+  for (const [mode, set] of [["light", { ...common, ...light }], ["dark", { ...common, ...dark }]]) {
+    const missing = COLOR_TOKENS.filter((k2) => set[k2] === void 0);
+    if (missing.length) errors.push(`${mode} mode is missing ${missing.join(" ")}`);
+  }
+  const css = cssField("css", data.css, errors);
+  let video;
+  if (data.video !== void 0) {
+    const v = data.video && typeof data.video === "object" ? data.video : {};
+    const vt2 = v.tokens ?? {};
+    video = {
+      tokens: { common: group("video.tokens.common", vt2.common), light: group("video.tokens.light", vt2.light), dark: group("video.tokens.dark", vt2.dark) },
+      css: cssField("video.css", v.css, errors)
+    };
+  }
+  const label = labelField(data.label, name, errors);
+  const fonts = {};
+  if (common["--font-sans"]) fonts["--font-sans"] = `${common["--font-sans"]}, ${SANS}`;
+  if (common["--font-mono"]) fonts["--font-mono"] = `${common["--font-mono"]}, ${MONO}`;
+  const theme = {
+    name,
+    summary: label.en,
+    label,
+    scope: ["page", "video"],
+    user: true,
+    ownFont: Boolean(common["--font-sans"]),
+    tokens: { common: { ...blueprint_default.tokens.common, ...common, ...fonts }, light, dark },
+    css,
+    video
+  };
+  return { theme, errors };
+}
+function labelField(label, name, errors) {
+  if (label === void 0) return Object.fromEntries(LANGS.map((l3) => [l3, name]));
+  if (typeof label === "string") return Object.fromEntries(LANGS.map((l3) => [l3, label]));
+  if (!label || typeof label !== "object" || Object.values(label).some((v) => typeof v !== "string")) {
+    errors.push("label must be a string or an object of zh / en / ja strings");
+    return Object.fromEntries(LANGS.map((l3) => [l3, name]));
+  }
+  const fallback = label.en ?? Object.values(label)[0] ?? name;
+  return Object.fromEntries(LANGS.map((l3) => [l3, label[l3] ?? fallback]));
+}
+function cssField(where, css, errors) {
+  if (css === void 0) return void 0;
+  if (typeof css !== "string") {
+    errors.push(`${where} must be a string`);
+    return void 0;
+  }
+  if (/<\/style/i.test(css)) errors.push(`${where} must not contain </style>`);
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (const m of text.matchAll(/(?:^|[{};])\s*([^{};]+?)\s*\{/g)) {
+    const prelude = m[1];
+    if (prelude.startsWith("@")) continue;
+    const bad = prelude.split(",").map((s) => s.trim()).find((s) => !s.startsWith("&"));
+    if (bad !== void 0) errors.push(`${where}: selector "${bad}" must start with & (the theme's root)`);
+  }
+  return css;
+}
+var TEXT_PAIRS = [["--ink", "--paper"], ["--ink", "--bg"], ["--ink-2", "--paper"], ["--ink-2", "--bg"], ["--head-fg", "--head-bg"], ["--accent", "--paper"]];
+var BADGE_PAIRS = [["--accent", "--accent-bg"], ["--ok", "--ok-bg"], ["--err", "--err-bg"], ["--warn", "--warn-bg"]];
+function checkColors(theme) {
+  const errors = [];
+  const warnings = [];
+  const { common = {}, light = {}, dark = {} } = theme.tokens ?? {};
+  for (const [mode, set] of [["light", { ...common, ...light }], ["dark", { ...common, ...light, ...dark }]]) {
+    const colors = {};
+    for (const k2 of COLOR_TOKENS) {
+      if (set[k2] === void 0) continue;
+      const c = parseColor(set[k2]);
+      if (c) colors[k2] = c;
+      else errors.push(`${mode}: ${k2} "${set[k2]}" is not a color this check reads (use hex, rgb() or hsl())`);
+    }
+    const ratio = (fg, bg) => colors[fg] && colors[bg] ? contrast(colors[fg], colors[bg], colors["--paper"]) : null;
+    const say = (fg, bg, r, need) => `${mode}: ${fg} on ${bg} has contrast ${r.toFixed(2)}:1, needs ${need}:1`;
+    for (const [fg, bg] of TEXT_PAIRS) {
+      const r = ratio(fg, bg);
+      if (r !== null && r < 4.5) errors.push(say(fg, bg, r, 4.5));
+    }
+    for (const [fg, bg] of BADGE_PAIRS) {
+      const r = ratio(fg, bg);
+      if (r !== null && r < 3) errors.push(say(fg, bg, r, 3));
+      else if (r !== null && r < 4.5) warnings.push(say(fg, bg, r, 4.5));
+    }
+  }
+  return { errors, warnings };
+}
+
+// src/themes/user.js
+function readThemeFile(file, builtinNames) {
+  const name = basename(file).replace(/\.json$/i, "");
+  let data;
+  try {
+    data = JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    return { name, theme: null, errors: [`cannot read it as JSON (${e.message})`] };
+  }
+  return { name, ...normalizeTheme(name, data, builtinNames) };
+}
+function readUserThemes(home, builtinNames) {
+  const dir = join(home, "themes");
+  const themes2 = [];
+  const broken = /* @__PURE__ */ new Map();
+  if (!existsSync(dir)) return { themes: themes2, broken };
+  for (const f2 of readdirSync(dir).filter((x2) => x2.toLowerCase().endsWith(".json")).sort()) {
+    const { name, theme, errors } = readThemeFile(join(dir, f2), builtinNames);
+    if (errors.length) broken.set(name, { file: `themes/${f2}`, reason: errors.join("; ") });
+    else themes2.push(theme);
+  }
+  return { themes: themes2, broken };
+}
+
 // src/themes/registry.js
 var ALL = Object.freeze([blueprint_default, shadcn_default, b1b_default]);
+var BUILTIN_NAMES = ALL.map((t) => t.name);
 var themes = (scope) => ALL.filter((t) => t.scope.includes(scope));
 var themeNames = (scope) => themes(scope).map((t) => t.name);
 var getTheme = (name) => ALL.find((t) => t.name === name);
+function themeSet(user = [], broken = /* @__PURE__ */ new Map()) {
+  const all = [...ALL, ...user];
+  const list = (scope) => all.filter((t) => t.scope.includes(scope));
+  const names = (scope) => list(scope).map((t) => t.name);
+  const unusable = [...broken].filter(([name]) => !BUILTIN_NAMES.includes(name));
+  return Object.freeze({
+    list,
+    names,
+    get: (name) => all.find((t) => t.name === name),
+    // Names a draft or flag may give: usable themes plus broken ones, so the error can say what is wrong with the file.
+    choices: (scope) => [...names(scope), ...unusable.map(([name]) => name)],
+    // Why a name cannot be used, or null.
+    problem(name, scope) {
+      if (names(scope).includes(name)) return null;
+      const bad = unusable.find(([n]) => n === name);
+      if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
+      return `Theme "${name}" is not installed. Choose one of: ${names(scope).join(" | ")}`;
+    },
+    // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
+    embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
+    warnings: [...broken.values()].map(({ file, reason }) => `${file} skipped: ${reason}`)
+  });
+}
+var BUILTIN = themeSet();
+function loadThemes(home, { extra } = {}) {
+  const { themes: user, broken } = home ? readUserThemes(home, BUILTIN_NAMES) : { themes: [], broken: /* @__PURE__ */ new Map() };
+  if (!extra) return themeSet(user, broken);
+  const one = readThemeFile(extra, BUILTIN_NAMES);
+  const rest = user.filter((t) => t.name !== one.name);
+  if (one.errors.length) return themeSet(rest, new Map([...broken, [one.name, { file: extra, reason: one.errors.join("; ") }]]));
+  return themeSet([...rest, one.theme], broken);
+}
 
 // src/parse.js
 var ParseError = class extends Error {
@@ -2218,13 +2449,13 @@ function parseRow(t, line) {
 function rowHtml({ label, value, limit, unit, note }) {
   const { max, step } = niceScale(Math.max(limit, value ?? 0));
   const shown = value ?? limit;
-  const over = value !== null && value > limit;
+  const over2 = value !== null && value > limit;
   const valText = `${value !== null ? `${value} / ` : ""}max ${limit}${unit ? ` ${unit}` : ""}`;
   const ticks = [];
   if (step > 0 && max > 0) {
     for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="left: ${pct(round(v), max)}">${round(v)}</span>`);
   }
-  return `<div class="am-lim${over ? " is-over" : ""}">
+  return `<div class="am-lim${over2 ? " is-over" : ""}">
 <div class="am-lim-head"><span>${esc(label)}${note ? `<span class="am-lim-note">${esc(note)}</span>` : ""}</span><span class="am-lim-val">${esc(valText)}</span></div>
 <div class="am-lim-track"><div class="am-lim-fill" style="width: ${pct(shown, max)}"></div><div class="am-lim-mark" style="left: ${pct(limit, max)}"></div></div>
 <div class="am-lim-ticks" aria-hidden="true">${ticks.join("")}</div>
@@ -2290,9 +2521,9 @@ function parseSequence(text) {
     if (m = t.match(RE.participants)) {
       m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add);
     } else if (m = t.match(RE.note)) {
-      const over = m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-      over.forEach(add);
-      steps.push({ kind: "note", over, text: m[2].trim(), line });
+      const over2 = m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+      over2.forEach(add);
+      steps.push({ kind: "note", over: over2, text: m[2].trim(), line });
     } else if (m = t.match(RE.divider)) {
       steps.push({ kind: "divider", text: m[1], line });
     } else if (m = t.match(RE.msg)) {
@@ -4627,17 +4858,18 @@ var pageSel = (t) => `html[data-theme="${t.name}"]`;
 var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
 var JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { "--font-sans": JA_SANS });
-function pageCss() {
-  const list = themes("page");
+var ownJaFont = (t) => block(`html[lang="ja"][data-theme="${t.name}"][data-mode]`, { "--font-sans": t.tokens.common["--font-sans"] });
+function pageCss(list = themes("page")) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), JA_FONT_CSS, BASE_CSS, ...decorations].join("\n\n");
+  const jaFonts = list.filter((t) => t.ownFont).map(ownJaFont);
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), JA_FONT_CSS, ...jaFonts, BASE_CSS, ...decorations].join("\n\n");
 }
-function videoCss() {
-  const parts = themes("video").filter((t) => t.video).flatMap((t) => [
+function videoCss(list = themes("video")) {
+  const parts = list.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : "",
     t.video.css ? scoped(t.video.css, videoSel(t)) : ""
   ]).filter(Boolean);
-  return [pageCss(), VIDEO_CSS, ...parts].join("\n\n");
+  return [pageCss(list.filter((t) => t.scope.includes("page"))), VIDEO_CSS, ...parts].join("\n\n");
 }
 
 // src/lint/wordlist.en.js
@@ -4930,10 +5162,13 @@ function detectLang(text) {
   if (cjk * 3 < latin) return "en";
   return isJapanese(text) ? "ja" : "zh";
 }
-function renderDoc(source, overrides = {}, defaults2 = {}) {
-  const parsed = parseDoc(source, { defaults: defaults2 });
-  const doc2 = { ...parsed, meta: applyOverrides(parsed.meta, overrides) };
+function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN } = {}) {
+  const choices = { theme: themes2.choices("page") };
+  const parsed = parseDoc(source, { defaults: defaults2, choices });
+  const doc2 = { ...parsed, meta: applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices }) };
   if (doc2.meta.template === "video") throw new ParseError("template: video is a video draft; render it with am video", 0);
+  const problem = themes2.problem(doc2.meta.theme, "page");
+  if (problem) throw new ParseError(problem, 0);
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const stats = { panels: doc2.panels.length, components: {} };
@@ -4943,7 +5178,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}) {
   const introHtml = renderBlocks(doc2.intro, ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui });
-  const html = shell({ meta: doc2.meta, lang, body, source });
+  const html = shell({ meta: doc2.meta, lang, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page") });
   return { html, warnings, stats, meta: doc2.meta };
 }
 function renderBlocks(blocks, ctx) {
@@ -4972,10 +5207,10 @@ function timestamp(d = /* @__PURE__ */ new Date()) {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function shell({ meta, lang, body, source }) {
+function shell({ meta, lang, body, source, embedded }) {
   const key = UI[lang] ? lang : "zh";
   const ui = UI[key];
-  const themeLabels = Object.fromEntries(themes("page").map((t) => [t.name, ui.themePrefix + t.label[key]]));
+  const themeLabels = Object.fromEntries(embedded.map((t) => [t.name, ui.themePrefix + t.label[key]]));
   return `<!doctype html>
 ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
@@ -4984,7 +5219,7 @@ ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: met
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${pageCss()}
+${pageCss(embedded)}
 </style>
 </head>
 <body>
@@ -5007,8 +5242,8 @@ ${RUNTIME_JS}</script>
 var NARRATION = /^\s*>\s?(.*)$/;
 var FOCUS = /\[([^\]\n]+)\]/g;
 var VIDEO_THEMES = Object.freeze(themeNames("video"));
-function parseVideo(source, { defaults: defaults2 = {} } = {}) {
-  const doc2 = parseDoc(source, { defaults: { ...defaults2, template: "video" }, choices: { theme: VIDEO_THEMES } });
+function parseVideo(source, { defaults: defaults2 = {}, themeChoices = VIDEO_THEMES } = {}) {
+  const doc2 = parseDoc(source, { defaults: { ...defaults2, template: "video" }, choices: { theme: themeChoices } });
   const intro = splitNarration(doc2.intro);
   const scenes = doc2.panels.map((p) => {
     const { blocks, beats } = splitNarration(p.blocks);
@@ -5090,9 +5325,9 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync } from "node:fs";
+import { mkdirSync, readFileSync as readFileSync2, writeFileSync, existsSync as existsSync2, rmSync, mkdtempSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join as join2 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -5244,7 +5479,7 @@ function systemVoice(platform, which) {
       synth: (text) => withTemp(async (file) => {
         const v = voices[detectLang(text)];
         await run("say", [...v ? ["-v", v] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
-        return readWav(readFileSync(file));
+        return readWav(readFileSync2(file));
       })
     };
   }
@@ -5256,7 +5491,7 @@ function systemVoice(platform, which) {
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[detectLang(text)] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
-        return readWav(readFileSync(file));
+        return readWav(readFileSync2(file));
       })
     };
   }
@@ -5292,9 +5527,9 @@ function textFile(wavFile, text) {
   return p;
 }
 async function withTemp(fn3) {
-  const dir = mkdtempSync(join(tmpdir(), "am-tts-"));
+  const dir = mkdtempSync(join2(tmpdir(), "am-tts-"));
   try {
-    return await fn3(join(dir, "out.wav"));
+    return await fn3(join2(dir, "out.wav"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -5338,7 +5573,7 @@ async function synthAll(texts, provider, { cacheDir } = {}) {
   const worker = async () => {
     while (next < texts.length) {
       const i = next++;
-      const file = cacheDir && join(cacheDir, `${createHash("sha1").update(`${provider.id}
+      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(`${provider.id}
 ${texts[i]}`).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
@@ -5353,8 +5588,8 @@ ${texts[i]}`).digest("hex")}.pcm`);
   return results;
 }
 function readCache(file) {
-  if (!existsSync(file)) return null;
-  const buf = readFileSync(file);
+  if (!existsSync2(file)) return null;
+  const buf = readFileSync2(file);
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
@@ -5405,9 +5640,12 @@ var UI2 = {
   en: { play: "Play", pause: "Pause", chapters: "Chapters" },
   ja: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
 };
-async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress } = {}) {
-  const video = parseVideo(source, { defaults: defaults2 });
-  const meta = applyOverrides(video.meta, overrides, { ...CHOICES, theme: VIDEO_THEMES });
+async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress, themes: themes2 = BUILTIN } = {}) {
+  const themeChoices = themes2.choices("video");
+  const video = parseVideo(source, { defaults: defaults2, themeChoices });
+  const meta = applyOverrides(video.meta, overrides, { ...CHOICES, theme: themeChoices });
+  const problem = themes2.problem(meta.theme, "video");
+  if (problem) throw new ParseError(problem, 0);
   const warnings = meta.style === "off" ? [] : lintDoc(video.doc).filter((w) => w.rule !== "paragraph-length");
   if (meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const beats = allBeats(video);
@@ -5418,7 +5656,7 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const stats = { panels: video.scenes.length, components: {} };
   const lang = meta.lang || detectLang(source);
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: UI[lang] ?? UI.zh });
-  const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source });
+  const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
   return { html, wav: wav2, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
 }
 async function voiceBeats(beats, provider, cacheDir, onProgress) {
@@ -5478,18 +5716,18 @@ function sheetFrame() {
   const letters = ["A", "B", "C", "D"];
   return `<div class="amv-sheet" aria-hidden="true">${ruler2("top", nums)}${ruler2("bottom", nums)}${ruler2("left", letters)}${ruler2("right", letters)}</div>`;
 }
-function shell2({ meta, lang, scenesHtml, data, wav: wav2, voice, source }) {
+function shell2({ meta, lang, scenesHtml, data, wav: wav2, voice, source, embedded }) {
   const ui = UI2[lang] ?? UI2.zh;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: getTheme(meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
+${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${videoCss()}
+${videoCss(embedded)}
 </style>
 </head>
 <body>
@@ -5522,9 +5760,9 @@ ${VIDEO_JS}</script>
 
 // src/video/export.js
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync2, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync3, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join2 } from "node:path";
+import { join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
 var ExportError = class extends Error {
   constructor(message) {
@@ -5551,7 +5789,7 @@ function findChrome(env = process.env, platform = process.platform) {
   const custom = env.AM_CHROME || env.CHROME_PATH;
   if (custom) return custom;
   const list = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
-  return list.find((p) => p.includes("/") || p.includes("\\") ? existsSync2(p) : hasCommand(p)) ?? null;
+  return list.find((p) => p.includes("/") || p.includes("\\") ? existsSync3(p) : hasCommand(p)) ?? null;
 }
 async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onProgress = () => {
 } } = {}) {
@@ -5559,11 +5797,11 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   if (!hasCommand("ffmpeg")) throw new ExportError("MP4 export needs ffmpeg: on macOS run brew install ffmpeg; on Linux install it with the package manager");
   const chromePath = findChrome(env);
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join2(tmpdir2(), "am-export-"));
+  const tmp = mkdtempSync2(join3(tmpdir2(), "am-export-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
-    `--user-data-dir=${join2(tmp, "profile")}`,
+    `--user-data-dir=${join3(tmp, "profile")}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--hide-scrollbars",
@@ -5589,7 +5827,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
       return r.result.value;
     };
     const info = await evaluate("document.fonts.ready.then(() => { window.__amv.exportMode(); return { duration: window.__amv.duration, fps: window.__amv.fps }; })");
-    const wavFile = wav2 ? join2(tmp, "voice.wav") : null;
+    const wavFile = wav2 ? join3(tmp, "voice.wav") : null;
     if (wav2) writeFileSync2(wavFile, wav2);
     const ffmpeg = spawn2("ffmpeg", [
       "-y",
@@ -5730,17 +5968,17 @@ function connect(url) {
 }
 
 // src/housekeeping.js
-import { readdirSync, lstatSync, rmSync as rmSync3 } from "node:fs";
-import { join as join4 } from "node:path";
+import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync3 } from "node:fs";
+import { join as join5 } from "node:path";
 
 // src/state.js
-import { readFileSync as readFileSync2, writeFileSync as writeFileSync3, mkdirSync as mkdirSync2, renameSync as renameSync2 } from "node:fs";
-import { join as join3 } from "node:path";
+import { readFileSync as readFileSync3, writeFileSync as writeFileSync3, mkdirSync as mkdirSync2, renameSync as renameSync2 } from "node:fs";
+import { join as join4 } from "node:path";
 var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join3(home, "state.json");
+var statePath = (home) => join4(home, "state.json");
 function readState(home) {
   try {
-    const data = JSON.parse(readFileSync2(statePath(home), "utf8"));
+    const data = JSON.parse(readFileSync3(statePath(home), "utf8"));
     return data && typeof data === "object" && !Array.isArray(data) ? data : {};
   } catch {
     return {};
@@ -5834,12 +6072,12 @@ function walk(dir) {
   let entries;
   try {
     if (!lstatSync(dir).isDirectory()) return [];
-    entries = readdirSync(dir, { withFileTypes: true });
+    entries = readdirSync2(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join4(dir, e.name);
+    const p = join5(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
       const s = lstatSync(p);
@@ -5852,7 +6090,7 @@ function walk(dir) {
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 function usage(home) {
   const parts = Object.fromEntries(DIRS2.map((d) => {
-    const files = walk(join4(home, d));
+    const files = walk(join5(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS2.reduce((n, d) => n + parts[d].bytes, 0) };
@@ -5860,8 +6098,8 @@ function usage(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join4(home, d)).filter((f2) => all || f2.mtime < cutoff)),
-    ...walk(join4(home, "cache"))
+    ...["pages", "videos"].flatMap((d) => walk(join5(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...walk(join5(home, "cache"))
   ];
   if (!dryRun) {
     for (const f2 of victims) rmSync3(f2.path, { force: true });
@@ -5901,9 +6139,9 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
 }
 
 // src/config.js
-import { readFileSync as readFileSync3, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync3 } from "node:fs";
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync4 } from "node:fs";
 import { homedir } from "node:os";
-import { join as join5, dirname } from "node:path";
+import { join as join6, dirname } from "node:path";
 var ConfigError = class extends Error {
   constructor(message) {
     super(message);
@@ -5922,13 +6160,16 @@ var CONFIG_KEYS = Object.freeze({
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
 function amHome(env = process.env) {
-  return env.AM_HOME || join5(homedir(), ".answer-me-with-html");
+  return env.AM_HOME || join6(homedir(), ".answer-me-with-html");
 }
 function configPath(env = process.env) {
-  return join5(amHome(env), "config.json");
+  return join6(amHome(env), "config.json");
 }
 var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
-function coerce2(key, raw) {
+function configChoices(key, themes2) {
+  return key === "theme" ? themes2.names("page") : CONFIG_KEYS[key].choices;
+}
+function coerce2(key, raw, themes2) {
   const spec = CONFIG_KEYS[key];
   if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
   if (spec.type === "bool") {
@@ -5939,30 +6180,33 @@ function coerce2(key, raw) {
     throw new ConfigError(`${key} accepts only on / off`);
   }
   const v = String(raw).trim();
-  if (!spec.choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${spec.choices.join(" | ")}`);
+  const choices = configChoices(key, themes2);
+  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
   return v;
 }
 function readStored(env) {
   const file = configPath(env);
-  if (!existsSync3(file)) return { stored: {} };
+  if (!existsSync4(file)) return { stored: {} };
   try {
-    const data = JSON.parse(readFileSync3(file, "utf8"));
+    const data = JSON.parse(readFileSync4(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
   } catch (e) {
     return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
   }
 }
-function readConfig(env = process.env) {
+function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
   const { stored, warning } = readStored(env);
   const values = defaults();
+  const warnings = [warning];
   for (const [k2, v] of Object.entries(stored)) {
     if (!CONFIG_KEYS[k2]) continue;
     try {
-      values[k2] = coerce2(k2, v);
+      values[k2] = coerce2(k2, v, themes2);
     } catch {
+      if (k2 === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
     }
   }
-  return { values, stored, warning, path: configPath(env) };
+  return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
 }
 function writeStored(stored, env) {
   const file = configPath(env);
@@ -5974,14 +6218,14 @@ function writeStored(stored, env) {
   writeFileSync4(file, `${JSON.stringify(stored, null, 2)}
 `);
 }
-function setConfig(key, raw, env = process.env) {
-  const value = coerce2(key, raw);
+function setConfig(key, raw, env = process.env, themes2 = loadThemes(amHome(env))) {
+  const value = coerce2(key, raw, themes2);
   const { stored } = readStored(env);
   writeStored({ ...stored, [key]: value }, env);
   return value;
 }
 function resetConfig(key, env = process.env) {
-  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "");
+  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "", null);
   const { stored } = readStored(env);
   const next = key === void 0 ? {} : Object.fromEntries(Object.entries(stored).filter(([k2]) => k2 !== key));
   writeStored(next, env);
@@ -6057,8 +6301,9 @@ Usage:
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
+  am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|video|patch]          show component syntax / page draft format / video draft format / patch usage
+  am help [component|format|video|patch|theme]    show component syntax / page draft format / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -6177,23 +6422,27 @@ ${USAGE}`);
   const { values: opts, positionals: [cmd, arg, ...rest] } = parsed;
   if (opts.version) return print(VERSION), 0;
   if (opts.help || !cmd) return print(USAGE), 0;
+  const themes2 = loadThemes(amHome(env));
+  const ctx = { print, fail, env, io, themes: themes2 };
   switch (cmd) {
     case "render":
-      return withSource(arg, io, fail, (src) => cmdRender(src, opts, { print, fail, env, io }));
+      return withSource(arg, io, fail, (src) => cmdRender(src, opts, ctx));
     case "patch":
-      return cmdPatch(arg, rest[0], opts, { print, fail, env, io });
+      return cmdPatch(arg, rest[0], opts, ctx);
     case "video":
-      return withSource(arg, io, fail, (src) => cmdVideo(src, opts, { print, fail, env, io }));
+      return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case "lint":
       return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case "config":
-      return cmdConfig([arg, ...rest].filter((x2) => x2 !== void 0), { print, fail, env });
+      return cmdConfig([arg, ...rest].filter((x2) => x2 !== void 0), ctx);
+    case "theme":
+      return cmdTheme(arg, rest[0], opts, ctx);
     case "clean":
       return cmdClean(opts, { print, fail, env });
     case "__update-check":
       return await runUpdateCheck(amHome(env)) ? 0 : 1;
     case "list":
-      return cmdList(print), 0;
+      return cmdList(ctx), 0;
     case "help":
       return cmdHelp(arg, { print, fail });
     default:
@@ -6210,7 +6459,7 @@ async function withSource(arg, io, fail, fn3) {
   }
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync4(resolve(io.cwd ?? process.cwd(), arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync5(resolve(io.cwd ?? process.cwd(), arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -6239,7 +6488,7 @@ function cmdRender(src, opts, ctx) {
   const { theme, mode, style } = config.values;
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -6260,6 +6509,34 @@ Usage:
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
+var THEME_HELP = `Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
+
+The file name is the theme name: themes/notes.json is theme "notes" (lowercase letters, digits and -; not a built-in name).
+Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am config set theme notes. The draft does not change.
+
+{
+  "label": "Notes",
+  "tokens": {
+    "common": { "--radius": "6px", "--font-sans": "\\"IBM Plex Sans\\", \\"Noto Sans CJK SC\\"" },
+    "light": { "--bg": "#f7f5ef", "--paper": "#fffdf8", "--ink": "#1f1d1a", ... },
+    "dark": { "--bg": "#14130f", "--paper": "#1c1b17", "--ink": "#eeeae0", ... }
+  },
+  "css": "& .am-panel-head { letter-spacing: 0.01em; }",
+  "video": { "tokens": { "light": { "--v-stage": "#fffdf8" } }, "css": "& .amv-title { font-weight: 500; }" }
+}
+
+- label: the name on the page's theme button: a string, or an object with zh / en / ja strings.
+- tokens: light and dark must each set every color: ${COLOR_TOKENS.join(" ")}.
+  common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
+- Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.
+- css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
+- video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
+- A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
+- A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
+
+am theme check <name|file.json> [--no-open]
+- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1).
+- Exits with 1 when there is an error. Without errors it renders two specimen pages (light, dark) with every component.`;
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const { fail, io } = ctx;
   if (!htmlArg || htmlArg === "-") {
@@ -6274,7 +6551,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const file = resolve(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync4(file, "utf8");
+    html = readFileSync5(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -6288,7 +6565,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync4(resolve(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync5(resolve(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -6299,6 +6576,11 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   } catch (e) {
     if (!(e instanceof PatchError)) return reportError(e, fail);
     fail(`\u2717 ${e.message}`);
+    return 1;
+  }
+  const problem = ctx.themes.problem(page.theme, video ? "video" : "page");
+  if (problem && !opts.theme) {
+    fail(`\u2717 The page uses theme "${page.theme}", which is not installed or cannot be used (${problem}); add --theme <name> to pick another`);
     return 1;
   }
   const config = loadConfig(ctx);
@@ -6316,7 +6598,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       if (!validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -6351,14 +6633,15 @@ function validVoice(voice, fail) {
   fail(`\u2717 Invalid voice value "${voice}". Choose one of: ${VOICES.join(" | ")}`);
   return false;
 }
-async function buildVideo(src, voice, opts, config, { fail, env, io }) {
+async function buildVideo(src, voice, opts, config, { fail, env, io, themes: themes2 }) {
   const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
-    cacheDir: join6(amHome(env), "cache", "tts"),
+    cacheDir: join7(amHome(env), "cache", "tts"),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
-    onProgress: (msg) => fail(`  ${msg}`)
+    onProgress: (msg) => fail(`  ${msg}`),
+    themes: themes2
   });
   return { ...result, voiceName: provider ? provider.name : "none (captions only)" };
 }
@@ -6375,14 +6658,18 @@ async function exportVideoMp4(file, wav2, { print, fail, env }) {
   print(`\u2713 ${mp4} (exported in ${((Date.now() - started) / 1e3).toFixed(0)}s)`);
   return true;
 }
-function loadConfig({ fail, env }) {
-  const config = readConfig(env);
+function loadConfig({ fail, env, themes: themes2 }) {
+  themeWarnings({ fail, themes: themes2 });
+  const config = readConfig(env, themes2);
   if (config.warning) fail(`! ${config.warning}`);
   return config;
 }
+function themeWarnings({ fail, themes: themes2 }) {
+  themes2.warnings.forEach((w) => fail(`! ${w}`));
+}
 function outputPath(dir, title, opts, { env, io }) {
   if (opts.out) return resolve(io.cwd ?? process.cwd(), opts.out);
-  return join6(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join7(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function emit(result, file, { print }, note = "") {
   mkdirSync4(dirname2(file), { recursive: true });
@@ -6477,17 +6764,17 @@ ${e.example.replace(/^/gm, "    ")}`);
   throw e;
 }
 var showValue = (v) => typeof v === "boolean" ? v ? "on" : "off" : String(v);
-function cmdConfig(args, { print, fail, env }) {
+function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   const [action, key, value] = args;
   try {
     if (action === "set") {
       if (key === void 0 || value === void 0) throw new ConfigError("Usage: am config set <key> <value>");
-      print(`\u2713 ${key} = ${showValue(setConfig(key, value, env))}`);
+      print(`\u2713 ${key} = ${showValue(setConfig(key, value, env, themes2))}`);
       return 0;
     }
     if (action === "get") {
       if (!CONFIG_KEYS[key]) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
-      print(showValue(readConfig(env).values[key]));
+      print(showValue(readConfig(env, themes2).values[key]));
       return 0;
     }
     if (action === "reset") {
@@ -6501,39 +6788,94 @@ function cmdConfig(args, { print, fail, env }) {
     fail(`\u2717 ${e.message}`);
     return 2;
   }
-  const { values, stored, warning, path } = readConfig(env);
+  themeWarnings({ fail, themes: themes2 });
+  const { values, stored, warning, path } = readConfig(env, themes2);
   if (warning) fail(`! ${warning}`);
   print(`Config file: ${path}`);
   for (const [k2, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k2 in stored ? "*" : " ";
-    const options = spec.type === "bool" ? "on | off" : spec.choices.join(" | ");
+    const options = spec.type === "bool" ? "on | off" : configChoices(k2, themes2).join(" | ");
     print(`${mark} ${k2.padEnd(13)}${showValue(values[k2]).padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== "0") print("Note: the AM_NO_OPEN environment variable is set and overrides the open setting.");
   print("* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]");
   return 0;
 }
-function cmdList(print) {
+function cmdList({ print, fail, themes: themes2 }) {
+  themeWarnings({ fail, themes: themes2 });
   print("Templates (template):");
   print("  sheet   blueprint board: a grid of letter-numbered panels, for a one-screen overview (default)");
   print("  doc     linear explainer: one-column reading, with contents when there are 3+ panels");
   print("  video   explainer video: render with am video, see am help video");
   print("\nThemes (theme):");
-  for (const t of themes("video")) print(`  ${t.name.padEnd(10)}${t.summary}${t.scope.includes("page") ? "" : " (video only)"}`);
+  const note = (t) => t.user ? " (yours)" : t.scope.includes("page") ? "" : " (video only)";
+  for (const t of themes2.list("video")) print(`  ${t.name.padEnd(10)}${t.summary}${note(t)}`);
   print("\nComponents (fence language):");
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print("  html/svg  embed as-is (escape hatch)");
   print("\nSyntax: am help <component>; draft format: am help format");
+}
+function specimenDraft(name, mode) {
+  const sections = [...COMPONENTS.values()].map((c) => `## ${c.name}
+${c.example}`);
+  const table = "## table\n| Check | Status |\n|---|---|\n| Approved | ok passes |\n| Rejected | no fails |\n| Pending | warn needs a look |";
+  return `---
+title: Theme ${name} (${mode})
+lang: en
+---
+${[...sections, table].join("\n\n")}
+`;
+}
+function cmdTheme(action, target, opts, ctx) {
+  const { print, fail, env, io } = ctx;
+  if (action !== "check" || !target) {
+    fail("\u2717 Usage: am theme check <name|file.json>");
+    return 2;
+  }
+  const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
+  const path = isFile ? resolve(io.cwd ?? process.cwd(), target) : join7(amHome(env), "themes", `${target}.json`);
+  const name = isFile ? basename2(path).replace(/\.json$/i, "") : target;
+  let theme;
+  let errors = [];
+  if (!isFile && getTheme(name)) {
+    theme = getTheme(name);
+  } else if (existsSync5(path)) {
+    ({ theme, errors } = readThemeFile(path, themeNames("video")));
+  } else {
+    fail(`\u2717 No theme named "${target}": ${path} does not exist`);
+    return 2;
+  }
+  const tokens = theme?.tokens ?? theme?.video?.tokens;
+  const colors = tokens ? checkColors({ tokens }) : { errors: [], warnings: [] };
+  const all = [...errors, ...colors.errors];
+  all.forEach((e) => print(`\u2717 ${e}`));
+  colors.warnings.forEach((w) => print(`! ${w}`));
+  print(`${name}: ${all.length} error${all.length === 1 ? "" : "s"}, ${colors.warnings.length} warning${colors.warnings.length === 1 ? "" : "s"}`);
+  if (all.length) return 1;
+  if (!theme.scope.includes("page")) return 0;
+  const themes2 = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
+  const files = ["light", "dark"].map((mode) => {
+    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: "off" }, {}, { themes: themes2 });
+    const file = outputPath("pages", `theme-${name}-${mode}`, {}, ctx);
+    mkdirSync4(dirname2(file), { recursive: true });
+    writeFileSync5(file, result.html);
+    print(`\u2713 ${file}`);
+    return file;
+  });
+  const config = readConfig(env, themes2);
+  if (shouldOpen(opts, env, config.values)) files.forEach((f2) => (io.open ?? openFile)(f2));
+  return 0;
 }
 function cmdHelp(name, { print, fail }) {
   if (!name) return print(USAGE), 0;
   if (name === "format") return print(FORMAT), 0;
   if (name === "video") return print(VIDEO_FORMAT), 0;
   if (name === "patch") return print(PATCH_HELP), 0;
+  if (name === "theme") return print(THEME_HELP), 0;
   if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, video, patch`);
+    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}

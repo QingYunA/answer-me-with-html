@@ -10,8 +10,9 @@ const FOCUS = /\[([^\]\n]+)\]/g;
 // Video themes: every theme whose scope includes video (the page themes, plus the video-only 3b1b).
 export const VIDEO_THEMES = Object.freeze(themeNames('video'));
 
-export function parseVideo(source, { defaults = {} } = {}) {
-  const doc = parseDoc(source, { defaults: { ...defaults, template: 'video' }, choices: { theme: VIDEO_THEMES } });
+// themeChoices: the theme names a draft may give (the CLI adds the user's themes).
+export function parseVideo(source, { defaults = {}, themeChoices = VIDEO_THEMES } = {}) {
+  const doc = parseDoc(source, { defaults: { ...defaults, template: 'video' }, choices: { theme: themeChoices } });
   const intro = splitNarration(doc.intro);
   const scenes = doc.panels.map((p) => {
     const { blocks, beats } = splitNarration(p.blocks);

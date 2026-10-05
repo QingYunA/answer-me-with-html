@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { CHOICES, VOICES } from './parse.js';
+import { loadThemes } from './themes/registry.js';
 
 export class ConfigError extends Error {
   constructor(message) {
@@ -36,7 +37,12 @@ export function configPath(env = process.env) {
 
 const defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k, s]) => [k, s.default]));
 
-function coerce(key, raw) {
+// The allowed values of a key; theme also allows the user's themes.
+export function configChoices(key, themes) {
+  return key === 'theme' ? themes.names('page') : CONFIG_KEYS[key].choices;
+}
+
+function coerce(key, raw, themes) {
   const spec = CONFIG_KEYS[key];
   if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(' | ')}`);
   if (spec.type === 'bool') {
@@ -47,7 +53,8 @@ function coerce(key, raw) {
     throw new ConfigError(`${key} accepts only on / off`);
   }
   const v = String(raw).trim();
-  if (!spec.choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${spec.choices.join(' | ')}`);
+  const choices = configChoices(key, themes);
+  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(' | ')}`);
   return v;
 }
 
@@ -62,18 +69,21 @@ function readStored(env) {
   }
 }
 
-export function readConfig(env = process.env) {
+// themes: the theme set that theme values are checked against (default: the built-in themes plus the user's theme files).
+export function readConfig(env = process.env, themes = loadThemes(amHome(env))) {
   const { stored, warning } = readStored(env);
   const values = defaults();
+  const warnings = [warning];
   for (const [k, v] of Object.entries(stored)) {
     if (!CONFIG_KEYS[k]) continue;
     try {
-      values[k] = coerce(k, v);
+      values[k] = coerce(k, v, themes);
     } catch {
-      // Invalid values keep the default.
+      // Invalid values keep the default. A default theme can vanish when its file is removed, so say so.
+      if (k === 'theme') warnings.push(`The default theme "${v}" cannot be used (${themes.problem(String(v), 'page')}); using ${values.theme}`);
     }
   }
-  return { values, stored, warning, path: configPath(env) };
+  return { values, stored, warning: warnings.filter(Boolean).join('; ') || undefined, path: configPath(env) };
 }
 
 function writeStored(stored, env) {
@@ -86,15 +96,15 @@ function writeStored(stored, env) {
   writeFileSync(file, `${JSON.stringify(stored, null, 2)}\n`);
 }
 
-export function setConfig(key, raw, env = process.env) {
-  const value = coerce(key, raw);
+export function setConfig(key, raw, env = process.env, themes = loadThemes(amHome(env))) {
+  const value = coerce(key, raw, themes);
   const { stored } = readStored(env);
   writeStored({ ...stored, [key]: value }, env);
   return value;
 }
 
 export function resetConfig(key, env = process.env) {
-  if (key !== undefined && !CONFIG_KEYS[key]) coerce(key, '');
+  if (key !== undefined && !CONFIG_KEYS[key]) coerce(key, '', null);
   const { stored } = readStored(env);
   const next = key === undefined ? {} : Object.fromEntries(Object.entries(stored).filter(([k]) => k !== key));
   writeStored(next, env);

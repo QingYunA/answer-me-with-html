@@ -9,10 +9,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
-import { themeNames } from '../src/themes/registry.js';
+import { themeNames, getTheme } from '../src/themes/registry.js';
 
 const EXAMPLES = new URL('../examples/', import.meta.url);
-const HOMES = { none: null, cfg: { theme: 'shadcn', mode: 'dark', style: 'off' } };
+const HOMES = { none: null, cfg: { theme: 'shadcn', mode: 'dark', style: 'off' }, user: { theme: 'notes' } };
+// The user home has a theme file (#64): blueprint's colors on a warmer paper, with its own font and one decoration rule.
+const { common, light, dark } = getTheme('blueprint').tokens;
+const NOTES = {
+  label: 'Notes',
+  tokens: { common: { ...common, '--font-sans': '"IBM Plex Sans"' }, light: { ...light, '--paper': '#fdfcf8' }, dark },
+  css: '& .am-panel-head { letter-spacing: 0.01em; }',
+};
 
 let dir;
 before(() => {
@@ -21,6 +28,8 @@ before(() => {
     mkdirSync(join(dir, name));
     if (config) writeFileSync(join(dir, name, 'config.json'), JSON.stringify(config));
   }
+  mkdirSync(join(dir, 'user', 'themes'));
+  writeFileSync(join(dir, 'user', 'themes', 'notes.json'), JSON.stringify(NOTES));
 });
 after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -72,7 +81,7 @@ function cases() {
   return out;
 }
 
-for (const [renderHome, patchHome] of [['none', 'none'], ['cfg', 'cfg'], ['none', 'cfg'], ['cfg', 'none']]) {
+for (const [renderHome, patchHome] of [['none', 'none'], ['cfg', 'cfg'], ['none', 'cfg'], ['cfg', 'none'], ['user', 'user']]) {
   test(`invariant: patching with the source leaves the page unchanged (render config ${renderHome}, patch config ${patchHome})`, async () => {
     const failures = [];
     for (const [i, c] of cases().entries()) {
