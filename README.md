@@ -52,7 +52,14 @@ With this skill, the model writes only the content. We asked the same questions 
 
 The speed-up holds in every setup. The cost depends on how much context your setup loads: the skill adds two short turns, and every turn re-reads the context. In a heavy setup (about 51,000 tokens of tools, rules and skills) the two extra turns cost more than the saved tokens, and we measured the skill about 20% more expensive.
 
-Explainer videos show a bigger gap. For the same TCP video with no voice, output tokens went 27,839 → 1,566 (17.8× fewer) and time 202 s → 17 s (11.8× faster). That is one topic and five runs, so read it as a rough size, not a precise ratio. Per-topic numbers and the script to reproduce them are in [bench/](bench/README.md).
+Explainer videos show a bigger gap. We asked for the TCP handshake as a 3Blue1Brown-style video, no voice, both ways:
+
+| | Write the video page by hand | `am video` | |
+| :--- | ---: | ---: | :--- |
+| Output tokens | 27,839 | **1,566** | **17.8× fewer** |
+| Time | 202 s | **17 s** | **11.8× faster** |
+
+That is one topic and five runs (3 by hand, 2 with `am video`, medians), so read it as a rough size, not a precise ratio. Per-topic numbers and the script to reproduce them are in [bench/](bench/README.md).
 
 ## Install
 
