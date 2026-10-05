@@ -4683,7 +4683,11 @@ var UI = {
   }
 };
 function htmlLang(lang) {
-  return lang === "zh" ? "zh-CN" : lang === "ja" ? "ja" : "en";
+  const normalized = String(lang || "").toLowerCase().replace(/_/g, "-");
+  if (normalized === "zh-tw") return "zh-TW";
+  if (normalized === "zh" || normalized === "zh-cn") return "zh-CN";
+  if (normalized === "ja") return "ja";
+  return "en";
 }
 function detectLang(text) {
   let cjk = 0;
