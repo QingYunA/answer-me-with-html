@@ -56,3 +56,13 @@ test('sheet: 自动加宽的面板之后，行尾面板仍拉满整行', () => {
   const html = render('cols: 3', `## A 对比\n${table(5)}`);
   assert.deepEqual(['A', 'B', 'C'].map((id) => spanOf(html, id)), [3, 1, 2]);
 });
+
+// 手机宽度下表格和图不再收缩：外层 overflow-x: auto 改为横向滚动。
+// 用浏览器实测过 390px：5 列表格单元格 >= 66px，图保持原尺寸。这里只守住规则不被删。
+test('base.css: ≤760px 时表格单元格有最小宽度、图不随容器缩小', async () => {
+  const { BASE_CSS } = await import('../src/assets.js');
+  const narrow = BASE_CSS.slice(BASE_CSS.indexOf('@media (max-width: 760px)'));
+  const block = narrow.slice(0, narrow.indexOf('\n}') + 2);
+  assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*6em/);
+  assert.match(block, /\.am-diagram svg\s*\{[^}]*max-width:\s*none/);
+});

@@ -267,6 +267,9 @@ html[data-theme="shadcn"] .am-kv { border-color: var(--line); border-radius: var
   .am-toc { position: static; }
   .am-timeline--h { grid-template-columns: minmax(0, 1fr); }
   .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
+  /* 表格和图不再被挤小：超出屏幕时由外层横向滚动。 */
+  .am-md th, .am-md td { min-width: 6em; }
+  .am-diagram svg { max-width: none; }
 }
 .am-colophon { text-align: center; padding: 0 0 28px; font: 11px var(--font-mono); color: var(--ink-3); }
 
