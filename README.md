@@ -182,7 +182,7 @@ The agent then gets a short reminder each turn (about 90 tokens). Whenever it gi
 /plugin install answer-me-with-html-always@answer-me-with-html
 ```
 
-Pause it with `/answer-me-with-html:config always off`. You don't need to uninstall.
+Pause it with `/answer-me-with-html:config always off`. You don't need to uninstall. That command exists only in the plugin install; if you installed the skill with `npx skills`, use `/answer-me-with-html config always off`.
 
 **Other agents:** paste this to your agent so it writes the rule into its own rules file, such as `AGENTS.md`:
 

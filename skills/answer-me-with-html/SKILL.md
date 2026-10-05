@@ -27,7 +27,7 @@ Arguments for this call: `$ARGUMENTS`
 
 When the arguments start with `config` (for example `/answer-me-with-html config open off`), this turn handles settings only and produces no page:
 
-- `config`: run `am config` to show the current settings, then ask the user which one to change.
+- `config`: run `am config` to show the current settings, then let the user choose. Where the agent has a choice tool such as AskUserQuestion, use it: at most 4 settings at a time, these first: `open`, `always`, `theme`, `mode`, with the current value marked in the options. Otherwise ask in plain text.
 - `config <key> <value>`: run `am config set <key> <value>`.
 - `config reset [key]`: run `am config reset [key]`.
 

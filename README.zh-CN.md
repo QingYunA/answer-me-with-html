@@ -182,7 +182,7 @@ Server -> Client: SYN-ACK
 /plugin install answer-me-with-html-always@answer-me-with-html
 ```
 
-想暂停，执行 `/answer-me-with-html:config always off`，不用卸载。
+想暂停，执行 `/answer-me-with-html:config always off`，不用卸载。这个命令只在插件安装里有；用 `npx skills` 装的 skill，改用 `/answer-me-with-html config always off`。
 
 **其他 Agent：** 把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `AGENTS.md`）：
 
