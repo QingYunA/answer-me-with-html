@@ -134,45 +134,12 @@ Server -> Client: SYN-ACK
 - **Spoken narration.** The agent writes narration the way a person explains things out loud, not like a manual.
 - **Camera focus.** `[Server]` in the narration pushes the camera toward that node and highlights it. The diagram never leaves the frame.
 - **Objects carry over.** A node with the same name in the next scene glides to its new place instead of cutting.
-- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set (setup: [Use ElevenLabs for narration](#use-elevenlabs-for-narration)), the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English, Kyoko for Japanese), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
+- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set (optional; [setup guide](docs/elevenlabs.md)), the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English, Kyoko for Japanese), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
 - **Local voice.** `--voice local` uses an OpenAI-compatible `POST /v1/audio/speech` server you run yourself that returns 16-bit PCM WAV, such as [mlx-audio](https://github.com/Blaizzy/mlx-audio) with Qwen3-TTS. Set `AM_TTS_URL` to the server root; set `AM_TTS_MODEL` and `AM_TTS_VOICE` unless the server has defaults, and `AM_TTS_API_KEY` if it requires a key. `AM_TTS_EXTRA` is a JSON object of model-specific options merged into each request; `AM_TTS_MODEL` and `AM_TTS_VOICE` override the same fields in it, and `am` always sets `input`, `response_format` and `stream`. A clip much shorter or longer than its text suggests is generated again, up to `AM_TTS_ATTEMPTS` tries (default 3; 1 turns the check off). `am patch` keeps the voice a video was made with. Example: `AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit AM_TTS_VOICE=vivian am video draft.md --voice local`.
 - **Same look as the pages.** Videos use the blueprint drawing style by default: a ruled frame and lettered sheet heads. Write `theme: 3b1b` for the dark 3Blue1Brown look. `theme: shadcn` and `mode: dark` also work.
 - **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine. Export takes about 1.3 times the video length.
 
 The draft for the example video ([examples/video-tcp.en.md](examples/video-tcp.en.md), about 45 seconds) is 1.3 KB, a few hundred output tokens. Rendering takes under a second without voice and about 4 seconds with the system voice. The agent only makes videos when you ask; always-on mode still makes pages. Full syntax: `am help video`.
-
-### Use ElevenLabs for narration
-
-1. **Create a key.** In the ElevenLabs dashboard, create an API key. A key limited to **Text to Speech** is enough; `am` calls nothing else.
-2. **Export it, then render.**
-
-   ```bash
-   export ELEVENLABS_API_KEY="sk_..."     # add this line to ~/.zshrc to keep it
-   am video draft.md                      # uses ElevenLabs when the key is set
-   am video draft.md --voice elevenlabs   # stops with an error if the key is missing
-   ```
-
-   An agent only sees the key if it was set before you started the agent. To always use ElevenLabs instead of letting `am` pick, run `am config set voice elevenlabs`.
-3. **Pick a voice.** Copy a voice ID from your ElevenLabs voices page and set `ELEVENLABS_VOICE_ID`. The default is Will, a premade voice that works on the free plan and is verified for Chinese by ElevenLabs. It is an English-native voice, so a Chinese-native library voice sounds more natural. A voice from the public library needs a paid plan: on the free plan the API answers `402 paid_plan_required`.
-4. **Pick a model** with `ELEVENLABS_MODEL_ID`. The default is `eleven_v4_turbo`.
-
-   | Model | Use it for |
-   | :--- | :--- |
-   | `eleven_v4_turbo` (default) | Expressive speech with low latency, 90+ languages |
-   | `eleven_v4` | The same family at the highest quality |
-   | `eleven_flash_v2_5` | Lowest price per character, 32 languages |
-   | `eleven_multilingual_v2` | Steady long reads, 29 languages |
-   | `eleven_v3` | The previous generation, 70+ languages |
-
-5. **Cost and cache.** ElevenLabs bills per character. Each narration line is generated once and cached in `~/.answer-me-with-html/cache/tts/` by voice, model and text, so you pay again only for the lines you change, or when you change the voice or the model.
-
-The CLI prints its messages in Chinese. These are the ones you may meet:
-
-| Message | Cause |
-| :--- | :--- |
-| `ElevenLabs 返回 401` or `missing_permissions` | The key is wrong, or it lacks the Text to Speech permission |
-| `ElevenLabs 返回 402` with `paid_plan_required` | The voice is a library voice and your plan is free; use a premade voice or upgrade |
-| `无法连接 ElevenLabs` | No response in 60 seconds, or no network; add `--voice off` for captions only |
 
 ## Settings
 
