@@ -36,8 +36,10 @@ ElevenLabs 按字符计费。每句旁白只合成一次，按声音、模型和
 
 ## 报错
 
+命令行的提示是英文的：
+
 | 报错 | 原因 |
 | :--- | :--- |
-| `ElevenLabs 返回 401` 或 `missing_permissions` | key 不对，或没有语音合成权限 |
-| `ElevenLabs 返回 402`，含 `paid_plan_required` | 用了声音库里的声音，而你是免费套餐；换官方声音或升级套餐 |
-| `无法连接 ElevenLabs` | 60 秒内没有响应，或没有网络；加 `--voice off` 只出字幕 |
+| `ElevenLabs returned 401` 或 `missing_permissions` | key 不对，或没有语音合成权限 |
+| `ElevenLabs returned 402`，含 `paid_plan_required` | 用了声音库里的声音，而你是免费套餐；换官方声音或升级套餐 |
+| `Cannot connect to ElevenLabs` | 60 秒内没有响应，或没有网络；加 `--voice off` 只出字幕 |

@@ -566,7 +566,7 @@ test('am patch: a voiced video keeps its voice instead of switching to the confi
   assert.match(readFileSync(file, 'utf8'), /data-voice="local"/);
 });
 
-test('ElevenLabs: 默认用 eleven_v4_turbo，ELEVENLABS_MODEL_ID 可以换模型，缓存键随模型变化', async () => {
+test('ElevenLabs: defaults to eleven_v4_turbo, ELEVENLABS_MODEL_ID changes the model, the cache id follows it', async () => {
   const realFetch = globalThis.fetch;
   const bodies = [];
   const urls = [];
@@ -583,7 +583,7 @@ test('ElevenLabs: 默认用 eleven_v4_turbo，ELEVENLABS_MODEL_ID 可以换模�
     await flash.synth('你好');
     assert.deepEqual(bodies.map((b) => b.model_id), ['eleven_v4_turbo', 'eleven_flash_v2_5']);
     assert.match(def.id, /:eleven_v4_turbo$/);
-    // 默认声音是免费套餐可用、标注验证过中文的官方声音 Will；ELEVENLABS_VOICE_ID 可覆盖。
+    // The default voice is Will, a premade voice that works on the free plan; ELEVENLABS_VOICE_ID overrides it.
     assert.match(urls[0], /text-to-speech\/bIHbv24MWmeRgasZH58o\?/);
     await pickProvider('elevenlabs', { ...base, ELEVENLABS_VOICE_ID: 'abc' }).synth('你好');
     assert.match(urls[2], /text-to-speech\/abc\?/);

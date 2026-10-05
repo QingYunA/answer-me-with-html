@@ -36,10 +36,10 @@ ElevenLabs bills per character. Each narration line is generated once and cached
 
 ## Errors
 
-The CLI prints its messages in Chinese. These are the ones you may meet:
+These are the messages you may meet:
 
 | Message | Cause |
 | :--- | :--- |
-| `ElevenLabs 返回 401` or `missing_permissions` | The key is wrong, or it lacks the Text to Speech permission |
-| `ElevenLabs 返回 402` with `paid_plan_required` | The voice is a library voice and your plan is free; use a premade voice or upgrade |
-| `无法连接 ElevenLabs` | No response in 60 seconds, or no network; add `--voice off` for captions only |
+| `ElevenLabs returned 401` or `missing_permissions` | The key is wrong, or it lacks the Text to Speech permission |
+| `ElevenLabs returned 402` with `paid_plan_required` | The voice is a library voice and your plan is free; use a premade voice or upgrade |
+| `Cannot connect to ElevenLabs` | No response in 60 seconds, or no network; add `--voice off` for captions only |

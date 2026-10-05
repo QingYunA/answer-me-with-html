@@ -11,7 +11,7 @@ import { hasCommand } from '../sys.js';
 import { estimateSeconds } from './script.js';
 
 export const SAMPLE_RATE = 22050;
-const ELEVEN_DEFAULT_VOICE = 'bIHbv24MWmeRgasZH58o'; // Will：官方声音，免费套餐可用，标注验证过 zh
+const ELEVEN_DEFAULT_VOICE = 'bIHbv24MWmeRgasZH58o'; // Will: a premade voice, so it works on the free plan; ElevenLabs lists zh as verified
 const ELEVEN_DEFAULT_MODEL = 'eleven_v4_turbo';
 const ELEVEN_TIMEOUT_MS = 60000;
 const LOCAL_TIMEOUT_MS = 300000;
