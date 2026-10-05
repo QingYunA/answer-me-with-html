@@ -153,7 +153,7 @@ Server -> Client: SYN-ACK
    ```
 
    Agent 只能读到启动它之前已经设好的变量。想把 ElevenLabs 固定为默认配音，运行 `am config set voice elevenlabs`。
-3. **选声音。** 在 ElevenLabs 的声音页复制声音 ID，设给 `ELEVENLABS_VOICE_ID`。默认声音是免费套餐也能用的官方声音，但不是为中文调的。公共声音库里的声音需要付费套餐：免费套餐调用时 API 会返回 `402 paid_plan_required`。
+3. **选声音。** 在 ElevenLabs 的声音页复制声音 ID，设给 `ELEVENLABS_VOICE_ID`。默认声音是 Will：免费套餐可用的官方声音，ElevenLabs 标注验证过中文。它母语是英语，所以声音库里的中文母语声音会更自然。公共声音库里的声音需要付费套餐：免费套餐调用时 API 会返回 `402 paid_plan_required`。
 4. **选模型**，用 `ELEVENLABS_MODEL_ID`，默认 `eleven_v4_turbo`。
 
    | 模型 | 适合 |

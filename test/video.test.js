@@ -569,7 +569,9 @@ test('am patch: a voiced video keeps its voice instead of switching to the confi
 test('ElevenLabs: 默认用 eleven_v4_turbo，ELEVENLABS_MODEL_ID 可以换模型，缓存键随模型变化', async () => {
   const realFetch = globalThis.fetch;
   const bodies = [];
+  const urls = [];
   globalThis.fetch = async (url, init) => {
+    urls.push(String(url));
     bodies.push(JSON.parse(init.body));
     return new Response(new Uint8Array(4), { status: 200 });
   };
@@ -581,6 +583,10 @@ test('ElevenLabs: 默认用 eleven_v4_turbo，ELEVENLABS_MODEL_ID 可以换模�
     await flash.synth('你好');
     assert.deepEqual(bodies.map((b) => b.model_id), ['eleven_v4_turbo', 'eleven_flash_v2_5']);
     assert.match(def.id, /:eleven_v4_turbo$/);
+    // 默认声音是免费套餐可用、标注验证过中文的官方声音 Will；ELEVENLABS_VOICE_ID 可覆盖。
+    assert.match(urls[0], /text-to-speech\/bIHbv24MWmeRgasZH58o\?/);
+    await pickProvider('elevenlabs', { ...base, ELEVENLABS_VOICE_ID: 'abc' }).synth('你好');
+    assert.match(urls[2], /text-to-speech\/abc\?/);
     assert.notEqual(def.id, flash.id);
   } finally {
     globalThis.fetch = realFetch;

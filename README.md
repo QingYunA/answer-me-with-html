@@ -153,7 +153,7 @@ The draft for the example video ([examples/video-tcp.en.md](examples/video-tcp.e
    ```
 
    An agent only sees the key if it was set before you started the agent. To always use ElevenLabs instead of letting `am` pick, run `am config set voice elevenlabs`.
-3. **Pick a voice.** Copy a voice ID from your ElevenLabs voices page and set `ELEVENLABS_VOICE_ID`. The default is a premade voice that works on the free plan, but it is not tuned for Chinese. A voice from the public library needs a paid plan: on the free plan the API answers `402 paid_plan_required`.
+3. **Pick a voice.** Copy a voice ID from your ElevenLabs voices page and set `ELEVENLABS_VOICE_ID`. The default is Will, a premade voice that works on the free plan and is verified for Chinese by ElevenLabs. It is an English-native voice, so a Chinese-native library voice sounds more natural. A voice from the public library needs a paid plan: on the free plan the API answers `402 paid_plan_required`.
 4. **Pick a model** with `ELEVENLABS_MODEL_ID`. The default is `eleven_v4_turbo`.
 
    | Model | Use it for |

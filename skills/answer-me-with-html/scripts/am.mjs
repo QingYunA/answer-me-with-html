@@ -4848,7 +4848,7 @@ function hasCommand(cmd) {
 
 // src/video/tts.js
 var SAMPLE_RATE = 22050;
-var ELEVEN_DEFAULT_VOICE = "JBFqnCBsd6RMkjVDRZzb";
+var ELEVEN_DEFAULT_VOICE = "bIHbv24MWmeRgasZH58o";
 var ELEVEN_DEFAULT_MODEL = "eleven_v4_turbo";
 var ELEVEN_TIMEOUT_MS = 6e4;
 var LOCAL_TIMEOUT_MS = 3e5;
