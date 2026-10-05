@@ -83,6 +83,32 @@ test('cli render: a component syntax error gives the absolute line, component na
   assert.match(r.err, /am help flow/);
 });
 
+test('cli render: a callout body that starts with "type: <kind>" fails and shows the type on the fence line', async () => {
+  const r = await run(['render', '-'], { stdin: '## A\n文本\n```callout\ntype: info\nBody\n```\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /✗ L4 \[callout\] callout: put the type on the fence line, not in the body: ```callout info/);
+  assert.match(r.err, /Correct example:\n {4}```callout warn Caution/);
+  assert.match(r.err, /am help callout/);
+});
+
+test('cli render: a first body line "type: warning|error|note", with or without a # comment, fails and names the right fence type', async () => {
+  for (const [line, fix] of [['type: warning', 'warn'], ['type: error', 'err'], ['type: note # the kind', 'info'], ['type: ok  # fine', 'ok']]) {
+    const r = await run(['render', '-'], { stdin: `## A\n文本\n\`\`\`callout\n${line}\nBody\n\`\`\`\n` });
+    assert.equal(r.code, 1, line);
+    assert.match(r.err, new RegExp(`✗ L4 \\[callout\\] callout: put the type on the fence line, not in the body: \`\`\`callout ${fix} \\[title\\]`), line);
+  }
+});
+
+test('cli render: a first body line "type: " followed by several words stays body text', async () => {
+  const r = await run(['render', '-', '-o', 'callout-words.html'], { stdin: '## A\n```callout info\ntype: of the valve is shown below\nBody\n```\n' });
+  assert.equal(r.code, 0, r.err);
+});
+
+test('cli render: a "type: <kind>" line that is not the first body line stays body text', async () => {
+  const r = await run(['render', '-', '-o', 'callout-ok.html'], { stdin: '## A\n```callout info\nBody\ntype: warn\n```\n' });
+  assert.equal(r.code, 0, r.err);
+});
+
 test('cli render: a parse error gives the line number', async () => {
   const r = await run(['render', '-'], { stdin: '## A\n```flow\nA -> B' });
   assert.equal(r.code, 1);

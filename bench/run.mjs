@@ -3,9 +3,10 @@
 // Records the real output tokens, duration, cost and turns that claude -p returns. Needs Claude Code and this skill installed.
 // Usage: node bench/run.mjs [model] [output directory] [repetitions per group]
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, copyFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, statSync, copyFileSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const MODEL = process.argv[2] || 'sonnet';
 const OUT = resolve(process.argv[3] || 'bench/results');
@@ -22,7 +23,13 @@ const ALL_TOPICS = [
 ];
 const TOPICS = ONLY ? ALL_TOPICS.filter((t) => ONLY.includes(t.id)) : ALL_TOPICS;
 
-const MODES = {
+// BENCH_KIND=video compares a hand-written narrated explainer page with `am video` (no audio in both).
+const VIDEO = process.env.BENCH_KIND === 'video';
+// BENCH_LEAN=1 runs with a small context: only project settings, no MCP servers, and the skill from this repo
+// installed in the work folder. Without it the run uses your own Claude Code setup (plugins, rules, skills).
+const LEAN = process.env.BENCH_LEAN === '1';
+const SKILL_DIR = fileURLToPath(new URL('../skills/answer-me-with-html', import.meta.url));
+const PAGE_MODES = {
   plain: {
     prompt: (t) => `Explain ${t} as a single self-contained HTML page: inline CSS, SVG diagrams where useful, no external resources. Save it to ./out.html with the Write tool. Do not use any skills. Then reply with one short sentence.`,
     args: ['--allowedTools', 'Write', '--disallowedTools', 'Skill', 'Bash'],
@@ -32,6 +39,18 @@ const MODES = {
     args: ['--allowedTools', 'Skill', 'Bash', 'Read'],
   },
 };
+
+const VIDEO_MODES = {
+  plain: {
+    prompt: (t) => `Make a 3Blue1Brown-style animated explainer about ${t} as a single self-contained HTML page: inline CSS, JS and SVG, no external resources. It plays by itself like a video: a title scene, then two or three scenes that build a diagram step by step, with a caption for each step, a play/pause button and a progress bar. No audio. Save it to ./out.html with the Write tool. Do not use any skills. Then reply with one short sentence.`,
+    args: ['--allowedTools', 'Write', '--disallowedTools', 'Skill', 'Bash'],
+  },
+  skill: {
+    prompt: (t) => `Make a 3Blue1Brown-style explainer video about ${t}. Use the answer-me-with-html skill (am video, theme 3b1b) with --voice off, and render it with -o ./out.html --no-open. Then reply with one short sentence.`,
+    args: ['--allowedTools', 'Skill', 'Bash', 'Read'],
+  },
+};
+const MODES = VIDEO ? VIDEO_MODES : PAGE_MODES;
 
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -67,8 +86,13 @@ function runOnce(topic, cfg) {
   const home = join(work, '.am');
   mkdirSync(home);
   writeFileSync(join(home, 'config.json'), JSON.stringify({ always: false, open: false }));
+  const lean = LEAN ? ['--setting-sources', 'project', '--strict-mcp-config'] : [];
+  if (LEAN && cfg.args.includes('Skill') && !cfg.args.includes('--disallowedTools')) {
+    mkdirSync(join(work, '.claude', 'skills'), { recursive: true });
+    cpSync(SKILL_DIR, join(work, '.claude', 'skills', 'answer-me-with-html'), { recursive: true });
+  }
   const started = Date.now();
-  const r = spawnSync('claude', ['-p', '--model', MODEL, '--output-format', 'json', '--permission-mode', 'acceptEdits', ...cfg.args, '--', cfg.prompt(topic.text) + SUFFIX], {
+  const r = spawnSync('claude', ['-p', '--model', MODEL, '--output-format', 'json', '--permission-mode', 'acceptEdits', ...lean, ...cfg.args, '--', cfg.prompt(topic.text) + SUFFIX], {
     cwd: work, encoding: 'utf8', env: { ...process.env, AM_HOME: home, AM_NO_OPEN: '1' }, maxBuffer: 64 * 1024 * 1024,
   });
   let result = {};
@@ -102,6 +126,9 @@ for (let rep = 1; rep <= REPS; rep++) for (const topic of TOPICS) {
       seconds: Math.round((result.duration_ms || wall) / 100) / 10,
       costUSD: Math.round((result.total_cost_usd || 0) * 10000) / 10000,
       turns: result.num_turns,
+      inputTokens: sum(result.modelUsage, 'inputTokens'),
+      cacheWriteTokens: sum(result.modelUsage, 'cacheCreationInputTokens'),
+      cacheReadTokens: sum(result.modelUsage, 'cacheReadInputTokens'),
       htmlBytes: ok ? statSync(page).size : 0,
       ...(ok ? {} : { apiError: result.api_error_status, denials: result.permission_denials, reply: String(result.result || '').slice(0, 200) }),
     };

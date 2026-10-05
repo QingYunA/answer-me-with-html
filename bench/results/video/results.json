@@ -1,0 +1,69 @@
+{
+  "kind": "video",
+  "model": "sonnet",
+  "date": "2026-10-05T06:57:17.642Z",
+  "topic": "tcp",
+  "rows": [
+    {
+      "topic": "tcp",
+      "mode": "plain",
+      "rep": 1,
+      "ok": true,
+      "attempts": 1,
+      "outputTokens": 27839,
+      "seconds": 202.3,
+      "costUSD": 1.0165,
+      "turns": 2,
+      "htmlBytes": 21148
+    },
+    {
+      "topic": "tcp",
+      "mode": "skill",
+      "rep": 1,
+      "ok": true,
+      "attempts": 1,
+      "outputTokens": 1564,
+      "seconds": 15.8,
+      "costUSD": 0.8468,
+      "turns": 4,
+      "htmlBytes": 60683
+    },
+    {
+      "topic": "tcp",
+      "mode": "plain",
+      "rep": 2,
+      "ok": true,
+      "attempts": 1,
+      "outputTokens": 27375,
+      "seconds": 198.5,
+      "costUSD": 0.4333,
+      "turns": 2,
+      "htmlBytes": 20479
+    },
+    {
+      "topic": "tcp",
+      "mode": "skill",
+      "rep": 2,
+      "ok": true,
+      "attempts": 1,
+      "outputTokens": 1567,
+      "seconds": 18.5,
+      "costUSD": 0.5789,
+      "turns": 4,
+      "htmlBytes": 61596
+    },
+    {
+      "topic": "tcp",
+      "mode": "plain",
+      "rep": 3,
+      "ok": true,
+      "attempts": 1,
+      "outputTokens": 34402,
+      "seconds": 270.4,
+      "costUSD": 1.0831,
+      "turns": 2,
+      "htmlBytes": 21159,
+      "note": "from an earlier run of the same script (the rest of that run hit a rate limit)"
+    }
+  ]
+}

@@ -66,3 +66,30 @@ test('base.css: at 760px or less, table cells have a minimum width and diagrams 
   assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*6em/);
   assert.match(block, /\.am-diagram svg\s*\{[^}]*max-width:\s*none/);
 });
+
+// The layout script reads the author's width hint from data-span. The inline grid-column written by the
+// server (automatic spans, row filling) is only the no-JavaScript fallback and must not be mistaken for a hint.
+const panelTag = (html, id) => html.match(new RegExp(`<section class="am-panel[^"]*" id="panel-${id}"[^>]*>`))[0];
+
+test('sheet: data-span carries only what the author wrote; rows stays a plain-grid style', () => {
+  const html = renderDoc('---\ncols: 4\n---\n## A 宽 {span=2 rows=3}\n文字\n\n## B 默认\n文字\n\n## C 一列 {span=1}\n文字').html;
+  assert.match(panelTag(html, 'A'), /data-span="2"/);
+  assert.match(panelTag(html, 'A'), /grid-row: span 3/);
+  assert.doesNotMatch(panelTag(html, 'A'), /data-rows/);
+  assert.doesNotMatch(panelTag(html, 'B'), /data-span/);
+  assert.match(panelTag(html, 'C'), /data-span="1"/);
+});
+
+test('sheet: spans added by the server (row filling, wide tables) are not rendered as hints', () => {
+  const html = render('cols: 3', `## A 对比\n${table(5)}`);
+  assert.match(panelTag(html, 'A'), /grid-column: span 3/);
+  for (const id of ['A', 'B', 'C']) assert.doesNotMatch(panelTag(html, id), /data-span/, `panel ${id}`);
+  const filled = renderDoc('---\ncols: 3\n---\n## A 一\n文字\n\n## B 二\n文字\n\n## C 三\n文字\n\n## D 四\n文字').html;
+  assert.match(panelTag(filled, 'D'), /grid-column: span 3/);
+  assert.doesNotMatch(panelTag(filled, 'D'), /data-span/);
+});
+
+test('sheet: an author span larger than cols is rendered clamped to cols', () => {
+  const html = renderDoc('---\ncols: 3\n---\n## A 宽 {span=5}\n文字').html;
+  assert.match(panelTag(html, 'A'), /data-span="3"/);
+});

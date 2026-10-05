@@ -68,7 +68,7 @@ A -> B
 <div>any content</div>
 \`\`\`
 
-- "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span makes a panel cover more columns; without span, tables with 4+ columns and wide diagrams widen automatically.
+- "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
 const RAW_HELP = `LANG — embed as-is (escape hatch)

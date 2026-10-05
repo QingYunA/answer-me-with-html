@@ -75,6 +75,8 @@ jobs:
       - run: npm ci
       - name: End-to-end video tests
         run: AM_E2E=1 node --test --test-timeout=300000 --test-name-pattern=e2e test/video.test.js
+      - name: Sheet layout in headless Chrome
+        run: AM_E2E=1 node --test --test-timeout=300000 --test-name-pattern=e2e test/layout-browser.test.js
       - name: Export an example video to MP4
         run: |
           set -euo pipefail

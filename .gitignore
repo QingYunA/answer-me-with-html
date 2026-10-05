@@ -3,8 +3,8 @@ node_modules/
 *.log
 coverage/
 .playwright-mcp/
-bench/results/*.html
-bench/results/*.png
+bench/results/**/*.html
+bench/results/**/*.png
 bench/en/
 
 # 社交媒体宣传图（本地制作，不入库）

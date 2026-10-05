@@ -59,7 +59,7 @@ ${headHtml(meta, introHtml)}
 <div class="am-frame">
 ${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}
 <div class="am-grid" style="--cols: ${cols}">
-${placed.map((p) => panelHtml(p, { cols })).join('\n')}
+${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span } })).join('\n')}
 </div>
 </div>
 </main>`;

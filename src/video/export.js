@@ -121,7 +121,7 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
   }
 }
 
-function devtoolsUrl(chrome) {
+export function devtoolsUrl(chrome) {
   return new Promise((resolve, reject) => {
     let buf = '';
     const timer = setTimeout(() => reject(new ExportError('Chrome did not start in time')), 20000);
@@ -138,7 +138,7 @@ function devtoolsUrl(chrome) {
 }
 
 // Minimal CDP client: requests/responses paired by id, events awaited once by method name.
-function connect(url) {
+export function connect(url) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     const pending = new Map();
