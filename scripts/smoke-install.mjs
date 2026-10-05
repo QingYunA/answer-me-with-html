@@ -4,7 +4,7 @@
 // 2. install once for real with a temporary HOME, then render a page with the installed am.mjs;
 // 3. claude plugin validate checks the manifests of the marketplace and the always-on plugin.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,82 @@ function find(dir, name) {
     }
   }
   return null;
+}
+
+// The commands in INSTALL.md are run as written, so the guide cannot drift from what works.
+// Only the repository source and the agent name are substituted; `claude` is a shim for the pinned Claude Code CLI.
+const GUIDE_SOURCE = 'QingYunA/answer-me-with-html';
+
+function guideBlocks() {
+  const blocks = [];
+  let heading = '';
+  let cur = null;
+  for (const line of readFileSync(join(ROOT, 'INSTALL.md'), 'utf8').split('\n')) {
+    if (cur) {
+      if (line.startsWith('```')) { blocks.push({ heading, code: cur.join('\n') }); cur = null; } else cur.push(line);
+    } else if (/^#{2,3} /.test(line)) heading = line.replace(/^#+ /, '');
+    else if (line.startsWith('```bash')) cur = [];
+  }
+  return blocks;
+}
+
+function runGuide() {
+  const blocks = guideBlocks();
+  const block = (h) => {
+    const b = blocks.find((x) => x.heading.startsWith(h));
+    if (!b) throw new Error(`INSTALL.md has no bash block under "${h}"`);
+    return b.code;
+  };
+  const guide = readFileSync(join(ROOT, 'INSTALL.md'), 'utf8');
+  const updateCmd = (prefix) => {
+    const m = guide.match(new RegExp('`(' + prefix + '[^`]*)`'));
+    if (!m) throw new Error(`INSTALL.md names no "${prefix}" command`);
+    return m[1];
+  };
+  const bin = join(home, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'claude'), '#!/bin/sh\nexec npx -y @anthropic-ai/claude-code@latest "$@"\n');
+  chmodSync(join(bin, 'claude'), 0o755);
+  const version = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version;
+
+  // One fresh HOME per scenario, so nothing leaks between agents.
+  const scenario = (name, { isolateClaude = false } = {}) => {
+    const h = mkdtempSync(join(tmpdir(), `am-guide-${name}-`));
+    const e = { ...env, HOME: h, AM_HOME: join(h, '.answer-me-with-html'), ...(isolateClaude ? { CLAUDE_CONFIG_DIR: join(h, '.claude-config') } : {}), PATH: `${bin}:${process.env.PATH}` };
+    const bash = (code, { allowFail = false } = {}) => {
+      const cmd = code.replaceAll(GUIDE_SOURCE, ROOT).replaceAll('<your agent name>', name);
+      try { return strip(execFileSync('bash', ['-c', cmd], { encoding: 'utf8', env: e, stdio: ['pipe', 'pipe', 'pipe'] })); }
+      catch (err) { if (allowFail) return strip(String(err.stdout ?? '')); throw err; }
+    };
+    return { h, bash };
+  };
+
+  for (const agent of ['claude-code', 'codex', 'cursor']) {
+    step(`INSTALL.md, skill route, agent "${agent}"`);
+    const { h, bash } = scenario(agent);
+    bash(block('Step 1'));
+    if (/answer-me-with-html/.test(bash(block('Step 2'), { allowFail: true }))) throw new Error('Step 2 found an install in a fresh HOME');
+    bash(block('Any other agent'));
+    if (!bash(block('Step 4')).includes(version)) throw new Error(`Step 4 did not print ${version}`);
+    const am = find(h, 'am.mjs');
+    if (!am) throw new Error('am.mjs not found after the guide installed the skill');
+    const page = execFileSync(process.execPath, [am, 'render', '-', '--no-open'], { encoding: 'utf8', env: { ...env, HOME: h, AM_HOME: join(h, '.answer-me-with-html') }, input: '## A 标题\n文字\n' });
+    if (!/^✓ /m.test(page)) throw new Error(`the guide's skill install cannot render a page:\n${page}`);
+    if (!/answer-me-with-html/.test(bash(block('Step 2'), { allowFail: true }))) throw new Error('Step 2 did not find the install it just made');
+    process.stdout.write(`✓ ${agent}: install, version check and render work\n`);
+  }
+
+  step('INSTALL.md, Claude Code plugin route');
+  const { h, bash } = scenario('claude-code', { isolateClaude: true });
+  bash(block('Step 1'));
+  bash(block('Claude Code'));
+  if (!/answer-me-with-html@answer-me-with-html[\s\S]*enabled/.test(bash('claude plugin list'))) throw new Error('plugin is not listed as enabled');
+  const pluginAm = find(join(h, '.claude-config', 'plugins', 'cache', 'answer-me-with-html', 'answer-me-with-html'), 'am.mjs');
+  if (!pluginAm) throw new Error('am.mjs not found after the guide installed the plugin');
+  if (!find(join(h, '.claude-config', 'plugins', 'cache', 'answer-me-with-html', 'answer-me-with-html'), 'config.md')) throw new Error('the config command is not part of the installed plugin');
+  bash(updateCmd('claude plugin update'));
+  process.stdout.write('✓ plugin route: install, enabled, commands present, update works\n');
+  rmSync(h, { recursive: true, force: true });
 }
 
 try {
@@ -71,6 +147,8 @@ try {
     sh('npx', ['-y', '@anthropic-ai/claude-code@latest', 'plugin', 'validate', target]);
   }
   process.stdout.write('✓ marketplace and plugin manifests pass validation\n');
+
+  runGuide();
 } catch (e) {
   process.stderr.write(`✗ ${e.stderr ? strip(String(e.stderr)) : ''}${e.message}\n`);
   process.exitCode = 1;
