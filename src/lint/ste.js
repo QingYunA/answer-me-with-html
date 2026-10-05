@@ -1,10 +1,10 @@
 // STE controlled-writing check (only constrains the explanatory text in drafts).
-// Rules: sentence length, paragraph length, non-approved words, English passive voice, Chinese light verbs / `的` chains / clichés. All are warnings; strictness comes from style.
+// Rules: sentence length, paragraph length, non-approved words (English and Chinese), English passive voice, Chinese light verbs / `的` chains / clichés. All are warnings; strictness comes from style.
 // Japanese with kana gets only the sentence and paragraph length checks: Japanese `的` is a suffix (`基本的`, `具体的`), not the Chinese structural particle.
 // Skipped: code and inline code, ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
 
 import { EN_WORDS } from './wordlist.en.js';
-import { ZH_LIGHT_VERBS, ZH_CLICHES } from './wordlist.zh.js';
+import { ZH_LIGHT_VERBS, ZH_CLICHES, ZH_WORDS } from './wordlist.zh.js';
 import { isCJK, isJapanese } from '../svg/text.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
@@ -110,6 +110,7 @@ function checkUnit(text, line, kind, out) {
   const lexical = [
     ...EN_RE.flatMap(({ re, suggestion }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `not recommended: "${m[0]}"`, suggestion }))),
     ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re, label }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` }))),
+    ...(ja ? [] : ZH_WORDS).flatMap(({ re, suggestion }) => [...text.matchAll(re)].map((m) => ({ index: m.index, rule: 'word', message: `not recommended: "${m[0]}"`, suggestion }))),
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {

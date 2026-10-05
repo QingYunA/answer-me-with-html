@@ -158,6 +158,7 @@ Selection rules:
 - No more than 6 sentences per paragraph. Use lists for complex content.
 - In English, use common short words: use, not utilize; start, not commence; before, not prior to.
 - In Chinese, do not use light verbs (`进行优化` → `优化`, `加以说明` → `说明`), do not chain more than three `的`, and do not use clichés (`赋能`, `闭环`, `至关重要`…).
+- Chinese also gets warnings for typos (`登陆` → `登录`), vague quantities (`尽快`, `若干`, `大概`, `多次`), `以上` / `以下` / `以内` after a number (write `大于` / `不小于` / `不超过`) and one meaning written several ways (`单击` → `点击`, `键入` → `输入`, `入参` → `参数`). The list comes from [Simplified Technical Chinese](https://github.com/mzopedia/simplified-technical-chinese).
 - For counter-examples shown on purpose, use `~~strikethrough~~` or put them in a table row whose status is `no`; the check skips them.
 
 ## 6. Explainer videos (am video, 3Blue1Brown style)

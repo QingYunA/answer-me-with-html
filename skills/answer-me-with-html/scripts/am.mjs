@@ -4468,6 +4468,29 @@ var ZH_CLICHES = Object.freeze([
   "\u9897\u7C92\u5EA6",
   "\u65B9\u6CD5\u8BBA"
 ]);
+var UNIT = String.raw`(?:个|次|秒|天|分钟|小时|倍|字|条|项|人|行|位|%|MB|GB|KB|TB|ms)?`;
+var ZH_WORDS = Object.freeze([
+  // typos
+  { re: /登陆/g, suggestion: "\u767B\u5F55" },
+  { re: /帐号/g, suggestion: "\u8D26\u53F7" },
+  { re: /阀值/g, suggestion: "\u9608\u503C" },
+  { re: /布署/g, suggestion: "\u90E8\u7F72" },
+  // quantities without a number
+  { re: /尽快/g, suggestion: "give a concrete deadline" },
+  { re: /若干/g, suggestion: "write the number" },
+  { re: /大概|大约/g, suggestion: 'use "\u7EA6" in descriptions, a value in steps' },
+  { re: /多次/g, suggestion: "write the count" },
+  // 以上/以下/以内 after a number: it is unclear whether the endpoint is included
+  { re: new RegExp(String.raw`(?<=\d\s*${UNIT}\s*)(?:以上|以下)`, "g"), suggestion: "name the endpoint: \u5927\u4E8E / \u4E0D\u5C0F\u4E8E, \u5C0F\u4E8E / \u4E0D\u5927\u4E8E" },
+  { re: /(?<=\d[^。，；\n]{0,6})以内/g, suggestion: "\u4E0D\u8D85\u8FC7" },
+  // one meaning, one word
+  { re: /单击|点按/g, suggestion: "\u70B9\u51FB" },
+  { re: /键入/g, suggestion: "\u8F93\u5165" },
+  { re: /登出/g, suggestion: "\u9000\u51FA\u767B\u5F55" },
+  { re: /入参/g, suggestion: "\u53C2\u6570" },
+  { re: /出参/g, suggestion: "\u8FD4\u56DE\u503C" },
+  { re: /缺省/g, suggestion: "\u9ED8\u8BA4" }
+]);
 
 // src/lint/ste.js
 var LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
@@ -4556,7 +4579,8 @@ function checkUnit(text, line, kind, out) {
   }
   const lexical = [
     ...EN_RE.flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion }))),
-    ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` })))
+    ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` }))),
+    ...(ja ? [] : ZH_WORDS).flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion })))
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {

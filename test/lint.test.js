@@ -83,6 +83,21 @@ test('callout bodies are checked; plain table cells are checked', () => {
   assert.deepEqual(ws.map((w) => [w.line, w.suggestion]), [[3, 'use'], [7, 'start']]);
 });
 
+test('Chinese non-approved words: typos, vague quantities, one-meaning-one-word; suggestions in order of appearance', () => {
+  const ws = lint('## A\n尽快登陆系统，单击「保存」，缺省值见入参。');
+  assert.deepEqual(rules(ws), ['word', 'word', 'word', 'word', 'word']);
+  assert.deepEqual(ws.map((w) => w.suggestion), ['give a concrete deadline', '登录', '点击', '默认', '参数']);
+  assert.equal(formatWarning(ws[1]), 'L2 [word] not recommended: "登陆" → 登录');
+});
+
+test('Chinese non-approved words: the range words only after a number; ordinary Chinese is not affected', () => {
+  assert.deepEqual(rules(lint('## A\n并发数 100 以上，延迟 50 ms 以内。')), ['word', 'word']);
+  assert.deepEqual(rules(lint('## A\n以上步骤完成后，服务可用。')), []);
+  assert.deepEqual(rules(lint('## A\n配置文件会被服务读取，相关日志等信息稍后再看。')), [], 'passive 被, 相关, 等, 稍后 are not in the list');
+  assert.deepEqual(rules(lint('## A\n1. 请点击「保存」。')), []);
+  assert.deepEqual(rules(lint('## A\nログインして設定を保存する。')), [], 'Japanese does not get the Chinese word list');
+});
+
 test('the intro is checked too', () => {
   assert.equal(lint('导语里 utilize 一下。\n## A\nx').length, 1);
 });
