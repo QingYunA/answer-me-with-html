@@ -176,14 +176,20 @@ test('planning a long page stays fast', () => {
   assert.ok(performance.now() - t0 < 1500, `took ${performance.now() - t0} ms`);
 });
 
-test('a page with cols: 12 plans at most six columns per row and stays fast', () => {
+test('a page with cols: 12 plans at most six columns per row and costs about the same as cols: 6', () => {
   const panels = Array.from({ length: 24 }, (_, i) => (i % 5 === 1 ? diagram(360, 0.7) : text(40000 + (i % 4) * 15000)));
-  const t0 = performance.now();
-  const result = plan(panels, { cols: 12 });
-  const ms = performance.now() - t0;
+  const time = (cols) => {
+    const t0 = performance.now();
+    const result = plan(panels, { cols });
+    return { result, ms: performance.now() - t0 };
+  };
+  time(6); // warm up
+  const six = Math.min(time(6).ms, time(6).ms);
+  const { result, ms } = time(12);
   assert.deepEqual(order(result), panels.map((_, i) => i));
   assert.ok(Math.max(...result.rows.map((r) => r.columns.length)) <= 6, 'no row has more than six columns');
-  assert.ok(ms < 300, `planning 24 panels with cols: 12 took ${Math.round(ms)} ms`);
+  // Relative, so a slow or instrumented machine does not fail it: without the cap cols: 12 took about 8x cols: 6.
+  assert.ok(ms < six * 3 + 50, `cols: 12 took ${Math.round(ms)} ms, cols: 6 took ${Math.round(six)} ms`);
 });
 
 test('a span still means a share of cols when cols is above the planner cap', () => {
