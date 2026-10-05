@@ -2018,12 +2018,12 @@ note A, C: note across several participants
 \`\`\`
 - Argument num: number the messages.`,
   example: "```sequence\nClient -> Server: SYN\nServer --> Client: SYN-ACK\nClient -> Server: ACK\nnote Client, Server: ESTABLISHED\n```",
-  render(text, { args, uid }) {
+  render(text, { args, uid, ui }) {
     const model = parseSequence(text);
-    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid() })}</figure>`;
+    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid(), ui })}</figure>`;
   }
 };
-function layout({ participants: ps, steps }, { num, id }) {
+function layout({ participants: ps, steps }, { num, id, ui }) {
   const idx = new Map(ps.map((p, i) => [p, i]));
   const actorW = ps.map((p) => Math.max(measure(p, FS) + 28, 84));
   const gaps = ps.slice(1).map((_2, i) => (actorW[i] + actorW[i + 1]) / 2 + 28);
@@ -2105,7 +2105,7 @@ function layout({ participants: ps, steps }, { num, id }) {
     const x2 = xs[i];
     return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
   });
-  return `${svgOpen(width, height, `\u65F6\u5E8F\u56FE\uFF1A${ps.join("\u3001")}`)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
+  return `${svgOpen(width, height, `${ui?.sequence ?? "Sequence diagram: "}${ps.join(ui?.sep ?? ", ")}`)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
 // node_modules/@dagrejs/dagre/dist/dagre.esm.js
@@ -4032,10 +4032,10 @@ group Group name: B, C        \u2190 draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).`,
   example: "```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```",
-  render(text, { args, uid }) {
+  render(text, { args, uid, ui }) {
     const model = parseFlow(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    return `<figure class="am-diagram am-flow">${layout2(model, DIRS.has(dir) ? dir : "TB", uid())}</figure>`;
+    return `<figure class="am-diagram am-flow">${layout2(model, DIRS.has(dir) ? dir : "TB", uid(), ui)}</figure>`;
   }
 };
 function parseFlow(text) {
@@ -4132,7 +4132,7 @@ function nodeSize(node) {
   }[node.shape];
   return { lines, width: size[0], height: size[1] };
 }
-function layout2({ nodes, edges, groups }, rankdir, id) {
+function layout2({ nodes, edges, groups }, rankdir, id, ui) {
   const g = new $o.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -4174,7 +4174,7 @@ function layout2({ nodes, edges, groups }, rankdir, id) {
     return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}">${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2)}</g>`;
   });
   const { width, height } = g.graph();
-  const label = `\u6D41\u7A0B\u56FE\uFF1A${[...nodes.keys()].slice(0, 8).join("\u3001")}`;
+  const label = `${ui?.flow ?? "Flowchart: "}${[...nodes.keys()].slice(0, 8).join(ui?.sep ?? ", ")}`;
   return `${svgOpen(width, height, label)}${arrowDefs(id)}<g>${clusters.join("")}</g><g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
 }
 function shapeSvg(shape, x2, y2, w, h2) {
@@ -4289,9 +4289,9 @@ ${placed.map((p) => panelHtml(p, { cols })).join("\n")}
 }
 
 // src/templates/doc.js
-function doc({ meta, introHtml, panels }) {
+function doc({ meta, introHtml, panels, ui }) {
   const withToc = panels.length >= 3;
-  const toc = withToc ? `<nav class="am-toc" aria-label="\u76EE\u5F55">${panels.map((p) => `<a href="#panel-${esc(p.id)}">${esc(p.id)} \xB7 ${esc(p.title)}</a>`).join("")}</nav>` : "";
+  const toc = withToc ? `<nav class="am-toc" aria-label="${esc(ui?.toc ?? "Contents")}">${panels.map((p) => `<a href="#panel-${esc(p.id)}">${esc(p.id)} \xB7 ${esc(p.title)}</a>`).join("")}</nav>` : "";
   return `<main class="am-doc">
 ${headHtml(meta, introHtml)}
 <div class="am-doc-layout${withToc ? "" : " am-doc-layout--notoc"}">
@@ -4651,19 +4651,31 @@ var UI = {
     theme: { blueprint: "\u4E3B\u9898\uFF1A\u56FE\u7EB8", shadcn: "\u4E3B\u9898\uFF1A\u5361\u7247" },
     mode: { auto: "\u660E\u6697\uFF1A\u8DDF\u968F\u7CFB\u7EDF", light: "\u660E\u6697\uFF1A\u4EAE", dark: "\u660E\u6697\uFF1A\u6697" },
     copy: "\u590D\u5236\u6E90\u7A3F",
-    done: "\u5DF2\u590D\u5236 \u2713"
+    done: "\u5DF2\u590D\u5236 \u2713",
+    toc: "\u76EE\u5F55",
+    flow: "\u6D41\u7A0B\u56FE\uFF1A",
+    sequence: "\u65F6\u5E8F\u56FE\uFF1A",
+    sep: "\u3001"
   },
   en: {
     theme: { blueprint: "Theme: Blueprint", shadcn: "Theme: Cards" },
     mode: { auto: "Mode: Auto", light: "Mode: Light", dark: "Mode: Dark" },
     copy: "Copy source",
-    done: "Copied \u2713"
+    done: "Copied \u2713",
+    toc: "Contents",
+    flow: "Flowchart: ",
+    sequence: "Sequence diagram: ",
+    sep: ", "
   },
   ja: {
     theme: { blueprint: "\u30C6\u30FC\u30DE\uFF1A\u56F3\u9762", shadcn: "\u30C6\u30FC\u30DE\uFF1A\u30AB\u30FC\u30C9" },
     mode: { auto: "\u8868\u793A\uFF1A\u81EA\u52D5", light: "\u8868\u793A\uFF1A\u30E9\u30A4\u30C8", dark: "\u8868\u793A\uFF1A\u30C0\u30FC\u30AF" },
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
-    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713"
+    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
+    toc: "\u76EE\u6B21",
+    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8\uFF1A",
+    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3\uFF1A",
+    sep: "\u3001"
   }
 };
 function htmlLang(lang) {
@@ -4686,11 +4698,12 @@ function renderDoc(source, overrides = {}, defaults2 = {}) {
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const stats = { panels: doc2.panels.length, components: {} };
-  const ctx = { seq: 0, stats };
+  const lang = doc2.meta.lang || detectLang(source);
+  const ui = UI[lang] ?? UI.zh;
+  const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc2.intro, ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
-  const lang = doc2.meta.lang || detectLang(source);
-  const body = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels });
+  const body = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui });
   const html = shell({ meta: doc2.meta, lang, body, source });
   return { html, warnings, stats, meta: doc2.meta };
 }
@@ -4706,7 +4719,7 @@ function renderFence(block2, ctx) {
   }
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
-    return comp.render(text, { args, uid: () => `am${++ctx.seq}` });
+    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui });
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -5162,8 +5175,8 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav2 = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
   const stats = { panels: video.scenes.length, components: {} };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats });
   const lang = meta.lang || detectLang(source);
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: UI[lang] ?? UI.zh });
   const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source });
   return { html, wav: wav2, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
 }

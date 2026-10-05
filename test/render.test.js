@@ -128,6 +128,27 @@ test('render: English drafts use English UI labels', () => {
   assert.match(html, /Copy source/);
 });
 
+// Diagrams and the table of contents are named for screen readers in the page's language (#47).
+const A11Y_DRAFT = (a, b, c) => `---\ntemplate: doc\n---\n## A ${a}\n\`\`\`flow\nClient -> Server\n\`\`\`\n## B ${b}\n\`\`\`sequence\nClient -> Server: hello\n\`\`\`\n## C ${c}\nx`;
+
+test('render: aria-labels of diagrams and the table of contents follow the page language', () => {
+  const en = renderDoc(A11Y_DRAFT('The request path', 'The handshake between them', 'Notes on what happens')).html;
+  assert.match(en, /<nav class="am-toc" aria-label="Contents">/);
+  assert.match(en, /aria-label="Flowchart: Client, Server"/);
+  assert.match(en, /aria-label="Sequence diagram: Client, Server"/);
+
+  const zh = renderDoc(A11Y_DRAFT('请求从客户端发出的路径', '客户端和服务器之间的握手过程', '关于整个过程的补充说明和注意事项')).html;
+  assert.match(zh, /<nav class="am-toc" aria-label="目录">/);
+  assert.match(zh, /aria-label="流程图：Client、Server"/);
+  assert.match(zh, /aria-label="时序图：Client、Server"/);
+
+  const ja = renderDoc(A11Y_DRAFT('クライアントから出るリクエストの流れ', 'クライアントとサーバーのあいだのハンドシェイクの手順', 'この流れについてのほかのメモと注意点')).html;
+  assert.match(ja, /<html lang="ja"/);
+  assert.match(ja, /<nav class="am-toc" aria-label="目次">/);
+  assert.match(ja, /aria-label="フローチャート：Client、Server"/);
+  assert.match(ja, /aria-label="シーケンス図：Client、Server"/);
+});
+
 test('detectLang: decides by the share of Chinese', () => {
   assert.equal(detectLang('全中文内容'), 'zh');
   assert.equal(detectLang('all english words here'), 'en');

@@ -34,16 +34,19 @@ export const UI = {
     theme: { blueprint: '主题：图纸', shadcn: '主题：卡片' },
     mode: { auto: '明暗：跟随系统', light: '明暗：亮', dark: '明暗：暗' },
     copy: '复制源稿', done: '已复制 ✓',
+    toc: '目录', flow: '流程图：', sequence: '时序图：', sep: '、',
   },
   en: {
     theme: { blueprint: 'Theme: Blueprint', shadcn: 'Theme: Cards' },
     mode: { auto: 'Mode: Auto', light: 'Mode: Light', dark: 'Mode: Dark' },
     copy: 'Copy source', done: 'Copied ✓',
+    toc: 'Contents', flow: 'Flowchart: ', sequence: 'Sequence diagram: ', sep: ', ',
   },
   ja: {
     theme: { blueprint: 'テーマ：図面', shadcn: 'テーマ：カード' },
     mode: { auto: '表示：自動', light: '表示：ライト', dark: '表示：ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓',
+    toc: '目次', flow: 'フローチャート：', sequence: 'シーケンス図：', sep: '、',
   },
 };
 
@@ -72,11 +75,12 @@ export function renderDoc(source, overrides = {}, defaults = {}) {
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
   const stats = { panels: doc.panels.length, components: {} };
-  const ctx = { seq: 0, stats };
+  const lang = doc.meta.lang || detectLang(source);
+  const ui = UI[lang] ?? UI.zh;
+  const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
-  const lang = doc.meta.lang || detectLang(source);
-  const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels });
+  const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
   const html = shell({ meta: doc.meta, lang, body, source });
   return { html, warnings, stats, meta: doc.meta };
 }
@@ -94,7 +98,7 @@ function renderFence(block, ctx) {
   }
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
-    return comp.render(text, { args, uid: () => `am${++ctx.seq}` });
+    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui });
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {

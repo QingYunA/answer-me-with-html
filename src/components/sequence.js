@@ -57,13 +57,13 @@ note A, C: note across several participants
 \`\`\`
 - Argument num: number the messages.`,
   example: '```sequence\nClient -> Server: SYN\nServer --> Client: SYN-ACK\nClient -> Server: ACK\nnote Client, Server: ESTABLISHED\n```',
-  render(text, { args, uid }) {
+  render(text, { args, uid, ui }) {
     const model = parseSequence(text);
-    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid() })}</figure>`;
+    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid(), ui })}</figure>`;
   },
 };
 
-function layout({ participants: ps, steps }, { num, id }) {
+function layout({ participants: ps, steps }, { num, id, ui }) {
   const idx = new Map(ps.map((p, i) => [p, i]));
   const actorW = ps.map((p) => Math.max(measure(p, FS) + 28, 84));
   const gaps = ps.slice(1).map((_, i) => (actorW[i] + actorW[i + 1]) / 2 + 28);
@@ -151,5 +151,5 @@ function layout({ participants: ps, steps }, { num, id }) {
       + `<g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>`
       + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
   });
-  return `${svgOpen(width, height, `时序图：${ps.join('、')}`)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`; // lang-ok: known gap, page aria-label is always Chinese (tracked in #47)
+  return `${svgOpen(width, height, `${ui?.sequence ?? 'Sequence diagram: '}${ps.join(ui?.sep ?? ', ')}`)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
 }

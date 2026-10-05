@@ -33,10 +33,10 @@ group Group name: B, C        ← draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
-  render(text, { args, uid }) {
+  render(text, { args, uid, ui }) {
     const model = parseFlow(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    return `<figure class="am-diagram am-flow">${layout(model, DIRS.has(dir) ? dir : 'TB', uid())}</figure>`;
+    return `<figure class="am-diagram am-flow">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui)}</figure>`;
   },
 };
 
@@ -140,7 +140,7 @@ function nodeSize(node) {
   return { lines, width: size[0], height: size[1] };
 }
 
-function layout({ nodes, edges, groups }, rankdir, id) {
+function layout({ nodes, edges, groups }, rankdir, id, ui) {
   const g = new dagre.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -188,7 +188,7 @@ function layout({ nodes, edges, groups }, rankdir, id) {
   });
 
   const { width, height } = g.graph();
-  const label = `流程图：${[...nodes.keys()].slice(0, 8).join('、')}`; // lang-ok: known gap, page aria-label is always Chinese (tracked in #47)
+  const label = `${ui?.flow ?? 'Flowchart: '}${[...nodes.keys()].slice(0, 8).join(ui?.sep ?? ', ')}`;
   return `${svgOpen(width, height, label)}${arrowDefs(id)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
 }
 

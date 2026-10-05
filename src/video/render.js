@@ -1,6 +1,6 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
-import { renderBlocks, detectLang, htmlLang, LintError, timestamp } from '../render.js';
+import { renderBlocks, detectLang, htmlLang, LintError, timestamp, UI as PAGE_UI } from '../render.js';
 import { pageCss } from '../themes/index.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
@@ -32,8 +32,8 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {} };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats });
   const lang = meta.lang || detectLang(source);
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: PAGE_UI[lang] ?? PAGE_UI.zh });
   const html = shell({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source });
   return { html, wav, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
 }
