@@ -34,9 +34,9 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 ## 为什么不直接让 AI 输出 HTML？
 
-当然可以，现在的模型写 HTML 已经写得不错了。问题在于输出 token 的账：每一行 CSS、每一层 `div`、每一个 SVG 坐标，都得模型一个字一个字地打出来。而你在屏幕前等的，也正是这些输出 token。
+当然可以，现在的模型写 HTML 已经写得不错了。问题在于输出 token 的账：每一行 CSS、每一层 `div`、每一个 SVG 坐标，都得模型一个字一个字地打出来，而你在屏幕前等的正是这些输出 token。
 
-用这个 skill，模型只写内容。我们用同一个模型、同样的问题，在普通的 Claude Code 环境里两种方式各做了一遍（3 个题目 × 每题 3 次，取中位数，Claude Sonnet 5.5）：
+用这个 skill，模型只写内容。同一个模型、同样的问题，在普通的 Claude Code 环境里两种方式各做一遍（3 个题目 × 每题 3 次，取中位数，Claude Sonnet 5.5）：
 
 | | 直接要 HTML | Answer me with HTML | |
 | :--- | ---: | ---: | :--- |
@@ -50,16 +50,9 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 <p align="center"><sub>这是基准测试中的一次运行：同样的提示词、同一个模型，两页都能用。这一次直接写 HTML 花了 9,351 个输出 token，用 skill 只花了 899 个。上表是多次运行的中位数。</sub></p>
 
-花费取决于你的环境加载了多少上下文。每一轮都要重读这些上下文，而 skill 会多两轮很短的对话（加载 skill、运行 CLI）。在普通环境里（约 2.2 万个 token 的上下文），省下的输出 token 更划算，9 次配对运行里 skill 每次都更便宜。我们还在自己加载很重的环境里（约 5.1 万个 token 的工具、规则和 skill）跑过这个测试的第一版：输出 token 6,873 → 923，耗时 46 秒 → 13 秒，但花费反过来了，$0.22 → $0.26，9 次里 skill 每次都更贵。环境加载得越多，省下的输出 token 越不值钱。提速在两种环境里都成立。
+提速在两种环境里都成立，花费则取决于你的环境加载了多少上下文：skill 会多两轮很短的对话，每一轮都要重读上下文。环境很重时（约 5.1 万个 token 的工具、规则和 skill），多出的两轮比省下的 token 更贵，我们测到 skill 贵约 20%。
 
-解释视频的差距更大。我们让模型做一个 3Blue1Brown 风格的 TCP 握手视频，不配音，两种方式各做一遍，在加载很重的环境里（手写 3 次，`am video` 2 次，取中位数）：
-
-| | 手写视频页 | `am video` | |
-| :--- | ---: | ---: | :--- |
-| 输出 token | 27,839 | **1,566** | **少 17.8 倍** |
-| 耗时 | 202 秒 | **17 秒** | **快 11.8 倍** |
-
-手写的页面能播放，有分场景、字幕和进度条；`am video` 另有镜头聚焦和场景间的变形。这只是一个题目、5 次运行，看个大概量级，不是精确倍数。每个题目的详细数据和复现脚本见 [bench/](bench/README.md)。
+解释视频的差距更大：同一个 TCP 握手视频，不配音，输出 token 27,839 → 1,566（少 17.8 倍），耗时 202 秒 → 17 秒（快 11.8 倍）。这只是一个题目、5 次运行，看个大概量级，不是精确倍数。每个题目的数据和复现脚本见 [bench/](bench/README.md)。
 
 ## 安装
 
@@ -140,15 +133,12 @@ Server -> Client: SYN-ACK
 `am video` 把它做成一个播放页：
 
 - **逐步构建**：第 N 句旁白播出时，图上出现第 N 步，箭头会一笔画出来。旁白比步数多时，多出的前几句当开场白。
-- **口语旁白**：旁白是要念出来的，Agent 会写成当面讲解的口吻，而不是说明书腔。
 - **镜头聚焦**：旁白里写 `[Server]`，镜头推向这个节点并高亮。整张图始终留在画面里，不会被裁掉。
 - **跨场景变形**：下一个场景里同名的节点，会从旧位置平滑移到新位置，而不是硬切。
-- **配音**：设置了 `ELEVENLABS_API_KEY` 就用 ElevenLabs（可选，[配置指南](docs/elevenlabs.zh-CN.md)），否则用系统语音（macOS `say`：中文用婷婷，英文用 Samantha，日文用 Kyoko），都没有就只出字幕。每一拍的时长等于这句音频的长度，所以音画同步。
-- **本地配音**：`--voice local` 调用你自己部署的 OpenAI 兼容 `POST /v1/audio/speech` 服务，要求返回 16 位 PCM WAV，比如用 [mlx-audio](https://github.com/Blaizzy/mlx-audio) 运行 Qwen3-TTS。`AM_TTS_URL` 填服务根地址；服务没有默认值时还要设 `AM_TTS_MODEL` 和 `AM_TTS_VOICE`，服务要求密钥时设 `AM_TTS_API_KEY`。`AM_TTS_EXTRA` 是模型专用参数（JSON 对象），并入每个请求；`AM_TTS_MODEL`、`AM_TTS_VOICE` 覆盖其中的同名字段，`input`、`response_format`、`stream` 总由 `am` 决定。某句音频比文字应有的时长短得多或长得多时，重新生成，每句最多 `AM_TTS_ATTEMPTS` 次（默认 3，设为 1 关闭检查）。`am patch` 沿用视频原来的配音方式。例：`AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit AM_TTS_VOICE=vivian am video draft.md --voice local`。
-- **和页面同一套外观**：默认是 blueprint 图纸风，带刻度外框和字母编号的图纸标题栏。稿件里写 `theme: 3b1b` 换成深色的 3Blue1Brown 风格；也支持 `theme: shadcn` 和 `mode: dark`。
-- **单个文件**：音频内嵌在页面里，离线也能播。加 `--mp4` 另存 1080p 视频文件，需要本机有 Chrome、ffmpeg 和 Node.js 22+，导出时间约为视频时长的 1.3 倍。
+- **配音**：设置了 `ELEVENLABS_API_KEY` 就用 ElevenLabs（可选，[配置指南](docs/elevenlabs.zh-CN.md)），否则用系统语音，都没有就只出字幕。每一拍的时长等于这句音频的长度，所以音画同步。
+- **单个文件**：音频内嵌在页面里，离线也能播。加 `--mp4` 另存 1080p 视频文件，需要本机有 Chrome、ffmpeg 和 Node.js 22+。
 
-示例视频（[examples/video-tcp.md](examples/video-tcp.md)）时长约 80 秒，稿件只有 835 个字符，也就是几百个输出 token。不配音时渲染不到 1 秒，用系统语音配音约 3 秒。只有你要视频时 Agent 才会做视频；高频模式仍然只出页面。完整语法：`am help video`。
+示例视频（[examples/video-tcp.md](examples/video-tcp.md)）的稿件只有 835 个字符，也就是几百个输出 token。只有你要视频时 Agent 才会做视频。本地配音服务、主题、导出时间等细节见[解释视频的细节](docs/video.zh-CN.md)；完整语法：`am help video`。
 
 ## 配置
 
@@ -193,26 +183,17 @@ Server -> Client: SYN-ACK
 
 ## 更新与清理
 
-**更新**：需要手动更新，但有新版本时会提醒你。工具每周在后台向 GitHub 查询一次最新版本号，只读这一个数字，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。关掉提醒：`/answer-me-with-html:config update_check off`。
+需要手动更新。工具每周在后台向 GitHub 查询一次最新版本号（不上传任何内容），有新版本时 Agent 会提醒你。关掉提醒：`/answer-me-with-html:config update_check off`。更新：`npx skills update answer-me-with-html -y`，或直接对 Agent 说"更新一下 answer-me-with-html"。
 
-| 安装方式 | 更新方法 |
-| :--- | :--- |
-| `npx skills add` | `npx skills update answer-me-with-html -y`，或直接对 Agent 说"更新一下 answer-me-with-html" |
-| `git clone` + `npm link` | 在仓库目录运行 `git pull && npm install` |
-| Claude Code 插件 | 终端运行 `claude plugin update answer-me-with-html@answer-me-with-html`（或在 `/plugin` → Installed 里点 Update now），再 `/reload-plugins`。想自动更新，就在 `/plugin` → Marketplaces 里给这个插件市场打开自动更新。第三方插件市场默认不自动更新 |
+页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录变大时 Agent 会先问你，没有你的同意，什么都不会删。直接说"清理一下页面"，或者运行 `am clean --dry-run` 先看看会删什么。
 
-**清理**：页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录超过 200 MB，或超过 20 MB 且 30 天没清理过，Agent 会问你要不要清理，每周最多问一次。没有你的同意，什么都不会删。
-
-- `/answer-me-with-html:clean`（插件），或者直接说"清理一下页面"：先预演，再问你。
-- `am clean`：删除 30 天前的页面和视频，清空配音缓存。`--days N` 改天数，`--all` 删除全部页面和视频，`--dry-run` 只看不删。配置始终保留。如果 `pages`、`videos` 或 `cache` 本身是软链接，会被跳过：`am clean` 不会碰链接指向的文件，用量统计和清理提示也不再计入。如果这些目录无法遍历（比如没有读权限），同样会被跳过：其中的文件不计入用量统计和清理提示，显示的大小可能低于实际占用，清理也不会删除它们。
+其他安装方式的更新步骤和 `am clean` 的全部选项：[参考](docs/reference.zh-CN.md#更新与清理)。
 
 ## 为什么做这个
 
 Karpathy 发过[一条推文](https://x.com/karpathy/status/2105819303471976479)。大意是 LLM 干的活越来越多，人反而越来越难跟上它的输出。比起读一大段文字，看一张图、一页网页要轻松得多。
 
-我试过让 Agent 直接用 HTML 回答问题。效果不错，就是太慢。
-
-一页像样的网页要等一两分钟。大半时间花在输出几百行 CSS 上，而这些 CSS 每次都差不多。画流程图更麻烦：模型得自己算 SVG 坐标，连线经常歪掉，箭头指到空白处。
+我试过让 Agent 直接用 HTML 回答问题。页面不错，就是太慢：一页像样的网页要等一两分钟，大半时间花在输出几百行每次都差不多的 CSS 上。画流程图更麻烦：模型得自己算 SVG 坐标，箭头经常指到空白处。
 
 所以 Answer me with HTML 把这些活从模型手里拿走了。模型只写内容，排版、配色、画图都交给 CLI。
 
@@ -248,7 +229,6 @@ SYN_RCVD -> *ESTABLISHED: 收 ACK
 
 ## 特性
 
-- **省 token、少等待:** 模型只写一份约 900 token 的简短稿件，不用输出 7,000 token 的 HTML、CSS 和 SVG。详见[基准测试](bench/README.md)。
 - **版面由代码计算:** 面板位置和图形坐标都是算出来的，不靠模型猜。文字不会被截断，网格里也不会留空洞。
 - **出错能自己改:** 稿件写错时，CLI 会给出行号、组件名和一段正确示例。Agent 照着改一次就行。
 - **两套主题:** blueprint 是图纸风，shadcn 是卡片风。都带亮色和暗色，页面上可以随时切换。
@@ -283,64 +263,7 @@ Agent 会按信息的形状挑组件：
 | `callout` | 结论、提示、警告 |
 | 表格 | 多维对比。单元格写 `ok` / `no` / `warn` 会变成 ✓ ✗ ! |
 
-<details>
-<summary>稿件格式（想自己写稿件时看）</summary>
-
-````markdown
----
-template: sheet        # sheet 是多面板网格（默认），doc 是单栏长文加目录
-theme: blueprint       # blueprint 或 shadcn
-title: 页面标题
-subtitle: 一句话说明
-cols: 3                # sheet 的列数
-source: RFC 9293       # 其他任意字段会显示在标题下方
----
-导语，写一两句核心结论。
-
-## A 面板标题 {span=2 meta="右上角的小字"}
-这里写普通 Markdown，段落、列表、表格都行。
-
-```flow LR
-A -> B: 标签
-```
-````
-
-- 每个 `## ` 开头的标题是一个面板。面板编号 A、B、C 可以不写，会自动补上。
-- `span=2` 让面板占两列，`rows=2` 让面板占两行，`bare` 会去掉面板的标题栏。`span` 只是提示：页面会按内容调整每个面板的大小，宽表格和宽图不需要写 `span`。只有想让某个面板更突出时才写 `span`。`rows` 只对普通网格生效（关闭 JavaScript、打印和窄屏时）；浏览器里的对齐排版会忽略它。
-- 组件覆盖不到的情况，可以用 ```` ```html ```` 或 ```` ```svg ```` 直接嵌入原始代码。
-
-每个组件的完整写法：`am help <组件名>`。
-
-</details>
-
-<details>
-<summary>不经过 Agent，直接用命令行</summary>
-
-CLI 就是 skill 目录里的 `scripts/am.mjs`：
-
-````bash
-AM=skills/answer-me-with-html/scripts/am.mjs
-
-node $AM render examples/tcp.md                  # 渲染并用浏览器打开
-node $AM render notes.md -o out.html --no-open   # 指定输出位置，不自动打开
-node $AM render notes.md --theme shadcn          # 这一次换主题
-node $AM patch page.html --panel "为什么是三次" < panel.md   # 只换一个 ## 面板，覆盖原 HTML
-node $AM lint notes.md                           # 只做写作检查
-node $AM list                                    # 列出所有组件
-node $AM config                                  # 查看配置
-
-# 从 stdin 读取，Agent 就是这样调用的
-node $AM render - <<'AM_EOF'
-## A 一个面板
-```flow
-A -> B: 你好
-```
-AM_EOF
-````
-
-页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。
-
-</details>
+稿件格式（frontmatter、`span`、`rows`、原始 `html`/`svg` 块）和不经过 Agent 直接用命令行：见[参考](docs/reference.zh-CN.md)。每个组件的完整写法：`am help <组件名>`。
 
 ## STE 受控写作检查
 
@@ -370,8 +293,6 @@ npm run snapshot  # 与 origin/main 对比生成的 HTML（重构不能改变它
 维护约定（生成的打包文件、页面格式、快照比对、审 PR、发版）见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 运行时依赖只有两个：[marked](https://github.com/markedjs/marked) 负责解析 Markdown，[@dagrejs/dagre](https://github.com/dagrejs/dagre) 负责流程图布局。打包时它们会被一起打进 `am.mjs`。
-
-更新演示视频：把 [docs/demo/demo.html](docs/demo/demo.html) 和渲染好的 [examples/tcp.en.md](examples/tcp.en.md)（`tcp.html`）放在一起通过 HTTP 提供，用 1920×1080 打开，等待 `window.ready` 后，依次调用 `window.render(i / 30)` 并截图为 `frame-0000.jpg` … `frame-0719.jpg`，再执行 `node docs/demo/make-demo.mjs <帧目录>` 配乐并编码。生成的 MP4 和 GIF 不入库，因为插件安装会拷贝整个仓库。把 MP4 上传到 GitHub 评论里，再在 README 里引用那个链接。动画由时间唯一决定，背景音乐由 [docs/demo/music.mjs](docs/demo/music.mjs) 按 120 BPM 合成，每个镜头切换都落在节拍上。
 
 ## Star 历史
 

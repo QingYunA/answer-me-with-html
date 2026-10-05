@@ -34,7 +34,7 @@ https://github.com/user-attachments/assets/d3063a28-5dfd-4c44-a562-be901c49b249
 
 ## Why not just ask for HTML?
 
-You can. Models write decent HTML now. The problem is the bill you pay in output tokens: the model has to type every line of CSS, every wrapper `div` and every SVG coordinate. Output tokens are also what you sit and wait for.
+You can. Models write decent HTML now. The cost is output tokens: the model has to type every line of CSS, every wrapper `div` and every SVG coordinate, and output tokens are what you sit and wait for.
 
 With this skill, the model writes only the content. We asked the same questions with the same model both ways, in a plain Claude Code setup (3 topics × 3 runs, medians, Claude Sonnet 5.5):
 
@@ -50,16 +50,9 @@ With this skill, the model writes only the content. We asked the same questions 
 
 <p align="center"><sub>One run from an earlier benchmark in a heavily loaded setup: same prompt, same model, and both pages are usable. This run took 9,351 output tokens for the plain page and 899 with the skill.</sub></p>
 
-The cost depends on how much context your setup loads. Every turn re-reads that context, and the skill adds two short turns (load the skill, run the CLI). In the plain setup (about 22,000 tokens of context) the saved output tokens win, and the skill was cheaper in 9 of 9 paired runs. We also ran the first version of this test in our own heavily loaded setup (about 51,000 tokens of tools, rules and skills): 6,873 → 923 output tokens and 46 s → 13 s, but the cost went the other way, $0.22 → $0.26, and the skill was more expensive in 9 of 9 runs. The more your setup loads, the less the saved output tokens matter. The speed-up holds in both.
+The speed-up holds in every setup. The cost depends on how much context your setup loads: the skill adds two short turns, and every turn re-reads the context. In a heavy setup (about 51,000 tokens of tools, rules and skills) the two extra turns cost more than the saved tokens, and we measured the skill about 20% more expensive.
 
-Explainer videos show a bigger gap. We asked for the TCP handshake as a 3Blue1Brown-style video, no voice, both ways, in the loaded setup (3 hand-written runs, 2 runs with `am video`, medians):
-
-| | Write the video page by hand | `am video` | |
-| :--- | ---: | ---: | :--- |
-| Output tokens | 27,839 | **1,566** | **17.8× fewer** |
-| Time | 202 s | **17 s** | **11.8× faster** |
-
-The hand-written pages play, with scenes, captions and a progress bar; `am video` also gives camera focus and morphs between scenes. This is one topic with five runs, so read it as a rough size, not a precise ratio. Per-topic numbers and the script to reproduce them are in [bench/](bench/README.md).
+Explainer videos show a bigger gap. For the same TCP video with no voice, output tokens went 27,839 → 1,566 (17.8× fewer) and time 202 s → 17 s (11.8× faster). That is one topic and five runs, so read it as a rough size, not a precise ratio. Per-topic numbers and the script to reproduce them are in [bench/](bench/README.md).
 
 ## Install
 
@@ -140,15 +133,12 @@ Server -> Client: SYN-ACK
 `am video` turns it into a player page:
 
 - **Built step by step.** When the Nth line of narration plays, the Nth step of the diagram appears. Arrows draw themselves. If there are more lines than steps, the extra lines at the start act as an intro.
-- **Spoken narration.** The agent writes narration the way a person explains things out loud, not like a manual.
 - **Camera focus.** `[Server]` in the narration pushes the camera toward that node and highlights it. The diagram never leaves the frame.
 - **Objects carry over.** A node with the same name in the next scene glides to its new place instead of cutting.
-- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set (optional; [setup guide](docs/elevenlabs.md)), the system voice otherwise (macOS `say`: Tingting for Chinese, Samantha for English, Kyoko for Japanese), and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
-- **Local voice.** `--voice local` uses an OpenAI-compatible `POST /v1/audio/speech` server you run yourself that returns 16-bit PCM WAV, such as [mlx-audio](https://github.com/Blaizzy/mlx-audio) with Qwen3-TTS. Set `AM_TTS_URL` to the server root; set `AM_TTS_MODEL` and `AM_TTS_VOICE` unless the server has defaults, and `AM_TTS_API_KEY` if it requires a key. `AM_TTS_EXTRA` is a JSON object of model-specific options merged into each request; `AM_TTS_MODEL` and `AM_TTS_VOICE` override the same fields in it, and `am` always sets `input`, `response_format` and `stream`. A clip much shorter or longer than its text suggests is generated again, up to `AM_TTS_ATTEMPTS` tries (default 3; 1 turns the check off). `am patch` keeps the voice a video was made with. Example: `AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit AM_TTS_VOICE=vivian am video draft.md --voice local`.
-- **Same look as the pages.** Videos use the blueprint drawing style by default: a ruled frame and lettered sheet heads. Write `theme: 3b1b` for the dark 3Blue1Brown look. `theme: shadcn` and `mode: dark` also work.
-- **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine. Export takes about 1.3 times the video length.
+- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set (optional; [setup guide](docs/elevenlabs.md)), the system voice otherwise, and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
+- **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine.
 
-The draft for the example video ([examples/video-tcp.en.md](examples/video-tcp.en.md), about 45 seconds) is 1.3 KB, a few hundred output tokens. Rendering takes under a second without voice and about 4 seconds with the system voice. The agent only makes videos when you ask; always-on mode still makes pages. Full syntax: `am help video`.
+The draft for the example video ([examples/video-tcp.en.md](examples/video-tcp.en.md)) is 1.3 KB, a few hundred output tokens. The agent only makes videos when you ask. A local voice server, themes and export time are in [video details](docs/video.md). Full syntax: `am help video`.
 
 ## Settings
 
@@ -193,26 +183,17 @@ Pause it with `/answer-me-with-html:config always off`. You don't need to uninst
 
 ## Updating and cleaning up
 
-**Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` from GitHub to read the latest version number. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Turn this off with `/answer-me-with-html:config update_check off`.
+Updates are manual. Once a week a background check reads the latest version number from GitHub (nothing about you or your pages is sent), and the agent mentions a new version when there is one. Turn it off with `/answer-me-with-html:config update_check off`. To update, run `npx skills update answer-me-with-html -y`, or tell your agent "update answer-me-with-html".
 
-| Installed with | Update with |
-| :--- | :--- |
-| `npx skills add` | `npx skills update answer-me-with-html -y`, or tell your agent "update answer-me-with-html" |
-| `git clone` + `npm link` | `git pull && npm install` in the repository |
-| Claude Code plugin | In a terminal run `claude plugin update answer-me-with-html@answer-me-with-html` (or open `/plugin` → Installed → Update now), then `/reload-plugins`. To update automatically, turn on auto-update for this marketplace in `/plugin` → Marketplaces. Claude Code leaves it off for third-party marketplaces |
+Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. When the folder gets large, the agent asks before cleaning, and nothing is deleted without your OK. Say "clean up the pages", or run `am clean --dry-run` to preview.
 
-**Cleaning up.** Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
-
-- `/answer-me-with-html:clean` (plugin), or say "clean up the pages", previews first and then asks.
-- `am clean` deletes pages and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
+Update steps for other install methods and every `am clean` option: [reference](docs/reference.md#updating-and-cleaning-up).
 
 ## Background
 
 Andrej Karpathy [posted](https://x.com/karpathy/status/2105819303471976479) that as LLMs do more of the work, keeping up with their output becomes the hard part. A diagram or a web page is far easier to take in than a long block of text.
 
-I tried asking agents to answer in HTML directly. The pages were good. They were also slow.
-
-A decent page took a minute or two. Most of that time went into hundreds of lines of CSS that were nearly the same every time. Diagrams were worse: the model had to compute SVG coordinates by hand, and arrows often pointed at nothing.
+I tried asking agents to answer in HTML directly. The pages were good, but slow: a decent page took a minute or two, mostly hundreds of lines of CSS that were nearly the same every time. Diagrams were worse. The model had to compute SVG coordinates by hand, and arrows often pointed at nothing.
 
 So Answer me with HTML takes that work away from the model. The model writes content. The CLI handles layout, color and drawing.
 
@@ -248,7 +229,6 @@ The CLI does the rest. It picks the template, places the panels, applies the the
 
 ## Features
 
-- **Fewer tokens, less waiting:** The model writes a short draft, about 900 output tokens, instead of 7,000 tokens of HTML, CSS and SVG. See the [benchmark](bench/README.md).
 - **Layout by code:** Panel placement and diagram coordinates are computed, not guessed. Labels don't get cut off, and there are no gaps in the grid.
 - **Fixes its own mistakes:** When a draft has an error, the CLI returns the line number, the component and a correct example. The agent fixes it in one try.
 - **Two themes:** `blueprint` looks like an engineering drawing. `shadcn` uses clean cards. Both have light and dark modes.
@@ -283,64 +263,7 @@ The agent picks a component by the shape of the information:
 | `callout` | A conclusion, a tip, a warning |
 | Table | Multi-way comparison. Write `ok` / `no` / `warn` in a cell to get ✓ ✗ ! |
 
-<details>
-<summary>Draft format (if you want to write drafts yourself)</summary>
-
-````markdown
----
-template: sheet        # sheet = grid of panels (default), doc = one column with a table of contents
-theme: blueprint       # blueprint or shadcn
-title: Page title
-subtitle: One line
-cols: 3                # columns for sheet
-source: RFC 9293       # any other field shows under the title
----
-A sentence or two with the main point.
-
-## A Panel title {span=2 meta="small text, top right"}
-Plain Markdown: paragraphs, lists, tables.
-
-```flow LR
-A -> B: label
-```
-````
-
-- Every `## ` heading is a panel. The letters A, B, C are optional and added for you.
-- `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. `span` is a hint: the page sizes each panel to its content, so wide tables and diagrams need no `span`. Write `span` only for a panel that must stand out. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the justified layout in a browser ignores it.
-- When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup.
-
-Full syntax for a component: `am help <component>`.
-
-</details>
-
-<details>
-<summary>Use the CLI directly, without an agent</summary>
-
-The CLI is `scripts/am.mjs` inside the skill folder.
-
-````bash
-AM=skills/answer-me-with-html/scripts/am.mjs
-
-node $AM render examples/tcp.en.md                # render and open in the browser
-node $AM render notes.md -o out.html --no-open    # choose the output file, don't open
-node $AM render notes.md --theme shadcn           # pick a theme for this run
-node $AM patch page.html --panel "Why three messages" < panel.md   # replace one ## panel, overwrite the same file
-node $AM lint notes.md                            # writing check only
-node $AM list                                     # list components
-node $AM config                                   # view settings
-
-# Read from stdin. This is how agents call it.
-node $AM render - <<'AM_EOF'
-## A One panel
-```flow
-A -> B: hello
-```
-AM_EOF
-````
-
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them.
-
-</details>
+The draft format (frontmatter, `span`, `rows`, raw `html` / `svg` blocks) and how to call the CLI without an agent are in the [reference](docs/reference.md). Full syntax for a component: `am help <component>`.
 
 ## The STE writing check
 
@@ -370,8 +293,6 @@ npm run snapshot  # compare rendered HTML with origin/main (refactors must not c
 Maintainer conventions (generated bundle, page format, snapshot checks, reviewing PRs, releasing) are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 There are two runtime dependencies: [marked](https://github.com/markedjs/marked) parses Markdown and [@dagrejs/dagre](https://github.com/dagrejs/dagre) lays out flow charts. Both are bundled into `am.mjs`.
-
-To refresh the demo video: serve [docs/demo/demo.html](docs/demo/demo.html) next to the rendered [examples/tcp.en.md](examples/tcp.en.md) (`tcp.html`), open it at 1920×1080, wait for `window.ready`, then call `window.render(i / 30)` and screenshot `frame-0000.jpg` … `frame-0719.jpg`. Run `node docs/demo/make-demo.mjs <frames-dir>` to add the music and encode. The MP4 and GIF are not committed, because plugin installs copy the whole repository. Upload the MP4 to a GitHub comment and use that link in the README. The animation is deterministic, and the music from [docs/demo/music.mjs](docs/demo/music.mjs) is synthesized at 120 BPM, so every scene change lands on a beat.
 
 ## Star History
 

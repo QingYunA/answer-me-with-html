@@ -25,6 +25,10 @@ Setup and test commands are in the README's [Development](README.md#development)
 4. To finish a PR on the contributor's branch, push to their fork. GitHub rejects the push if the PR touches `.github/workflows/` and your token lacks the `workflow` scope; open a carrier PR from a branch in this repository instead.
 5. Comment in English, then remove the worktree.
 
+## Refreshing the demo video
+
+Serve [docs/demo/demo.html](docs/demo/demo.html) next to the rendered [examples/tcp.en.md](examples/tcp.en.md) (`tcp.html`), open it at 1920×1080, wait for `window.ready`, then call `window.render(i / 30)` and screenshot `frame-0000.jpg` … `frame-0719.jpg`. Run `node docs/demo/make-demo.mjs <frames-dir>` to add the music and encode. The MP4 and GIF are not committed, because plugin installs copy the whole repository. Upload the MP4 to a GitHub comment and use that link in the README. The animation is deterministic, and the music from [docs/demo/music.mjs](docs/demo/music.mjs) is synthesized at 120 BPM, so every scene change lands on a beat.
+
 ## Releasing
 
 A release is a version bump merged to `main`. All installs read `main`: `npx skills update` takes the latest commit, and `claude plugin update` only updates when the version changes.
