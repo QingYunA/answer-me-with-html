@@ -301,6 +301,10 @@ npm run snapshot  # 与 origin/main 对比生成的 HTML（重构不能改变它
 
 运行时依赖只有两个：[marked](https://github.com/markedjs/marked) 负责解析 Markdown，[@dagrejs/dagre](https://github.com/dagrejs/dagre) 负责流程图布局。打包时它们会被一起打进 `am.mjs`。
 
+## 社区
+
+也欢迎到 [LINUX DO](https://linux.do) 讨论和反馈。
+
 ## Star 历史
 
 <a href="https://star-history.com/#QingYunA/answer-me-with-html&Date">
