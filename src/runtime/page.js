@@ -1,21 +1,12 @@
 (() => {
   const root = document.documentElement;
-  const cycle = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
-  // The button's data-labels lists every value in cycle order, so the runtime names no theme or mode.
-  const bind = (name, attr) => {
-    const btn = document.querySelector(`[data-am="${name}"]`);
-    if (!btn) return;
-    const labels = JSON.parse(btn.dataset.labels || '{}');
-    const show = (value) => { btn.textContent = labels[value] || value; };
-    show(root.getAttribute(attr));
-    btn.addEventListener('click', () => {
-      const next = cycle(Object.keys(labels), root.getAttribute(attr));
-      root.setAttribute(attr, next);
-      show(next);
-    });
-  };
-  bind('theme', 'data-theme');
-  bind('mode', 'data-mode');
+  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.
+  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {
+    const select = document.querySelector(`select[data-am="${name}"]`);
+    if (!select) continue;
+    select.value = root.getAttribute(attr);
+    select.addEventListener('change', () => root.setAttribute(attr, select.value));
+  }
 
   const copyBtn = document.querySelector('[data-am="copy"]');
   copyBtn?.addEventListener('click', async () => {

@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'node
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { CHOICES, VOICES } from './parse.js';
-import { loadThemes } from './themes/registry.js';
+import { loadThemes, AUTO } from './themes/registry.js';
 
 export class ConfigError extends Error {
   constructor(message) {
@@ -17,7 +17,7 @@ export class ConfigError extends Error {
 export const CONFIG_KEYS = Object.freeze({
   open: { type: 'bool', default: true, label: 'Open the page in the browser after it is made' },
   always: { type: 'bool', default: true, label: 'Always-on mode: add a page to every conclusion (needs the answer-me-with-html-always plugin)' },
-  theme: { type: 'enum', choices: CHOICES.theme, default: 'blueprint', label: 'Default theme' },
+  theme: { type: 'enum', choices: CHOICES.theme, default: AUTO, label: 'Default theme (auto: paper for long text, blueprint for diagrams)' },
   mode: { type: 'enum', choices: CHOICES.mode, default: 'auto', label: 'Default light/dark mode' },
   style: { type: 'enum', choices: CHOICES.style, default: '80', label: 'STE writing-check strictness' },
   update_check: { type: 'bool', default: true, label: 'Check for a new version once a week in the background and tell you (never updates by itself)' },
@@ -39,7 +39,7 @@ const defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k, s
 
 // The allowed values of a key; theme also allows the user's themes.
 export function configChoices(key, themes) {
-  return key === 'theme' ? themes.names('page') : CONFIG_KEYS[key].choices;
+  return key === 'theme' ? [AUTO, ...themes.names('page')] : CONFIG_KEYS[key].choices;
 }
 
 function coerce(key, raw, themes) {

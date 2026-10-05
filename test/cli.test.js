@@ -179,7 +179,7 @@ test('cli config: set / get / reset, changed values are marked with *', async ()
   assert.match(readFileSync(join(dir, 'cfg.html'), 'utf8'), /data-theme="shadcn"/, 'render reads the default theme from config');
   assert.equal(rendered.code, 0);
   assert.equal((await run(['config', 'reset', 'theme'])).code, 0);
-  assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'blueprint');
+  assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'auto');
 });
 
 test('cli config: booleans print as on/off; an unknown key or invalid value returns 2', async () => {

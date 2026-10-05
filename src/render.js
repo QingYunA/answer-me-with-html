@@ -5,7 +5,7 @@ import { md } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
-import { BUILTIN } from './themes/registry.js';
+import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc, isCJK, isJapanese } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
@@ -32,20 +32,20 @@ export class LintError extends Error {
 
 export const UI = {
   zh: {
-    themePrefix: '主题：',
-    mode: { auto: '明暗：跟随系统', light: '明暗：亮', dark: '明暗：暗' },
+    theme: '主题', modeLabel: '明暗',
+    mode: { auto: '跟随系统', light: '亮', dark: '暗' },
     copy: '复制源稿', done: '已复制 ✓',
     toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
   },
   en: {
-    themePrefix: 'Theme: ',
-    mode: { auto: 'Mode: Auto', light: 'Mode: Light', dark: 'Mode: Dark' },
+    theme: 'Theme', modeLabel: 'Mode',
+    mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     copy: 'Copy source', done: 'Copied ✓',
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
   },
   ja: {
-    themePrefix: 'テーマ：',
-    mode: { auto: '表示：自動', light: '表示：ライト', dark: '表示：ダーク' },
+    theme: 'テーマ', modeLabel: '表示',
+    mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓',
     toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
   },
@@ -71,10 +71,12 @@ export function detectLang(text) {
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
-  const doc = { ...parsed, meta: applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices }) };
-  if (doc.meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
-  const problem = themes.problem(doc.meta.theme, 'page');
+  const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
+  if (meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
+  const problem = themes.problem(meta.theme, 'page');
   if (problem) throw new ParseError(problem, 0);
+  // theme: auto becomes a real theme here, so the page, the summary and later patches name the theme that was used.
+  const doc = { ...parsed, meta: meta.theme === AUTO ? { ...meta, theme: pickTheme({ scope: 'page', template: meta.template, visuals: hasVisuals(parsed) }) } : meta };
 
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
@@ -88,6 +90,11 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
   const html = shell({ meta: doc.meta, lang, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
   return { html, warnings, stats, meta: doc.meta };
+}
+
+// A diagram, another component or a raw html / svg block anywhere in the draft.
+function hasVisuals({ intro, panels }) {
+  return [...intro, ...panels.flatMap((p) => p.blocks)].some((b) => b.type === 'fence' && (COMPONENTS.has(b.lang) || RAW_LANGS.has(b.lang)));
 }
 
 export function renderBlocks(blocks, ctx) {
@@ -122,7 +129,8 @@ export function timestamp(d = new Date()) {
 function shell({ meta, lang, body, source, embedded }) {
   const key = UI[lang] ? lang : 'zh';
   const ui = UI[key];
-  const themeLabels = Object.fromEntries(embedded.map((t) => [t.name, ui.themePrefix + t.label[key]]));
+  const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
+    .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   return `<!doctype html>
 ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
@@ -136,8 +144,8 @@ ${pageCss(embedded)}
 </head>
 <body>
 <div class="am-toolbar">
-<button class="am-btn" type="button" data-am="theme" data-labels="${esc(JSON.stringify(themeLabels))}">${esc(themeLabels[meta.theme])}</button>
-<button class="am-btn" type="button" data-am="mode" data-labels="${esc(JSON.stringify(ui.mode))}">${esc(ui.mode[meta.mode])}</button>
+${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[key]]), meta.theme)}
+${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
 ${body}

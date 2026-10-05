@@ -5,15 +5,24 @@
 // The built-in themes are always there; loadThemes adds the user's theme files from <AM_HOME>/themes/.
 import blueprint from './blueprint.js';
 import shadcn from './shadcn.js';
+import paper from './paper.js';
 import b3 from './3b1b.js';
 import { readUserThemes, readThemeFile } from './user.js';
 
-const ALL = Object.freeze([blueprint, shadcn, b3]);
+const ALL = Object.freeze([blueprint, shadcn, paper, b3]);
 const BUILTIN_NAMES = ALL.map((t) => t.name);
 
 export const themes = (scope) => ALL.filter((t) => t.scope.includes(scope));
 export const themeNames = (scope) => themes(scope).map((t) => t.name);
 export const getTheme = (name) => ALL.find((t) => t.name === name);
+
+// theme: auto picks a built-in theme from the draft. Pages: paper for reading (the doc template, or a draft with no
+// diagram or other visual block), blueprint otherwise. Videos are always visual: blueprint.
+export const AUTO = 'auto';
+export function pickTheme({ scope, template, visuals }) {
+  if (scope === 'video') return 'blueprint';
+  return template === 'doc' || !visuals ? 'paper' : 'blueprint';
+}
 
 // A set of themes: the built-in ones plus user themes. broken maps a skipped file's theme name to { file, reason }.
 function themeSet(user = [], broken = new Map()) {
@@ -26,9 +35,10 @@ function themeSet(user = [], broken = new Map()) {
     names,
     get: (name) => all.find((t) => t.name === name),
     // Names a draft or flag may give: usable themes plus broken ones, so the error can say what is wrong with the file.
-    choices: (scope) => [...names(scope), ...unusable.map(([name]) => name)],
+    choices: (scope) => [AUTO, ...names(scope), ...unusable.map(([name]) => name)],
     // Why a name cannot be used, or null.
     problem(name, scope) {
+      if (name === AUTO) return null;
       if (names(scope).includes(name)) return null;
       const bad = unusable.find(([n]) => n === name);
       if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;

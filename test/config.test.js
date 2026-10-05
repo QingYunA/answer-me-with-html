@@ -19,7 +19,7 @@ test('configPath: is AM_HOME/config.json', () => {
 });
 
 test('readConfig: returns the defaults when the file does not exist', () => {
-  assert.deepEqual(readConfig(env).values, { open: true, always: true, theme: 'blueprint', mode: 'auto', style: '80', voice: 'auto', update_check: true });
+  assert.deepEqual(readConfig(env).values, { open: true, always: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true });
 });
 
 test('setConfig: booleans accept on/off/true/false/`开`/`关` and are written to the file', () => {

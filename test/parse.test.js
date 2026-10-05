@@ -33,7 +33,7 @@ test('frontmatter: uses the defaults when absent', () => {
   const doc = parseDoc('## 只有一个面板\n内容');
   assert.deepEqual(
     { t: doc.meta.template, th: doc.meta.theme, s: doc.meta.style, c: doc.meta.cols },
-    { t: 'sheet', th: 'blueprint', s: '80', c: 3 },
+    { t: 'sheet', th: 'auto', s: '80', c: 3 },
   );
 });
 

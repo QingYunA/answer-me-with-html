@@ -39,7 +39,8 @@ const install = (name, theme) => {
   writeFileSync(join(home, 'themes', `${name}.json`), typeof theme === 'string' ? theme : JSON.stringify(theme));
 };
 const pageOf = (r) => readFileSync(r.out.match(/✓ (.+\.html)/)[1], 'utf8');
-const labels = (html) => JSON.parse(html.match(/data-am="theme" data-labels="([^"]+)"/)[1].replace(/&quot;/g, '"'));
+// The options of the toolbar's theme list: { value: text }.
+const labels = (html) => Object.fromEntries([...html.match(/<select[^>]*data-am="theme"[^>]*>([\s\S]*?)<\/select>/)[1].matchAll(/<option value="([^"]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));
 const DRAFT = '## A 流程\n客户端先发送请求，服务端再返回结果。\n';
 const VIDEO = '## A\n- 画面\n> 客户端先发送请求。\n';
 
@@ -53,7 +54,7 @@ test('user theme: picked by --theme, theme: and config; the page embeds it next 
     assert.match(html, /html\[data-theme="notes"\], html\[data-theme="notes"\]\[data-mode="light"\] \{[^}]*--paper: #fdfcf8;/);
     assert.match(html, /html\[data-theme="notes"\] \.am-panel-head \{ letter-spacing/);
     assert.deepEqual(Object.keys(labels(html)), [...themeNames('page'), 'notes']);
-    assert.equal(labels(html).notes, '主题：笔记'); // lang-ok: expected Chinese UI label
+    assert.equal(labels(html).notes, '笔记'); // lang-ok: expected Chinese UI label
   }
   assert.equal((await run(['config', 'set', 'theme', 'notes'])).code, 0);
   const html = pageOf(await run(['render', '-', '--no-open'], DRAFT));

@@ -26,12 +26,12 @@ const MAX_LISTED_WARNINGS = 20;
 const USAGE = `Answer me with HTML ${VERSION} — renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--no-open] [--theme ${themeNames('page').join('|')}]
+  am render <file|->  [-o <path>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
-                      [--theme ${themeNames('video').join('|')}] [--mode light|dark]
+                      [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
@@ -49,7 +49,7 @@ const FORMAT = `Draft format (extended Markdown)
 
 ---
 template: sheet        # sheet: blueprint board (default, multi-panel grid) | doc: linear explainer (one column + contents)
-theme: blueprint       # blueprint: drawing style (default) | shadcn: card style; switchable in the page
+theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
 cols: 3                # number of sheet grid columns, default 3
@@ -89,7 +89,7 @@ const VIDEO_FORMAT = `Video draft format (am video)
 ---
 title: TCP three-way handshake
 subtitle: Why three steps      # optional, subtitle on the title card
-theme: blueprint               # blueprint: drawing style (default, follows the theme in am config) | shadcn: cards | 3b1b: dark
+theme: blueprint               # blueprint: drawing style (auto picks it; follows the theme in am config) | shadcn: cards | 3b1b: dark
 mode: light                    # light | dark (blueprint + dark is a dark-blue drawing)
 ---
 > Title-card narration (optional; without it the title card stays for 2.4 seconds)

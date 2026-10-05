@@ -173,7 +173,7 @@ test('render: Japanese drafts use Japanese UI labels and lang="ja"', () => {
   const { html } = renderDoc('# TCP の接続\n## A 概要\n接続は3回のやりとりで行う。');
   assert.match(html, /<html lang="ja"/);
   assert.match(html, /原稿をコピー/);
-  assert.match(html, /テーマ：図面/);
+  assert.match(html, /<label class="am-pick">テーマ<select data-am="theme">.*>図面<\/option>/);
   assert.doesNotMatch(html, /复制源稿/);
 });
 

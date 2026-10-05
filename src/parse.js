@@ -1,7 +1,7 @@
 // Draft parsing: frontmatter → meta; `## ` headings → panels (slots); panel bodies → markdown blocks and fenced blocks.
 // Structure splitting only, no rendering. All line numbers are 1-based source-file lines, for error messages and the STE lint.
 
-import { themeNames } from './themes/registry.js';
+import { themeNames, AUTO } from './themes/registry.js';
 
 export class ParseError extends Error {
   constructor(message, line) {
@@ -13,7 +13,7 @@ export class ParseError extends Error {
 
 export const CHOICES = Object.freeze({
   template: ['sheet', 'doc', 'video'],
-  theme: themeNames('page'),
+  theme: [AUTO, ...themeNames('page')],
   style: ['off', '80', 'strict'],
   mode: ['auto', 'light', 'dark'],
 });
@@ -34,7 +34,7 @@ export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'o
 
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
-  theme: 'blueprint',
+  theme: AUTO,
   style: '80',
   mode: 'auto',
   cols: 3,

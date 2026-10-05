@@ -108,7 +108,7 @@ AM_EOF
 ```markdown
 ---
 template: sheet     # sheet board (default, one-screen overview) | doc linear explanation (read step by step)
-theme: blueprint    # blueprint drawing style (default) | shadcn card style | a theme the user made (am list shows it)
+theme: auto         # auto (default): paper for doc or text-only drafts, blueprint with diagrams | blueprint | shadcn | paper | a theme the user made (am list shows it)
 title: Title
 subtitle: One-line summary     # optional
 cols: 3             # most columns in a sheet row, default 3

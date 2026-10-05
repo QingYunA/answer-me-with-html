@@ -2,7 +2,7 @@
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
 import { renderBlocks, detectLang, htmlLang, LintError, timestamp, UI as PAGE_UI } from '../render.js';
 import { videoCss } from '../themes/index.js';
-import { BUILTIN } from '../themes/registry.js';
+import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
 import { VERSION, VIDEO_JS } from '../assets.js';
@@ -22,9 +22,10 @@ const UI = {
 export async function renderVideo(source, { provider = null, cacheDir, defaults = {}, overrides = {}, onProgress, themes = BUILTIN } = {}) {
   const themeChoices = themes.choices('video');
   const video = parseVideo(source, { defaults, themeChoices });
-  const meta = applyOverrides(video.meta, overrides, { ...CHOICES, theme: themeChoices });
-  const problem = themes.problem(meta.theme, 'video');
+  const picked = applyOverrides(video.meta, overrides, { ...CHOICES, theme: themeChoices });
+  const problem = themes.problem(picked.theme, 'video');
   if (problem) throw new ParseError(problem, 0);
+  const meta = picked.theme === AUTO ? { ...picked, theme: pickTheme({ scope: 'video' }) } : picked;
 
   // Each narration line is one beat; consecutive lines do not count as an "overlong paragraph".
   const warnings = meta.style === 'off' ? [] : lintDoc(video.doc).filter((w) => w.rule !== 'paragraph-length');

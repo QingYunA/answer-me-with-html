@@ -7,7 +7,7 @@
 ````markdown
 ---
 template: sheet        # sheet 是多面板网格（默认），doc 是单栏长文加目录
-theme: blueprint       # blueprint、shadcn，或你自己的主题
+theme: auto            # auto（默认）：长文用 paper，有图表用 blueprint；也可写 blueprint、shadcn、paper 或你自己的主题
 title: 页面标题
 subtitle: 一句话说明
 cols: 3                # sheet 的列数

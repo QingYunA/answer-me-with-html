@@ -50,19 +50,22 @@ test('themes: am list shows every theme, video-only themes marked', async () => 
 test('themes: an unknown theme lists the registered choices', async () => {
   const page = await run(['render', '-', '--theme', 'nope', '--no-open'], DRAFT);
   assert.notEqual(page.code, 0);
-  assert.match(page.err, new RegExp(`Choose one of: ${themeNames('page').join(' \\| ')}`));
+  assert.match(page.err, new RegExp(`Choose one of: ${['auto', ...themeNames('page')].join(' \\| ')}`));
   const video = await run(['video', '-', '--theme', 'nope', '--voice', 'off', '--no-open'], VIDEO);
   assert.notEqual(video.code, 0);
-  assert.match(video.err, new RegExp(`Choose one of: ${themeNames('video').join(' \\| ')}`));
+  assert.match(video.err, new RegExp(`Choose one of: ${['auto', ...themeNames('video')].join(' \\| ')}`));
 });
 
-test('themes: the theme button carries a label for each page theme, in the page language', () => {
-  const labels = (html) => JSON.parse(html.match(/data-am="theme" data-labels="([^"]+)"/)[1].replace(/&quot;/g, '"'));
+// The options of the toolbar's theme list: { value: text }.
+const labelsOf = (html) => Object.fromEntries([...html.match(/<select[^>]*data-am="theme"[^>]*>([\s\S]*?)<\/select>/)[1].matchAll(/<option value="([^"]+)"[^>]*>([^<]*)</g)].map((m) => [m[1], m[2]]));
+
+test('themes: the theme list has an option for each page theme, in the page language', () => {
+  const labels = labelsOf;
   const zh = labels(renderDoc(DRAFT).html);
   assert.deepEqual(Object.keys(zh), themeNames('page'));
-  assert.equal(zh.blueprint, '主题：图纸'); // lang-ok: expected Chinese UI label
+  assert.equal(zh.blueprint, '图纸'); // lang-ok: expected Chinese UI label
   const en = labels(renderDoc('## A Flow\nPlain English text here.\n').html);
-  assert.equal(en.shadcn, 'Theme: Cards');
+  assert.equal(en.shadcn, 'Cards');
 });
 
 test('themes: decoration rules apply only under their own theme', async () => {

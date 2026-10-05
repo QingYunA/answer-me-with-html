@@ -7,7 +7,7 @@
 ````markdown
 ---
 template: sheet        # sheet = grid of panels (default), doc = one column with a table of contents
-theme: blueprint       # blueprint, shadcn, or your own theme
+theme: auto            # auto (default) picks paper for long text, blueprint for diagrams; or blueprint, shadcn, paper, your own theme
 title: Page title
 subtitle: One line
 cols: 3                # columns for sheet
