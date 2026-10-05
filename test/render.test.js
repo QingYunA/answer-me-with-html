@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDoc, RenderError, detectLang } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
-import { THEMES } from '../src/themes/index.js';
+import { getTheme } from '../src/themes/registry.js';
 import { COMPONENTS } from '../src/components/index.js';
 
 const SRC = `---
@@ -53,7 +53,8 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     '.am-diagram .am-cluster-label', '.am-lifeline', '.am-actor', '.am-note',
     '.am-diagram .am-step',
   ];
-  const tokens = { ...THEMES.blueprint.common, ...THEMES.blueprint.light };
+  const { common, light } = getTheme('blueprint').tokens;
+  const tokens = { ...common, ...light };
   for (const selector of selectors) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rule = html.match(new RegExp(`${escaped} \\{([^}]+)\\}`))?.[1];

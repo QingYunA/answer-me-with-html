@@ -1,5 +1,5 @@
-/* Video player: the 1920×1080 stage scales to the window. All colors come from theme variables:
-   blueprint / shadcn reuse the page themes; 3b1b is a video-only dark theme (dark ground, blue lines, yellow accents). */
+/* Video player: the 1920×1080 stage scales to the window. All colors come from theme variables.
+   Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
 html[data-video] {
   /* Player controls stay out of the picture and ignore the theme: one fixed set of dark tokens */
   --v-ctl-bg: #0b0d11; --v-ctl-line: #1d2330; --v-ctl-fg: #c9d1dc; --v-ctl-muted: #5b6576;
@@ -10,31 +10,6 @@ html[data-video] {
   --v-title-font: var(--head-font);
   --v-glow: none;
 }
-html[data-video][data-theme="3b1b"] {
-  --bg: #0e1015; --paper: #141922; --ink: #eceff4; --ink-2: #a9b4c4; --ink-3: #6c7789;
-  --line: #58c4dd; --line-2: #2a3444; --fill: #171d27;
-  --accent: #f7d96f; --accent-bg: rgba(247, 217, 111, 0.12);
-  --ok: #83c167; --ok-bg: rgba(131, 193, 103, 0.14); --err: #fc6255; --err-bg: rgba(252, 98, 85, 0.14);
-  --warn: #f7d96f; --warn-bg: rgba(247, 217, 111, 0.12); --head-bg: #eceff4; --head-fg: #0e1015;
-  --radius: 6px; --bw: 1.6px; --shadow: none;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --head-font: var(--font-sans);
-  --v-stage: radial-gradient(ellipse at 50% 40%, #151a23 0%, #0e1015 70%);
-  --v-cap-fg: #fff; --v-cap-bg: rgba(8, 10, 14, 0.55); --v-cap-border: transparent;
-  --v-title-font: "CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino", "Songti SC", "STSong", "Noto Serif CJK SC", serif;
-  --v-glow: drop-shadow(0 0 6px rgba(247, 217, 111, 0.55));
-}
-/* blueprint: drawing-sheet ground with a fine grid */
-html[data-video][data-theme="blueprint"] {
-  --v-stage: linear-gradient(var(--line-2) 1px, transparent 1px) 0 0 / 40px 40px,
-             linear-gradient(90deg, var(--line-2) 1px, transparent 1px) 0 0 / 40px 40px, var(--paper);
-}
-html[data-video][data-theme="blueprint"][data-mode="dark"] {
-  --v-stage: linear-gradient(rgba(201, 214, 232, 0.07) 1px, transparent 1px) 0 0 / 40px 40px,
-             linear-gradient(90deg, rgba(201, 214, 232, 0.07) 1px, transparent 1px) 0 0 / 40px 40px, var(--bg);
-}
-
 html[data-video], html[data-video] body { background: var(--v-letterbox); height: 100%; overflow: hidden; }
 html[data-video] body { font-size: 22px; }
 
@@ -48,14 +23,8 @@ html[data-video] body { font-size: 22px; }
 .amv-ghost { position: absolute; left: 0; top: 0; transform-origin: 0 0; margin: 0; }
 .amv-ghost svg { display: block; max-width: none; overflow: visible; }
 
-/* ── Sheet frame (blueprint) ── */
+/* ── Sheet frame (hidden unless a theme shows it) ── */
 .amv-sheet { display: none; }
-html[data-theme="blueprint"] .amv-sheet {
-  display: block; position: absolute; inset: 24px; border: 1.5px solid var(--line); pointer-events: none;
-}
-html[data-theme="blueprint"] .amv-sheet::before {
-  content: ""; position: absolute; inset: 24px; border: 1.5px solid var(--line);
-}
 .amv-ruler { position: absolute; display: flex; font: 13px/1 var(--font-mono); color: var(--ink-3); }
 .amv-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }
 .amv-ruler--top, .amv-ruler--bottom { left: 24px; right: 24px; height: 24px; }
@@ -80,13 +49,6 @@ html[data-theme="blueprint"] .amv-sheet::before {
 }
 .amv-scene-title { flex: 1; display: flex; align-items: center; padding: 0 22px; font: 600 32px var(--v-title-font); }
 .amv-scene-meta { display: flex; align-items: center; padding: 0 22px; font: 16px var(--font-mono); color: var(--ink-2); letter-spacing: 0.06em; }
-html[data-theme="shadcn"] .amv-scene-n { margin: 12px 0 12px 14px; min-width: 40px; border-radius: 8px; font-size: 22px; }
-html[data-theme="shadcn"] .amv-scene-head { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
-/* 3b1b: title floats top left, no frame */
-html[data-theme="3b1b"] .amv-scene-head { left: 96px; top: 56px; border: 0; background: none; align-items: baseline; gap: 22px; }
-html[data-theme="3b1b"] .amv-scene-n { background: none; color: var(--line); padding: 0; min-width: 0; font: 500 30px var(--font-mono); }
-html[data-theme="3b1b"] .amv-scene-title { padding: 0; font-weight: 400; font-size: 46px; }
-html[data-theme="3b1b"] .amv-scene-meta { display: none; }
 
 .amv-body { position: absolute; left: 96px; right: 96px; top: 160px; height: 760px; display: grid; place-items: center; }
 .amv-fit { width: max-content; max-width: 1100px; transform-origin: 50% 50%; display: flex; flex-direction: column; gap: 28px; }
@@ -110,9 +72,6 @@ html[data-theme="3b1b"] .amv-scene-meta { display: none; }
 .amv-titleblock div + div { border-left: 1px solid var(--line); }
 .amv-titleblock b { font: 600 16px var(--font-mono); color: var(--ink-3); letter-spacing: 0.08em; }
 .amv-titleblock span { font: 28px var(--font-sans); color: var(--ink); }
-html[data-theme="3b1b"] .amv-title { font-weight: 400; font-size: 104px; letter-spacing: 0.005em; }
-html[data-theme="3b1b"] .amv-subtitle { color: var(--line); }
-html[data-theme="3b1b"] .amv-titleblock { display: none; }
 
 /* ── Captions ── */
 .amv-caption {
@@ -123,8 +82,6 @@ html[data-theme="3b1b"] .amv-titleblock { display: none; }
   font: 500 38px/1.45 var(--font-sans); color: var(--v-cap-fg); background: var(--v-cap-bg);
   border: var(--bw) solid var(--v-cap-border);
 }
-html[data-theme="3b1b"] .amv-caption { bottom: 56px; }
-html[data-theme="3b1b"] .amv-caption span { text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); font-size: 40px; }
 .amv-caption span:empty { display: none; }
 .amv-caption b { color: var(--accent); font-weight: 700; }
 

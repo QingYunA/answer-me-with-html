@@ -9,7 +9,7 @@ import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
 import { COMPONENTS } from './components/index.js';
-import { THEMES } from './themes/index.js';
+import { themes, themeNames } from './themes/registry.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, ExportError } from './video/export.js';
@@ -24,12 +24,12 @@ const MAX_LISTED_WARNINGS = 20;
 const USAGE = `Answer me with HTML ${VERSION} — renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--no-open] [--theme blueprint|shadcn]
+  am render <file|->  [-o <path>] [--no-open] [--theme ${themeNames('page').join('|')}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
-                      [--theme blueprint|shadcn|3b1b] [--mode light|dark]
+                      [--theme ${themeNames('video').join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
@@ -522,7 +522,7 @@ function cmdList(print) {
   print('  doc     linear explainer: one-column reading, with contents when there are 3+ panels');
   print('  video   explainer video: render with am video, see am help video');
   print('\nThemes (theme):');
-  for (const [name, t] of Object.entries(THEMES)) print(`  ${name.padEnd(10)}${t.label}`);
+  for (const t of themes('video')) print(`  ${t.name.padEnd(10)}${t.summary}${t.scope.includes('page') ? '' : ' (video only)'}`);
   print('\nComponents (fence language):');
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print('  html/svg  embed as-is (escape hatch)');

@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { themeNames } from '../src/themes/registry.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FIXED = new Date('2026-01-02T03:04:05Z').getTime();
@@ -57,7 +58,7 @@ function cases() {
   const opt = (flag, v) => (v ? [flag, v] : []);
   const out = [];
   for (const f of ['architecture.md', 'ste100.md', 'tcp.md', 'tcp.en.md']) {
-    for (const theme of [null, 'blueprint', 'shadcn']) {
+    for (const theme of [null, ...themeNames('page')]) {
       for (const mode of [null, 'light', 'dark', 'auto']) {
         for (const template of [null, 'sheet', 'doc']) {
           out.push({ cmd: 'render', f, args: [...opt('--theme', theme), ...opt('--mode', mode), ...opt('--template', template)] });
@@ -66,7 +67,7 @@ function cases() {
     }
   }
   for (const f of ['video-tcp.md', 'video-tcp.en.md']) {
-    for (const theme of [null, 'blueprint', 'shadcn', '3b1b']) {
+    for (const theme of [null, ...themeNames('video')]) {
       for (const mode of [null, 'light', 'dark']) {
         out.push({ cmd: 'video', f, args: ['--voice', 'off', ...opt('--theme', theme), ...opt('--mode', mode)] });
       }

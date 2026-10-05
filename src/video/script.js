@@ -1,13 +1,14 @@
 // Video draft: reuses parseDoc's panel splitting. One "## " panel = one scene; lines starting with > in a panel are narration,
 // each narration line is one beat; [name] in narration focuses the camera on the same-named element. Everything else (components, Markdown) is visuals.
-import { parseDoc, ParseError, CHOICES } from '../parse.js';
+import { parseDoc, ParseError } from '../parse.js';
 import { isCJK } from '../svg/text.js';
+import { themeNames } from '../themes/registry.js';
 
 const NARRATION = /^\s*>\s?(.*)$/;
 const FOCUS = /\[([^\]\n]+)\]/g;
 
-// Video themes: the page's two themes, plus the dark 3b1b.
-export const VIDEO_THEMES = Object.freeze([...CHOICES.theme, '3b1b']);
+// Video themes: every theme whose scope includes video (the page themes, plus the video-only 3b1b).
+export const VIDEO_THEMES = Object.freeze(themeNames('video'));
 
 export function parseVideo(source, { defaults = {} } = {}) {
   const doc = parseDoc(source, { defaults: { ...defaults, template: 'video' }, choices: { theme: VIDEO_THEMES } });

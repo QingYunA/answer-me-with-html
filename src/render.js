@@ -5,6 +5,7 @@ import { md } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
+import { themes } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc, isCJK, isJapanese } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
@@ -31,19 +32,19 @@ export class LintError extends Error {
 
 export const UI = {
   zh: {
-    theme: { blueprint: '主题：图纸', shadcn: '主题：卡片' },
+    themePrefix: '主题：',
     mode: { auto: '明暗：跟随系统', light: '明暗：亮', dark: '明暗：暗' },
     copy: '复制源稿', done: '已复制 ✓',
     toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
   },
   en: {
-    theme: { blueprint: 'Theme: Blueprint', shadcn: 'Theme: Cards' },
+    themePrefix: 'Theme: ',
     mode: { auto: 'Mode: Auto', light: 'Mode: Light', dark: 'Mode: Dark' },
     copy: 'Copy source', done: 'Copied ✓',
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
   },
   ja: {
-    theme: { blueprint: 'テーマ：図面', shadcn: 'テーマ：カード' },
+    themePrefix: 'テーマ：',
     mode: { auto: '表示：自動', light: '表示：ライト', dark: '表示：ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓',
     toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
@@ -115,7 +116,9 @@ export function timestamp(d = new Date()) {
 }
 
 function shell({ meta, lang, body, source }) {
-  const ui = UI[lang] ?? UI.zh;
+  const key = UI[lang] ? lang : 'zh';
+  const ui = UI[key];
+  const themeLabels = Object.fromEntries(themes('page').map((t) => [t.name, ui.themePrefix + t.label[key]]));
   return `<!doctype html>
 ${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
@@ -129,7 +132,7 @@ ${pageCss()}
 </head>
 <body>
 <div class="am-toolbar">
-<button class="am-btn" type="button" data-am="theme" data-labels="${esc(JSON.stringify(ui.theme))}">${esc(ui.theme[meta.theme])}</button>
+<button class="am-btn" type="button" data-am="theme" data-labels="${esc(JSON.stringify(themeLabels))}">${esc(themeLabels[meta.theme])}</button>
 <button class="am-btn" type="button" data-am="mode" data-labels="${esc(JSON.stringify(ui.mode))}">${esc(ui.mode[meta.mode])}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>

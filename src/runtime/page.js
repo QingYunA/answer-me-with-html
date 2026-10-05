@@ -1,22 +1,21 @@
 (() => {
   const root = document.documentElement;
   const cycle = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
-  const label = (btn, value) => {
-    const map = JSON.parse(btn.dataset.labels || '{}');
-    btn.textContent = map[value] || value;
-  };
-  const bind = (name, attr, values) => {
+  // The button's data-labels lists every value in cycle order, so the runtime names no theme or mode.
+  const bind = (name, attr) => {
     const btn = document.querySelector(`[data-am="${name}"]`);
     if (!btn) return;
-    label(btn, root.getAttribute(attr));
+    const labels = JSON.parse(btn.dataset.labels || '{}');
+    const show = (value) => { btn.textContent = labels[value] || value; };
+    show(root.getAttribute(attr));
     btn.addEventListener('click', () => {
-      const next = cycle(values, root.getAttribute(attr));
+      const next = cycle(Object.keys(labels), root.getAttribute(attr));
       root.setAttribute(attr, next);
-      label(btn, next);
+      show(next);
     });
   };
-  bind('theme', 'data-theme', ['blueprint', 'shadcn']);
-  bind('mode', 'data-mode', ['auto', 'light', 'dark']);
+  bind('theme', 'data-theme');
+  bind('mode', 'data-mode');
 
   const copyBtn = document.querySelector('[data-am="copy"]');
   copyBtn?.addEventListener('click', async () => {

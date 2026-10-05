@@ -370,7 +370,7 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
 test('video fonts: Japanese 3b1b titles use a Japanese serif; titles in other themes are not overridden', async () => {
   const JA = '## 概要\n> 接続は3回のやりとりで行う。\n';
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${JA}`);
-  const rule = dark.html.match(/html\[lang="ja"\]\[data-theme="3b1b"\]\[data-mode\] \{[^}]*\}/)?.[0];
+  const rule = dark.html.match(/html\[data-video\]\[data-theme="3b1b"\]\[lang="ja"\]\[data-mode\] \{[^}]*\}/)?.[0];
   assert.ok(rule, '3b1b has a Japanese title font rule');
   assert.ok(rule.indexOf('"Hiragino Mincho ProN"') < rule.indexOf('"Songti SC"'));
   assert.doesNotMatch(rule, /--font-sans/, 'the serif rule applies only to titles');

@@ -1,10 +1,11 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
 import { renderBlocks, detectLang, htmlLang, LintError, timestamp, UI as PAGE_UI } from '../render.js';
-import { pageCss } from '../themes/index.js';
+import { videoCss } from '../themes/index.js';
+import { getTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
-import { VERSION, VIDEO_CSS, VIDEO_JS } from '../assets.js';
+import { VERSION, VIDEO_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats, VIDEO_THEMES } from './script.js';
 import { CHOICES, applyOverrides } from '../parse.js';
@@ -99,7 +100,7 @@ function scene(s, i, total, body) {
 </section>`;
 }
 
-// Drawing frame and coordinate ticks (shown only in the blueprint theme), fixed outside the camera.
+// Drawing frame and coordinate ticks (hidden unless the theme shows .amv-sheet), fixed outside the camera.
 function sheetFrame() {
   const ruler = (side, labels) => `<div class="amv-ruler amv-ruler--${side}">${labels.map((l) => `<span>${l}</span>`).join('')}</div>`;
   const nums = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -111,15 +112,14 @@ function shell({ meta, lang, scenesHtml, data, wav, voice, source }) {
   const ui = UI[lang] ?? UI.zh;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light', style: meta.style, voice, video: true })}
+${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: getTheme(meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss()}
-${VIDEO_CSS}
+${videoCss()}
 </style>
 </head>
 <body>
