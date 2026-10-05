@@ -111,7 +111,7 @@ Client -> Server: ACK
   ElevenLabs 声音可用环境变量 ELEVENLABS_VOICE_ID 指定。
   local 调用本地 OpenAI 兼容的语音服务（POST /v1/audio/speech，返回 16 位 PCM WAV）：
   AM_TTS_URL（必填，服务根地址）、AM_TTS_MODEL、AM_TTS_VOICE（服务没有默认值时必填），
-  AM_TTS_EXTRA 写模型专用参数（JSON 对象）；AM_TTS_MODEL / AM_TTS_VOICE 覆盖其中的同名字段，
+  AM_TTS_API_KEY 有值时作为 Bearer 令牌发送；AM_TTS_EXTRA 写模型专用参数（JSON 对象）；AM_TTS_MODEL / AM_TTS_VOICE 覆盖其中的同名字段，
   input、response_format、stream 总由 am 决定。时长明显不对的句子会重新合成，
   每句最多 AM_TTS_ATTEMPTS 次（默认 3，设为 1 关闭）。
   例：AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
@@ -291,8 +291,9 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
-      // 原页用 --voice off 出的无声视频，patch 时不要按配置重配音，除非用户显式传 --voice。
-      const voice = opts.voice ?? (page.voiced ? config.values.voice : 'off');
+      // 有配音的页面沿用原来的配音方式（data-voice，旧页面没有时用配置）；--voice off 出的无声视频保持无声。
+      // 用户显式传 --voice 时以它为准。
+      const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : 'off');
       if (!validVoice(voice, fail)) return 2;
       // 视频页同样沿用原页面的主题、明暗与 STE 严格度（例如 3b1b / --style off），本次命令行参数优先。
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);

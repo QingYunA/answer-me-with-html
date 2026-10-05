@@ -50,6 +50,7 @@ function elevenLabs(env) {
   const voice = env.ELEVENLABS_VOICE_ID || ELEVEN_DEFAULT_VOICE;
   return {
     name: 'elevenlabs',
+    voice: 'elevenlabs',
     id: `elevenlabs:${voice}:${ELEVEN_MODEL}`,
     concurrency: 2,
     async synth(text) {
@@ -75,6 +76,7 @@ function elevenLabs(env) {
 // OpenAI 兼容的语音接口：POST {AM_TTS_URL}/v1/audio/speech，要求返回 16 位 PCM WAV（一次返回整段，不分块流式）。
 // AM_TTS_MODEL / AM_TTS_VOICE 对应请求里的 model / voice；AM_TTS_EXTRA 是一个 JSON 对象，并入请求体（模型专用参数），
 // 但 input / response_format / stream 总由 am 决定。AM_TTS_ATTEMPTS 是每句最多合成次数，默认 3，设为 1 关闭时长检查。
+// AM_TTS_API_KEY 有值时以 Bearer 令牌发送；它不进缓存键。
 function localSpeech(env) {
   if (!env.AM_TTS_URL) throw new TtsError('voice=local 需要环境变量 AM_TTS_URL（如 http://127.0.0.1:8000）');
   const url = `${env.AM_TTS_URL.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1/audio/speech`;
@@ -95,6 +97,7 @@ function localSpeech(env) {
   if (env.AM_TTS_VOICE) body.voice = env.AM_TTS_VOICE;
   // 请求了变速时，按变速后的语速估算时长，正常的慢速朗读不会被当成失控。
   const speed = typeof body.speed === 'number' && body.speed > 0 ? body.speed : 1;
+  const headers = { 'content-type': 'application/json', ...(env.AM_TTS_API_KEY ? { authorization: `Bearer ${env.AM_TTS_API_KEY}` } : {}) };
   const request = async (text) => {
     const signal = AbortSignal.timeout(LOCAL_TIMEOUT_MS);
     const why = (e) => (signal.aborted ? `${LOCAL_TIMEOUT_MS / 1000} 秒内没有完成` : e.message);
@@ -102,7 +105,7 @@ function localSpeech(env) {
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ ...body, input: text }),
         signal,
       });
@@ -124,6 +127,7 @@ function localSpeech(env) {
   };
   return {
     name: 'local',
+    voice: 'local',
     id: `local:${url}:${attempts}:${stableJson(body)}`,
     concurrency: 1,
     async synth(text) {
@@ -157,6 +161,7 @@ function systemVoice(platform, which) {
     const voices = macVoices();
     return {
       name: 'say',
+      voice: 'system',
       id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
@@ -169,6 +174,7 @@ function systemVoice(platform, which) {
   if (which('espeak-ng')) {
     return {
       name: 'espeak-ng',
+      voice: 'system',
       id: 'espeak-ng',
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {

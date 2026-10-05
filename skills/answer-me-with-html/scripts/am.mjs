@@ -4576,8 +4576,8 @@ function checkUnit(text, line, kind, out) {
 var SOURCE_OPEN = '<textarea id="am-source"';
 var SOURCE_RE = new RegExp(`^${SOURCE_OPEN}[^>]*>([\\s\\S]*?)<\\/textarea>`);
 var AUDIO_OPEN = '<audio id="amv-audio"';
-function rootTag({ lang, theme, mode, style, video = false }) {
-  return `<html lang="${lang}" data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${video ? " data-video" : ""}>`;
+function rootTag({ lang, theme, mode, style, voice, video = false }) {
+  return `<html lang="${lang}" data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${voice ? ` data-voice="${esc(voice)}"` : ""}${video ? " data-video" : ""}>`;
 }
 function audioTag(wav2) {
   return `${AUDIO_OPEN} preload="auto" src="data:audio/wav;base64,${wav2.toString("base64")}"></audio>`;
@@ -4601,6 +4601,7 @@ function readPage(html) {
     theme: attr("data-theme"),
     mode: attr("data-mode"),
     style: attr("data-style"),
+    voice: attr("data-voice"),
     voiced: video && before.endsWith("</audio>") && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf("<textarea")
   };
 }
@@ -4861,6 +4862,7 @@ function elevenLabs(env) {
   const voice = env.ELEVENLABS_VOICE_ID || ELEVEN_DEFAULT_VOICE;
   return {
     name: "elevenlabs",
+    voice: "elevenlabs",
     id: `elevenlabs:${voice}:${ELEVEN_MODEL}`,
     concurrency: 2,
     async synth(text) {
@@ -4901,6 +4903,7 @@ function localSpeech(env) {
   if (env.AM_TTS_MODEL) body.model = env.AM_TTS_MODEL;
   if (env.AM_TTS_VOICE) body.voice = env.AM_TTS_VOICE;
   const speed = typeof body.speed === "number" && body.speed > 0 ? body.speed : 1;
+  const headers = { "content-type": "application/json", ...env.AM_TTS_API_KEY ? { authorization: `Bearer ${env.AM_TTS_API_KEY}` } : {} };
   const request = async (text) => {
     const signal = AbortSignal.timeout(LOCAL_TIMEOUT_MS);
     const why = (e) => signal.aborted ? `${LOCAL_TIMEOUT_MS / 1e3} \u79D2\u5185\u6CA1\u6709\u5B8C\u6210` : e.message;
@@ -4908,7 +4911,7 @@ function localSpeech(env) {
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: JSON.stringify({ ...body, input: text }),
         signal
       });
@@ -4930,6 +4933,7 @@ function localSpeech(env) {
   };
   return {
     name: "local",
+    voice: "local",
     id: `local:${url}:${attempts}:${stableJson(body)}`,
     concurrency: 1,
     async synth(text) {
@@ -4959,6 +4963,7 @@ function systemVoice(platform, which) {
     const voices = macVoices();
     return {
       name: "say",
+      voice: "system",
       id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
@@ -4971,6 +4976,7 @@ function systemVoice(platform, which) {
   if (which("espeak-ng")) {
     return {
       name: "espeak-ng",
+      voice: "system",
       id: "espeak-ng",
       concurrency: 4,
       synth: (text) => withTemp(async (file) => {
@@ -5137,7 +5143,7 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const stats = { panels: video.scenes.length, components: {} };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats });
   const lang = meta.lang || detectLang(source);
-  const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, source });
+  const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source });
   return { html, wav: wav2, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
 }
 async function voiceBeats(beats, provider, cacheDir, onProgress) {
@@ -5197,11 +5203,11 @@ function sheetFrame() {
   const letters = ["A", "B", "C", "D"];
   return `<div class="amv-sheet" aria-hidden="true">${ruler2("top", nums)}${ruler2("bottom", nums)}${ruler2("left", letters)}${ruler2("right", letters)}</div>`;
 }
-function shell2({ meta, lang, scenesHtml, data, wav: wav2, source }) {
+function shell2({ meta, lang, scenesHtml, data, wav: wav2, voice, source }) {
   const ui = UI2[lang] ?? UI2.zh;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light", style: meta.style, video: true })}
+${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === "3b1b" || meta.mode === "dark" ? "dark" : "light", style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -5850,7 +5856,7 @@ Client -> Server: ACK
   ElevenLabs \u58F0\u97F3\u53EF\u7528\u73AF\u5883\u53D8\u91CF ELEVENLABS_VOICE_ID \u6307\u5B9A\u3002
   local \u8C03\u7528\u672C\u5730 OpenAI \u517C\u5BB9\u7684\u8BED\u97F3\u670D\u52A1\uFF08POST /v1/audio/speech\uFF0C\u8FD4\u56DE 16 \u4F4D PCM WAV\uFF09\uFF1A
   AM_TTS_URL\uFF08\u5FC5\u586B\uFF0C\u670D\u52A1\u6839\u5730\u5740\uFF09\u3001AM_TTS_MODEL\u3001AM_TTS_VOICE\uFF08\u670D\u52A1\u6CA1\u6709\u9ED8\u8BA4\u503C\u65F6\u5FC5\u586B\uFF09\uFF0C
-  AM_TTS_EXTRA \u5199\u6A21\u578B\u4E13\u7528\u53C2\u6570\uFF08JSON \u5BF9\u8C61\uFF09\uFF1BAM_TTS_MODEL / AM_TTS_VOICE \u8986\u76D6\u5176\u4E2D\u7684\u540C\u540D\u5B57\u6BB5\uFF0C
+  AM_TTS_API_KEY \u6709\u503C\u65F6\u4F5C\u4E3A Bearer \u4EE4\u724C\u53D1\u9001\uFF1BAM_TTS_EXTRA \u5199\u6A21\u578B\u4E13\u7528\u53C2\u6570\uFF08JSON \u5BF9\u8C61\uFF09\uFF1BAM_TTS_MODEL / AM_TTS_VOICE \u8986\u76D6\u5176\u4E2D\u7684\u540C\u540D\u5B57\u6BB5\uFF0C
   input\u3001response_format\u3001stream \u603B\u7531 am \u51B3\u5B9A\u3002\u65F6\u957F\u660E\u663E\u4E0D\u5BF9\u7684\u53E5\u5B50\u4F1A\u91CD\u65B0\u5408\u6210\uFF0C
   \u6BCF\u53E5\u6700\u591A AM_TTS_ATTEMPTS \u6B21\uFF08\u9ED8\u8BA4 3\uFF0C\u8BBE\u4E3A 1 \u5173\u95ED\uFF09\u3002
   \u4F8B\uFF1AAM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit       AM_TTS_VOICE=vivian am video draft.md --voice local
@@ -6031,7 +6037,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
-      const voice = opts.voice ?? (page.voiced ? config.values.voice : "off");
+      const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : "off");
       if (!validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
     } else {

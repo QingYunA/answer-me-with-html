@@ -189,12 +189,13 @@ test('pageSettings: 从页面读回模板、主题、明暗与 STE style', async
 test('readPage: 写出的信封原样读回（页面与视频，有无配音）', async () => {
   const source = '---\ntitle: 信封 <&"\'>\n---\n## A 面板\n> 一句。\n';
   const doc = renderDoc(source, { theme: 'shadcn', mode: 'dark', template: 'doc' });
-  assert.deepEqual(readPage(doc.html), { source, video: false, template: 'doc', theme: 'shadcn', mode: 'dark', style: '80', voiced: false });
+  assert.deepEqual(readPage(doc.html), { source, video: false, template: 'doc', theme: 'shadcn', mode: 'dark', style: '80', voice: undefined, voiced: false });
   const silent = await renderVideo(source, { overrides: { theme: '3b1b' } });
-  assert.deepEqual(readPage(silent.html), { source, video: true, template: 'video', theme: '3b1b', mode: 'dark', style: '80', voiced: false });
-  const provider = { name: 'fake', id: 'fake', concurrency: 1, synth: async () => new Int16Array(1600).fill(1000) };
+  assert.deepEqual(readPage(silent.html), { source, video: true, template: 'video', theme: '3b1b', mode: 'dark', style: '80', voice: undefined, voiced: false });
+  const provider = { name: 'fake', voice: 'local', id: 'fake', concurrency: 1, synth: async () => new Int16Array(1600).fill(1000) };
   const voiced = await renderVideo(source, { provider });
   assert.equal(readPage(voiced.html).voiced, true);
+  assert.equal(readPage(voiced.html).voice, 'local');
 });
 
 test('readPage: 正文里的假 <audio id="amv-audio"> 不算有配音', async () => {

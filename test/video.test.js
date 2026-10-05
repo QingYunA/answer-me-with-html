@@ -149,7 +149,7 @@ async function withFakeFetch(replies, fn) {
   const calls = [];
   const real = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
-    calls.push({ url, body: JSON.parse(init.body) });
+    calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
     const r = replies[Math.min(calls.length - 1, replies.length - 1)];
     if (typeof r === 'number') return new Response(wav(new Int16Array(Math.round(r * SAMPLE_RATE)).fill(1000)));
     if (r instanceof Response) return r;
@@ -532,4 +532,36 @@ test('播放页：变形时用"先汇总再设置"的方式隐藏元素，不会
   const { VIDEO_JS } = await import('../src/assets.js');
   assert.match(VIDEO_JS, /const hidden = new Set\(\)/);
   assert.doesNotMatch(VIDEO_JS, /m\.to\.style\.visibility =/);
+});
+
+test('local 配音：AM_TTS_API_KEY 作为 Bearer 令牌发送，不进缓存键', async () => {
+  const env = { AM_TTS_URL: 'http://x' };
+  const keyed = pickProvider('local', { ...env, AM_TTS_API_KEY: 'sk-1' });
+  await withFakeFetch([estimateSeconds('一句话')], async (calls) => {
+    await keyed.synth('一句话');
+    assert.equal(calls[0].headers.authorization, 'Bearer sk-1');
+  });
+  await withFakeFetch([estimateSeconds('一句话')], async (calls) => {
+    await pickProvider('local', env).synth('一句话');
+    assert.equal(calls[0].headers.authorization, undefined);
+  });
+  assert.equal(keyed.id, pickProvider('local', env).id);
+  assert.ok(!keyed.id.includes('sk-1'));
+});
+
+test('am patch：有配音的视频沿用原来的配音方式，不按配置换成别的', async () => {
+  const draft = '## 第一幕\n- 画面\n> 第一句。\n';
+  const local = { name: 'local', voice: 'local', id: 'fake-local', concurrency: 1, synth: async () => new Int16Array(SAMPLE_RATE).fill(1000) };
+  const { html } = await renderVideo(draft, { provider: local });
+  assert.match(html, /<html[^>]* data-voice="local"/);
+  const file = join(dir, 'voiced-local.html');
+  const { writeFileSync } = await import('node:fs');
+  writeFileSync(file, html);
+  await withFakeFetch([estimateSeconds('改过的一句。')], async (calls) => {
+    const r = await run(['patch', file, '--panel', '第一幕', '--no-open'], { stdin: '- 画面\n> 改过的一句。\n', env: { AM_TTS_URL: 'http://tts' }, ttsProvider: undefined });
+    assert.equal(r.code, 0, r.err);
+    assert.equal(calls.length, 1, '用 local 重新配音');
+    assert.match(r.out, /配音：local/);
+  });
+  assert.match(readFileSync(file, 'utf8'), /data-voice="local"/);
 });

@@ -34,7 +34,7 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const stats = { panels: video.scenes.length, components: {} };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats });
   const lang = meta.lang || detectLang(source);
-  const html = shell({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav, source });
+  const html = shell({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source });
   return { html, wav, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
 }
 
@@ -107,11 +107,11 @@ function sheetFrame() {
   return `<div class="amv-sheet" aria-hidden="true">${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}</div>`;
 }
 
-function shell({ meta, lang, scenesHtml, data, wav, source }) {
+function shell({ meta, lang, scenesHtml, data, wav, voice, source }) {
   const ui = UI[lang] ?? UI.zh;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light', style: meta.style, video: true })}
+${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.theme === '3b1b' || meta.mode === 'dark' ? 'dark' : 'light', style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
