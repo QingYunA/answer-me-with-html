@@ -69,7 +69,9 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 把下面这段话粘贴给你的 Agent。Claude Code、Codex、Cursor、OpenCode 都可以：
 
-> 帮我安装 Answer me with HTML 这个 skill：运行 `npx -y skills add QingYunA/answer-me-with-html -g -y`，用 `-a` 参数指定你自己这个 Agent（比如 Claude Code 是 `-a claude-code`）。装好后读一遍它的 SKILL.md，然后用它生成一页"TCP 三次握手"的解释页，确认能正常生成。
+> 帮我安装 Answer me with HTML：读 https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/INSTALL.md，照着做。
+
+[INSTALL.md](INSTALL.md) 是写给 Agent 看的。它在 Claude Code 里装插件，在其他 Agent 里装 skill，已有安装会保留，全程不向你提问，用"TCP 三次握手"页面验证后给你一份汇报。如果你的 Agent 打不开链接，用 `npx -y skills add QingYunA/answer-me-with-html -g -y -a <你的 Agent 名>`（Claude Code 是 `-a claude-code`）。
 
 ### Claude Code 插件
 
