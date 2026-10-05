@@ -1928,6 +1928,11 @@ function textLines(lines, cx, cy, lineHeight, attrs = "") {
   const top = cy - (lines.length - 1) * lineHeight / 2;
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(line)}</text>`).join("");
 }
+var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", colon: ": ", sep: ", " };
+function diagramLabel(ui, kind, names) {
+  const u = { ...EN_LABELS, ...ui };
+  return `${u[kind]}${u.colon}${names.join(u.sep)}`;
+}
 function svgOpen(width, height, label) {
   const w = Math.ceil(width);
   const h2 = Math.ceil(height);
@@ -2075,7 +2080,7 @@ function layout({ participants: ps, steps }, { num, id, ui }) {
     const x2 = xs[i];
     return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
   });
-  return `${svgOpen(width, height, `${ui?.sequence ?? "Sequence diagram: "}${ps.join(ui?.sep ?? ", ")}`)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
+  return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps))}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
 // node_modules/@dagrejs/dagre/dist/dagre.esm.js
@@ -4144,7 +4149,7 @@ function layout2({ nodes, edges, groups }, rankdir, id, ui) {
     return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}">${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2)}</g>`;
   });
   const { width, height } = g.graph();
-  const label = `${ui?.flow ?? "Flowchart: "}${[...nodes.keys()].slice(0, 8).join(ui?.sep ?? ", ")}`;
+  const label = diagramLabel(ui, "flow", [...nodes.keys()].slice(0, 8));
   return `${svgOpen(width, height, label)}${arrowDefs(id)}<g>${clusters.join("")}</g><g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
 }
 function shapeSvg(shape, x2, y2, w, h2) {
@@ -4625,8 +4630,9 @@ var UI = {
     copy: "\u590D\u5236\u6E90\u7A3F",
     done: "\u5DF2\u590D\u5236 \u2713",
     toc: "\u76EE\u5F55",
-    flow: "\u6D41\u7A0B\u56FE\uFF1A",
-    sequence: "\u65F6\u5E8F\u56FE\uFF1A",
+    flow: "\u6D41\u7A0B\u56FE",
+    sequence: "\u65F6\u5E8F\u56FE",
+    colon: "\uFF1A",
     sep: "\u3001"
   },
   en: {
@@ -4635,8 +4641,9 @@ var UI = {
     copy: "Copy source",
     done: "Copied \u2713",
     toc: "Contents",
-    flow: "Flowchart: ",
-    sequence: "Sequence diagram: ",
+    flow: "Flowchart",
+    sequence: "Sequence diagram",
+    colon: ": ",
     sep: ", "
   },
   ja: {
@@ -4645,8 +4652,9 @@ var UI = {
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     toc: "\u76EE\u6B21",
-    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8\uFF1A",
-    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3\uFF1A",
+    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
+    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
+    colon: "\uFF1A",
     sep: "\u3001"
   }
 };

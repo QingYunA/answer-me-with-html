@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { renderDoc, RenderError, detectLang } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { THEMES } from '../src/themes/index.js';
+import { COMPONENTS } from '../src/components/index.js';
 
 const SRC = `---
 title: 测试页
@@ -147,6 +148,12 @@ test('render: aria-labels of diagrams and the table of contents follow the page 
   assert.match(ja, /<nav class="am-toc" aria-label="目次">/);
   assert.match(ja, /aria-label="フローチャート：Client、Server"/);
   assert.match(ja, /aria-label="シーケンス図：Client、Server"/);
+});
+
+test('render: a diagram rendered without a page context is named in English', () => {
+  const uid = () => 'am1';
+  assert.match(COMPONENTS.get('flow').render('A -> B', { args: '', uid }), /aria-label="Flowchart: A, B"/);
+  assert.match(COMPONENTS.get('sequence').render('A -> B: hi', { args: '', uid }), /aria-label="Sequence diagram: A, B"/);
 });
 
 test('detectLang: decides by the share of Chinese', () => {

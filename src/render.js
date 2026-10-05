@@ -34,19 +34,19 @@ export const UI = {
     theme: { blueprint: '主题：图纸', shadcn: '主题：卡片' },
     mode: { auto: '明暗：跟随系统', light: '明暗：亮', dark: '明暗：暗' },
     copy: '复制源稿', done: '已复制 ✓',
-    toc: '目录', flow: '流程图：', sequence: '时序图：', sep: '、',
+    toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
   },
   en: {
     theme: { blueprint: 'Theme: Blueprint', shadcn: 'Theme: Cards' },
     mode: { auto: 'Mode: Auto', light: 'Mode: Light', dark: 'Mode: Dark' },
     copy: 'Copy source', done: 'Copied ✓',
-    toc: 'Contents', flow: 'Flowchart: ', sequence: 'Sequence diagram: ', sep: ', ',
+    toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
   },
   ja: {
     theme: { blueprint: 'テーマ：図面', shadcn: 'テーマ：カード' },
     mode: { auto: '表示：自動', light: '表示：ライト', dark: '表示：ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓',
-    toc: '目次', flow: 'フローチャート：', sequence: 'シーケンス図：', sep: '、',
+    toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
   },
 };
 

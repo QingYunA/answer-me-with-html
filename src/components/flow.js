@@ -1,7 +1,7 @@
 // Flow / architecture diagram: the model writes only relations (A -> B: label), dagre computes coordinates, this file draws the layout as SVG.
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, smoothPath, arrowDefs, svgOpen, textLines } from '../svg/shapes.js';
+import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
 import { ComponentError, contentLines } from './error.js';
 
 const FS = 13;
@@ -188,7 +188,7 @@ function layout({ nodes, edges, groups }, rankdir, id, ui) {
   });
 
   const { width, height } = g.graph();
-  const label = `${ui?.flow ?? 'Flowchart: '}${[...nodes.keys()].slice(0, 8).join(ui?.sep ?? ', ')}`;
+  const label = diagramLabel(ui, 'flow', [...nodes.keys()].slice(0, 8));
   return `${svgOpen(width, height, label)}${arrowDefs(id)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
 }
 

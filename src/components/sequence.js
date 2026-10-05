@@ -1,6 +1,6 @@
 // Sequence diagram: participants laid out horizontally, messages top to bottom. Spacing derives from message label widths, so labels are never squeezed.
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, arrowDefs, svgOpen, textLines } from '../svg/shapes.js';
+import { f, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
 import { ComponentError, contentLines } from './error.js';
 
 const FS = 13;
@@ -151,5 +151,5 @@ function layout({ participants: ps, steps }, { num, id, ui }) {
       + `<g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>`
       + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
   });
-  return `${svgOpen(width, height, `${ui?.sequence ?? 'Sequence diagram: '}${ps.join(ui?.sep ?? ', ')}`)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
+  return `${svgOpen(width, height, diagramLabel(ui, 'sequence', ps))}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
 }
