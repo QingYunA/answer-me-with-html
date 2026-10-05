@@ -8,7 +8,8 @@ import { join } from 'node:path';
 export const REMINDER = [
   '[answer-me-with-html always-on] Whenever this reply states a conclusion, recommendation, summary, plan, comparison,',
   'review or explanation - even a short one - also render a small answer-me-with-html page (2-4 panels, use the',
-  'answer-me-with-html skill, render with --no-open so no browser window pops up) and end the reply with the page path.',
+  'answer-me-with-html skill, render with --no-open so no browser window pops up).',
+  'Render the page first, then write the reply last, ending with the page path.',
   'Do not skip it because the answer seems short.',
   'Skip only for casual chat, a one- or two-sentence reply with no conclusion, pure command output,',
   'or when the user asks for plain text.',

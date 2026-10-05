@@ -55,3 +55,9 @@ test('always plugin: always=off injects no reminder; a broken config still injec
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+test('render the page before the text reply, so the reply ends with text, not a tool call', () => {
+  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8' });
+  assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /render the page first/i);
+  assert.match(readFileSync(`${ROOT}/skills/answer-me-with-html/SKILL.md`, 'utf8'), /render the page first/i);
+});

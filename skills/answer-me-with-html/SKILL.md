@@ -55,7 +55,7 @@ If the context contains the `[answer-me-with-html always-on]` reminder (the user
 - Do not skip it because "the answer is short". If there is a conclusion, produce a page.
 - For everyday conclusions use a small page with 2–4 panels: one callout with the conclusion, plus one table or one diagram. Do not add panels just to fill space.
 - Render with `--no-open`, so no browser window interrupts the user. The user opens the page by clicking the path at the end of the reply.
-- In the terminal, give the text conclusion first as usual, and put the page path on the last line.
+- Order: render the page first, then write the text reply. The reply is the last thing in the turn, with the page path on its last line. Do not write the reply and then call `am render`.
 - Produce no page for small talk, one or two sentences with no conclusion, pure command output, or when the user asks for plain text.
 
 ## 2. Workflow (one Bash call)
@@ -90,7 +90,7 @@ AM_EOF
    - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again.
    - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, keep the page and say so.
    - `! Cleanup hint: …` or `! Update hint: …`: pass it on to the user in one sentence at the end of the reply, and ask whether to clean up / update. **Do not run am clean or the update command yourself**; wait until the user agrees. The CLI throttles these: the cleanup hint appears at most once every 7 days, the update hint at most once every 3 days.
-5. Reply in the terminal with only 2–3 lines: one core conclusion + the page path. Do not paste the draft or the HTML back into the terminal.
+5. Reply in the terminal with only 2–3 lines: one core conclusion + the page path. Do not paste the draft or the HTML back into the terminal. Write this reply after the render, as the last step of the turn: render the page first, then reply. No tool call comes after the reply.
 
 When a page already exists and only one panel needs to change, do not rewrite the whole page. Take the source draft from the HTML's `#am-source`, replace only the matching `##` section, and overwrite the page in place:
 
