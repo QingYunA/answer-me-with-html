@@ -440,6 +440,72 @@ function contrast(fg, bg, base = [255, 255, 255, 1]) {
   return (Math.max(x2, y2) + 0.05) / (Math.min(x2, y2) + 0.05);
 }
 
+// src/languages/zh.js
+var zh_default = {
+  id: "zh",
+  language: "zh",
+  script: "Hans",
+  ui: {
+    theme: "\u4E3B\u9898",
+    modeLabel: "\u660E\u6697",
+    mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
+    copy: "\u590D\u5236\u6E90\u7A3F",
+    done: "\u5DF2\u590D\u5236 \u2713",
+    toc: "\u76EE\u5F55",
+    flow: "\u6D41\u7A0B\u56FE",
+    sequence: "\u65F6\u5E8F\u56FE",
+    colon: "\uFF1A",
+    sep: "\u3001"
+  },
+  videoUi: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282" }
+};
+
+// src/languages/en.js
+var en_default = {
+  id: "en",
+  language: "en",
+  ui: {
+    theme: "Theme",
+    modeLabel: "Mode",
+    mode: { auto: "Auto", light: "Light", dark: "Dark" },
+    copy: "Copy source",
+    done: "Copied \u2713",
+    toc: "Contents",
+    flow: "Flowchart",
+    sequence: "Sequence diagram",
+    colon: ": ",
+    sep: ", "
+  },
+  videoUi: { play: "Play", pause: "Pause", chapters: "Chapters" }
+};
+
+// src/languages/ja.js
+var ja_default = {
+  id: "ja",
+  language: "ja",
+  ui: {
+    theme: "\u30C6\u30FC\u30DE",
+    modeLabel: "\u8868\u793A",
+    mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
+    copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
+    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
+    toc: "\u76EE\u6B21",
+    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
+    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
+    colon: "\uFF1A",
+    sep: "\u3001"
+  },
+  videoUi: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
+};
+
+// src/languages/registry.js
+var LANGUAGES = Object.freeze([zh_default, en_default, ja_default]);
+var FALLBACK = en_default;
+var languageIds = () => LANGUAGES.map((l3) => l3.id);
+function findLanguage(language, script) {
+  return LANGUAGES.find((l3) => l3.language === language && (!l3.script || l3.script === script));
+}
+
 // src/themes/check.js
 var NAME = /^[a-z0-9][a-z0-9-]*$/;
 var COLOR_TOKENS = Object.freeze([
@@ -462,7 +528,7 @@ var COLOR_TOKENS = Object.freeze([
   "--head-bg",
   "--head-fg"
 ]);
-var LANGS = ["zh", "en", "ja"];
+var LANGS = languageIds();
 var UNSAFE_VALUE = /[;{}<]/;
 function normalizeTheme(name, data, builtinNames = []) {
   const errors = [];
@@ -520,7 +586,7 @@ function labelField(label, name, errors) {
   if (label === void 0) return Object.fromEntries(LANGS.map((l3) => [l3, name]));
   if (typeof label === "string") return Object.fromEntries(LANGS.map((l3) => [l3, label]));
   if (!label || typeof label !== "object" || Object.values(label).some((v) => typeof v !== "string")) {
-    errors.push("label must be a string or an object of zh / en / ja strings");
+    errors.push(`label must be a string or an object of ${LANGS.join(" / ")} strings`);
     return Object.fromEntries(LANGS.map((l3) => [l3, name]));
   }
   const fallback = label.en ?? Object.values(label)[0] ?? name;
@@ -5163,6 +5229,51 @@ function unescapeHtml(s) {
   return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 }
 
+// src/language.js
+var CJK_PER_LATIN = 3;
+function detectLang(text) {
+  let cjk = 0;
+  let latin = 0;
+  for (const ch of String(text)) {
+    if (isCJK(ch)) cjk++;
+    else if (/[a-z]/i.test(ch)) latin++;
+  }
+  if (cjk * CJK_PER_LATIN < latin) return "en";
+  return isJapanese(text) ? "ja" : "zh";
+}
+function canonicalTag(value) {
+  if (typeof value !== "string") return null;
+  const text = value.trim().replace(/_/g, "-");
+  if (!text) return null;
+  try {
+    const tag = Intl.getCanonicalLocales(text)[0];
+    const { language } = new Intl.Locale(tag);
+    return !language || language === "und" ? null : tag;
+  } catch {
+    return null;
+  }
+}
+function directionOf(locale) {
+  const info = typeof locale.getTextInfo === "function" ? locale.getTextInfo() : locale.textInfo;
+  return info?.direction === "rtl" ? "rtl" : "ltr";
+}
+function resolveLanguage({ declared, text = "" }) {
+  const tag = canonicalTag(declared) ?? detectLang(text);
+  const locale = new Intl.Locale(tag).maximize();
+  const entry = findLanguage(locale.language, locale.script);
+  const labels = entry ?? FALLBACK;
+  return Object.freeze({
+    tag,
+    htmlLang: tag === "zh" ? "zh-CN" : tag,
+    script: locale.script,
+    dir: directionOf(locale),
+    supported: Boolean(entry),
+    labelKey: labels.id,
+    ui: labels.ui,
+    videoUi: labels.videoUi
+  });
+}
+
 // src/render.js
 var RenderError = class extends Error {
   constructor(message, { line, component, example } = {}) {
@@ -5180,57 +5291,6 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
-var UI = {
-  zh: {
-    theme: "\u4E3B\u9898",
-    modeLabel: "\u660E\u6697",
-    mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
-    copy: "\u590D\u5236\u6E90\u7A3F",
-    done: "\u5DF2\u590D\u5236 \u2713",
-    toc: "\u76EE\u5F55",
-    flow: "\u6D41\u7A0B\u56FE",
-    sequence: "\u65F6\u5E8F\u56FE",
-    colon: "\uFF1A",
-    sep: "\u3001"
-  },
-  en: {
-    theme: "Theme",
-    modeLabel: "Mode",
-    mode: { auto: "Auto", light: "Light", dark: "Dark" },
-    copy: "Copy source",
-    done: "Copied \u2713",
-    toc: "Contents",
-    flow: "Flowchart",
-    sequence: "Sequence diagram",
-    colon: ": ",
-    sep: ", "
-  },
-  ja: {
-    theme: "\u30C6\u30FC\u30DE",
-    modeLabel: "\u8868\u793A",
-    mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
-    copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
-    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
-    toc: "\u76EE\u6B21",
-    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
-    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
-    colon: "\uFF1A",
-    sep: "\u3001"
-  }
-};
-function htmlLang(lang) {
-  return lang === "zh" ? "zh-CN" : lang === "ja" ? "ja" : "en";
-}
-function detectLang(text) {
-  let cjk = 0;
-  let latin = 0;
-  for (const ch of String(text)) {
-    if (isCJK(ch)) cjk++;
-    else if (/[a-z]/i.test(ch)) latin++;
-  }
-  if (cjk * 3 < latin) return "en";
-  return isJapanese(text) ? "ja" : "zh";
-}
 function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
@@ -5242,14 +5302,14 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const stats = { panels: doc2.panels.length, components: {} };
-  const lang = doc2.meta.lang || detectLang(source);
-  const ui = UI[lang] ?? UI.zh;
+  const language = resolveLanguage({ declared: doc2.meta.lang, text: source });
+  const ui = language.ui;
   const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc2.intro, ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui });
-  const html = shell({ meta: doc2.meta, lang, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page") });
-  return { html, warnings, stats, meta: doc2.meta };
+  const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page") });
+  return { html, warnings, stats, meta: doc2.meta, language };
 }
 function hasVisuals({ intro, panels }) {
   return [...intro, ...panels.flatMap((p) => p.blocks)].some((b) => b.type === "fence" && (COMPONENTS.has(b.lang) || RAW_LANGS.has(b.lang)));
@@ -5280,12 +5340,11 @@ function timestamp(d = /* @__PURE__ */ new Date()) {
   const p = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function shell({ meta, lang, body, source, embedded }) {
-  const key = UI[lang] ? lang : "zh";
-  const ui = UI[key];
+function shell({ meta, language, body, source, embedded }) {
+  const { ui, labelKey } = language;
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
+${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -5297,7 +5356,7 @@ ${pageCss(embedded)}
 </head>
 <body>
 <div class="am-toolbar">
-${pick("theme", ui.theme, embedded.map((t) => [t.name, t.label[key]]), meta.theme)}
+${pick("theme", ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick("mode", ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
@@ -5708,11 +5767,6 @@ function wav(samples) {
 }
 
 // src/video/render.js
-var UI2 = {
-  zh: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282" },
-  en: { play: "Play", pause: "Pause", chapters: "Chapters" },
-  ja: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
-};
 async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress, themes: themes2 = BUILTIN } = {}) {
   const themeChoices = themes2.choices("video");
   const video = parseVideo(source, { defaults: defaults2, themeChoices });
@@ -5728,10 +5782,10 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav2 = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
   const stats = { panels: video.scenes.length, components: {} };
-  const lang = meta.lang || detectLang(source);
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: UI[lang] ?? UI.zh });
-  const html = shell2({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
-  return { html, wav: wav2, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
+  const language = resolveLanguage({ declared: meta.lang, text: source });
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui });
+  const html = shell2({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
+  return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
 }
 async function voiceBeats(beats, provider, cacheDir, onProgress) {
   if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
@@ -5790,11 +5844,11 @@ function sheetFrame() {
   const letters = ["A", "B", "C", "D"];
   return `<div class="amv-sheet" aria-hidden="true">${ruler2("top", nums)}${ruler2("bottom", nums)}${ruler2("left", letters)}${ruler2("right", letters)}</div>`;
 }
-function shell2({ meta, lang, scenesHtml, data, wav: wav2, voice, source, embedded }) {
-  const ui = UI2[lang] ?? UI2.zh;
+function shell2({ meta, language, scenesHtml, data, wav: wav2, voice, source, embedded }) {
+  const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
+${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

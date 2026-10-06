@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderDoc, RenderError, detectLang } from '../src/render.js';
+import { renderDoc, RenderError } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { getTheme } from '../src/themes/registry.js';
 import { COMPONENTS } from '../src/components/index.js';
@@ -157,18 +157,6 @@ test('render: a diagram rendered without a page context is named in English', ()
   assert.match(COMPONENTS.get('sequence').render('A -> B: hi', { args: '', uid }), /aria-label="Sequence diagram: A, B"/);
 });
 
-test('detectLang: decides by the share of Chinese', () => {
-  assert.equal(detectLang('全中文内容'), 'zh');
-  assert.equal(detectLang('all english words here'), 'en');
-});
-
-test('detectLang: a CJK draft with kana is Japanese', () => {
-  assert.equal(detectLang('TCP の3ウェイハンドシェイク'), 'ja');
-  assert.equal(detectLang('接続は3回のやりとりで行う'), 'ja');
-  assert.equal(detectLang('三次握手建立连接'), 'zh');
-  assert.equal(detectLang('a long english sentence with one あ'), 'en');
-});
-
 test('render: Japanese drafts use Japanese UI labels and lang="ja"', () => {
   const { html } = renderDoc('# TCP の接続\n## A 概要\n接続は3回のやりとりで行う。');
   assert.match(html, /<html lang="ja"/);
@@ -217,12 +205,6 @@ test('sheet: when the next panel does not fit, the current row is filled with no
 test('sheet: the automatic widening shows in the rendered output', () => {
   const { html } = renderDoc('---\ncols: 2\n---\n## A {span=2}\nx\n## B\ny\n## C {span=2}\nz');
   assert.match(html, /id="panel-B" style="grid-column: span 2"/);
-});
-
-test('detectLang: Chinese quoting one katakana word stays Chinese; a high kana share is Japanese', async () => {
-  const { detectLang } = await import('../src/render.js');
-  assert.equal(detectLang('这部动画叫《ワンピース》，讲的是海贼的故事，主角想成为海贼王。'), 'zh');
-  assert.equal(detectLang('基本的には具体的で効果的な手順を説明します。'), 'ja');
 });
 
 test('isJapanese: a short Chinese sentence with only katakana is not Japanese; a short Japanese sentence with hiragana is', async () => {

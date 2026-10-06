@@ -7,9 +7,10 @@ import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
-import { esc, isCJK, isJapanese } from './svg/text.js';
+import { esc } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
 import { rootTag, sourceTag } from './page.js';
+import { resolveLanguage } from './language.js';
 
 
 export class RenderError extends Error {
@@ -30,43 +31,6 @@ export class LintError extends Error {
   }
 }
 
-export const UI = {
-  zh: {
-    theme: '主题', modeLabel: '明暗',
-    mode: { auto: '跟随系统', light: '亮', dark: '暗' },
-    copy: '复制源稿', done: '已复制 ✓',
-    toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
-  },
-  en: {
-    theme: 'Theme', modeLabel: 'Mode',
-    mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
-    copy: 'Copy source', done: 'Copied ✓',
-    toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
-  },
-  ja: {
-    theme: 'テーマ', modeLabel: '表示',
-    mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
-    copy: '原稿をコピー', done: 'コピーしました ✓',
-    toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
-  },
-};
-
-// The <html lang> value.
-export function htmlLang(lang) {
-  return lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja' : 'en';
-}
-
-export function detectLang(text) {
-  let cjk = 0;
-  let latin = 0;
-  for (const ch of String(text)) {
-    if (isCJK(ch)) cjk++;
-    else if (/[a-z]/i.test(ch)) latin++;
-  }
-  if (cjk * 3 < latin) return 'en';
-  return isJapanese(text) ? 'ja' : 'zh';
-}
-
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN } = {}) {
   const choices = { theme: themes.choices('page') };
@@ -82,14 +46,14 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
   const stats = { panels: doc.panels.length, components: {} };
-  const lang = doc.meta.lang || detectLang(source);
-  const ui = UI[lang] ?? UI.zh;
+  const language = resolveLanguage({ declared: doc.meta.lang, text: source });
+  const ui = language.ui;
   const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
-  const html = shell({ meta: doc.meta, lang, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
-  return { html, warnings, stats, meta: doc.meta };
+  const html = shell({ meta: doc.meta, language, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
+  return { html, warnings, stats, meta: doc.meta, language };
 }
 
 // A diagram, another component or a raw html / svg block anywhere in the draft.
@@ -126,13 +90,12 @@ export function timestamp(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-function shell({ meta, lang, body, source, embedded }) {
-  const key = UI[lang] ? lang : 'zh';
-  const ui = UI[key];
+function shell({ meta, language, body, source, embedded }) {
+  const { ui, labelKey } = language;
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: meta.mode, style: meta.style })}
+${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: meta.mode, style: meta.style })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -144,7 +107,7 @@ ${pageCss(embedded)}
 </head>
 <body>
 <div class="am-toolbar">
-${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[key]]), meta.theme)}
+${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>

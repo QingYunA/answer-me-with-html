@@ -3,6 +3,7 @@
 import { parseColor, contrast } from './color.js';
 import { SANS, MONO } from './fonts.js';
 import blueprint from './blueprint.js';
+import { languageIds } from '../languages/registry.js';
 
 export const NAME = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -12,7 +13,7 @@ export const COLOR_TOKENS = Object.freeze([
   '--ok', '--ok-bg', '--err', '--err-bg', '--warn', '--warn-bg', '--head-bg', '--head-fg',
 ]);
 
-const LANGS = ['zh', 'en', 'ja'];
+const LANGS = languageIds();
 const UNSAFE_VALUE = /[;{}<]/;
 
 // Returns { theme, errors }. theme is built even when there are errors, so am theme check can go on to check colors.
@@ -77,7 +78,7 @@ function labelField(label, name, errors) {
   if (label === undefined) return Object.fromEntries(LANGS.map((l) => [l, name]));
   if (typeof label === 'string') return Object.fromEntries(LANGS.map((l) => [l, label]));
   if (!label || typeof label !== 'object' || Object.values(label).some((v) => typeof v !== 'string')) {
-    errors.push('label must be a string or an object of zh / en / ja strings');
+    errors.push(`label must be a string or an object of ${LANGS.join(' / ')} strings`);
     return Object.fromEntries(LANGS.map((l) => [l, name]));
   }
   const fallback = label.en ?? Object.values(label)[0] ?? name;

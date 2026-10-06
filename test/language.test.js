@@ -144,10 +144,9 @@ const ALLOWED = [
 // not text the CLI prints. `lines` matches the exempt lines (every line of the file when omitted).
 // A single line can instead end in `// lang-ok: <reason>`.
 const EXCEPTIONS = [
+  { dir: 'src/languages/', why: 'the page and player labels of each supported language' },
   { file: 'src/lint/wordlist.zh.js', why: 'the Chinese writing-check word list' },
   { file: 'src/lint/ste.js', lines: /^.*[`"]的[`"].*$/gm, why: 'names the Chinese particle the writing check counts' },
-  { file: 'src/render.js', lines: /^ {2}(?:zh|ja): \{\n[\s\S]*?^ {2}\},$/gm, why: 'page UI label table' },
-  { file: 'src/video/render.js', lines: /^ {2}(?:zh|ja): \{.*\},$/gm, why: 'player UI label table' },
   { file: 'src/svg/text.js', lines: /^.*(?:`の`|`《ワンピース》`|`TCP の3ウェイ…`).*$/gm, why: 'examples for the Japanese detection' },
   { file: 'src/themes/index.js', lines: /^.*\(`直`, `込`\).*$/gm, why: 'examples of Han glyphs that differ by font' },
   { file: 'scripts/smoke-install.mjs', lines: /^.*input: '## A 标题.*$/gm, why: 'Chinese render input for the smoke test' },
@@ -162,7 +161,7 @@ function skippedLines(src, file) {
   const lineOf = (offset) => src.slice(0, offset).split('\n').length - 1;
   const skipped = new Set();
   src.split('\n').forEach((line, i) => /\/\/ lang-ok:/.test(line) && skipped.add(i));
-  for (const { lines } of EXCEPTIONS.filter((e) => e.file === file)) {
+  for (const { lines } of EXCEPTIONS.filter((e) => e.file === file || (e.dir && file.startsWith(e.dir)))) {
     const spans = lines ? [...src.matchAll(lines)].map((m) => [m.index, m.index + m[0].length]) : [[0, src.length]];
     for (const [from, to] of spans) for (let i = lineOf(from); i <= lineOf(to); i++) skipped.add(i);
   }
@@ -225,6 +224,6 @@ test('language: every file in scope is English outside allowed spans', () => {
 });
 
 test('language: every exception still matches lines in its file', () => {
-  const stale = EXCEPTIONS.filter(({ file, lines }) => lines && ![...readFileSync(join(ROOT, file), 'utf8').matchAll(lines)].length);
+  const stale = EXCEPTIONS.filter(({ file, lines }) => file && lines && ![...readFileSync(join(ROOT, file), 'utf8').matchAll(lines)].length);
   assert.deepEqual(stale.map((e) => e.file), []);
 });

@@ -1,6 +1,7 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
-import { renderBlocks, detectLang, htmlLang, LintError, timestamp, UI as PAGE_UI } from '../render.js';
+import { renderBlocks, LintError, timestamp } from '../render.js';
+import { resolveLanguage } from '../language.js';
 import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
@@ -10,12 +11,6 @@ import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
-
-const UI = {
-  zh: { play: '播放', pause: '暂停', chapters: '章节' },
-  en: { play: 'Play', pause: 'Pause', chapters: 'Chapters' },
-  ja: { play: '再生', pause: '一時停止', chapters: '章' },
-};
 
 // When provider is null, only captions are produced and durations are estimated from word count.
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
@@ -38,10 +33,10 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {} };
-  const lang = meta.lang || detectLang(source);
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: PAGE_UI[lang] ?? PAGE_UI.zh });
-  const html = shell({ meta, lang, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
-  return { html, wav, warnings, stats, meta, duration: timeline.duration, beats: beats.length };
+  const language = resolveLanguage({ declared: meta.lang, text: source });
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui });
+  const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
+  return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
 }
 
 // With a voice-over each beat lasts as long as its audio; otherwise it is estimated from word count.
@@ -113,11 +108,11 @@ function sheetFrame() {
   return `<div class="amv-sheet" aria-hidden="true">${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}</div>`;
 }
 
-function shell({ meta, lang, scenesHtml, data, wav, voice, source, embedded }) {
-  const ui = UI[lang] ?? UI.zh;
+function shell({ meta, language, scenesHtml, data, wav, voice, source, embedded }) {
+  const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-${rootTag({ lang: htmlLang(lang), theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
+${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

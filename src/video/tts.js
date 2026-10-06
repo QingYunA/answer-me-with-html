@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { detectLang } from '../render.js';
+import { detectLang } from '../language.js';
 import { hasCommand } from '../sys.js';
 import { estimateSeconds } from './script.js';
 
