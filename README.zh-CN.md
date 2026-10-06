@@ -32,6 +32,10 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 <p align="center"><sub>24 秒演示，打开声音可以听到配乐。</sub></p>
 
+<p align="center">
+  <img src="docs/images/text-vs-page-zh.png" alt="同一个 TCP 问题的两种回答：左边是终端里的一堵文字墙，右边是带图表的一页能看懂的页面" width="100%">
+</p>
+
 ## 为什么不直接让 AI 输出 HTML？
 
 当然可以，现在的模型写 HTML 已经写得不错了。问题在于输出 token 的账：每一行 CSS、每一层 `div`、每一个 SVG 坐标，都得模型一个字一个字地打出来，而你在屏幕前等的正是这些输出 token。

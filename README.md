@@ -33,6 +33,10 @@ https://github.com/user-attachments/assets/d3063a28-5dfd-4c44-a562-be901c49b249
 
 <p align="center"><sub>24-second demo. Turn the sound on for the music.</sub></p>
 
+<p align="center">
+  <img src="docs/images/text-vs-page.png" alt="The same TCP question answered in plain text and with the skill: a wall of terminal text on the left, one readable page with diagrams on the right" width="100%">
+</p>
+
 ## Why not just ask for HTML?
 
 You can. Models write decent HTML now. The cost is output tokens: the model has to type every line of CSS, every wrapper `div` and every SVG coordinate, and output tokens are what you sit and wait for.
