@@ -14,7 +14,7 @@ DONE WHEN: `node <skill dir>/scripts/am.mjs --version` prints a version number, 
 - Run only the commands in this file. Do not clone the repository or build anything. The CLI is already bundled in the skill.
 - Install **one** way per agent. A skill and a plugin with the same name load twice and their instructions conflict.
 - Never remove or overwrite an existing install. If one exists, keep it (Step 2).
-- Do not add the always-on rule to any rules file. Mention how in the report.
+- Do not add the always-on rule to any rules file yourself. Recommend it in the report and ask (Step 5).
 - Put the commands of one step in a single shell call, so I approve as few prompts as possible.
 
 ## TODO
@@ -91,7 +91,7 @@ Send one message. Keep it to these lines:
 2. The result of the check, and the path of the TCP page if you made one.
 3. What I still need to do, if anything (for example `/reload-plugins`). Say "nothing" if there is nothing.
 4. How to change settings: `/answer-me-with-html:config` for the plugin, or `/answer-me-with-html config` for the skill.
-5. Optional, one line: an always-on rule adds a small page to every answer with a conclusion. To add it, see "Always-on mode" in [README.md](README.md).
+5. One line: we recommend always-on mode, which adds a small page to every answer with a conclusion. Ask whether I want it, and do not add it yourself. The rule is in "Always-on mode" in [README.md](README.md).
 
 ## Troubleshooting
 

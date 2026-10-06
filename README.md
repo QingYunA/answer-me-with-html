@@ -104,7 +104,7 @@ Skill folders for other agents: Codex `~/.codex/skills/`, Cursor `~/.cursor/skil
 
 </details>
 
-No setup is needed after install. Want a page with every conclusion, not only the hard ones? See [Always-on mode](#always-on-mode-optional).
+No setup is needed after install. **We recommend turning on [always-on mode](#always-on-mode-recommended)**: the agent then adds a page to every conclusion, not only the hard ones. It takes one rule in your rules file.
 
 ## What you ask, what you get
 
@@ -170,11 +170,13 @@ Change settings with a slash command. There are no config files to edit by hand.
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
 
-## Always-on mode (optional)
+## Always-on mode (recommended)
 
 With always-on mode, **every conclusion comes with a page**: whenever the agent gives a conclusion, summary, plan or comparison, even a short one, it adds a small page with 2 to 4 panels and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
 
-By default it is off: the agent makes a page only for questions that need one. To turn it on, add one rule to your agent's rules file.
+We recommend turning it on: you stop having to ask for a page, and a short conclusion gets the same readable format as a long one. The cost is a short draft per reply, and the pages pile up in `~/.answer-me-with-html/` (clear them with `am clean`).
+
+It is off by default: the agent makes a page only for questions that need one. To turn it on, add one rule to your agent's rules file.
 
 Paste this to your agent so it writes the rule into its own rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
 
