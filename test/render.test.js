@@ -108,7 +108,7 @@ test('render: a status word may be followed by inline HTML; only a leading word 
 test('render: html fences embed as is; unknown languages become escaped code blocks', () => {
   const { html } = renderDoc(SRC);
   assert.match(html, /<div class="raw-x">raw<\/div>/);
-  assert.match(html, /<pre class="am-code"><code data-lang="python">print\(&quot;&lt;x&gt;&quot;\)<\/code><\/pre>/);
+  assert.match(html, /<pre class="am-code"><code data-lang="python"><span class="am-ln">print\(&quot;&lt;x&gt;&quot;\)<\/span><\/code><\/pre>/);
 });
 
 test('render: the escaped source is embedded in a hidden textarea and reads back unchanged', () => {

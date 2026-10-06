@@ -12,7 +12,7 @@ export default {
   ui: {
     theme: '主題', modeLabel: '明暗',
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
-    copy: '複製源稿', done: '已複製 ✓',
+    copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',
     toc: '目錄', flow: '流程圖', sequence: '時序圖', colon: '：', sep: '、',
   },
   videoUi: { play: '播放', pause: '暫停', chapters: '章節' },

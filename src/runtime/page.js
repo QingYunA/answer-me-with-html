@@ -8,10 +8,7 @@
     select.addEventListener('change', () => root.setAttribute(attr, select.value));
   }
 
-  const copyBtn = document.querySelector('[data-am="copy"]');
-  copyBtn?.addEventListener('click', async () => {
-    const nodes = document.querySelectorAll('#am-source');
-    const text = nodes[nodes.length - 1]?.value ?? '';
+  const copyText = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -21,10 +18,29 @@
       document.execCommand('copy');
       ta.remove();
     }
-    const original = copyBtn.textContent;
-    copyBtn.textContent = copyBtn.dataset.done;
-    setTimeout(() => { copyBtn.textContent = original; }, 1400);
+  };
+  // The button reads its label from data-done for a moment after a copy.
+  const flash = (btn) => {
+    const original = btn.textContent;
+    btn.textContent = btn.dataset.done;
+    setTimeout(() => { btn.textContent = original; }, 1400);
+  };
+
+  const copyBtn = document.querySelector('[data-am="copy"]');
+  copyBtn?.addEventListener('click', async () => {
+    const nodes = document.querySelectorAll('#am-source');
+    await copyText(nodes[nodes.length - 1]?.value ?? '');
+    flash(copyBtn);
   });
+
+  // Each code block copies its own lines, without the line numbers.
+  for (const btn of document.querySelectorAll('[data-am="copy-code"]')) {
+    btn.addEventListener('click', async () => {
+      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];
+      await copyText([...lines].map((l) => l.textContent).join('\n'));
+      flash(btn);
+    });
+  }
 
   // ── Diagram Lightbox & Pan-Zoom Viewer ─────────────
   const diagrams = document.querySelectorAll('.am-diagram');

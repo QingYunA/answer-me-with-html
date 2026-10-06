@@ -142,11 +142,14 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 | Conclusion / warning | `callout <info\|ok\|warn\|err> title` | Markdown body |
 | Multi-dimension comparison, can / cannot list | Markdown table | write ok / no / warn in the status column |
 | What a real screen, photo or render looks like, as an existing file | image | `![what it shows](/absolute/path.png)` alone on a line |
+| Code that exists in the project | code block that quotes the file | ```` ```ts src=path/to/file.ts lines=18-30 hl=22 ```` and an empty block |
+| Code that does not exist yet, or a command | code block | ```` ```ts title="name · sketch" ```` with the code inside |
 
 Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.
 - One panel, one question. With more than 8 panels, split the page or cut panels.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
+- Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–30 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.
 - Use an image only for what a diagram cannot show, such as a real UI. Use an existing file by its absolute path (PNG, JPG, GIF, WebP, AVIF or SVG, up to 5 MB). The alt text is the caption, so write what the picture shows. Never generate or invent an image. See `am help image`.
 - Do not invent data. Without real numbers, do not use limits; mark illustrative data as "illustrative" in the description.
 

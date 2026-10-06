@@ -12,6 +12,7 @@ import { VERSION, RUNTIME_JS } from './assets.js';
 import { rootTag, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
+import { renderCode, CodeError, CODE_EXAMPLE } from './code.js';
 
 
 export class RenderError extends Error {
@@ -34,8 +35,9 @@ export class LintError extends Error {
 
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
-// baseDir: where relative image paths are read from. knownImages: images the page already embeds (draft path → data URI), the fallback when a file is gone.
-export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, knownImages } = {}) {
+// baseDir: where relative image paths are read from; codeDir: where relative code paths are read from (the folder the agent works in).
+// knownImages / knownCode: what the page already embeds, the fallback when a file is gone.
+export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -49,9 +51,9 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {} };
+  const stats = { panels: doc.panels.length, components: {}, code: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages } };
+  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
@@ -84,9 +86,7 @@ function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
-  if (!comp) {
-    return `<pre class="am-code"><code${lang ? ` data-lang="${esc(lang)}"` : ''}>${esc(text)}</code></pre>`;
-  }
+  if (!comp) return codeBlock(block, ctx);
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui });
@@ -97,6 +97,18 @@ function renderFence(block, ctx) {
       component: lang,
       example: comp.example,
     });
+  }
+}
+
+// A fence that is not a component is code. ctx.code is absent in a video, where the block has no copy button.
+function codeBlock(block, ctx) {
+  try {
+    const { html, file } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
+    if (file && ctx.stats.code) ctx.stats.code.push(file);
+    return html;
+  } catch (err) {
+    if (!(err instanceof CodeError)) throw err;
+    throw new RenderError(err.message, { line: block.line + err.line, component: 'code', example: CODE_EXAMPLE });
   }
 }
 

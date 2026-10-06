@@ -102,10 +102,12 @@ function splitSections(lines, start) {
       flushMd();
       const close = findFenceClose(lines, i, fence[1]);
       if (close === -1) throw new ParseError(`fenced block ${fence[1]}${fence[2]} is not closed`, i + 1);
+      // A fence with settings but no language (```src=a.ts) has no language; its first word is a setting.
+      const bare = fence[2].includes('=');
       current.blocks.push({
         type: 'fence',
-        lang: fence[2].toLowerCase(),
-        args: fence[3].trim(),
+        lang: bare ? '' : fence[2].toLowerCase(),
+        args: (bare ? `${fence[2]} ${fence[3]}` : fence[3]).trim(),
         text: lines.slice(i + 1, close).join('\n'),
         line: i + 1,
       });
