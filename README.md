@@ -186,6 +186,18 @@ To turn it off, delete that rule from the file.
 
 **Installed the old `answer-me-with-html-always` plugin?** It is gone from this repository, but your copy keeps adding the reminder until you remove it. Run `/plugin uninstall answer-me-with-html-always@answer-me-with-html`, then paste the rule above.
 
+## Less proactive
+
+By default the agent makes a page whenever one would help. If that is too much, pick one of two ways. Do not combine either with always-on mode.
+
+**Only when you ask in words.** Add this rule to your rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
+
+> Do not use the answer-me-with-html skill unless I ask for a page, a diagram or a visual explanation, or say I don't get it.
+
+The rule survives updates. The agent still sees the skill, so it follows the rule by judgment.
+
+**Only with the slash command (Claude Code).** Add `disable-model-invocation: true` to the frontmatter of the installed `SKILL.md`, such as `~/.claude/skills/answer-me-with-html/SKILL.md`. The agent then never sees the skill, and a page appears only when you type `/answer-me-with-html`. An update replaces the file, so add the line again afterwards. See the [Claude Code skills docs](https://code.claude.com/docs/en/skills).
+
 ## Updating and cleaning up
 
 Updates are manual. Once a week a background check reads the latest version number from GitHub (nothing about you or your pages is sent), and the agent mentions a new version when there is one. Turn it off with `/answer-me-with-html:config update_check off`. To update, run `npx skills update answer-me-with-html -y`, or tell your agent "update answer-me-with-html".

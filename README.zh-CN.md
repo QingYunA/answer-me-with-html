@@ -186,6 +186,18 @@ Server -> Client: SYN-ACK
 
 **装过旧的 `answer-me-with-html-always` 插件？** 仓库里已经删掉它，但你本机的副本会一直注入提醒，直到你卸载。先执行 `/plugin uninstall answer-me-with-html-always@answer-me-with-html`，再贴上面的规则。
 
+## 少一点主动
+
+默认情况下，只要页面更好懂，agent 就会出页面。嫌太多的话，有两种办法。两种都不要和高频模式同时用。
+
+**只在你用话要求时出。** 把这条规则加到你的规则文件里，例如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`：
+
+> 除非我要求生成页面、图示或可视化讲解，或者说我没看懂，否则不要使用 answer-me-with-html skill。
+
+这条规则在更新后还在。agent 仍然看得到这个 skill，所以靠自己的判断遵守规则。
+
+**只用斜杠命令触发（Claude Code）。** 在已安装的 `SKILL.md` 的 frontmatter 里加一行 `disable-model-invocation: true`，例如 `~/.claude/skills/answer-me-with-html/SKILL.md`。之后 agent 完全看不到这个 skill，只有你输入 `/answer-me-with-html` 才会出页面。更新会替换这个文件，更新后要重新加这一行。见 [Claude Code skills 文档](https://code.claude.com/docs/en/skills)。
+
 ## 更新与清理
 
 需要手动更新。工具每周在后台向 GitHub 查询一次最新版本号（不上传任何内容），有新版本时 Agent 会提醒你。关掉提醒：`/answer-me-with-html:config update_check off`。更新：`npx skills update answer-me-with-html -y`，或直接对 Agent 说"更新一下 answer-me-with-html"。
