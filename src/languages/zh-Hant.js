@@ -13,6 +13,13 @@ export default {
     theme: '主題', modeLabel: '明暗',
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
     copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',
+    reply: {
+      button: '回覆', comment: '評論', commentHint: '對這個面板的意見', title: '你的回覆',
+      hint: '複製後貼到對話裡。', copy: '複製回覆', close: '關閉', suggested: '建議',
+      empty: '先選擇選項，或在面板上寫評論。', decisions: '決定', comments: '評論',
+      confirmed: '確認了建議', untouched: '未作答，保留建議', was: '原為',
+      typed: '以 ">" 開頭的行是讀者輸入的文字。',
+    },
     toc: '目錄', flow: '流程圖', sequence: '時序圖', colon: '：', sep: '、',
   },
   videoUi: { play: '播放', pause: '暫停', chapters: '章節' },

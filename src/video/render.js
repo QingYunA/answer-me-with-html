@@ -37,7 +37,7 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {} };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui });
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
 }

@@ -11,7 +11,7 @@ test('every component provides name / summary / syntax / example, and the exampl
   assert.ok(COMPONENTS.size >= 4);
   for (const [name, c] of COMPONENTS) {
     for (const key of ['summary', 'syntax', 'example']) assert.ok(c[key], `${name}.${key}`);
-    const m = c.example.match(/^```(\S+)\s*(.*)\n([\s\S]*?)\n```$/);
+    const m = c.example.match(/^```(\S+)[ \t]*(.*)\n([\s\S]*?)\n```$/);
     assert.ok(m, `${name}.example must be one complete fenced block`);
     assert.equal(m[1], name);
     assert.ok(c.render(m[3], ctx(m[2])).length > 0);

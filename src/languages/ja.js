@@ -14,6 +14,13 @@ export default {
     theme: 'テーマ', modeLabel: '表示',
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓', copyCode: 'コピー',
+    reply: {
+      button: '返信', comment: 'コメント', commentHint: 'このパネルへのコメント', title: 'あなたの返信',
+      hint: 'コピーしてチャットに貼り付けてください。', copy: '返信をコピー', close: '閉じる', suggested: '推奨',
+      empty: '選択肢を選ぶか、パネルにコメントしてください。', decisions: '決定', comments: 'コメント',
+      confirmed: '推奨を確認', untouched: '未回答（推奨のまま）', was: '変更前',
+      typed: '「>」で始まる行は読者が入力した文字です。',
+    },
     toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
   },
   videoUi: { play: '再生', pause: '一時停止', chapters: '章' },

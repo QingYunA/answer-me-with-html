@@ -8,6 +8,7 @@
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES, ZH_WORDS } from './wordlist.zh.js';
 import { isCJK, isJapanese } from '../svg/text.js';
+import { COMPONENTS } from '../components/index.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
 const MAX_SENTENCES = 6;
@@ -66,6 +67,7 @@ export function lintDoc(doc, language) {
   for (const b of blocks) {
     if (b.type === 'md') lintMarkdown(b.text, b.line, warnings, family);
     else if (b.lang === 'callout') lintMarkdown(b.text, b.line + 1, warnings, family);
+    else if (COMPONENTS.get(b.lang)?.lint) lintMarkdown(COMPONENTS.get(b.lang).lint(b.text), b.line + 1, warnings, family);
   }
   return warnings;
 }

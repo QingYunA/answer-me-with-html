@@ -54,6 +54,8 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
+  const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
+  if (loose) throw new RenderError(`${loose.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: loose.line, component: loose.lang, example: COMPONENTS.get(loose.lang).example });
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
@@ -91,6 +93,7 @@ function renderFence(block, ctx) {
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
   if (!comp) return codeBlock(block, ctx);
+  if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui });
@@ -104,10 +107,10 @@ function renderFence(block, ctx) {
   }
 }
 
-// A fence that is not a component is code. ctx.code is absent in a video, where the block has no copy button.
+// A fence that is not a component is code. In a video the block has no copy button.
 function codeBlock(block, ctx) {
   try {
-    const { html, file, warning } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
+    const { html, file, warning } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: !ctx.video });
     if (file && ctx.stats.code) ctx.stats.code.push(file);
     if (warning && ctx.stats.codeWarnings) ctx.stats.codeWarnings.push({ line: block.line, message: warning });
     return html;
@@ -141,6 +144,7 @@ ${pageCss(embedded)}
 <div class="am-toolbar">
 ${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
+<button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
 ${body}

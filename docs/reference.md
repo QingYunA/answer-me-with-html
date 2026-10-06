@@ -29,6 +29,26 @@ A -> B: label
 
 Full syntax for a component: `am help <component>`.
 
+## Answer on the page
+
+Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload.
+
+For a decision the reader must make, write an `ask` block in the panel it changes:
+
+````markdown
+```ask
+Which cache do we use?
+* Redis | keeps data after a restart
+- Memcached | simpler, no disk
+```
+````
+
+- The first line is the question. Each option starts with `*` (the suggestion, selected at the start) or `-`. Write 2 to 6 options.
+- One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options that start picked.
+- The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text comes back quoted with `>`.
+
+Full syntax: `am help ask`.
+
 ## Code blocks
 
 Quote code that exists in the project instead of typing it:

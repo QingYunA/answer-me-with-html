@@ -8,6 +8,13 @@ export default {
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
     copy: '复制源稿', done: '已复制 ✓', copyCode: '复制',
+    reply: {
+      button: '回复', comment: '评论', commentHint: '对这个面板的意见', title: '你的回复',
+      hint: '复制后粘贴到对话里。', copy: '复制回复', close: '关闭', suggested: '建议',
+      empty: '先选择选项，或在面板上写评论。', decisions: '决定', comments: '评论',
+      confirmed: '确认了建议', untouched: '未作答，保留建议', was: '原为',
+      typed: '以 ">" 开头的行是读者输入的文字。',
+    },
     toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
   },
   videoUi: { play: '播放', pause: '暂停', chapters: '章节' },
