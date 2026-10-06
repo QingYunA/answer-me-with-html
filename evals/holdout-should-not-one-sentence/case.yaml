@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: holdout-should-not-one-sentence
+tags: [should-not-trigger, holdout]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    Summarize in one sentence: The meeting moved to Thursday because two people were out, and the budget review was postponed.
+graders:
+  - name: skill-not-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'
+    min: 0
+    max: 0
+    arm: both

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: should-flow-https-request-zh
+tags: [should-trigger, flow]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    讲一下一次 HTTPS 请求，从浏览器输入网址到页面显示，中间经过哪些环节？
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

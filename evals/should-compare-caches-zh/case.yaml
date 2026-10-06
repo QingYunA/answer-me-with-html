@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: should-compare-caches-zh
+tags: [should-trigger, comparison]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    对比一下 Redis、Memcached 和进程内本地缓存，从一致性、容量、运维成本、适用场景几个维度说说。
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

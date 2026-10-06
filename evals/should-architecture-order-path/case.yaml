@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: should-architecture-order-path
+tags: [should-trigger, architecture]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    Our system has an API gateway, an auth service, an order service, a message queue and a worker pool. Walk me through what happens when a customer places an order, including how failures are handled.
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

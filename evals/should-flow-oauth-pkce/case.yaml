@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: should-flow-oauth-pkce
+tags: [should-trigger, flow]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    Explain how the OAuth 2.0 authorization code flow with PKCE works between a single-page app, its API server and the authorization server.
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

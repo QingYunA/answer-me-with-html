@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: holdout-should-review-findings-zh
+tags: [should-trigger, holdout, findings]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    代码评审发现：1. 接口没做幂等；2. 重试没有退避；3. 日志里有手机号；4. 配置里写死了密钥。这几个问题分别多严重，怎么排优先级？
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

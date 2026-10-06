@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: holdout-should-pr-states
+tags: [should-trigger, holdout, state-machine]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    A pull request can be draft, open, approved, merged, closed or reverted. How do these states connect, and which transitions are not allowed?
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: should-state-machine-order-zh
+tags: [should-trigger, state-machine]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    订单有创建、已支付、已发货、已完成、已取消、退款中这几种状态，它们之间怎么转换？哪些转换是不允许的？
+graders:
+  - name: skill-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'

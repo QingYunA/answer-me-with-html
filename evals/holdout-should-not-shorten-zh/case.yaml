@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: holdout-should-not-shorten-zh
+tags: [should-not-trigger, holdout]
+execution:
+  max_turns: 2
+  timeout_seconds: 600
+  allowed_tools: [Skill]
+  prompt: |
+    帮我把下面这段话改得更简洁：我们将会在明天的会议上对这个项目的进展情况进行一下汇报。
+graders:
+  - name: skill-not-fired
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?answer-me-with-html"'
+    min: 0
+    max: 0
+    arm: both
