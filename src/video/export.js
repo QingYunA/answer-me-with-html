@@ -121,11 +121,19 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
   }
 }
 
-export function devtoolsUrl(chrome) {
+// Waits for Chrome to print its DevTools URL. A failure message carries the end of Chrome's stderr,
+// so a crash at start can be told apart from a slow start.
+export function devtoolsUrl(chrome, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     let buf = '';
-    const timer = setTimeout(() => reject(new ExportError('Chrome did not start in time')), 20000);
-    chrome.on('error', (e) => { clearTimeout(timer); reject(new ExportError(`Cannot start Chrome: ${e.message}`)); });
+    const fail = (msg) => {
+      clearTimeout(timer);
+      const tail = buf.trim().split('\n').slice(-5).join('\n');
+      reject(new ExportError(tail ? `${msg}. Chrome stderr:\n${tail}` : msg));
+    };
+    const timer = setTimeout(() => fail('Chrome did not start in time'), timeoutMs);
+    chrome.on('error', (e) => fail(`Cannot start Chrome: ${e.message}`));
+    chrome.on('close', (code, signal) => fail(`Chrome exited (${code ?? signal}) before it started`));
     chrome.stderr.on('data', (d) => {
       buf += d;
       const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);

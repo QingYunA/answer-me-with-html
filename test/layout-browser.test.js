@@ -332,7 +332,13 @@ after(async () => {
       chrome.kill();
     });
   }
-  if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  try {
+    if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  } catch (e) {
+    // Chrome helper processes can still write to the profile after the main process exits (#74).
+    // A leftover temp directory is not a test failure.
+    console.warn(`Could not remove ${tmp}: ${e.message}`);
+  }
 });
 
 // The laid-out page, as a reader sees it, must keep these invariants at any width above the single-column breakpoint.

@@ -1,15 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
+// Run the hook against an empty AM_HOME, so the developer's own `always` setting does not change the result.
+const cleanEnv = { ...process.env, AM_HOME: mkdtempSync(join(tmpdir(), 'am-always-')) };
 const read = (p) => JSON.parse(readFileSync(`${ROOT}/${p}`, 'utf8'));
 
 test('always plugin: the hook prints a valid UserPromptSubmit additionalContext', () => {
   const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], {
-    input: '{"prompt":"讲讲 TCP"}', encoding: 'utf8',
+    input: '{"prompt":"讲讲 TCP"}', encoding: 'utf8', env: cleanEnv,
   });
   assert.equal(r.status, 0, r.stderr);
   const out = JSON.parse(r.stdout);
@@ -32,7 +36,7 @@ test('SKILL.md explains the always-on reminder marker', () => {
 });
 
 test('always plugin: the reminder asks for --no-open, so no browser opens', () => {
-  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8', env: cleanEnv });
   assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /--no-open/);
 });
 
@@ -57,13 +61,13 @@ test('always plugin: always=off injects no reminder; a broken config still injec
 });
 
 test('render the page before the text reply, so the reply ends with text, not a tool call', () => {
-  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8', env: cleanEnv });
   assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /render the page first/i);
   assert.match(readFileSync(`${ROOT}/skills/answer-me-with-html/SKILL.md`, 'utf8'), /render the page first/i);
 });
 
 test('the reply links the page as a file:// URL, which GUI hosts render as a link', () => {
-  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [`${ROOT}/plugins/answer-me-with-html-always/hooks/remind.mjs`], { encoding: 'utf8', env: cleanEnv });
   assert.match(JSON.parse(r.stdout).hookSpecificOutput.additionalContext, /file:\/\//);
   assert.match(readFileSync(`${ROOT}/skills/answer-me-with-html/SKILL.md`, 'utf8'), /\[file:\/\/\/abs\/path\.html\]\(file:\/\/\/abs\/path\.html\)/);
 });

@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { exportMp4, findChrome, ExportError } from '../src/video/export.js';
+import { spawn } from 'node:child_process';
+import { devtoolsUrl, exportMp4, findChrome, ExportError } from '../src/video/export.js';
 import { renderVideo } from '../src/video/render.js';
 
 const chrome = findChrome();
@@ -30,5 +31,25 @@ test('exportMp4: throws ExportError when ffmpeg exits midway, without crashing o
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A stand-in for Chrome: writes to stderr, then exits or keeps running.
+const fakeChrome = (script) => spawn(process.execPath, ['-e', script], { stdio: ['ignore', 'ignore', 'pipe'] });
+
+test('devtoolsUrl: rejects at once when Chrome exits before it listens, and shows its stderr', async () => {
+  const started = Date.now();
+  await assert.rejects(devtoolsUrl(fakeChrome('process.stderr.write("no usable sandbox\\n"); process.exit(3)')),
+    (e) => e instanceof ExportError && /exited \(3\)/.test(e.message) && /no usable sandbox/.test(e.message));
+  assert.ok(Date.now() - started < 5000, 'must not wait for the start timeout');
+});
+
+test('devtoolsUrl: the start timeout shows the stderr Chrome printed so far', async () => {
+  const chrome = fakeChrome('process.stderr.write("still loading\\n"); setTimeout(() => {}, 60000)');
+  try {
+    await assert.rejects(devtoolsUrl(chrome, 300),
+      (e) => e instanceof ExportError && /did not start in time/.test(e.message) && /still loading/.test(e.message));
+  } finally {
+    chrome.kill();
   }
 });

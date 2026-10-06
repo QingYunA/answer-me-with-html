@@ -5980,14 +5980,18 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
     }
   }
 }
-function devtoolsUrl(chrome) {
+function devtoolsUrl(chrome, timeoutMs = 2e4) {
   return new Promise((resolve2, reject) => {
     let buf = "";
-    const timer = setTimeout(() => reject(new ExportError("Chrome did not start in time")), 2e4);
-    chrome.on("error", (e) => {
+    const fail = (msg) => {
       clearTimeout(timer);
-      reject(new ExportError(`Cannot start Chrome: ${e.message}`));
-    });
+      const tail = buf.trim().split("\n").slice(-5).join("\n");
+      reject(new ExportError(tail ? `${msg}. Chrome stderr:
+${tail}` : msg));
+    };
+    const timer = setTimeout(() => fail("Chrome did not start in time"), timeoutMs);
+    chrome.on("error", (e) => fail(`Cannot start Chrome: ${e.message}`));
+    chrome.on("close", (code, signal) => fail(`Chrome exited (${code ?? signal}) before it started`));
     chrome.stderr.on("data", (d) => {
       buf += d;
       const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
