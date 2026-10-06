@@ -19,7 +19,7 @@ test('configPath: is AM_HOME/config.json', () => {
 });
 
 test('readConfig: returns the defaults when the file does not exist', () => {
-  assert.deepEqual(readConfig(env).values, { open: true, always: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true });
 });
 
 test('setConfig: booleans accept on/off/true/false/`开`/`关` and are written to the file', () => {
@@ -42,7 +42,7 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   setConfig('open', 'off', env);
   setConfig('theme', 'shadcn', env);
   resetConfig('open', env);
-  assert.deepEqual(readConfig(env).values, { open: true, always: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true });
   resetConfig(undefined, env);
   assert.equal(existsSync(configPath(env)), false);
 });
@@ -56,7 +56,7 @@ test('readConfig: falls back to the defaults with a warning when the file is bro
 
 test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
-  assert.deepEqual(readConfig(env).values, { open: true, always: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true });
 });
 
 test('CONFIG_KEYS: every key has a label', () => {

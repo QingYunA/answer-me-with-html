@@ -27,11 +27,11 @@ Arguments for this call: `$ARGUMENTS`
 
 When the arguments start with `config` (for example `/answer-me-with-html config open off`), this turn handles settings only and produces no page:
 
-- `config`: run `am config` to show the current settings, then let the user choose. Where the agent has a choice tool such as AskUserQuestion, use it: at most 4 settings at a time, these first: `open`, `always`, `theme`, `mode`, with the current value marked in the options. Otherwise ask in plain text.
+- `config`: run `am config` to show the current settings, then let the user choose. Where the agent has a choice tool such as AskUserQuestion, use it: at most 4 settings at a time, these first: `open`, `theme`, `mode`, `style`, with the current value marked in the options. Otherwise ask in plain text.
 - `config <key> <value>`: run `am config set <key> <value>`.
 - `config reset [key]`: run `am config reset [key]`.
 
-When the user asks in natural language ("stop opening the browser", "turn off always-on mode", "use the card theme by default"), also convert it to `am config set`. Settings: `open` (auto-open the browser), `always` (always-on mode), `theme`, `mode`, `style`, `voice` (video narration), `update_check` (new-version notices). Run `am config` to see all descriptions.
+When the user asks in natural language ("stop opening the browser", "use the card theme by default"), also convert it to `am config set`. Settings: `open` (auto-open the browser), `theme`, `mode`, `style`, `voice` (video narration), `update_check` (new-version notices). Run `am config` to see all descriptions.
 
 When the arguments start with `clean`, or the user asks to clean up pages / the cache: first run `am clean --dry-run` and tell the user how many items and how much space will be deleted. Run `am clean` only after the user agrees (add `--all` to delete all pages and videos, `--days N` to change how many days to keep).
 
@@ -49,7 +49,7 @@ Otherwise answer in plain text. When unsure: the more the question "needs a pict
 
 ### Always-on mode
 
-If the context contains the `[answer-me-with-html always-on]` reminder (the user installed the answer-me-with-html-always plugin, or turned on always-on mode in a rules file), the bar is lower:
+If the context contains the `[answer-me-with-html always-on]` reminder (the user added the always-on rule to a rules file such as `CLAUDE.md` or `AGENTS.md`), the bar is lower:
 
 - Whenever this turn gives a conclusion, summary, plan, comparison, review or explanation, attach a page.
 - Do not skip it because "the answer is short". If there is a conclusion, produce a page.

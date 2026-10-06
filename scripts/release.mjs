@@ -17,7 +17,6 @@ const FILES = [
   'package-lock.json',
   '.claude-plugin/plugin.json',
   '.claude-plugin/marketplace.json',
-  'plugins/answer-me-with-html-always/.claude-plugin/plugin.json',
 ];
 
 const current = JSON.parse(readFileSync(new URL('package.json', ROOT), 'utf8')).version;

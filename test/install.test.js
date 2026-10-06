@@ -12,9 +12,8 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const json = (rel) => JSON.parse(readFileSync(join(ROOT, rel), 'utf8'));
 const VERSION = json('package.json').version;
 
-test('install: package.json, both plugin.json files and marketplace.json have the same version', () => {
+test('install: package.json, plugin.json and marketplace.json have the same version', () => {
   assert.equal(json('.claude-plugin/plugin.json').version, VERSION);
-  assert.equal(json('plugins/answer-me-with-html-always/.claude-plugin/plugin.json').version, VERSION);
   for (const p of json('.claude-plugin/marketplace.json').plugins) assert.equal(p.version, VERSION, p.name);
 });
 
@@ -26,12 +25,7 @@ test('install: every marketplace plugin exists and its name matches plugin.json'
   }
 });
 
-test('install: script paths referenced by hooks, commands and SKILL.md exist', () => {
-  const hooks = json('plugins/answer-me-with-html-always/hooks/hooks.json');
-  const args = hooks.hooks.UserPromptSubmit.flatMap((h) => h.hooks).flatMap((h) => h.args ?? []);
-  for (const a of args) {
-    assert.ok(existsSync(join(ROOT, 'plugins/answer-me-with-html-always', a.replace('${CLAUDE_PLUGIN_ROOT}/', ''))), a);
-  }
+test('install: script paths referenced by commands and SKILL.md exist', () => {
   for (const f of readdirSync(join(ROOT, 'commands'))) {
     for (const [, rel] of readFileSync(join(ROOT, 'commands', f), 'utf8').matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([\w./-]+)/g)) {
       assert.ok(existsSync(join(ROOT, rel)), `${f}: ${rel}`);

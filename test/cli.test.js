@@ -168,7 +168,7 @@ test('cli config: shows every setting, its current value and the config file pat
   const r = await run(['config']);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /config\.json/);
-  for (const key of ['open', 'always', 'theme', 'mode', 'style']) assert.match(r.out, new RegExp(`\\b${key}\\b`));
+  for (const key of ['open', 'theme', 'mode', 'style']) assert.match(r.out, new RegExp(`\\b${key}\\b`));
 });
 
 test('cli config: set / get / reset, changed values are marked with *', async () => {

@@ -34,7 +34,7 @@ Serve [docs/demo/demo.html](docs/demo/demo.html) next to the rendered [examples/
 
 A release is a version bump merged to `main`. All installs read `main`: `npx skills update` takes the latest commit, and `claude plugin update` only updates when the version changes.
 
-1. `npm run release -- <x.y.z>` writes the version to all five manifests and rebuilds the bundle. `test/install.test.js` checks that they agree.
+1. `npm run release -- <x.y.z>` writes the version to all four manifests and rebuilds the bundle. `test/install.test.js` checks that they agree.
 2. Run `npm test` and `npm run smoke:install`, then open and merge a `chore: release <x.y.z>` PR.
 3. Tag the merge commit and publish the GitHub Release:
    `git tag -a v<x.y.z> <sha> -m v<x.y.z> && git push origin v<x.y.z> && gh release create v<x.y.z> --verify-tag --notes-file <notes>`.

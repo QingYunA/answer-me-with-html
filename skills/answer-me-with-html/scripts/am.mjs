@@ -6228,7 +6228,6 @@ var ConfigError = class extends Error {
 };
 var CONFIG_KEYS = Object.freeze({
   open: { type: "bool", default: true, label: "Open the page in the browser after it is made" },
-  always: { type: "bool", default: true, label: "Always-on mode: add a page to every conclusion (needs the answer-me-with-html-always plugin)" },
   theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
   mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
   style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },

@@ -67,7 +67,7 @@ BENCH_TOPICS=tcp node bench/run.mjs sonnet /tmp/b 1  # one topic, one run
 
 Your own setup decides how much context every turn re-reads, so it also decides the cost. Each row records `inputTokens`, `cacheWriteTokens` and `cacheReadTokens` next to the output tokens, so you can see where the cost comes from.
 
-Each run happens in a fresh temp folder with always-on mode switched off. The "direct" runs may only use the Write tool; the "skill" runs may use the skill and Bash.
+Each run happens in a fresh temp folder. The "direct" runs may only use the Write tool; the "skill" runs may use the skill and Bash.
 
 ---
 

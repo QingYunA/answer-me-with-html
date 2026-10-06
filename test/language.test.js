@@ -123,13 +123,12 @@ const JS_CSS = /\.(m?js|css)$/;
 const SCOPE = [
   { files: () => ['package.json'], part: 'whole' },
   { files: () => ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'], part: 'whole' },
-  { files: () => ['plugins/answer-me-with-html-always/.claude-plugin/plugin.json'], part: 'whole' },
-  { files: () => ['src', 'bin', 'scripts', 'plugins'].flatMap((d) => filesIn(d, JS)), part: 'strings' },
+  { files: () => ['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS)), part: 'strings' },
   { files: () => ['src/lint/ste.js'], part: 'lintMessages' },
   { files: () => ['skills/answer-me-with-html/SKILL.md'], part: 'skill' },
   { files: () => ['CONTRIBUTING.md', ...commandFiles()], part: 'whole' },
   {
-    files: () => [...['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS_CSS)), ...['plugins', 'bench', 'docs/demo'].flatMap((d) => filesIn(d, JS))],
+    files: () => [...['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS_CSS)), ...['bench', 'docs/demo'].flatMap((d) => filesIn(d, JS))],
     part: 'comments',
   },
   { files: () => readdirSync(join(ROOT, 'test')).filter((f) => f.endsWith('.test.js')).map((f) => `test/${f}`), part: 'testText' },

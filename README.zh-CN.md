@@ -162,7 +162,6 @@ Server -> Client: SYN-ACK
 | 配置项 | 默认值 | 作用 |
 | :--- | :--- | :--- |
 | `open` | `on` | 生成后自动用浏览器打开。嫌弹窗打扰就关掉 |
-| `always` | `on` | 高频模式开关（见下一节），只在装了高频插件时有用 |
 | `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
@@ -173,22 +172,15 @@ Server -> Client: SYN-ACK
 
 ## 高频模式（可选）
 
-默认情况下，只有问题需要时 Agent 才会出页面。如果你希望它**每次给结论都附一页**，可以打开高频模式。
+默认情况下，只有问题需要时 Agent 才会出页面。如果你希望它**每次给结论都附一页**，在 Agent 的规则文件里加一条规则就行。
 
-打开后，Agent 每轮都会收到一句很短的提醒（约 90 个 token）。只要这一轮给出了结论、总结、方案或对比，哪怕回答很短，它也会顺手出一页 2～4 个面板的小页面，并在回复最后附上路径。这些页面只生成、不弹出，不会打断你手上的事。闲聊、没有结论的一两句话不受影响。Claude Code 处于 plan 模式时不会出页面。
+加上后，只要这一轮给出了结论、总结、方案或对比，哪怕回答很短，Agent 也会顺手出一页 2～4 个面板的小页面，并在回复最后附上路径。这些页面只生成、不弹出，不会打断你手上的事。闲聊、没有结论的一两句话不受影响。Claude Code 处于 plan 模式时不会出页面。
 
-**Claude Code：** 再装一个插件就行。
-
-```
-/plugin marketplace add QingYunA/answer-me-with-html
-/plugin install answer-me-with-html-always@answer-me-with-html
-```
-
-想暂停，执行 `/answer-me-with-html:config always off`，不用卸载。这个命令只在插件安装里有；用 `npx skills` 装的 skill，改用 `/answer-me-with-html config always off`。
-
-**其他 Agent：** 把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `AGENTS.md`）：
+把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`）：
 
 > 帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后附上页面的 file:// 链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。"
+
+想关掉，把这条规则从文件里删掉即可。
 
 ## 更新与清理
 

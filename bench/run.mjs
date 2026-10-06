@@ -85,7 +85,7 @@ function runOnce(topic, cfg) {
   const work = mkdtempSync(join(tmpdir(), `bench-${topic.id}-`));
   const home = join(work, '.am');
   mkdirSync(home);
-  writeFileSync(join(home, 'config.json'), JSON.stringify({ always: false, open: false }));
+  writeFileSync(join(home, 'config.json'), JSON.stringify({ open: false }));
   const lean = LEAN ? ['--setting-sources', 'project', '--strict-mcp-config'] : [];
   if (LEAN && cfg.args.includes('Skill') && !cfg.args.includes('--disallowedTools')) {
     mkdirSync(join(work, '.claude', 'skills'), { recursive: true });

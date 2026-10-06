@@ -162,7 +162,6 @@ Change settings with a slash command. There are no config files to edit by hand.
 | Key | Default | What it does |
 | :--- | :--- | :--- |
 | `open` | `on` | Open each page in the browser after it is made. Turn it off if pop-ups interrupt you |
-| `always` | `on` | Always-on mode (see below). Only matters when the always-on plugin is installed |
 | `theme` | `auto` | Default theme: `auto` (paper for long text, blueprint for diagrams), `blueprint`, `shadcn`, `paper`, or your own theme |
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
@@ -173,22 +172,15 @@ Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draf
 
 ## Always-on mode (optional)
 
-By default, the agent makes a page only for questions that need one. If you want **a page with every conclusion**, turn on always-on mode.
+By default, the agent makes a page only for questions that need one. If you want **a page with every conclusion**, add one rule to your agent's rules file.
 
-The agent then gets a short reminder each turn (about 90 tokens). Whenever it gives a conclusion, summary, plan or comparison, even a short one, it adds a small page with 2 to 4 panels and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
+The agent then adds a small page with 2 to 4 panels whenever it gives a conclusion, summary, plan or comparison, even a short one, and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
 
-**Claude Code:** install one more plugin.
-
-```
-/plugin marketplace add QingYunA/answer-me-with-html
-/plugin install answer-me-with-html-always@answer-me-with-html
-```
-
-Pause it with `/answer-me-with-html:config always off`. You don't need to uninstall. That command exists only in the plugin install; if you installed the skill with `npx skills`, use `/answer-me-with-html config always off`.
-
-**Other agents:** paste this to your agent so it writes the rule into its own rules file, such as `AGENTS.md`:
+Paste this to your agent so it writes the rule into its own rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
 
 > Turn on always-on mode for Answer me with HTML: add a global rule — "[answer-me-with-html always-on] Whenever a reply gives a conclusion, summary, plan, comparison, review or explanation, even a short one, also make a page with the answer-me-with-html skill (2 to 4 panels for routine answers), render it with --no-open before you write the reply, and end the reply with a file:// link to the page. Skip casual chat, one- or two-sentence replies with no conclusion, pure command output, and requests for plain text."
+
+To turn it off, delete that rule from the file.
 
 ## Updating and cleaning up
 

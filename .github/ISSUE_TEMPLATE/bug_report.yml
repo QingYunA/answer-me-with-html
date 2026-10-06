@@ -75,7 +75,6 @@ body:
       options:
         - npx skills add
         - Claude Code plugin
-        - Claude Code plugin + always-on
         - Cloned repository
         - Other
     validations:
