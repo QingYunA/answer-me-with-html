@@ -1,6 +1,6 @@
 {
   "name": "answer-me-with-html",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "Answer hard questions with a one-page HTML: the model writes a short Markdown draft; the bundled CLI handles templates, SVG auto-layout and an STE controlled-writing check.",
   "type": "module",
   "bin": {
