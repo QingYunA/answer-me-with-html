@@ -238,6 +238,7 @@ The CLI does the rest. It picks the template, places the panels, applies the the
 - **Fixes its own mistakes:** When a draft has an error, the CLI returns the line number, the component and a correct example. The agent fixes it in one try.
 - **Three themes:** `blueprint` looks like an engineering drawing, `shadcn` uses clean cards, and `paper` is set for long reading. By default the CLI picks paper for long text and blueprint for diagrams. All have light and dark modes, and you can add your own.
 - **One file, no dependencies:** Each page is a single `.html` with no CDN links or web fonts. It opens offline and is easy to share.
+- **Languages:** Simplified Chinese, Traditional Chinese, English and Japanese are fully supported: page buttons, theme names, fonts and the video player. Any other language gets the right `lang` attribute and English buttons. Write `lang: zh-Hant` (or `zh-TW`) for Traditional Chinese, or `lang: fr` for French; see the [reference](docs/reference.md#languages).
 - **Writing check:** Drafts are checked against rules adapted from ASD-STE100: long sentences, wordy phrases, passive voice. It only warns unless you ask for strict mode.
 - **Keeps its source:** Every page embeds the Markdown that made it. Click "Copy source" to get it back.
 

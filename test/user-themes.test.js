@@ -74,7 +74,7 @@ test('user theme: fonts get the default fallback stack', async () => {
   assert.match(html, /--font-sans: "IBM Plex Sans", "Noto Sans CJK SC", -apple-system, [^;]*sans-serif;/);
   // On Japanese pages a theme that sets its own font keeps it.
   const ja = pageOf(await run(['render', '-', '--no-open', '--theme', 'notes'], '## A 概要\n接続は3回のやりとりで行う。\n'));
-  assert.match(ja, /html\[lang="ja"\]\[data-theme="notes"\]\[data-mode\] \{\n {2}--font-sans: "IBM Plex Sans"/);
+  assert.match(ja, /html:lang\(ja\)\[data-theme="notes"\]\[data-mode\] \{\n {2}--font-sans: "IBM Plex Sans"/);
 });
 
 test('user theme: video and patch keep it', async () => {

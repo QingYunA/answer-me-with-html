@@ -4,7 +4,7 @@ import { SANS, MONO } from './fonts.js';
 export default {
   name: 'blueprint',
   summary: 'Blueprint drawing',
-  label: { zh: '图纸', en: 'Blueprint', ja: '図面' }, // lang-ok: viewer-facing theme labels
+  label: { zh: '图纸', 'zh-Hant': '圖紙', en: 'Blueprint', ja: '図面' }, // lang-ok: viewer-facing theme labels
   scope: ['page', 'video'],
   tokens: {
     common: { '--font-sans': SANS, '--font-mono': MONO, '--radius': '0px', '--shadow': 'none', '--bw': '1.5px', '--head-font': 'var(--font-sans)' },

@@ -20,6 +20,7 @@ import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
+import { languageIds } from './languages/registry.js';
 
 const MAX_LISTED_WARNINGS = 20;
 
@@ -260,7 +261,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   "video": { "tokens": { "light": { "--v-stage": "#fffdf8" } }, "css": "& .amv-title { font-weight: 500; }" }
 }
 
-- label: the name on the page's theme button: a string, or an object with zh / en / ja strings.
+- label: the name on the page's theme button: a string, or an object with ${languageIds().join(' / ')} strings.
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(' ')}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
 - Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.

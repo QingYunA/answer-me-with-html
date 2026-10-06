@@ -148,7 +148,6 @@ const EXCEPTIONS = [
   { file: 'src/lint/wordlist.zh.js', why: 'the Chinese writing-check word list' },
   { file: 'src/lint/ste.js', lines: /^.*[`"]的[`"].*$/gm, why: 'names the Chinese particle the writing check counts' },
   { file: 'src/svg/text.js', lines: /^.*(?:`の`|`《ワンピース》`|`TCP の3ウェイ…`).*$/gm, why: 'examples for the Japanese detection' },
-  { file: 'src/themes/index.js', lines: /^.*\(`直`, `込`\).*$/gm, why: 'examples of Han glyphs that differ by font' },
   { file: 'scripts/smoke-install.mjs', lines: /^.*input: '## A 标题.*$/gm, why: 'Chinese render input for the smoke test' },
   { file: 'test/config.test.js', lines: /^test\('setConfig: booleans accept .*$/gm, why: 'names the Chinese input aliases under test' },
   { file: 'test/lint.test.js', lines: /^test\('(?:Chinese light verbs:|Chinese chained|messages: chained) .*$/gm, why: 'names the Chinese text the writing check flags' },

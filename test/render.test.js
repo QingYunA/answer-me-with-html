@@ -167,7 +167,7 @@ test('render: Japanese drafts use Japanese UI labels and lang="ja"', () => {
 
 test('render: Japanese pages list Japanese fonts before Chinese fonts', () => {
   const { html } = renderDoc('# TCP の接続\n## A 概要\n接続は3回のやりとりで行う。');
-  const rule = html.match(/html\[lang="ja"\]\[data-theme\]\[data-mode\] \{[^}]*\}/)?.[0];
+  const rule = html.match(/html:lang\(ja\)\[data-theme\]\[data-mode\] \{[^}]*\}/)?.[0];
   assert.ok(rule, 'has a Japanese font rule');
   const fonts = rule.match(/--font-sans: ([^;]*);/)[1];
   assert.ok(fonts.indexOf('"Hiragino Sans"') < fonts.indexOf('"PingFang SC"'));

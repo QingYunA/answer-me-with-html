@@ -1,7 +1,8 @@
 // 3b1b: video-only dark theme (dark ground, blue lines, yellow accents); the title floats top left with no frame.
+import { serifByLanguage } from './fonts.js';
 
-// Japanese pages: Japanese serif fonts come before Chinese ones, so Han characters use Japanese glyphs.
-const JA_SERIF = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
+// The Latin fonts in front of a language's serif fonts, so Han characters use that language's glyphs.
+const TITLE_HEAD = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino"';
 
 export default {
   name: '3b1b',
@@ -26,7 +27,7 @@ export default {
         '--v-glow': 'drop-shadow(0 0 6px rgba(247, 217, 111, 0.55))',
       },
     },
-    css: `&[lang="ja"][data-mode] { --v-title-font: ${JA_SERIF}; }
+    css: `${serifByLanguage('--v-title-font', TITLE_HEAD)}
 & .amv-scene-head { left: 96px; top: 56px; border: 0; background: none; align-items: baseline; gap: 22px; }
 & .amv-scene-n { background: none; color: var(--line); padding: 0; min-width: 0; font: 500 30px var(--font-mono); }
 & .amv-scene-title { padding: 0; font-weight: 400; font-size: 46px; }

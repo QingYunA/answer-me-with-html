@@ -1,15 +1,15 @@
 // Paper: a reading theme for long text. Warm paper, ink-colored text, serif prose and headings; diagrams keep the sans font,
 // because their text widths are estimated for sans in Node (svg/text.js).
-import { SANS, MONO } from './fonts.js';
+import { SANS, MONO, serifByLanguage } from './fonts.js';
 
 const SERIF = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif';
-// Japanese pages: Japanese serif fonts come before Chinese ones, so Han characters use Japanese glyphs.
-const JA_SERIF = '"Iowan Old Style", Palatino, Georgia, "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
+// The Latin fonts in front of a language's serif fonts, so Han characters use that language's glyphs.
+const LANGUAGE_SERIF_HEAD = '"Iowan Old Style", Palatino, Georgia';
 
 export default {
   name: 'paper',
   summary: 'Paper, for long reading',
-  label: { zh: '纸张', en: 'Paper', ja: '紙' }, // lang-ok: viewer-facing theme labels
+  label: { zh: '纸张', 'zh-Hant': '紙張', en: 'Paper', ja: '紙' }, // lang-ok: viewer-facing theme labels
   scope: ['page'],
   tokens: {
     common: { '--font-sans': SANS, '--font-mono': MONO, '--font-serif': SERIF, '--radius': '2px', '--shadow': 'none', '--bw': '1px', '--head-font': 'var(--font-serif)' },
@@ -28,7 +28,7 @@ export default {
       '--warn': '#e3b866', '--warn-bg': '#352a13', '--head-bg': '#ebe5d8', '--head-fg': '#15130f',
     },
   },
-  css: `&[lang="ja"][data-mode] { --font-serif: ${JA_SERIF}; }
+  css: `${serifByLanguage('--font-serif', LANGUAGE_SERIF_HEAD)}
 & .am-head h1, & .am-panel-head h2, & .am-md, & .am-intro, & .am-callout { font-family: var(--font-serif); }
 & .am-head h1 { font-weight: 600; letter-spacing: 0; }
 & .am-md p, & .am-md li, & .am-md blockquote, & .am-intro { font-size: 15.5px; line-height: 1.75; }

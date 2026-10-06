@@ -55,6 +55,22 @@ AM_EOF
 
 Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them.
 
+## Languages
+
+The language of a draft sets the page's `lang` attribute, the language of the buttons and theme names, the fonts, and the video player labels. A draft can declare it with `lang:` in the header. Without it, the tool detects Chinese, Japanese and English from the text.
+
+| `lang:` | `<html lang>` | Labels and fonts |
+| :--- | :--- | :--- |
+| `zh`, `zh-CN`, `zh-Hans` | as written (a bare `zh` becomes `zh-CN`) | Simplified Chinese |
+| `zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO` | as written | Traditional Chinese, with Traditional fonts first |
+| `en`, `en-US` and other English tags | as written | English |
+| `ja`, `ja-JP` | as written | Japanese, with Japanese fonts first |
+| any other tag, such as `fr` or `ko` | as written | English labels |
+
+A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
+
+Declare the language when you write Traditional Chinese or a Latin-script language other than English. Detection reads Chinese as Simplified and Latin text as English.
+
 ## Your own theme
 
 Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name is the theme name, so `themes/notes.json` is the theme `notes`. Pick it like a built-in theme: `theme: notes` in the draft, `--theme notes`, or `am config set theme notes`. The agent writes the same draft, so a theme adds nothing to each answer.

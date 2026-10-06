@@ -137,15 +137,114 @@ var VIDEO_JS = "(() => {\n  const D = JSON.parse(document.getElementById('amv-da
 import { join as join7, resolve, dirname as dirname2, basename as basename2 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
+// src/languages/zh.js
+var zh_default = {
+  id: "zh",
+  language: "zh",
+  script: "Hans",
+  ui: {
+    theme: "\u4E3B\u9898",
+    modeLabel: "\u660E\u6697",
+    mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
+    copy: "\u590D\u5236\u6E90\u7A3F",
+    done: "\u5DF2\u590D\u5236 \u2713",
+    toc: "\u76EE\u5F55",
+    flow: "\u6D41\u7A0B\u56FE",
+    sequence: "\u65F6\u5E8F\u56FE",
+    colon: "\uFF1A",
+    sep: "\u3001"
+  },
+  videoUi: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282" }
+};
+
+// src/languages/zh-Hant.js
+var zh_Hant_default = {
+  id: "zh-Hant",
+  language: "zh",
+  script: "Hant",
+  langs: ["zh-Hant", "zh-TW", "zh-HK", "zh-MO"],
+  fonts: {
+    sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Heiti TC", "Microsoft JhengHei", "Noto Sans CJK TC", "Noto Sans TC", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',
+    serif: '"Songti TC", "PMingLiU", "MingLiU", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "Songti SC"'
+  },
+  ui: {
+    theme: "\u4E3B\u984C",
+    modeLabel: "\u660E\u6697",
+    mode: { auto: "\u8DDF\u96A8\u7CFB\u7D71", light: "\u6DFA\u8272", dark: "\u6DF1\u8272" },
+    copy: "\u8907\u88FD\u6E90\u7A3F",
+    done: "\u5DF2\u8907\u88FD \u2713",
+    toc: "\u76EE\u9304",
+    flow: "\u6D41\u7A0B\u5716",
+    sequence: "\u6642\u5E8F\u5716",
+    colon: "\uFF1A",
+    sep: "\u3001"
+  },
+  videoUi: { play: "\u64AD\u653E", pause: "\u66AB\u505C", chapters: "\u7AE0\u7BC0" }
+};
+
+// src/languages/en.js
+var en_default = {
+  id: "en",
+  language: "en",
+  ui: {
+    theme: "Theme",
+    modeLabel: "Mode",
+    mode: { auto: "Auto", light: "Light", dark: "Dark" },
+    copy: "Copy source",
+    done: "Copied \u2713",
+    toc: "Contents",
+    flow: "Flowchart",
+    sequence: "Sequence diagram",
+    colon: ": ",
+    sep: ", "
+  },
+  videoUi: { play: "Play", pause: "Pause", chapters: "Chapters" }
+};
+
+// src/languages/ja.js
+var ja_default = {
+  id: "ja",
+  language: "ja",
+  langs: ["ja"],
+  fonts: {
+    sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',
+    serif: '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC"'
+  },
+  ui: {
+    theme: "\u30C6\u30FC\u30DE",
+    modeLabel: "\u8868\u793A",
+    mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
+    copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
+    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
+    toc: "\u76EE\u6B21",
+    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
+    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
+    colon: "\uFF1A",
+    sep: "\u3001"
+  },
+  videoUi: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
+};
+
+// src/languages/registry.js
+var LANGUAGES = Object.freeze([zh_default, zh_Hant_default, en_default, ja_default]);
+var FALLBACK = en_default;
+var languageIds = () => LANGUAGES.map((l3) => l3.id);
+function findLanguage(language, script) {
+  return LANGUAGES.find((l3) => l3.language === language && (!l3.script || l3.script === script));
+}
+
 // src/themes/fonts.js
 var SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
 var MONO = 'ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace';
+var fontLanguages = () => LANGUAGES.filter((l3) => l3.fonts);
+var langSelector = (language, base, rest) => language.langs.map((tag) => `${base}:lang(${tag})${rest}`).join(", ");
+var serifByLanguage = (variable, head) => fontLanguages().map((l3) => `${langSelector(l3, "&", "[data-mode]")} { ${variable}: ${head}, ${l3.fonts.serif}, serif; }`).join("\n");
 
 // src/themes/blueprint.js
 var blueprint_default = {
   name: "blueprint",
   summary: "Blueprint drawing",
-  label: { zh: "\u56FE\u7EB8", en: "Blueprint", ja: "\u56F3\u9762" },
+  label: { zh: "\u56FE\u7EB8", "zh-Hant": "\u5716\u7D19", en: "Blueprint", ja: "\u56F3\u9762" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -227,7 +326,7 @@ var blueprint_default = {
 var shadcn_default = {
   name: "shadcn",
   summary: "shadcn cards",
-  label: { zh: "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9" },
+  label: { zh: "\u5361\u7247", "zh-Hant": "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -284,11 +383,11 @@ var shadcn_default = {
 
 // src/themes/paper.js
 var SERIF = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif';
-var JA_SERIF = '"Iowan Old Style", Palatino, Georgia, "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
+var LANGUAGE_SERIF_HEAD = '"Iowan Old Style", Palatino, Georgia';
 var paper_default = {
   name: "paper",
   summary: "Paper, for long reading",
-  label: { zh: "\u7EB8\u5F20", en: "Paper", ja: "\u7D19" },
+  label: { zh: "\u7EB8\u5F20", "zh-Hant": "\u7D19\u5F35", en: "Paper", ja: "\u7D19" },
   // lang-ok: viewer-facing theme labels
   scope: ["page"],
   tokens: {
@@ -334,7 +433,7 @@ var paper_default = {
       "--head-fg": "#15130f"
     }
   },
-  css: `&[lang="ja"][data-mode] { --font-serif: ${JA_SERIF}; }
+  css: `${serifByLanguage("--font-serif", LANGUAGE_SERIF_HEAD)}
 & .am-head h1, & .am-panel-head h2, & .am-md, & .am-intro, & .am-callout { font-family: var(--font-serif); }
 & .am-head h1 { font-weight: 600; letter-spacing: 0; }
 & .am-md p, & .am-md li, & .am-md blockquote, & .am-intro { font-size: 15.5px; line-height: 1.75; }
@@ -343,7 +442,7 @@ var paper_default = {
 };
 
 // src/themes/3b1b.js
-var JA_SERIF2 = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC", serif';
+var TITLE_HEAD = '"CMU Serif", "Latin Modern Roman", "Iowan Old Style", "Palatino"';
 var b1b_default = {
   name: "3b1b",
   summary: "3Blue1Brown dark",
@@ -384,7 +483,7 @@ var b1b_default = {
         "--v-glow": "drop-shadow(0 0 6px rgba(247, 217, 111, 0.55))"
       }
     },
-    css: `&[lang="ja"][data-mode] { --v-title-font: ${JA_SERIF2}; }
+    css: `${serifByLanguage("--v-title-font", TITLE_HEAD)}
 & .amv-scene-head { left: 96px; top: 56px; border: 0; background: none; align-items: baseline; gap: 22px; }
 & .amv-scene-n { background: none; color: var(--line); padding: 0; min-width: 0; font: 500 30px var(--font-mono); }
 & .amv-scene-title { padding: 0; font-weight: 400; font-size: 46px; }
@@ -438,72 +537,6 @@ function contrast(fg, bg, base = [255, 255, 255, 1]) {
   const back = over(bg, base);
   const [x2, y2] = [luminance(over(fg, back)), luminance(back)];
   return (Math.max(x2, y2) + 0.05) / (Math.min(x2, y2) + 0.05);
-}
-
-// src/languages/zh.js
-var zh_default = {
-  id: "zh",
-  language: "zh",
-  script: "Hans",
-  ui: {
-    theme: "\u4E3B\u9898",
-    modeLabel: "\u660E\u6697",
-    mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
-    copy: "\u590D\u5236\u6E90\u7A3F",
-    done: "\u5DF2\u590D\u5236 \u2713",
-    toc: "\u76EE\u5F55",
-    flow: "\u6D41\u7A0B\u56FE",
-    sequence: "\u65F6\u5E8F\u56FE",
-    colon: "\uFF1A",
-    sep: "\u3001"
-  },
-  videoUi: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282" }
-};
-
-// src/languages/en.js
-var en_default = {
-  id: "en",
-  language: "en",
-  ui: {
-    theme: "Theme",
-    modeLabel: "Mode",
-    mode: { auto: "Auto", light: "Light", dark: "Dark" },
-    copy: "Copy source",
-    done: "Copied \u2713",
-    toc: "Contents",
-    flow: "Flowchart",
-    sequence: "Sequence diagram",
-    colon: ": ",
-    sep: ", "
-  },
-  videoUi: { play: "Play", pause: "Pause", chapters: "Chapters" }
-};
-
-// src/languages/ja.js
-var ja_default = {
-  id: "ja",
-  language: "ja",
-  ui: {
-    theme: "\u30C6\u30FC\u30DE",
-    modeLabel: "\u8868\u793A",
-    mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
-    copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
-    done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
-    toc: "\u76EE\u6B21",
-    flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
-    sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
-    colon: "\uFF1A",
-    sep: "\u3001"
-  },
-  videoUi: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0" }
-};
-
-// src/languages/registry.js
-var LANGUAGES = Object.freeze([zh_default, en_default, ja_default]);
-var FALLBACK = en_default;
-var languageIds = () => LANGUAGES.map((l3) => l3.id);
-function findLanguage(language, script) {
-  return LANGUAGES.find((l3) => l3.language === language && (!l3.script || l3.script === script));
 }
 
 // src/themes/check.js
@@ -4973,7 +5006,6 @@ ${panels.map((p) => panelHtml(p, { grid: false })).join("\n")}
 var TEMPLATES = { sheet, doc };
 
 // src/themes/index.js
-var JA_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif';
 var block = (selector, vars) => `${selector} {
 ${Object.entries(vars).map(([k2, v]) => `  ${k2}: ${v};`).join("\n")}
 }`;
@@ -4989,12 +5021,12 @@ ${block(`${sel}[data-mode="auto"]`, dark)}
 var pageSel = (t) => `html[data-theme="${t.name}"]`;
 var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
-var JA_FONT_CSS = block('html[lang="ja"][data-theme][data-mode]', { "--font-sans": JA_SANS });
-var ownJaFont = (t) => block(`html[lang="ja"][data-theme="${t.name}"][data-mode]`, { "--font-sans": t.tokens.common["--font-sans"] });
+var languageFontCss = () => fontLanguages().map((l3) => block(langSelector(l3, "html", "[data-theme][data-mode]"), { "--font-sans": l3.fonts.sans }));
+var ownLanguageFont = (t) => fontLanguages().map((l3) => block(langSelector(l3, "html", `[data-theme="${t.name}"][data-mode]`), { "--font-sans": t.tokens.common["--font-sans"] }));
 function pageCss(list = themes("page")) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  const jaFonts = list.filter((t) => t.ownFont).map(ownJaFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), JA_FONT_CSS, ...jaFonts, BASE_CSS, ...decorations].join("\n\n");
+  const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, BASE_CSS, ...decorations].join("\n\n");
 }
 function videoCss(list = themes("video")) {
   const parts = list.filter((t) => t.video).flatMap((t) => [
@@ -6656,7 +6688,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   "video": { "tokens": { "light": { "--v-stage": "#fffdf8" } }, "css": "& .amv-title { font-weight: 500; }" }
 }
 
-- label: the name on the page's theme button: a string, or an object with zh / en / ja strings.
+- label: the name on the page's theme button: a string, or an object with ${languageIds().join(" / ")} strings.
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(" ")}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
 - Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.
