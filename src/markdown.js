@@ -21,7 +21,8 @@ export function statusHtml(word, label = '') {
 // A paragraph that holds only an image becomes a figure; the alt text is its caption.
 const IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
 
-const CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+([^<]*?))?\s*<\/td>/g;
+// The status word must open the cell; the label after it may hold inline HTML (code, em, strong, a) but never crosses a cell boundary.
+const CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
 
 function figure(img) {
   const alt = img.match(/\salt="([^"]*)"/)?.[1];

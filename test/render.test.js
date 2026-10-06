@@ -6,6 +6,7 @@ import { renderDoc, RenderError } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { getTheme } from '../src/themes/registry.js';
 import { COMPONENTS } from '../src/components/index.js';
+import { md } from '../src/markdown.js';
 
 const SRC = `---
 title: 测试页
@@ -92,6 +93,16 @@ test('render: status words in tables render as badges', () => {
   assert.match(html, /am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span>已批准/);
   assert.match(html, /am-status--no/);
   assert.match(html, /am-table-wrap/);
+});
+
+test('render: a status word may be followed by inline HTML; only a leading word is a status', () => {
+  const html = md('| a | b |\n|---|---|\n| ok shared with `page.js` | warn **slow** and *rare* |\n| no see [docs](https://x.org) | noted `x` |\n| uses ok `y` | ✓ |');
+  assert.match(html, /<td><span class="am-status am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span>shared with <code>page.js<\/code><\/span><\/td>/);
+  assert.match(html, /am-status--warn"><span class="am-status-icon" aria-hidden="true">!<\/span><strong>slow<\/strong> and <em>rare<\/em><\/span><\/td>/);
+  assert.match(html, /am-status--no"><span class="am-status-icon" aria-hidden="true">✗<\/span>see <a href="https:\/\/x.org">docs<\/a><\/span><\/td>/);
+  assert.match(html, /<td>noted <code>x<\/code><\/td>/);
+  assert.match(html, /<td>uses ok <code>y<\/code><\/td>/);
+  assert.equal(html.match(/am-status--/g).length, 4);
 });
 
 test('render: html fences embed as is; unknown languages become escaped code blocks', () => {
