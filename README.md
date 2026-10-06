@@ -104,7 +104,7 @@ Skill folders for other agents: Codex `~/.codex/skills/`, Cursor `~/.cursor/skil
 
 </details>
 
-No setup is needed after install.
+No setup is needed after install. Want a page with every conclusion, not only the hard ones? See [Always-on mode](#always-on-mode-optional).
 
 ## What you ask, what you get
 
@@ -172,15 +172,17 @@ Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draf
 
 ## Always-on mode (optional)
 
-By default, the agent makes a page only for questions that need one. If you want **a page with every conclusion**, add one rule to your agent's rules file.
+With always-on mode, **every conclusion comes with a page**: whenever the agent gives a conclusion, summary, plan or comparison, even a short one, it adds a small page with 2 to 4 panels and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
 
-The agent then adds a small page with 2 to 4 panels whenever it gives a conclusion, summary, plan or comparison, even a short one, and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
+By default it is off: the agent makes a page only for questions that need one. To turn it on, add one rule to your agent's rules file.
 
 Paste this to your agent so it writes the rule into its own rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
 
 > Turn on always-on mode for Answer me with HTML: add a global rule — "[answer-me-with-html always-on] Whenever a reply gives a conclusion, summary, plan, comparison, review or explanation, even a short one, also make a page with the answer-me-with-html skill (2 to 4 panels for routine answers), render it with --no-open before you write the reply, and end the reply with a file:// link to the page. Skip casual chat, one- or two-sentence replies with no conclusion, pure command output, and requests for plain text."
 
 To turn it off, delete that rule from the file.
+
+**Installed the old `answer-me-with-html-always` plugin?** It is gone from this repository, but your copy keeps adding the reminder until you remove it. Run `/plugin uninstall answer-me-with-html-always@answer-me-with-html`, then paste the rule above.
 
 ## Updating and cleaning up
 
