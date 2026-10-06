@@ -6,7 +6,7 @@ These cases measure one thing: does the agent load the `answer-me-with-html` ski
 caffeinate -i claude plugin eval . --ablation none --trust-plugin --no-publish -j 2 --max-cost-usd 10
 ```
 
-Needs Claude Code 2.1.269 or newer. The full suite (40 cases, 3 runs each) costs about $8 at list price and uses your own credentials. Use `--runs 2` or `--tag <tag>` for a cheaper run. Use `-j 2` on a busy machine, and `caffeinate` so the Mac does not sleep: a run that is starved of CPU times out and scores as a miss, which looks like a regression.
+Needs Claude Code 2.1.269 or newer. The full suite (39 cases, 3 runs each) costs about $9 at list price and uses your own credentials. Use `--runs 2` or `--tag <tag>` for a cheaper run. Use `-j 2` on a busy machine, and `caffeinate` so the Mac does not sleep: a run that is starved of CPU times out and scores as a miss, which looks like a regression.
 
 What is measured:
 
