@@ -95,6 +95,11 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
 .am-md tbody tr:nth-child(even) td { background: var(--fill); }
 .am-table-wrap { overflow-x: auto; }
+/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
+.am-md img { max-width: 100%; max-height: 70vh; height: auto; }
+.am-figure { margin: 0; text-align: center; }
+.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }
+.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }
 .am-code {
   margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);
   border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;

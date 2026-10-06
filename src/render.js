@@ -11,6 +11,7 @@ import { esc } from './svg/text.js';
 import { VERSION, RUNTIME_JS } from './assets.js';
 import { rootTag, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
+import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 
 
 export class RenderError extends Error {
@@ -33,7 +34,8 @@ export class LintError extends Error {
 
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
-export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage } = {}) {
+// baseDir: where relative image paths are read from. knownImages: images the page already embeds (draft path → data URI), the fallback when a file is gone.
+export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, knownImages } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -49,7 +51,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
 
   const stats = { panels: doc.panels.length, components: {} };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui };
+  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages } };
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
@@ -63,7 +65,19 @@ function hasVisuals({ intro, panels }) {
 }
 
 export function renderBlocks(blocks, ctx) {
-  return blocks.map((b) => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx))).join('\n');
+  return blocks.map((b) => embedImages(b, b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join('\n');
+}
+
+// Local images in a block's html become data URIs; a missing or oversize file is reported at the line that names it.
+function embedImages(block, html, ctx) {
+  try {
+    return inlineImages(html, ctx.images);
+  } catch (err) {
+    if (!(err instanceof ImageError)) throw err;
+    const idx = block.text.split('\n').findIndex((l) => l.includes(err.ref));
+    const first = block.type === 'md' ? block.line : block.line + 1;
+    throw new RenderError(err.message, { line: first + Math.max(idx, 0), component: 'image', example: IMAGE_EXAMPLE });
+  }
 }
 
 function renderFence(block, ctx) {

@@ -20,6 +20,7 @@ import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
+import { readEmbeddedImages } from './images.js';
 import { languageIds } from './languages/registry.js';
 
 const MAX_LISTED_WARNINGS = 20;
@@ -39,7 +40,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|video|patch|theme]    show component syntax / page draft format / video draft format / patch / theme usage
+  am help [component|format|image|video|patch|theme]  show component syntax / page draft format / image syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -73,7 +74,19 @@ A -> B
 \`\`\`
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
+- An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
 - For the component list see am list; for one component's syntax see am help <component>.`;
+
+const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
+
+![What the picture shows](/absolute/path/to/screenshot.png)
+
+- Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
+- http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
+- The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
+- Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
 
 const RAW_HELP = `LANG — embed as-is (escape hatch)
 
@@ -166,7 +179,7 @@ export async function main(argv, io = {}) {
   const themes = loadThemes(amHome(env));
   const ctx = { print, fail, env, io, themes };
   switch (cmd) {
-    case 'render': return withSource(arg, io, fail, (src) => cmdRender(src, opts, ctx));
+    case 'render': return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
     case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
@@ -187,9 +200,10 @@ async function withSource(arg, io, fail, fn) {
     fail('✗ Missing the draft argument: pass a file path, or - to read from stdin');
     return 2;
   }
+  const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === '-' ? await readStream(io.stdin ?? process.stdin) : readFileSync(resolve(io.cwd ?? process.cwd(), arg), 'utf8');
+    src = arg === '-' ? await readStream(io.stdin ?? process.stdin) : readFileSync(resolve(cwd, arg), 'utf8');
   } catch (e) {
     fail(`✗ Cannot read the draft: ${e.message}`);
     return 2;
@@ -198,7 +212,8 @@ async function withSource(arg, io, fail, fn) {
     fail('✗ The draft is empty');
     return 2;
   }
-  return fn(src);
+  // Relative image paths are read from the draft file's folder, or from the current folder for a draft on stdin.
+  return fn(src, arg === '-' ? cwd : dirname(resolve(cwd, arg)));
 }
 
 async function readStream(stream) {
@@ -216,13 +231,13 @@ export function shouldOpen(opts, env, config) {
   return config.open !== false;
 }
 
-function cmdRender(src, opts, ctx) {
+function cmdRender(src, opts, ctx, baseDir) {
   const { fail } = ctx;
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -341,7 +356,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, knownImages: readEmbeddedImages(html) });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -635,13 +650,14 @@ function cmdTheme(action, target, opts, ctx) {
 function cmdHelp(name, { print, fail }) {
   if (!name) return print(USAGE), 0;
   if (name === 'format') return print(FORMAT), 0;
+  if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, image, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

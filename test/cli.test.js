@@ -147,7 +147,7 @@ test('cli list / help', async () => {
 
 test('cli: usage, list, config and every help topic print English only', async () => {
   const { COMPONENTS } = await import('../src/components/index.js');
-  const topics = [...COMPONENTS.keys(), 'html', 'svg', 'format', 'video', 'patch'];
+  const topics = [...COMPONENTS.keys(), 'html', 'svg', 'format', 'image', 'video', 'patch'];
   const runs = [[], ['list'], ['config'], ...topics.map((t) => ['help', t])];
   for (const args of runs) {
     const r = await run(args, { env: { AM_NO_OPEN: '1' } });

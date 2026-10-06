@@ -2,6 +2,7 @@
 // Rules: sentence length, paragraph length, non-approved words (English and Chinese), English passive voice, Chinese light verbs / `的` chains / clichés. All are warnings; strictness comes from style.
 // Japanese with kana gets only the sentence and paragraph length checks: Japanese `的` is a suffix (`基本的`, `具体的`), not the Chinese structural particle.
 // A language other than Chinese, English and Japanese gets only the language-neutral rules: sentence length (in words, or in characters for CJK text) and paragraph length.
+// Image captions (the alt text) are checked like any other text.
 // Skipped: code and inline code, ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
 
 import { EN_WORDS } from './wordlist.en.js';
@@ -73,7 +74,7 @@ function clean(text) {
   return text
     .replace(/~~[^~]*~~/g, '')
     .replace(/`[^`]*`/g, '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, '')
     .replace(/[*_]{1,3}/g, '');
