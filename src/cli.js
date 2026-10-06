@@ -339,9 +339,9 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : 'off');
       if (!validVoice(voice, fail)) return 2;
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
-      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
+      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -386,6 +386,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
     cacheDir: join(amHome(env), 'cache', 'tts'),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
+    previousLanguage: opts.previousLanguage,
     onProgress: (msg) => fail(`  ${msg}`),
     themes,
   });

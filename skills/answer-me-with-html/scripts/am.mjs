@@ -5139,22 +5139,40 @@ function sentenceLength(sentence) {
   const words = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
   return cjk >= 4 || cjk > words ? { lang: "zh", count: cjk + words } : { lang: "en", count: words };
 }
+var NO_SPACES = new RegExp("\\p{Script=Thai}", "u");
+var CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
+var thaiWords;
+function neutralLength(sentence) {
+  const han = sentence.match(CJK_TEXT)?.length ?? 0;
+  const rest = sentence.replace(CJK_TEXT, " ");
+  thaiWords ??= new Intl.Segmenter("th", { granularity: "word" });
+  const words = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  return han >= 4 || han > words ? { lang: "zh", count: han + words } : { lang: "en", count: words };
+}
+var RULE_LANGUAGES = /* @__PURE__ */ new Set(["zh", "en", "ja"]);
+function ruleFamily(language) {
+  if (!language) return "auto";
+  const base = language.tag.split("-")[0];
+  if (!RULE_LANGUAGES.has(base)) return "neutral";
+  return language.declared ? base : "auto";
+}
 function formatWarning(w) {
   return `L${w.line} [${w.rule}] ${w.message}${w.suggestion ? ` \u2192 ${w.suggestion}` : ""}`;
 }
-function lintDoc(doc2) {
+function lintDoc(doc2, language) {
   const warnings = [];
+  const family = ruleFamily(language);
   const blocks = [...doc2.intro, ...doc2.panels.flatMap((p) => p.blocks)];
   for (const b of blocks) {
-    if (b.type === "md") lintMarkdown(b.text, b.line, warnings);
-    else if (b.lang === "callout") lintMarkdown(b.text, b.line + 1, warnings);
+    if (b.type === "md") lintMarkdown(b.text, b.line, warnings, family);
+    else if (b.lang === "callout") lintMarkdown(b.text, b.line + 1, warnings, family);
   }
   return warnings;
 }
 function clean(text) {
   return text.replace(/~~[^~]*~~/g, "").replace(/`[^`]*`/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/<[^>]+>/g, "").replace(/[*_]{1,3}/g, "");
 }
-function lintMarkdown(text, startLine, out) {
+function lintMarkdown(text, startLine, out, family) {
   let para = null;
   const flush = () => {
     if (para && para.count > MAX_SENTENCES) {
@@ -5177,48 +5195,51 @@ function lintMarkdown(text, startLine, out) {
       if (/^\|?[\s:|-]+\|?$/.test(t)) return;
       const cells = t.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
       if (cells.some((c) => /^(no|✗|✘)(\s|$)/.test(c))) return;
-      cells.forEach((c) => checkUnit(clean(c.replace(/^(ok|warn|✓|✔|⚠)(\s|$)/, "")), line, "descriptive", out));
+      cells.forEach((c) => checkUnit(clean(c.replace(/^(ok|warn|✓|✔|⚠)(\s|$)/, "")), line, "descriptive", out, family));
       return;
     }
     const list = t.match(/^(?:([-*+])|(\d+)[.)])\s+(.*)$/);
     if (list) {
       flush();
-      checkUnit(clean(list[3]), line, list[2] ? "procedural" : "descriptive", out);
+      checkUnit(clean(list[3]), line, list[2] ? "procedural" : "descriptive", out, family);
       return;
     }
     const body = clean(t.replace(/^>\s*/, ""));
-    const n = checkUnit(body, line, "descriptive", out);
+    const n = checkUnit(body, line, "descriptive", out, family);
     if (!para) para = { line, count: 0 };
     para.count += n;
   });
   flush();
 }
-function checkUnit(text, line, kind, out) {
+function checkUnit(text, line, kind, out, family) {
   const sentences = splitSentences(text);
-  const ja = isJapanese(text);
+  const zhFamily = family === "auto" || family === "zh";
+  const ja = family === "ja" || zhFamily && isJapanese(text);
+  const chineseRules = zhFamily && !ja;
+  const englishRules = family !== "neutral";
   for (const s of sentences) {
-    const { lang, count: count2 } = sentenceLength(s);
+    const { lang, count: count2 } = family === "neutral" ? neutralLength(s) : sentenceLength(s);
     const limit = LIMITS[lang][kind];
     if (count2 > limit) {
       const unit = lang === "zh" ? "characters" : "words";
       const preview = s.length > 24 ? `${s.slice(0, 24)}\u2026` : s;
       out.push({ line, rule: "sentence-length", message: `${kind === "procedural" ? "step" : "sentence"} has ${count2} ${unit} (max ${limit}): "${preview}"` });
     }
-    if (lang === "en" && PASSIVE.test(s)) {
+    if (englishRules && lang === "en" && PASSIVE.test(s)) {
       out.push({ line, rule: "passive", message: `possible passive voice: "${s.match(PASSIVE)[0]}"`, suggestion: "use active voice" });
     }
   }
   const lexical = [
-    ...EN_RE.flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion }))),
-    ...(ja ? [] : ZH_LIGHT_VERBS).flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` }))),
-    ...(ja ? [] : ZH_WORDS).flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion })))
+    ...(englishRules ? EN_RE : []).flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion }))),
+    ...(chineseRules ? ZH_LIGHT_VERBS : []).flatMap(({ re: re3, label }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` }))),
+    ...(chineseRules ? ZH_WORDS : []).flatMap(({ re: re3, suggestion }) => [...text.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion })))
   ];
   out.push(...lexical.sort((a, b) => a.index - b.index).map(({ index, ...w }) => ({ line, ...w })));
   for (const s of sentences) {
-    if (isJapanese(s)) continue;
+    if (!zhFamily || isJapanese(s)) continue;
     if ((s.match(/的/g) ?? []).length >= 3) out.push({ line, rule: "de-chain", message: `chained "\u7684": ${s}`, suggestion: 'split the sentence or remove extra "\u7684"' });
   }
-  for (const c of ja ? [] : ZH_CLICHES) {
+  for (const c of chineseRules ? ZH_CLICHES : []) {
     if (text.includes(c)) out.push({ line, rule: "cliche", message: `clich\xE9 "${c}"`, suggestion: "delete it or state a concrete fact" });
   }
   return sentences.length;
@@ -5253,6 +5274,7 @@ function readPage(html) {
     theme: attr("data-theme"),
     mode: attr("data-mode"),
     style: attr("data-style"),
+    lang: attr("lang"),
     voice: attr("data-voice"),
     voiced: video && before.endsWith("</audio>") && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf("<textarea")
   };
@@ -5261,17 +5283,55 @@ function unescapeHtml(s) {
   return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
 }
 
+// src/han-forms.js
+var PAIRS = "\u8FD9\u9019 \u4E2A\u500B \u4EEC\u5011 \u8BF4\u8AAA \u56FD\u570B \u4E3A\u70BA \u6765\u4F86 \u65F6\u6642 \u4F1A\u6703 \u8FC7\u904E \u5BF9\u5C0D \u5B66\u5B78 \u8FD8\u9084 \u6CA1\u6C92 \u6837\u6A23 \u5F00\u958B \u95E8\u9580 \u95EE\u554F \u95F4\u9593 \u70B9\u9EDE \u73B0\u73FE \u79CD\u7A2E \u7ECF\u7D93 \u52A8\u52D5 \u5B9E\u5BE6 \u673A\u6A5F \u5173\u95DC \u4E1A\u696D \u4E0E\u8207 \u65E0\u7121 \u7535\u96FB \u4E66\u66F8 \u9A6C\u99AC \u8F66\u8ECA \u89C1\u898B \u4E70\u8CB7 \u5356\u8CE3 \u8BFB\u8B80 \u8BED\u8A9E \u8BDD\u8A71 \u8BF7\u8ACB \u8BA9\u8B93 \u8BA4\u8A8D \u5E94\u61C9 \u5F53\u7576 \u603B\u7E3D \u5C06\u5C07 \u4F53\u9AD4 \u534E\u83EF \u58F0\u8072 \u542C\u807D \u89C2\u89C0 \u89C9\u89BA \u8BB0\u8A18 \u8BBE\u8A2D \u8BA1\u8A08 \u8BBA\u8AD6 \u8BAE\u8B70 \u8BB8\u8A31 \u8BC1\u8B49 \u8BC6\u8B58 \u8C03\u8ABF \u8BD5\u8A66 \u8BE5\u8A72 \u8BE6\u8A73 \u8BEF\u8AA4 \u8C08\u8AC7 \u8C22\u8B1D \u8C01\u8AB0 \u8BFE\u8AB2 \u8D1F\u8CA0 \u8D23\u8CAC \u8D35\u8CB4 \u8D44\u8CC7 \u8D39\u8CBB \u8D5B\u8CFD \u8D22\u8CA1 \u8D2D\u8CFC \u8D27\u8CA8 \u8D38\u8CBF \u8D28\u8CEA \u94B1\u9322 \u94F6\u9280 \u94C1\u9435 \u7F51\u7DB2 \u9875\u9801 \u7EA7\u7D1A \u7EBF\u7DDA \u7C7B\u985E \u6570\u6578 \u636E\u64DA \u5E93\u5EAB \u6237\u6236 \u52A1\u52D9 \u533A\u5340 \u4E1C\u6771 \u4E50\u6A02 \u4EA7\u7522 \u4EB2\u89AA \u513F\u5152 \u529E\u8FA6 \u5174\u8208 \u519B\u8ECD \u519C\u8FB2 \u51B5\u6CC1 \u5218\u5289 \u521B\u5275 \u5267\u5287 \u5355\u55AE \u53CC\u96D9 \u53F7\u865F \u5458\u54E1 \u56ED\u5712 \u56F4\u570D \u56FE\u5716 \u5706\u5713 \u573A\u5834 \u5757\u584A \u574F\u58DE \u5904\u8655 \u5907\u5099 \u5934\u982D \u5939\u593E \u594B\u596E \u5987\u5A66 \u5B59\u5B6B \u5B81\u5BE7 \u5B9D\u5BF6 \u5BA1\u5BE9 \u5C42\u5C64 \u5C5E\u5C6C \u5C81\u6B72 \u5E08\u5E2B \u5E26\u5E36 \u5E2E\u5E6B \u5E7F\u5EE3 \u5F02\u7570 \u5F20\u5F35 \u5F3A\u5F37 \u5F55\u9304 \u5F52\u6B78 \u5F7B\u5FB9 \u5F84\u5F91 \u60AC\u61F8 \u60CA\u9A5A \u6218\u6230 \u62A4\u8B77 \u62A5\u5831 \u62E9\u64C7 \u62C5\u64D4 \u62E5\u64C1 \u62DF\u64EC \u6362\u63DB \u635F\u640D \u654C\u6575 \u65AD\u65B7 \u65E7\u820A \u663E\u986F \u6653\u66C9 \u6682\u66AB \u672F\u8853 \u6742\u96DC \u6781\u6975 \u6784\u69CB \u6807\u6A19 \u680F\u6B04 \u6811\u6A39 \u6863\u6A94 \u6865\u6A4B \u68C0\u6AA2 \u697C\u6A13 \u6B22\u6B61 \u6BD5\u7562 \u6C14\u6C23 \u6C49\u6F22 \u6D4E\u6FDF \u6D4F\u700F \u6D4B\u6E2C \u6E7E\u7063 \u6EE1\u6EFF \u706D\u6EC5 \u706F\u71C8 \u7231\u611B \u72B6\u72C0 \u72EC\u7368 \u73AF\u74B0 \u753B\u756B \u7597\u7642 \u76D8\u76E4 \u7801\u78BC \u786E\u78BA \u79BB\u96E2 \u79EF\u7A4D \u79F0\u7A31 \u7A77\u7AAE \u7ADE\u7AF6 \u7B14\u7B46 \u7B80\u7C21 \u7CAE\u7CE7 \u7D27\u7DCA \u7EA2\u7D05 \u7EA6\u7D04 \u7EAA\u7D00 \u7EAF\u7D14 \u7EB8\u7D19 \u7EC4\u7D44 \u7EC6\u7D30 \u7EC7\u7E54 \u7EC8\u7D42 \u7ED3\u7D50 \u7ED9\u7D66 \u7EDC\u7D61 \u7EDF\u7D71 \u7EE7\u7E7C \u7EED\u7E8C \u7EF4\u7DAD \u7EFC\u7D9C \u7EFF\u7DA0 \u7F13\u7DE9 \u7F16\u7DE8 \u7F57\u7F85 \u4E60\u7FD2 \u8054\u806F \u804C\u8077 \u8111\u8166 \u8138\u81C9 \u8282\u7BC0 \u8425\u71DF \u84DD\u85CD \u8651\u616E \u867D\u96D6 \u8865\u88DC \u88C5\u88DD \u89C8\u89BD \u89C4\u898F \u89C6\u8996 \u89E6\u89F8 \u8BA2\u8A02 \u8BA8\u8A0E \u8BAD\u8A13 \u8BB2\u8B1B \u8BBF\u8A2A \u8BC4\u8A55 \u8BCD\u8A5E \u8BD1\u8B6F \u8BC9\u8A34 \u8F93\u8F38 \u8F91\u8F2F \u8FB9\u908A \u8FBE\u9054 \u8FC1\u9077 \u8FD0\u904B \u8FDC\u9060 \u8FDE\u9023 \u8FDB\u9032 \u9009\u9078 \u9012\u905E \u9002\u9069 \u903B\u908F \u9057\u907A \u90AE\u90F5 \u94FA\u92EA \u94FE\u93C8 \u9500\u92B7 \u9501\u9396 \u9519\u932F \u952E\u9375 \u955C\u93E1 \u957F\u9577 \u95EA\u9583 \u95ED\u9589 \u95FB\u805E \u9605\u95B1 \u961F\u968A \u9636\u968E \u9645\u969B \u9690\u96B1 \u96BE\u96E3 \u9759\u975C \u9876\u9802 \u9879\u9805 \u987A\u9806 \u987B\u9808 \u9898\u984C \u989D\u984D \u98CE\u98A8 \u98DE\u98DB \u996D\u98EF \u9986\u9928 \u9A8C\u9A57 \u9A97\u9A19 \u9C7C\u9B5A \u9E1F\u9CE5 \u9E21\u96DE \u9EA6\u9EA5 \u9F50\u9F4A \u9F7F\u9F52 \u9F99\u9F8D".split(" ");
+var SIMPLIFIED_ONLY = PAIRS.map((pair) => [...pair][0]).join("");
+var TRADITIONAL_ONLY = PAIRS.map((pair) => [...pair][1]).join("");
+
 // src/language.js
 var CJK_PER_LATIN = 3;
-function detectLang(text) {
-  let cjk = 0;
-  let latin = 0;
-  for (const ch of String(text)) {
-    if (isCJK(ch)) cjk++;
-    else if (/[a-z]/i.test(ch)) latin++;
+var SCRIPT_LANGUAGES = [
+  [new RegExp("\\p{Script=Thai}", "u"), "th"],
+  [new RegExp("\\p{Script=Hebrew}", "u"), "he"],
+  [new RegExp("\\p{Script=Greek}", "u"), "el"],
+  [new RegExp("\\p{Script=Arabic}", "u"), "ar"],
+  [new RegExp("\\p{Script=Cyrillic}", "u"), "ru"]
+];
+var HANGUL = new RegExp("\\p{Script=Hangul}", "u");
+var SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
+var TRADITIONAL = new Set(TRADITIONAL_ONLY);
+function hanLanguage(text) {
+  let simplified = 0;
+  let traditional = 0;
+  for (const ch of text) {
+    if (SIMPLIFIED.has(ch)) simplified++;
+    else if (TRADITIONAL.has(ch)) traditional++;
   }
-  if (cjk * CJK_PER_LATIN < latin) return "en";
-  return isJapanese(text) ? "ja" : "zh";
+  return traditional > simplified ? "zh-Hant" : "zh";
+}
+function detectLang(text) {
+  const draft = String(text);
+  let cjk = 0;
+  let hangul = 0;
+  let latin = 0;
+  const others = /* @__PURE__ */ new Map();
+  for (const ch of draft) {
+    if (isCJK(ch)) {
+      cjk++;
+      if (HANGUL.test(ch)) hangul++;
+    } else if (/[a-z]/i.test(ch)) {
+      latin++;
+    } else {
+      const script = SCRIPT_LANGUAGES.find(([re3]) => re3.test(ch));
+      if (script) others.set(script[1], (others.get(script[1]) ?? 0) + 1);
+    }
+  }
+  const otherTotal = [...others.values()].reduce((sum2, n) => sum2 + n, 0);
+  if ((cjk + otherTotal) * CJK_PER_LATIN < latin) return "en";
+  const [topTag, topCount] = [...others].sort((a, b) => b[1] - a[1])[0] ?? [null, 0];
+  if (topCount > cjk) return topTag;
+  if (hangul * 2 > cjk) return "ko";
+  return isJapanese(draft) ? "ja" : hanLanguage(draft);
 }
 function canonicalTag(value) {
   if (typeof value !== "string") return null;
@@ -5285,17 +5345,20 @@ function canonicalTag(value) {
     return null;
   }
 }
+var baseLanguage = (tag) => new Intl.Locale(tag).language;
 function directionOf(locale) {
   const info = typeof locale.getTextInfo === "function" ? locale.getTextInfo() : locale.textInfo;
   return info?.direction === "rtl" ? "rtl" : "ltr";
 }
-function resolveLanguage({ declared, text = "" }) {
-  const tag = canonicalTag(declared) ?? detectLang(text);
+function resolveLanguage({ declared, previous, text = "" }) {
+  const declaredTag = canonicalTag(declared);
+  const tag = declaredTag ?? canonicalTag(previous) ?? detectLang(text);
   const locale = new Intl.Locale(tag).maximize();
   const entry = findLanguage(locale.language, locale.script);
   const labels = entry ?? FALLBACK;
   return Object.freeze({
     tag,
+    declared: declaredTag !== null,
     htmlLang: tag === "zh" ? "zh-CN" : tag,
     script: locale.script,
     dir: directionOf(locale),
@@ -5323,7 +5386,7 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
-function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN } = {}) {
+function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -5331,10 +5394,10 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const problem = themes2.problem(meta.theme, "page");
   if (problem) throw new ParseError(problem, 0);
   const doc2 = { ...parsed, meta: meta.theme === AUTO ? { ...meta, theme: pickTheme({ scope: "page", template: meta.template, visuals: hasVisuals(parsed) }) } : meta };
-  const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2);
+  const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
+  const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const stats = { panels: doc2.panels.length, components: {} };
-  const language = resolveLanguage({ declared: doc2.meta.lang, text: source });
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc2.intro, ctx);
@@ -5640,8 +5703,9 @@ function systemVoice(platform, which) {
       voice: "system",
       id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
-      synth: (text) => withTemp(async (file) => {
-        const v = voices[detectLang(text)];
+      usesLanguage: true,
+      synth: (text, { language } = {}) => withTemp(async (file) => {
+        const v = voices[language];
         await run("say", [...v ? ["-v", v] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
         return readWav(readFileSync2(file));
       })
@@ -5653,8 +5717,9 @@ function systemVoice(platform, which) {
       voice: "system",
       id: "espeak-ng",
       concurrency: 4,
-      synth: (text) => withTemp(async (file) => {
-        await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[detectLang(text)] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
+      usesLanguage: true,
+      synth: (text, { language } = {}) => withTemp(async (file) => {
+        await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[language] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
         return readWav(readFileSync2(file));
       })
     };
@@ -5730,21 +5795,23 @@ function resample(input) {
   }
   return out;
 }
-async function synthAll(texts, provider, { cacheDir } = {}) {
+async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
   if (cacheDir) mkdirSync(cacheDir, { recursive: true });
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
     while (next < texts.length) {
       const i = next++;
-      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(`${provider.id}
+      const language = provider.usesLanguage ? languageOf?.(texts[i]) : void 0;
+      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(`${provider.id}${language ? `
+${language}` : ""}
 ${texts[i]}`).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
         continue;
       }
-      results[i] = trimSilence(await provider.synth(texts[i]));
+      results[i] = trimSilence(await provider.synth(texts[i], { language }));
       if (file) writeCache(file, results[i]);
     }
   };
@@ -5799,30 +5866,31 @@ function wav(samples) {
 }
 
 // src/video/render.js
-async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress, themes: themes2 = BUILTIN } = {}) {
+async function renderVideo(source, { provider = null, cacheDir, defaults: defaults2 = {}, overrides = {}, onProgress, themes: themes2 = BUILTIN, previousLanguage } = {}) {
   const themeChoices = themes2.choices("video");
   const video = parseVideo(source, { defaults: defaults2, themeChoices });
   const picked = applyOverrides(video.meta, overrides, { ...CHOICES, theme: themeChoices });
   const problem = themes2.problem(picked.theme, "video");
   if (problem) throw new ParseError(problem, 0);
   const meta = picked.theme === AUTO ? { ...picked, theme: pickTheme({ scope: "video" }) } : picked;
-  const warnings = meta.style === "off" ? [] : lintDoc(video.doc).filter((w) => w.rule !== "paragraph-length");
+  const language = resolveLanguage({ declared: meta.lang, previous: previousLanguage, text: source });
+  const warnings = meta.style === "off" ? [] : lintDoc(video.doc, language).filter((w) => w.rule !== "paragraph-length");
   if (meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const beats = allBeats(video);
-  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress);
+  const languageOf = (text) => baseLanguage(language.declared ? language.tag : detectLang(text));
+  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
   const timeline = buildTimeline(video, durations);
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav2 = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
   const stats = { panels: video.scenes.length, components: {} };
-  const language = resolveLanguage({ declared: meta.lang, text: source });
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui });
   const html = shell2({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
   return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
 }
-async function voiceBeats(beats, provider, cacheDir, onProgress) {
+async function voiceBeats(beats, provider, cacheDir, onProgress, languageOf) {
   if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
   onProgress?.(`Voice-over: ${provider.name}, ${beats.length} line${beats.length === 1 ? "" : "s"}`);
-  const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir });
+  const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir, languageOf });
   return { clips, durations: clips.map((c) => c.length / SAMPLE_RATE) };
 }
 function playerData(video, meta, timeline) {
@@ -6759,9 +6827,9 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     if (video) {
       const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : "off");
       if (!validVoice(voice, fail)) return 2;
-      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style }, config, ctx);
+      result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -6803,6 +6871,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
     cacheDir: join7(amHome(env), "cache", "tts"),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
+    previousLanguage: opts.previousLanguage,
     onProgress: (msg) => fail(`  ${msg}`),
     themes: themes2
   });

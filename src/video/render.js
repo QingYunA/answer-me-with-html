@@ -1,7 +1,7 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
 import { renderBlocks, LintError, timestamp } from '../render.js';
-import { resolveLanguage } from '../language.js';
+import { resolveLanguage, detectLang, baseLanguage } from '../language.js';
 import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
@@ -14,7 +14,8 @@ import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 
 // When provider is null, only captions are produced and durations are estimated from word count.
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
-export async function renderVideo(source, { provider = null, cacheDir, defaults = {}, overrides = {}, onProgress, themes = BUILTIN } = {}) {
+// previousLanguage: the language the page had before (a patched video keeps it unless the draft declares one).
+export async function renderVideo(source, { provider = null, cacheDir, defaults = {}, overrides = {}, onProgress, themes = BUILTIN, previousLanguage } = {}) {
   const themeChoices = themes.choices('video');
   const video = parseVideo(source, { defaults, themeChoices });
   const picked = applyOverrides(video.meta, overrides, { ...CHOICES, theme: themeChoices });
@@ -22,28 +23,30 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   if (problem) throw new ParseError(problem, 0);
   const meta = picked.theme === AUTO ? { ...picked, theme: pickTheme({ scope: 'video' }) } : picked;
 
+  const language = resolveLanguage({ declared: meta.lang, previous: previousLanguage, text: source });
   // Each narration line is one beat; consecutive lines do not count as an "overlong paragraph".
-  const warnings = meta.style === 'off' ? [] : lintDoc(video.doc).filter((w) => w.rule !== 'paragraph-length');
+  const warnings = meta.style === 'off' ? [] : lintDoc(video.doc, language).filter((w) => w.rule !== 'paragraph-length');
   if (meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
   const beats = allBeats(video);
-  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress);
+  // A declared language applies to every line; otherwise each line is read in the language of its own text.
+  const languageOf = (text) => baseLanguage(language.declared ? language.tag : detectLang(text));
+  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
   const timeline = buildTimeline(video, durations);
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {} };
-  const language = resolveLanguage({ declared: meta.lang, text: source });
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui });
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
 }
 
 // With a voice-over each beat lasts as long as its audio; otherwise it is estimated from word count.
-async function voiceBeats(beats, provider, cacheDir, onProgress) {
+async function voiceBeats(beats, provider, cacheDir, onProgress, languageOf) {
   if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
   onProgress?.(`Voice-over: ${provider.name}, ${beats.length} line${beats.length === 1 ? '' : 's'}`);
-  const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir });
+  const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir, languageOf });
   return { clips, durations: clips.map((c) => c.length / SAMPLE_RATE) };
 }
 

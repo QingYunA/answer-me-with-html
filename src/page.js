@@ -21,7 +21,7 @@ export function sourceTag(source) {
   return `${SOURCE_OPEN} hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
 }
 
-// Read the envelope back: { source, video, template, theme, mode, style, voice, voiced }. source is null when there is no source draft.
+// Read the envelope back: { source, video, template, theme, mode, style, lang, voice, voiced }. source is null when there is no source draft.
 // The body html / markdown may contain tags with the same names, so: settings come only from the document-root <html>,
 // the source only from the final textarea, the voice only from the audio right before the source.
 export function readPage(html) {
@@ -40,6 +40,7 @@ export function readPage(html) {
     theme: attr('data-theme'),
     mode: attr('data-mode'),
     style: attr('data-style'),
+    lang: attr('lang'),
     voice: attr('data-voice'),
     voiced: video && before.endsWith('</audio>') && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf('<textarea'),
   };

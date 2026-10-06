@@ -57,7 +57,7 @@ Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move th
 
 ## Languages
 
-The language of a draft sets the page's `lang` attribute, the language of the buttons and theme names, the fonts, and the video player labels. A draft can declare it with `lang:` in the header. Without it, the tool detects Chinese, Japanese and English from the text.
+The language of a draft sets the page's `lang` attribute, the language of the buttons and theme names, the fonts, and the video player labels. A draft can declare it with `lang:` in the header. Without it, the tool detects the language from the script of the text.
 
 | `lang:` | `<html lang>` | Labels and fonts |
 | :--- | :--- | :--- |
@@ -69,7 +69,19 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-Declare the language when you write Traditional Chinese or a Latin-script language other than English. Detection reads Chinese as Simplified and Latin text as English.
+| Script in the text | Detected as |
+| :--- | :--- |
+| Han | `zh-CN` (Simplified), or `zh-Hant` when more characters are written only in the Traditional form than only in the Simplified form |
+| Han with kana | `ja` |
+| Hangul | `ko` |
+| Cyrillic, Arabic, Hebrew, Thai, Greek | `ru`, `ar`, `he`, `th`, `el` (the most common language of the script) |
+| Latin | `en` |
+
+Declare the language when you write a Latin-script language other than English, when a Chinese text is too short or too plain to show Traditional characters (characters both forms share say nothing, and the text stays Simplified), or when the exact language matters: Arabic script also writes Persian, and Cyrillic also Ukrainian.
+
+A patched page keeps the language it had, unless the draft declares one.
+
+The writing check follows the language. Chinese, English and Japanese keep their rules. Any other language gets only the language-neutral ones: sentence length (in words, or in characters for CJK text) and paragraph length.
 
 ## Your own theme
 

@@ -32,7 +32,8 @@ export class LintError extends Error {
 }
 
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
-export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN } = {}) {
+// previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
+export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -42,11 +43,11 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   // theme: auto becomes a real theme here, so the page, the summary and later patches name the theme that was used.
   const doc = { ...parsed, meta: meta.theme === AUTO ? { ...meta, theme: pickTheme({ scope: 'page', template: meta.template, visuals: hasVisuals(parsed) }) } : meta };
 
-  const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc);
+  const language = resolveLanguage({ declared: doc.meta.lang, previous: previousLanguage, text: source });
+  const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
   const stats = { panels: doc.panels.length, components: {} };
-  const language = resolveLanguage({ declared: doc.meta.lang, text: source });
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui };
   const introHtml = renderBlocks(doc.intro, ctx);

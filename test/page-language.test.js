@@ -74,6 +74,22 @@ const DETECTED = [
   ['English with one kana', '## A Overview\na long english sentence with one あ\n', 'en', 'en'], // lang-ok: draft text under test
   ['Chinese quoting one katakana title', '## A 概要\n这部动画叫《ワンピース》，讲的是海贼的故事，主角想成为海贼王。\n', 'zh-CN', 'zh'], // lang-ok: draft text under test
   ['Japanese with a high kana share', '## A 概要\n基本的には具体的で効果的な手順を説明します。\n', 'ja', 'ja'], // lang-ok: draft text under test
+  // Chinese is Simplified unless the text has characters that exist in only one form and most of them are Traditional.
+  ['Traditional Chinese', '## A 概要\n這是一段用來測試語言的繁體中文內容。\n', 'zh-Hant', 'zh-Hant'], // lang-ok: draft text under test
+  ['one Traditional-only character', '## A 握手過程\n過程\n', 'zh-Hant', 'zh-Hant'], // lang-ok: draft text under test
+  ['Chinese made only of characters both forms share', '## A 三次握手\n人在山中。\n', 'zh-CN', 'zh'], // lang-ok: draft text under test
+  ['Simplified Chinese quoting one Traditional word', '## A 概要\n这是简体中文的内容，里面引用了一个詞。\n', 'zh-CN', 'zh'], // lang-ok: draft text under test
+  ['Chinese with English terms', '## A API 概要\n使用 REST API 调用服务端接口。\n', 'zh-CN', 'zh'], // lang-ok: draft text under test
+  // Other scripts are tagged with the most common language of the script, and have no labels of their own.
+  ['Korean', '## A 개요\n이것은 한국어로 쓴 짧은 설명입니다.\n', 'ko', 'en'], // lang-ok: draft text under test
+  ['Korean with a Hanja word', '## A 개요\n이것은 한국어로 쓴 짧은 설명이며 漢字 한 단어가 있습니다.\n', 'ko', 'en'], // lang-ok: draft text under test
+  ['Russian', '## A Обзор\nЭто короткое описание на русском языке.\n', 'ru', 'en'],
+  ['Arabic', '## A نظرة عامة\nهذا وصف قصير باللغة العربية.\n', 'ar', 'en'],
+  ['Hebrew', '## A סקירה\nזהו תיאור קצר בעברית.\n', 'he', 'en'],
+  ['Thai', '## A ภาพรวม\nนี่คือคำอธิบายสั้นๆ ภาษาไทย\n', 'th', 'en'],
+  ['Greek', '## A Επισκόπηση\nΑυτή είναι μια σύντομη περιγραφή στα ελληνικά.\n', 'el', 'en'],
+  // Latin text cannot be told apart by script: it stays English. The skill tells the agent to declare the language.
+  ['French (Latin script)', '## A Aperçu\nCeci est une courte description en français.\n', 'en', 'en'],
 ];
 
 for (const [name, body, written, labels] of DETECTED) {
@@ -100,11 +116,27 @@ test('page language: an empty, undetermined or malformed declaration is ignored 
   assert.equal(htmlLangOf(en), 'en');
 });
 
+// A patched page keeps the language it had: the CLI hands the old page's language to the render as the previous language.
+// It is not a declaration by the author, so it never changes the rules of the writing check.
+test('page language: without a declaration the previous language of the page is kept; a declaration wins', () => {
+  const shared = '## A 三次握手\n人在山中。\n'; // lang-ok: draft text under test
+  assert.equal(htmlLangOf(renderDoc(shared).html), 'zh-CN');
+  const kept = renderDoc(shared, {}, {}, { previousLanguage: 'zh-Hant' });
+  assert.equal(htmlLangOf(kept.html), 'zh-Hant');
+  assert.deepEqual(pageLabels(kept.html), ['zh-Hant']);
+  assert.equal(kept.language.declared, false);
+  const declared = renderDoc(`---\nlang: ja\n---\n${shared}`, {}, {}, { previousLanguage: 'zh-Hant' });
+  assert.equal(htmlLangOf(declared.html), 'ja');
+  assert.equal(declared.language.declared, true);
+  assert.equal(htmlLangOf(renderDoc(shared, {}, {}, { previousLanguage: 'not a tag!!' }).html), 'zh-CN', 'a bad previous language is ignored');
+});
+
 test('page language: the result reports script, direction and whether the language has labels', () => {
   const read = (declared) => page(declared).language;
   assert.deepEqual([read('zh').script, read('zh-tw').script, read('ar').script, read('fr').script], ['Hans', 'Hant', 'Arab', 'Latn']);
   assert.deepEqual([read('ar').dir, read('he').dir, read('zh').dir, read('ja').dir, read('fr').dir], ['rtl', 'rtl', 'ltr', 'ltr', 'ltr']);
   assert.deepEqual([read('zh').supported, read('en-US').supported, read('ja').supported], [true, true, true]);
+  assert.deepEqual([read('zh').declared, read('fr').declared, page(undefined).language.declared], [true, true, false]);
   assert.deepEqual([read('zh-tw').supported, read('zh-Hant').supported, read('zh-HK').supported], [true, true, true]);
   assert.deepEqual([read('fr').supported, read('ko').supported], [false, false]);
 });

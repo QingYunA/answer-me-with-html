@@ -6,7 +6,6 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { detectLang } from '../language.js';
 import { hasCommand } from '../sys.js';
 import { estimateSeconds } from './script.js';
 
@@ -165,8 +164,9 @@ function systemVoice(platform, which) {
       voice: 'system',
       id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
       concurrency: 4,
-      synth: (text) => withTemp(async (file) => {
-        const v = voices[detectLang(text)];
+      usesLanguage: true,
+      synth: (text, { language } = {}) => withTemp(async (file) => {
+        const v = voices[language];
         await run('say', [...(v ? ['-v', v] : []), '-o', file, '--file-format=WAVE', `--data-format=LEI16@${SAMPLE_RATE}`, '-f', textFile(file, text)]);
         return readWav(readFileSync(file));
       }),
@@ -178,8 +178,9 @@ function systemVoice(platform, which) {
       voice: 'system',
       id: 'espeak-ng',
       concurrency: 4,
-      synth: (text) => withTemp(async (file) => {
-        await run('espeak-ng', ['-v', ({ zh: 'cmn', ja: 'ja' })[detectLang(text)] ?? 'en-us', '-w', file, '-f', textFile(file, text)]);
+      usesLanguage: true,
+      synth: (text, { language } = {}) => withTemp(async (file) => {
+        await run('espeak-ng', ['-v', ({ zh: 'cmn', ja: 'ja' })[language] ?? 'en-us', '-w', file, '-f', textFile(file, text)]);
         return readWav(readFileSync(file));
       }),
     };
@@ -267,20 +268,23 @@ function resample(input) {
 }
 
 // Synthesize all narration (with cache and a concurrency limit); returns a list of Int16Array as long as texts.
-export async function synthAll(texts, provider, { cacheDir } = {}) {
+// languageOf(text) is the language to read a line in; only a voice marked usesLanguage (the system voices) gets it, and for it the
+// language is part of the cache key. The cache of the other voices (ElevenLabs, a local server) does not change with the language.
+export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
   if (cacheDir) mkdirSync(cacheDir, { recursive: true });
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
     while (next < texts.length) {
       const i = next++;
-      const file = cacheDir && join(cacheDir, `${createHash('sha1').update(`${provider.id}\n${texts[i]}`).digest('hex')}.pcm`);
+      const language = provider.usesLanguage ? languageOf?.(texts[i]) : undefined;
+      const file = cacheDir && join(cacheDir, `${createHash('sha1').update(`${provider.id}${language ? `\n${language}` : ''}\n${texts[i]}`).digest('hex')}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
         continue;
       }
-      results[i] = trimSilence(await provider.synth(texts[i]));
+      results[i] = trimSilence(await provider.synth(texts[i], { language }));
       if (file) writeCache(file, results[i]);
     }
   };
