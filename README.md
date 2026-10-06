@@ -5,6 +5,10 @@
 <h1 align="center">Answer me with HTML</h1>
 
 <p align="center">
+  <b>Super Fast&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;Explainer Videos&nbsp;&nbsp;|&nbsp;&nbsp;One File, Offline</b>
+</p>
+
+<p align="center">
   <b>An agent skill. Ask a hard question, get a page you can actually read instead of a wall of text.<br>The model writes about 1/7 of the tokens it would need to hand-write the HTML.</b>
 </p>
 

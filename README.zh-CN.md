@@ -5,6 +5,10 @@
 <h1 align="center">Answer me with HTML</h1>
 
 <p align="center">
+  <b>极速出页&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;讲解视频&nbsp;&nbsp;|&nbsp;&nbsp;单文件离线</b>
+</p>
+
+<p align="center">
   <b>一个 Agent Skill：遇到复杂问题，Agent 不再甩给你一堵文字墙，而是给你一页能看懂的 HTML。<br>模型要写的 token，只有它直接手写 HTML 的约 1/7。</b>
 </p
 
