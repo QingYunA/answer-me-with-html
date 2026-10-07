@@ -2880,7 +2880,7 @@ function md(text) {
   return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
 }
 function mdInline(text) {
-  return marked.parseInline(String(text ?? ""));
+  return marked.parseInline(wrapSpacedImages(String(text ?? "")));
 }
 
 // src/svg/text.js
@@ -6039,11 +6039,11 @@ function readImage(ref, baseDir) {
   return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
 }
 function assertNoImageText(html) {
-  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").match(TEXT_IMAGE);
+  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
   if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
 }
-function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map() } = {}) {
-  assertNoImageText(html);
+function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
+  if (checkText) assertNoImageText(html);
   return html.replace(IMG_SRC, (whole, before, src) => {
     const ref = decodeRef(src);
     if (NOT_LOCAL.test(ref)) return whole;
@@ -6099,9 +6099,10 @@ function hasVisuals({ intro, panels }) {
 function renderBlocks(blocks, ctx) {
   return blocks.map((b) => embedImages(b, b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join("\n");
 }
+var MARKDOWN_FENCES = /* @__PURE__ */ new Set(["callout", "kv", "tree", "timeline"]);
 function embedImages(block2, html, ctx) {
   try {
-    return inlineImages(html, ctx.images);
+    return inlineImages(html, { ...ctx.images, checkText: block2.type === "md" || MARKDOWN_FENCES.has(block2.lang) });
   } catch (err) {
     if (!(err instanceof ImageError)) throw err;
     const idx = block2.text.split("\n").findIndex((l3) => l3.includes(err.ref) || l3.includes(encodeURI(err.ref)));

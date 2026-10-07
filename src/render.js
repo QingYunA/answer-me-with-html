@@ -68,10 +68,13 @@ export function renderBlocks(blocks, ctx) {
   return blocks.map((b) => embedImages(b, b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join('\n');
 }
 
+// Components that read their text as Markdown. Only there is ![a](b) an image the author meant; in raw html and in diagram text it is literal.
+const MARKDOWN_FENCES = new Set(['callout', 'kv', 'tree', 'timeline']);
+
 // Local images in a block's html become data URIs; a missing or oversize file is reported at the line that names it.
 function embedImages(block, html, ctx) {
   try {
-    return inlineImages(html, ctx.images);
+    return inlineImages(html, { ...ctx.images, checkText: block.type === 'md' || MARKDOWN_FENCES.has(block.lang) });
   } catch (err) {
     if (!(err instanceof ImageError)) throw err;
     // The draft may write the path as decoded (a b.png) or percent-encoded (a%20b.png).

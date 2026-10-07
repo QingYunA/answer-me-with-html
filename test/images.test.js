@@ -112,6 +112,24 @@ test('image: the error names the line even when the draft writes the path as %20
   assert.throws(() => renderDoc(draft('Intro.\n\n![Gone](/nonexistent%20dir/a.png)')), (e) => e instanceof RenderError && e.line === 7 && e.component === 'image');
 });
 
+test('image: ![a](b) typed in a raw html block or diagram text stays literal and passes', () => {
+  assert.ok(renderDoc('## A\n```html\n<p>![a](b.png)</p>\n```\n').html.includes('<p>![a](b.png)</p>'));
+  assert.doesNotThrow(() => renderDoc('## A\n```flow\nA[![a](b)] -> B\n```\n'));
+});
+
+test('image: an image in a tree label works, with or without a space in the path', () => {
+  for (const name of ['ui shots/spectator view.png', 'shots/ui.png']) {
+    assert.ok(renderDoc(`## A\n\`\`\`tree\n![UI](${join(dir, name)})\n\`\`\`\n`).html.includes(DATA_URI), name);
+  }
+});
+
+test('image: a space in the path works in kv, tree and timeline text too', () => {
+  const abs = join(dir, 'ui shots', 'spectator view.png');
+  for (const fence of [`kv\nshot: ![UI](${abs})`, `tree\n![UI](${abs})`, `timeline\n2026 | ![UI](${abs}) | done`]) {
+    assert.ok(renderDoc(`## A\n\`\`\`${fence}\n\`\`\`\n`).html.includes(DATA_URI), fence);
+  }
+});
+
 test('image: a reference-style image with a space in its definition is an error, not text', () => {
   assert.throws(() => renderDoc(draft('![Odd][r]\n\n[r]: /a b/c.png')), (e) => e instanceof RenderError && e.line === 5 && /was not read as an image/.test(e.message));
 });

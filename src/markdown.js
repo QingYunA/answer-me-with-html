@@ -50,5 +50,5 @@ export function md(text) {
 }
 
 export function mdInline(text) {
-  return marked.parseInline(String(text ?? ''));
+  return marked.parseInline(wrapSpacedImages(String(text ?? '')));
 }
