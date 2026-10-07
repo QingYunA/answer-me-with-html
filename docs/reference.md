@@ -29,6 +29,23 @@ A -> B: label
 
 Full syntax for a component: `am help <component>`.
 
+## Code blocks
+
+Quote code that exists in the project instead of typing it:
+
+````markdown
+```ts src=server/routes.ts lines=18-30 hl=22
+```
+````
+
+- Any fence whose language is not a component is a code block, with a header and a Copy button.
+- `src=` reads the file and `lines=18-30` picks the lines, numbered as in the file. Leave the block empty. The path is read from the current folder, and only files inside it are quoted.
+- `hl=22` or `hl=20-22,25` highlights lines. For code you type, `title="limits.ts · sketch"` names it and `start=38` numbers it from line 38.
+- A block longer than 40 lines gets a warning; more than 200 lines is an error. Files that hold keys by convention (`.env`, `*.pem`, `id_rsa`, `.ssh/`, `.git/` …) and files with anything that looks like a key or a token are refused. The rules follow html-plan's.
+- The render lists every file it embedded. The page keeps the path; `am patch` reads the file again, or keeps the page's copy when the file has moved.
+
+Full syntax: `am help code`.
+
 ## Images
 
 For something a diagram cannot show, such as a real screen, use an image that already exists as a file:
@@ -38,7 +55,7 @@ For something a diagram cannot show, such as a real screen, use an image that al
 ```
 
 - Put the image alone on its line. The alt text becomes its caption, so write what the picture shows. The writing check reads it.
-- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, so the page stays one file that opens offline. A wide image scales down to its panel.
 - `http(s)` URLs and `data:` URIs are left as they are. A URL needs the network when the page is opened.
 - The page keeps the path of each image. `am patch` embeds the image again from the file, or from the page when the file has moved.

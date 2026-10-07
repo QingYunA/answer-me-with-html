@@ -7,7 +7,7 @@ export default {
   ui: {
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
-    copy: '复制源稿', done: '已复制 ✓',
+    copy: '复制源稿', done: '已复制 ✓', copyCode: '复制',
     toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
   },
   videoUi: { play: '播放', pause: '暂停', chapters: '章节' },

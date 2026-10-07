@@ -104,6 +104,26 @@ code, pre, kbd { font-family: var(--font-mono); }
   margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);
   border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;
 }
+/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */
+.am-codeblock { margin: 10px 0; min-width: 0; }
+.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }
+.am-code-head {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);
+  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;
+}
+.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }
+.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }
+.am-code-lang + .am-code-copy { margin-left: 0; }
+.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }
+.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-code code { display: block; min-width: max-content; }
+.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }
+.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+.am-code--num .am-ln::before {
+  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);
+  user-select: none; -webkit-user-select: none;
+}
 
 /* ── Status badges ok / no / warn ──────────────── */
 .am-status { white-space: nowrap; font-weight: 500; }
@@ -374,7 +394,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 @media print {
-  .am-toolbar, .am-diagram-expand, .am-lightbox { display: none !important; }
+  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
 }

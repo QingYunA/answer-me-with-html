@@ -21,6 +21,7 @@ import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS,
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
+import { readEmbeddedCode, MAX_CODE_LINES, LONG_CODE_LINES } from './code.js';
 import { languageIds } from './languages/registry.js';
 
 const MAX_LISTED_WARNINGS = 20;
@@ -40,7 +41,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|image|video|patch|theme]  show component syntax / page draft format / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -75,6 +76,7 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
 const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
@@ -82,11 +84,29 @@ const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as
 ![What the picture shows](/absolute/path/to/screenshot.png)
 
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
-- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
 - http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
 - Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
+
+const CODE_HELP = `Code blocks: real code from a file, or code you type
+
+\`\`\`ts src=server/routes.ts lines=18-30 hl=22
+\`\`\`
+
+\`\`\`ts title="limits.ts · sketch"
+export const LIMIT = 50
+\`\`\`
+
+- A fence whose language is not a component is a code block. Each block gets a header and a Copy button.
+- src= quotes a file: the CLI reads the lines, so you do not type them, and the code is the real code. Leave the block empty.
+  The path is read from the current folder, and only files inside it are quoted. lines=18-30 (or lines=18) picks the lines; without it the whole file is quoted.
+- The header shows path:lines, or title= when you set it. Write "sketch" in the title of code that does not exist yet.
+- hl=22 or hl=20-22,25 highlights lines by their shown number. start=38 numbers a typed block from 38.
+- 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
+- Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ …) and files with anything that looks like a key or a token are refused.
+- The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.`;
 
 const RAW_HELP = `LANG — embed as-is (escape hatch)
 
@@ -237,7 +257,7 @@ function cmdRender(src, opts, ctx, baseDir) {
   const { theme, mode, style } = config.values;
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -356,7 +376,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, knownImages: readEmbeddedImages(html) });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html) });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -446,6 +466,13 @@ function emit(result, file, { print }, note = '') {
   writeFileSync(file, result.html);
   print(`✓ ${file}`);
   print(`  ${summaryLine(result)}${note}`);
+  // The code the page now holds, so the user can check it before sharing the page.
+  if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(', ')}`);
+  const long = result.stats.codeWarnings ?? [];
+  if (long.length) {
+    print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
+    long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
+  }
   printWarnings(result.warnings, print, result.meta.style);
 }
 
@@ -595,6 +622,7 @@ function cmdList({ print, fail, themes }) {
   print('\nComponents (fence language):');
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print('  html/svg  embed as-is (escape hatch)');
+  print('  <other>   code block; src=path lines=a-b quotes a file (am help code)');
   print('\nSyntax: am help <component>; draft format: am help format');
 }
 
@@ -651,13 +679,14 @@ function cmdHelp(name, { print, fail }) {
   if (!name) return print(USAGE), 0;
   if (name === 'format') return print(FORMAT), 0;
   if (name === 'image') return print(IMAGE_HELP), 0;
+  if (name === 'code') return print(CODE_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, image, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

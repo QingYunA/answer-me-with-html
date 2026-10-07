@@ -52,7 +52,7 @@ export function readPage(html) {
   };
 }
 
-function unescapeHtml(s) {
+export function unescapeHtml(s) {
   return s
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')

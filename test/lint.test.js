@@ -78,6 +78,11 @@ utilize = 1
   assert.deepEqual(lint(src), []);
 });
 
+test('status cells followed by inline code agree with the render: no rows skipped, ok/warn prefix stripped', () => {
+  const ws = lint('## A\n| a |\n|---|\n| no Commence with `utilize()`. |\n| ok Commence with `utilize()`. |\n| warn Commence with **care**. |');
+  assert.deepEqual(ws.map((w) => [w.line, w.suggestion]), [[5, 'start'], [6, 'start']]);
+});
+
 test('callout bodies are checked; plain table cells are checked', () => {
   const ws = lint('## A\n```callout warn 注意\nUtilize it.\n```\n| a |\n|---|\n| Commence now. |');
   assert.deepEqual(ws.map((w) => [w.line, w.suggestion]), [[3, 'use'], [7, 'start']]);

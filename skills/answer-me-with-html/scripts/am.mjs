@@ -3,11 +3,11 @@
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync5, mkdirSync as mkdirSync4, existsSync as existsSync5 } from "node:fs";
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, mkdirSync as mkdirSync4, existsSync as existsSync5 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.4.12";
-var BASE_CSS = '/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  background: var(--bg); color: var(--ink);\n  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;\n  -webkit-font-smoothing: antialiased;\n}\ncode, pre, kbd { font-family: var(--font-mono); }\n\n/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-toolbar {\n  position: fixed; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px;\n}\n.am-btn {\n  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;\n}\n.am-btn:hover { border-color: var(--ink-3); }\n.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n/* Theme and mode lists: a label and a native select inside one button-like box */\n.am-pick {\n  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 0 4px 0 10px;\n}\n.am-pick:hover { border-color: var(--ink-3); }\n.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-pick select {\n  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;\n}\n.am-pick option { color: var(--ink); background: var(--paper); }\n\n/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-head { margin: 0 0 20px; padding-right: 300px; }\n.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }\n.am-sub { margin: 4px 0 0; color: var(--ink-2); }\n.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }\n.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-right: 6px; }\n.am-intro { margin-top: 12px; max-width: 80ch; }\n\n/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }\n.am-frame { position: relative; }\n.am-grid {\n  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));\n  gap: 20px; align-items: start;\n}\n.am-ruler { display: none; }\n.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }\n.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }\n.am-ruler--top { top: 0; }\n.am-ruler--bottom { bottom: 0; }\n.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }\n.am-ruler--left { left: 0; }\n.am-ruler--right { right: 0; }\n.am-ruler--top span + span, .am-ruler--bottom span + span { border-left: 1px solid var(--line); }\n.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }\n\n/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-panel {\n  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);\n  box-shadow: var(--shadow); min-width: 0; overflow: hidden;\n}\n.am-panel-head {\n  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;\n}\n.am-panel-id {\n  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;\n  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;\n}\n.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }\n.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: right; }\n.am-panel-body { padding: 14px 16px 16px; }\n.am-panel-body > * + * { margin-top: 12px; }\n\n/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-md > :first-child { margin-top: 0; }\n.am-md > :last-child { margin-bottom: 0; }\n.am-md p { margin: 0 0 8px; }\n.am-md ul, .am-md ol { margin: 0 0 8px; padding-left: 20px; }\n.am-md li + li { margin-top: 3px; }\n.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }\n.am-md a { color: var(--accent); }\n.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--line-2); color: var(--ink-2); }\n.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }\n.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }\n.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }\n.am-md th {\n  text-align: left; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;\n  padding: 6px 10px; border-bottom: 1px solid var(--line-2);\n}\n/* th { text-align: left } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */\n.am-md th[align="right"] { text-align: right; }\n.am-md th[align="center"] { text-align: center; }\n.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }\n.am-md tbody tr:nth-child(even) td { background: var(--fill); }\n.am-table-wrap { overflow-x: auto; }\n/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */\n.am-md img { max-width: 100%; max-height: 70vh; height: auto; }\n.am-figure { margin: 0; text-align: center; }\n.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }\n.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }\n.am-code {\n  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);\n  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;\n}\n\n/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-status { white-space: nowrap; font-weight: 500; }\n.am-status--ok { color: var(--ok); }\n.am-status--no { color: var(--err); }\n.am-status--warn { color: var(--warn); }\n.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }\n\n/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-callout {\n  border: 1px solid var(--line-2); border-left: 3px solid var(--accent); background: var(--accent-bg);\n  padding: 10px 14px; border-radius: var(--radius);\n}\n.am-callout--ok { border-left-color: var(--ok); background: var(--ok-bg); }\n.am-callout--warn { border-left-color: var(--warn); background: var(--warn-bg); }\n.am-callout--err { border-left-color: var(--err); background: var(--err-bg); }\n.am-callout-title { font-weight: 600; margin-bottom: 4px; }\n\n/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-kv {\n  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;\n  border-top: var(--bw) solid var(--line); border-left: var(--bw) solid var(--line);\n}\n.am-kv-cell { border-right: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }\n.am-kv-cell--wide { grid-column: 1 / -1; }\n.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }\n.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }\n.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }\n\n/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-timeline { list-style: none; margin: 0; padding: 0; }\n.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }\n.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }\n.am-timeline--h li::before {\n  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);\n}\n.am-timeline--h li:first-child::before { left: 50%; }\n.am-timeline--h li:last-child::before { right: 50%; }\n.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }\n.am-tl-dot {\n  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;\n  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);\n}\n.am-tl-item--hi .am-tl-dot { background: var(--accent); border-color: var(--accent); }\n.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }\n.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }\n.am-timeline--v li { position: relative; padding: 0 0 14px 22px; }\n.am-timeline--v li::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: -6px; border-left: var(--bw) solid var(--line-2); }\n.am-timeline--v li:last-child::before { display: none; }\n.am-timeline--v .am-tl-dot { position: absolute; left: 0; top: 4px; margin: 0; }\n.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-right: 8px; }\n.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }\n.am-timeline--v .am-tl-text { margin-top: 2px; }\n\n/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }\n.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }\n.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }\n.am-annot-scroll { overflow-x: auto; }\n.am-annot-line {\n  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);\n  padding-bottom: calc(var(--rows, 0) * 17px + 14px);\n}\n.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }\n.am-annot-line--wrap .am-seg { white-space: nowrap; }\n.am-seg { position: relative; }\n.am-seg::after {\n  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;\n  border: 1px solid var(--accent); border-top: 0;\n}\n.am-seg-n {\n  position: absolute; left: 0; top: calc(100% + 8px + var(--row, 0) * 17px);\n  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;\n}\n.am-seg--err { color: var(--err); }\n.am-seg--err::after { border-color: var(--err); }\n.am-seg--err .am-seg-n { color: var(--err); }\n.am-annot-caption { font-size: 12px; color: var(--ink-2); }\n\n/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lim + .am-lim { margin-top: 14px; }\n.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }\n.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }\n.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }\n.am-lim-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-bg); border-right: 1px solid var(--accent); }\n.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }\n.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-right-color: var(--err); }\n.am-lim.is-over .am-lim-val { color: var(--err); }\n.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }\n.am-lim-ticks span { position: absolute; transform: translateX(-50%); }\n.am-lim-ticks span:first-child { transform: none; }\n.am-lim-note { font-size: 11px; color: var(--ink-2); margin-left: 6px; }\n\n/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-tree { font-size: 13px; }\n.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }\n.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-root--solo { padding-bottom: 12px; }\n.am-tree-root--solo::after { display: none; }\n.am-tree-box {\n  border: var(--bw) solid var(--line); background: var(--paper); padding: 6px 14px; text-align: center;\n  border-radius: var(--radius); font-weight: 600;\n}\n.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }\n.am-tree-box--root { background: var(--accent-bg); font-size: 15px; padding: 8px 28px; }\n.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }\n.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }\n.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }\n.am-tree-col:first-child::before { left: 50%; }\n.am-tree-col:last-child::before { right: 50%; }\n.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }\n.am-tree-col > .am-tree-list { margin: 8px 0 0 14px; }\n.am-tree-list ul { margin-left: 16px; }\n.am-tree-list li { position: relative; padding: 3px 0 3px 18px; }\n.am-tree-list li::before { content: ""; position: absolute; left: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }\n.am-tree-list li::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1px solid var(--ink-3); }\n.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }\n.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-right: 4px; }\n.am-tree code { font: 12px var(--font-mono); }\n.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }\n.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }\n\n/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-diagram { margin: 0; overflow-x: auto; text-align: center; }\n/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */\n.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }\n.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }\n.am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-node--hi .am-node-shape { fill: var(--accent-bg, #e4ecf8); stroke: var(--accent, #1d5fbf); }\n.am-node--hi text { fill: var(--accent, #1d5fbf); font-weight: 600; }\n.am-edge { fill: none; stroke: var(--ink-2, #4b5260); stroke-width: 1.3; }\n.am-edge--dashed { stroke-dasharray: 5 4; }\n.am-arrow { fill: var(--ink-2, #4b5260); }\n.am-edge-label rect { fill: var(--paper, #ffffff); }\n.am-diagram .am-edge-label text { fill: var(--accent, #1d5fbf); font-size: 11.5px; }\n.am-cluster { fill: var(--fill, #f3f5f8); stroke: var(--line-2, #d6dae1); stroke-width: 1; stroke-dasharray: 4 3; }\n.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }\n.am-lifeline { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 4 4; }\n.am-actor { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-note { fill: var(--warn-bg, #fdf3e2); stroke: var(--warn, #a8620a); stroke-width: 1; }\n.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }\n\n.am-diagram-expand {\n  /* In flow and sticky: it sits at the right edge and stays in view when the diagram scrolls sideways. */\n  position: sticky; left: calc(100% - 36px); z-index: 2;\n  display: flex; align-items: center; justify-content: center;\n  width: 28px; height: 28px; padding: 0; margin: 8px 8px -36px auto;\n  color: var(--ink-2); background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);\n  cursor: pointer; opacity: 0.72;\n  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;\n}\n.am-diagram:hover .am-diagram-expand,\n.am-diagram-expand:focus-visible { opacity: 1; }\n.am-diagram-expand:hover {\n  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);\n}\n.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lightbox {\n  position: fixed; inset: 0; z-index: 1000;\n  display: flex; flex-direction: column;\n  touch-action: none;\n}\n.am-lightbox[hidden] { display: none !important; }\n\n.am-lightbox-backdrop {\n  position: absolute; inset: 0;\n  background: rgba(0, 0, 0, 0.72);\n  backdrop-filter: blur(6px);\n  -webkit-backdrop-filter: blur(6px);\n}\n\n.am-lightbox-header {\n  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;\n  display: flex; align-items: center; justify-content: space-between;\n  z-index: 10; pointer-events: none;\n}\n.am-lightbox-title {\n  display: inline-flex; align-items: center; gap: 8px;\n  color: rgba(255, 255, 255, 0.92);\n  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;\n  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);\n  pointer-events: auto;\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;\n}\n.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }\n.am-lightbox-actions {\n  display: flex; align-items: center; gap: 8px; pointer-events: auto;\n}\n.am-lightbox-close {\n  width: 32px; height: 32px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: 50%;\n  color: var(--ink);\n  font-size: 15px; line-height: 1;\n  cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);\n  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;\n}\n.am-lightbox-close:hover {\n  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);\n}\n.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n.am-lightbox-stage {\n  position: absolute;\n  top: 54px; bottom: 20px; left: 24px; right: 24px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: max(var(--radius), 14px);\n  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);\n  overflow: hidden;\n  cursor: grab;\n  user-select: none;\n  -webkit-user-select: none;\n}\n.am-lightbox-stage.am-panning { cursor: grabbing; }\n\n.am-lightbox-canvas {\n  position: absolute; left: 0; top: 0;\n  transform-origin: 0 0;\n  will-change: transform;\n  pointer-events: none;\n}\n.am-lightbox-canvas svg {\n  max-width: none !important;\n  max-height: none !important;\n  display: block;\n  font-family: var(--font-sans, sans-serif);\n}\n\n/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }\n.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }\n.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }\n.am-toc { position: sticky; top: 24px; font-size: 13px; }\n.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0 4px 10px; border-left: 2px solid var(--line-2); }\n.am-toc a:hover { color: var(--ink); border-left-color: var(--accent); }\n.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }\n\n/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n@media (max-width: 1100px) {\n  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }\n}\n@media (max-width: 760px) {\n  .am-sheet, .am-doc { padding: 56px 12px 24px; }\n  .am-head { padding-right: 0; }\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }\n  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }\n  .am-toc { position: static; }\n  .am-timeline--h { grid-template-columns: minmax(0, 1fr); }\n  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }\n  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. */\n  .am-md th, .am-md td { min-width: 6em; }\n  .am-diagram svg { max-width: none; }\n  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }\n  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }\n}\n.am-colophon { text-align: center; padding: 0 0 28px; font: 11px var(--font-mono); color: var(--ink-3); }\n.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n\n@media print {\n  .am-toolbar, .am-diagram-expand, .am-lightbox { display: none !important; }\n  body { background: var(--paper); }\n  .am-panel { break-inside: avoid; box-shadow: none; }\n}\n.am-panel--bare { border: 0; background: transparent; box-shadow: none; }\n.am-panel--bare > .am-panel-body { padding: 0; }\n.am-panel--bare .am-kv { background: var(--paper); }\n';
+var BASE_CSS = '/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  background: var(--bg); color: var(--ink);\n  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;\n  -webkit-font-smoothing: antialiased;\n}\ncode, pre, kbd { font-family: var(--font-mono); }\n\n/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-toolbar {\n  position: fixed; top: 12px; right: 12px; z-index: 10; display: flex; gap: 6px;\n}\n.am-btn {\n  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;\n}\n.am-btn:hover { border-color: var(--ink-3); }\n.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n/* Theme and mode lists: a label and a native select inside one button-like box */\n.am-pick {\n  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 0 4px 0 10px;\n}\n.am-pick:hover { border-color: var(--ink-3); }\n.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-pick select {\n  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;\n}\n.am-pick option { color: var(--ink); background: var(--paper); }\n\n/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-head { margin: 0 0 20px; padding-right: 300px; }\n.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }\n.am-sub { margin: 4px 0 0; color: var(--ink-2); }\n.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }\n.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-right: 6px; }\n.am-intro { margin-top: 12px; max-width: 80ch; }\n\n/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }\n.am-frame { position: relative; }\n.am-grid {\n  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));\n  gap: 20px; align-items: start;\n}\n.am-ruler { display: none; }\n.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }\n.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }\n.am-ruler--top { top: 0; }\n.am-ruler--bottom { bottom: 0; }\n.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }\n.am-ruler--left { left: 0; }\n.am-ruler--right { right: 0; }\n.am-ruler--top span + span, .am-ruler--bottom span + span { border-left: 1px solid var(--line); }\n.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }\n\n/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-panel {\n  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);\n  box-shadow: var(--shadow); min-width: 0; overflow: hidden;\n}\n.am-panel-head {\n  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;\n}\n.am-panel-id {\n  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;\n  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;\n}\n.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }\n.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: right; }\n.am-panel-body { padding: 14px 16px 16px; }\n.am-panel-body > * + * { margin-top: 12px; }\n\n/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-md > :first-child { margin-top: 0; }\n.am-md > :last-child { margin-bottom: 0; }\n.am-md p { margin: 0 0 8px; }\n.am-md ul, .am-md ol { margin: 0 0 8px; padding-left: 20px; }\n.am-md li + li { margin-top: 3px; }\n.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }\n.am-md a { color: var(--accent); }\n.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-left: 3px solid var(--line-2); color: var(--ink-2); }\n.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }\n.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }\n.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }\n.am-md th {\n  text-align: left; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;\n  padding: 6px 10px; border-bottom: 1px solid var(--line-2);\n}\n/* th { text-align: left } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */\n.am-md th[align="right"] { text-align: right; }\n.am-md th[align="center"] { text-align: center; }\n.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }\n.am-md tbody tr:nth-child(even) td { background: var(--fill); }\n.am-table-wrap { overflow-x: auto; }\n/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */\n.am-md img { max-width: 100%; max-height: 70vh; height: auto; }\n.am-figure { margin: 0; text-align: center; }\n.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }\n.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }\n.am-code {\n  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);\n  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;\n}\n/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */\n.am-codeblock { margin: 10px 0; min-width: 0; }\n.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }\n.am-code-head {\n  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);\n  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;\n}\n.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }\n.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }\n.am-code-lang + .am-code-copy { margin-left: 0; }\n.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }\n.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-code code { display: block; min-width: max-content; }\n.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }\n.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }\n.am-code--num .am-ln::before {\n  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);\n  user-select: none; -webkit-user-select: none;\n}\n\n/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-status { white-space: nowrap; font-weight: 500; }\n.am-status--ok { color: var(--ok); }\n.am-status--no { color: var(--err); }\n.am-status--warn { color: var(--warn); }\n.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }\n\n/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-callout {\n  border: 1px solid var(--line-2); border-left: 3px solid var(--accent); background: var(--accent-bg);\n  padding: 10px 14px; border-radius: var(--radius);\n}\n.am-callout--ok { border-left-color: var(--ok); background: var(--ok-bg); }\n.am-callout--warn { border-left-color: var(--warn); background: var(--warn-bg); }\n.am-callout--err { border-left-color: var(--err); background: var(--err-bg); }\n.am-callout-title { font-weight: 600; margin-bottom: 4px; }\n\n/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-kv {\n  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;\n  border-top: var(--bw) solid var(--line); border-left: var(--bw) solid var(--line);\n}\n.am-kv-cell { border-right: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }\n.am-kv-cell--wide { grid-column: 1 / -1; }\n.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }\n.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }\n.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }\n\n/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-timeline { list-style: none; margin: 0; padding: 0; }\n.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }\n.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }\n.am-timeline--h li::before {\n  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);\n}\n.am-timeline--h li:first-child::before { left: 50%; }\n.am-timeline--h li:last-child::before { right: 50%; }\n.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }\n.am-tl-dot {\n  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;\n  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);\n}\n.am-tl-item--hi .am-tl-dot { background: var(--accent); border-color: var(--accent); }\n.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }\n.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }\n.am-timeline--v li { position: relative; padding: 0 0 14px 22px; }\n.am-timeline--v li::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: -6px; border-left: var(--bw) solid var(--line-2); }\n.am-timeline--v li:last-child::before { display: none; }\n.am-timeline--v .am-tl-dot { position: absolute; left: 0; top: 4px; margin: 0; }\n.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-right: 8px; }\n.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }\n.am-timeline--v .am-tl-text { margin-top: 2px; }\n\n/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }\n.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }\n.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }\n.am-annot-scroll { overflow-x: auto; }\n.am-annot-line {\n  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);\n  padding-bottom: calc(var(--rows, 0) * 17px + 14px);\n}\n.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }\n.am-annot-line--wrap .am-seg { white-space: nowrap; }\n.am-seg { position: relative; }\n.am-seg::after {\n  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;\n  border: 1px solid var(--accent); border-top: 0;\n}\n.am-seg-n {\n  position: absolute; left: 0; top: calc(100% + 8px + var(--row, 0) * 17px);\n  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;\n}\n.am-seg--err { color: var(--err); }\n.am-seg--err::after { border-color: var(--err); }\n.am-seg--err .am-seg-n { color: var(--err); }\n.am-annot-caption { font-size: 12px; color: var(--ink-2); }\n\n/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lim + .am-lim { margin-top: 14px; }\n.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }\n.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }\n.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }\n.am-lim-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent-bg); border-right: 1px solid var(--accent); }\n.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }\n.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-right-color: var(--err); }\n.am-lim.is-over .am-lim-val { color: var(--err); }\n.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }\n.am-lim-ticks span { position: absolute; transform: translateX(-50%); }\n.am-lim-ticks span:first-child { transform: none; }\n.am-lim-note { font-size: 11px; color: var(--ink-2); margin-left: 6px; }\n\n/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-tree { font-size: 13px; }\n.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }\n.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-root--solo { padding-bottom: 12px; }\n.am-tree-root--solo::after { display: none; }\n.am-tree-box {\n  border: var(--bw) solid var(--line); background: var(--paper); padding: 6px 14px; text-align: center;\n  border-radius: var(--radius); font-weight: 600;\n}\n.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }\n.am-tree-box--root { background: var(--accent-bg); font-size: 15px; padding: 8px 28px; }\n.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }\n.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }\n.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }\n.am-tree-col:first-child::before { left: 50%; }\n.am-tree-col:last-child::before { right: 50%; }\n.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }\n.am-tree-col > .am-tree-list { margin: 8px 0 0 14px; }\n.am-tree-list ul { margin-left: 16px; }\n.am-tree-list li { position: relative; padding: 3px 0 3px 18px; }\n.am-tree-list li::before { content: ""; position: absolute; left: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }\n.am-tree-list li::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1px solid var(--ink-3); }\n.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }\n.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-right: 4px; }\n.am-tree code { font: 12px var(--font-mono); }\n.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }\n.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }\n\n/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-diagram { margin: 0; overflow-x: auto; text-align: center; }\n/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */\n.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }\n.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }\n.am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-node--hi .am-node-shape { fill: var(--accent-bg, #e4ecf8); stroke: var(--accent, #1d5fbf); }\n.am-node--hi text { fill: var(--accent, #1d5fbf); font-weight: 600; }\n.am-edge { fill: none; stroke: var(--ink-2, #4b5260); stroke-width: 1.3; }\n.am-edge--dashed { stroke-dasharray: 5 4; }\n.am-arrow { fill: var(--ink-2, #4b5260); }\n.am-edge-label rect { fill: var(--paper, #ffffff); }\n.am-diagram .am-edge-label text { fill: var(--accent, #1d5fbf); font-size: 11.5px; }\n.am-cluster { fill: var(--fill, #f3f5f8); stroke: var(--line-2, #d6dae1); stroke-width: 1; stroke-dasharray: 4 3; }\n.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }\n.am-lifeline { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 4 4; }\n.am-actor { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-note { fill: var(--warn-bg, #fdf3e2); stroke: var(--warn, #a8620a); stroke-width: 1; }\n.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }\n\n.am-diagram-expand {\n  /* In flow and sticky: it sits at the right edge and stays in view when the diagram scrolls sideways. */\n  position: sticky; left: calc(100% - 36px); z-index: 2;\n  display: flex; align-items: center; justify-content: center;\n  width: 28px; height: 28px; padding: 0; margin: 8px 8px -36px auto;\n  color: var(--ink-2); background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);\n  cursor: pointer; opacity: 0.72;\n  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;\n}\n.am-diagram:hover .am-diagram-expand,\n.am-diagram-expand:focus-visible { opacity: 1; }\n.am-diagram-expand:hover {\n  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);\n}\n.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lightbox {\n  position: fixed; inset: 0; z-index: 1000;\n  display: flex; flex-direction: column;\n  touch-action: none;\n}\n.am-lightbox[hidden] { display: none !important; }\n\n.am-lightbox-backdrop {\n  position: absolute; inset: 0;\n  background: rgba(0, 0, 0, 0.72);\n  backdrop-filter: blur(6px);\n  -webkit-backdrop-filter: blur(6px);\n}\n\n.am-lightbox-header {\n  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;\n  display: flex; align-items: center; justify-content: space-between;\n  z-index: 10; pointer-events: none;\n}\n.am-lightbox-title {\n  display: inline-flex; align-items: center; gap: 8px;\n  color: rgba(255, 255, 255, 0.92);\n  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;\n  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);\n  pointer-events: auto;\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;\n}\n.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }\n.am-lightbox-actions {\n  display: flex; align-items: center; gap: 8px; pointer-events: auto;\n}\n.am-lightbox-close {\n  width: 32px; height: 32px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: 50%;\n  color: var(--ink);\n  font-size: 15px; line-height: 1;\n  cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);\n  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;\n}\n.am-lightbox-close:hover {\n  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);\n}\n.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n.am-lightbox-stage {\n  position: absolute;\n  top: 54px; bottom: 20px; left: 24px; right: 24px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: max(var(--radius), 14px);\n  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);\n  overflow: hidden;\n  cursor: grab;\n  user-select: none;\n  -webkit-user-select: none;\n}\n.am-lightbox-stage.am-panning { cursor: grabbing; }\n\n.am-lightbox-canvas {\n  position: absolute; left: 0; top: 0;\n  transform-origin: 0 0;\n  will-change: transform;\n  pointer-events: none;\n}\n.am-lightbox-canvas svg {\n  max-width: none !important;\n  max-height: none !important;\n  display: block;\n  font-family: var(--font-sans, sans-serif);\n}\n\n/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }\n.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }\n.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }\n.am-toc { position: sticky; top: 24px; font-size: 13px; }\n.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0 4px 10px; border-left: 2px solid var(--line-2); }\n.am-toc a:hover { color: var(--ink); border-left-color: var(--accent); }\n.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }\n\n/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n@media (max-width: 1100px) {\n  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }\n}\n@media (max-width: 760px) {\n  .am-sheet, .am-doc { padding: 56px 12px 24px; }\n  .am-head { padding-right: 0; }\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }\n  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }\n  .am-toc { position: static; }\n  .am-timeline--h { grid-template-columns: minmax(0, 1fr); }\n  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }\n  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. */\n  .am-md th, .am-md td { min-width: 6em; }\n  .am-diagram svg { max-width: none; }\n  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }\n  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }\n}\n.am-colophon { text-align: center; padding: 0 0 28px; font: 11px var(--font-mono); color: var(--ink-3); }\n.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n\n@media print {\n  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy { display: none !important; }\n  body { background: var(--paper); }\n  .am-panel { break-inside: avoid; box-shadow: none; }\n}\n.am-panel--bare { border: 0; background: transparent; box-shadow: none; }\n.am-panel--bare > .am-panel-body { padding: 0; }\n.am-panel--bare .am-kv { background: var(--paper); }\n';
 var RUNTIME_JS = `(() => {
   const root = document.documentElement;
   // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;
@@ -24,10 +24,7 @@ var RUNTIME_JS = `(() => {
     select.addEventListener('change', () => root.setAttribute(attr, select.value));
   }
 
-  const copyBtn = document.querySelector('[data-am="copy"]');
-  copyBtn?.addEventListener('click', async () => {
-    const nodes = document.querySelectorAll('#am-source');
-    const text = nodes[nodes.length - 1]?.value ?? '';
+  const copyText = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -37,10 +34,29 @@ var RUNTIME_JS = `(() => {
       document.execCommand('copy');
       ta.remove();
     }
-    const original = copyBtn.textContent;
-    copyBtn.textContent = copyBtn.dataset.done;
-    setTimeout(() => { copyBtn.textContent = original; }, 1400);
+  };
+  // The button reads its label from data-done for a moment after a copy.
+  const flash = (btn) => {
+    const original = btn.textContent;
+    btn.textContent = btn.dataset.done;
+    setTimeout(() => { btn.textContent = original; }, 1400);
+  };
+
+  const copyBtn = document.querySelector('[data-am="copy"]');
+  copyBtn?.addEventListener('click', async () => {
+    const nodes = document.querySelectorAll('#am-source');
+    await copyText(nodes[nodes.length - 1]?.value ?? '');
+    flash(copyBtn);
   });
+
+  // Each code block copies its own lines, without the line numbers.
+  for (const btn of document.querySelectorAll('[data-am="copy-code"]')) {
+    btn.addEventListener('click', async () => {
+      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];
+      await copyText([...lines].map((l) => l.textContent).join('\\n'));
+      flash(btn);
+    });
+  }
 
   // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   const diagrams = document.querySelectorAll('.am-diagram');
@@ -745,7 +761,7 @@ html[data-export] .amv-stage { left: 0; top: 0; transform: none !important; }
 var VIDEO_JS = "(() => {\n  const D = JSON.parse(document.getElementById('amv-data').textContent);\n  const W = 1920;\n  const H = 1080;\n  const T = 0.9;     // scene transition, matches TIMING.transition\n  const R = 0.6;     // one step appearing\n  const CAM = 0.8;   // camera move\n  const root = document.documentElement;\n  const stage = document.querySelector('.amv-stage');\n  const camera = document.querySelector('.amv-camera');\n  const overlay = document.querySelector('.amv-overlay');\n  const caption = document.querySelector('.amv-caption span');\n  const scenes = [...document.querySelectorAll('.amv-scene')];\n  const segs = D.segments;\n  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));\n  const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };\n  const lerp = (a, b, p) => a + (b - a) * p;\n  const STEP_SEL = '.am-tl-item, .am-lim, .am-seg, tbody tr, .am-kv-cell, .am-md > ul > li, .am-md > ol > li, .am-md > p, .am-md > blockquote, .am-callout';\n\n  // \u2500\u2500 1. Fit each scene's content to the frame \u2500\u2500\n  for (const sc of scenes) {\n    const fit = sc.querySelector('.amv-fit');\n    if (!fit || !fit.children.length) continue;\n    const s = Math.min(1600 / fit.offsetWidth, 740 / fit.offsetHeight, 3.4);\n    fit.style.transform = `scale(${s})`;\n  }\n\n  // Scene titles sit outside the camera, so they stay put when it zooms.\n  const heads = scenes.map((sc) => {\n    const h = sc.querySelector('.amv-scene-head');\n    if (h) stage.insertBefore(h, camera.nextSibling);\n    return h;\n  });\n\n  // Measure elements in stage coordinates (the camera is the identity transform here).\n  const sr = stage.getBoundingClientRect();\n  const k = sr.width / W;\n  const rectOf = (el) => {\n    const r = el.getBoundingClientRect();\n    return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k, w: r.width / k, h: r.height / k };\n  };\n\n  // \u2500\u2500 2. Steps: group by data-step when a component sets it, else one step per row / item \u2500\u2500\n  const items = [];   // { el, at, paths: [{ el, len }] }\n  scenes.forEach((sc, i) => {\n    if (i === 0) return;\n    const groups = [];\n    for (const block of sc.querySelectorAll('.amv-fit > *')) {\n      const marked = [...block.querySelectorAll('[data-step]')];\n      if (marked.length) {\n        const by = new Map();\n        for (const el of marked) {\n          const n = Number(el.dataset.step);\n          if (!by.has(n)) by.set(n, []);\n          by.get(n).push(el);\n        }\n        [...by.keys()].sort((a, b) => a - b).forEach((n) => groups.push(by.get(n)));\n      } else {\n        const found = [...block.querySelectorAll(STEP_SEL)].filter((el) => !el.parentElement.closest(STEP_SEL));\n        if (found.length) found.forEach((el) => groups.push([el]));\n        else groups.push([block]);\n      }\n    }\n    const beats = segs[i].beats;\n    const S = groups.length;\n    const B = beats.length;\n    const perBeat = new Map();\n    groups.forEach((g, gi) => {\n      // With more beats than steps, the extra beats open the scene: steps align to the last beats.\n      const b = S <= B ? gi + (B - S) : Math.floor((gi * B) / S);\n      const rank = perBeat.get(b) ?? 0;\n      perBeat.set(b, rank + 1);\n      const beat = beats[b];\n      const count = S <= B ? 1 : Math.ceil(S / B) || 1;\n      const slot = Math.min(0.45, (beat.end - beat.start) / count);\n      for (const el of g) {\n        const paths = (el.matches('path.am-edge') ? [el] : [...el.querySelectorAll('path.am-edge')])\n          .filter((p) => !p.classList.contains('am-edge--dashed'))\n          .map((p) => ({ el: p, len: p.getTotalLength() }));\n        items.push({ el, scene: i, at: beat.start + rank * slot, paths });\n      }\n    });\n  });\n\n  // \u2500\u2500 3. Morphs: elements with the same data-key in consecutive scenes \u2500\u2500\n  const morphs = [];  // { scene, from, to, ghost, a, b }\n  const keyed = (sc) => {\n    const m = new Map();\n    for (const el of sc.querySelectorAll('[data-key]')) if (!m.has(el.dataset.key)) m.set(el.dataset.key, el);\n    return m;\n  };\n  for (let i = 2; i < scenes.length; i++) {\n    const prev = keyed(scenes[i - 1]);\n    for (const [key, to] of keyed(scenes[i])) {\n      const from = prev.get(key);\n      // Morph only like with like (SVG to SVG, HTML to HTML); otherwise the shapes do not match.\n      if (!from || (from instanceof SVGElement) !== (to instanceof SVGElement)) continue;\n      try {\n        const ghost = makeGhost(from);\n        overlay.append(ghost.node);\n        morphs.push({ scene: i, from, to, ghost: ghost.node, a: ghost.place(rectOf(from)), b: ghost.place(rectOf(to)) });\n      } catch {\n        // Morphs are a nicety: skip an element whose measurement fails; playback is unaffected.\n      }\n    }\n  }\n  const carried = new Set(morphs.map((m) => m.to));\n\n  function makeGhost(el) {\n    const wrap = document.createElement('div');\n    const host = el.closest('.am-diagram, .am-tree, .am-timeline, .am-kv, .am-limits');\n    wrap.className = `amv-ghost ${host ? host.className : ''}`;\n    if (el instanceof SVGGraphicsElement) {\n      const bb = el.getBBox();\n      const pad = 4;\n      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');\n      svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`);\n      svg.setAttribute('width', bb.width + pad * 2);\n      svg.setAttribute('height', bb.height + pad * 2);\n      const clone = el.cloneNode(true);\n      clone.removeAttribute('style');\n      svg.append(clone);\n      wrap.append(svg);\n      return {\n        node: wrap,\n        place: (r) => {\n          const s = r.w / (bb.width || 1);\n          return { x: r.x - pad * s, y: r.y - pad * s, s };\n        },\n      };\n    }\n    const clone = el.cloneNode(true);\n    clone.removeAttribute('style');\n    clone.querySelectorAll('[data-key], ul').forEach((n) => n.remove());\n    const box = document.createElement(el.tagName === 'LI' ? 'ul' : 'div');\n    box.className = el.tagName === 'LI' ? 'am-tree-list' : '';\n    box.style.margin = '0';\n    box.append(clone);\n    wrap.append(box);\n    wrap.style.width = `${el.offsetWidth}px`;\n    const w0 = el.offsetWidth || 1;\n    return { node: wrap, place: (r) => ({ x: r.x, y: r.y, s: r.w / w0 }) };\n  }\n\n  // \u2500\u2500 4. Camera: the element named by [name] in the narration \u2500\u2500\n  const findKey = (sc, key) => {\n    const all = [...sc.querySelectorAll('[data-key]')];\n    const norm = (s) => s.replace(/[`*]/g, '').trim().toLowerCase();\n    return all.find((el) => norm(el.dataset.key) === norm(key))\n      ?? all.find((el) => norm(el.dataset.key).includes(norm(key)))\n      ?? [...sc.querySelectorAll(`${STEP_SEL}, text`)].find((el) => norm(el.textContent).includes(norm(key)));\n  };\n  const IDENT = { s: 1, x: 0, y: 0 };\n  // Zoom without cropping: the whole diagram must stay in the safe area between title and captions.\n  const SAFE = { left: 60, right: W - 60, top: 150, bottom: H - 200 }; // leave room for captions at the bottom\n  function focusCam(r, sc) {\n    const fit = sc.querySelector('.amv-fit');\n    const c = fit ? rectOf(fit) : { x: 0, y: 0, w: W, h: H };\n    const room = Math.min((SAFE.right - SAFE.left) / c.w, (SAFE.bottom - SAFE.top) / c.h);\n    const s = clamp(Math.min(0.5 * W / r.w, 0.42 * H / r.h, room, 1.4), 1, 1.4);\n    const fitAxis = (want, lo, hi, a, b) => (s * (b - a) <= hi - lo ? clamp(want, lo - s * a, hi - s * b) : want);\n    return {\n      s,\n      x: fitAxis(W / 2 - s * (r.x + r.w / 2), SAFE.left, SAFE.right, c.x, c.x + c.w),\n      y: fitAxis(H * 0.5 - s * (r.y + r.h / 2), SAFE.top, SAFE.bottom, c.y, c.y + c.h),\n    };\n  }\n  const camEvents = [];   // { t, cam, hl }\n  segs.forEach((seg, i) => {\n    camEvents.push({ t: seg.start, cam: IDENT, hl: null });\n    seg.beats.forEach((b) => {\n      const el = b.focus ? findKey(scenes[i], b.focus) : null;\n      let cam = IDENT;\n      if (el) cam = focusCam(rectOf(el), scenes[i]);\n      camEvents.push({ t: b.start, cam, hl: el });\n    });\n  });\n  const hlTargets = new Set(camEvents.map((e) => e.hl).filter(Boolean));\n\n  // Scene and title fades. Titles never overlap: the old one fades out in the first half of the transition, the new one fades in in the second half.\n  const show = (el, op) => {\n    el.style.opacity = op;\n    el.style.visibility = op > 0 ? 'visible' : 'hidden';\n  };\n  function drawScenes(t) {\n    scenes.forEach((sc, i) => {\n      const seg = segs[i];\n      const next = segs[i + 1];\n      const before = t < seg.start;\n      const fadeIn = i === 0 ? ease(t / 0.8) : ease((t - seg.start) / T);\n      const fadeOut = next ? 1 - ease((t - next.start) / T) : 1;\n      show(sc, before ? 0 : Math.min(fadeIn, fadeOut));\n      if (!heads[i]) return;\n      const hin = ease((t - seg.start - T / 2) / (T / 2));\n      const hout = next ? 1 - ease((t - next.start) / (T / 2)) : 1;\n      show(heads[i], before ? 0 : Math.min(hin, hout));\n    });\n  }\n\n  // Steps appear: edges draw in one stroke, other elements fade in and rise slightly.\n  function drawSteps(t) {\n    for (const it of items) {\n      if (carried.has(it.el)) continue;\n      const p = ease((t - it.at) / R);\n      it.el.style.opacity = clamp((t - it.at) / 0.25);\n      if (!it.paths.length) {\n        it.el.style.transform = p < 1 ? `translateY(${(1 - p) * 14}px)` : '';\n        continue;\n      }\n      for (const { el, len } of it.paths) {\n        el.style.strokeDasharray = `${len}`;\n        el.style.strokeDashoffset = `${len * (1 - p)}`;\n        el.style.markerEnd = p < 0.97 ? 'none' : '';\n      }\n    }\n  }\n\n  // Morphs: during the transition a stand-in moves from the old to the new position while the real elements are hidden.\n  // An element can end one morph and start the next; collect the elements to hide first, then apply, so the two do not overwrite each other.\n  const morphed = [...new Set(morphs.flatMap((m) => [m.from, m.to]))];\n  function drawMorphs(t) {\n    const hidden = new Set();\n    for (const m of morphs) {\n      const s0 = segs[m.scene].start;\n      const during = t >= s0 && t < s0 + T;\n      m.ghost.style.display = during ? '' : 'none';\n      if (during) {\n        const p = ease((t - s0) / T);\n        m.ghost.style.transform = `translate(${lerp(m.a.x, m.b.x, p)}px, ${lerp(m.a.y, m.b.y, p)}px) scale(${lerp(m.a.s, m.b.s, p)})`;\n        hidden.add(m.from);\n      }\n      if (t < s0 + T) hidden.add(m.to);\n      m.to.style.opacity = 1;\n    }\n    for (const el of morphed) el.style.visibility = hidden.has(el) ? 'hidden' : '';\n  }\n\n  // Camera and highlight: interpolate between the previous camera position and the current target.\n  function drawCamera(t) {\n    const ev = camEvents.findLastIndex((e) => t >= e.t);\n    const e = ev >= 0 ? camEvents[ev] : null;\n    const prev = ev > 0 ? camEvents[ev - 1].cam : IDENT;\n    const p = e ? ease((t - e.t) / CAM) : 0;\n    const to = e ? e.cam : IDENT;\n    camera.style.transform = `translate(${lerp(prev.x, to.x, p)}px, ${lerp(prev.y, to.y, p)}px) scale(${lerp(prev.s, to.s, p)})`;\n    for (const el of hlTargets) el.classList.toggle('amv-hl', el === e?.hl);\n  }\n\n  function drawCaption(t) {\n    const cur = segs.findLastIndex((s) => t >= s.start);\n    const beats = cur >= 0 ? segs[cur].beats : [];\n    const b = beats.find((x) => t >= x.start && t < x.end + 0.3);\n    const html = b ? b.html : '';\n    if (caption.dataset.html !== html) {\n      caption.innerHTML = html;\n      caption.dataset.html = html;\n    }\n    caption.style.opacity = b ? clamp((t - b.start) / 0.2) : 0;\n  }\n\n  // \u2500\u2500 5. Deterministic rendering: the same time always draws the same frame \u2500\u2500\n  function render(time) {\n    const t = clamp(time, 0, D.duration);\n    drawScenes(t);\n    drawSteps(t);\n    drawMorphs(t);\n    drawCamera(t);\n    drawCaption(t);\n    updateUi(t);\n  }\n\n  // \u2500\u2500 6. Player \u2500\u2500\n  const audio = document.getElementById('amv-audio');\n  const seek = document.querySelector('.amv-seek');\n  const timeEl = document.querySelector('.amv-time');\n  const toggleBtn = document.querySelector('[data-amv=\"toggle\"]');\n  const bigPlay = document.querySelector('.amv-bigplay');\n  const marks = document.querySelector('.amv-marks');\n  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;\n  seek.max = D.duration;\n  segs.slice(1).forEach((s) => {\n    const m = document.createElement('i');\n    m.style.left = `${(s.start / D.duration) * 100}%`;\n    m.title = s.title;\n    marks.append(m);\n  });\n\n  let playing = false;\n  let base = 0;\n  let t0 = 0;\n  const now = () => (!playing ? base : audio ? audio.currentTime : base + (performance.now() - t0) / 1000);\n\n  function updateUi(t) {\n    if (document.activeElement !== seek) seek.value = t;\n    timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;\n  }\n\n  function play() {\n    if (base >= D.duration - 0.05) base = 0;\n    playing = true;\n    bigPlay.hidden = true;\n    toggleBtn.textContent = '\u275A\u275A';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.pause);\n    if (audio) {\n      audio.currentTime = base;\n      audio.play().catch(() => {});\n    } else {\n      t0 = performance.now();\n    }\n    requestAnimationFrame(tick);\n  }\n\n  function pause() {\n    base = now();\n    playing = false;\n    audio?.pause();\n    toggleBtn.textContent = '\u25B6';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.play);\n  }\n\n  function seekTo(x) {\n    base = clamp(x, 0, D.duration);\n    if (audio) audio.currentTime = base;\n    t0 = performance.now();\n    render(base);\n  }\n\n  function tick() {\n    if (!playing) return;\n    const t = now();\n    if (t >= D.duration) {\n      pause();\n      base = D.duration;\n      render(D.duration);\n      return;\n    }\n    render(t);\n    requestAnimationFrame(tick);\n  }\n\n  const toggle = () => (playing ? pause() : play());\n  toggleBtn.addEventListener('click', toggle);\n  bigPlay.addEventListener('click', play);\n  stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });\n  seek.addEventListener('input', () => seekTo(Number(seek.value)));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === ' ') { e.preventDefault(); toggle(); }\n    if (e.key === 'ArrowRight') seekTo(now() + 5);\n    if (e.key === 'ArrowLeft') seekTo(now() - 5);\n  });\n  audio?.addEventListener('ended', () => { pause(); base = D.duration; });\n\n  function fitStage() {\n    if (root.hasAttribute('data-export')) return;\n    const vp = stage.parentElement;\n    const s = Math.min(vp.clientWidth / W, vp.clientHeight / H);\n    stage.style.transform = `translate(-50%, -50%) scale(${s})`;\n  }\n  window.addEventListener('resize', fitStage);\n\n  // Export: place the stage 1:1 at the top left and call render(t) frame by frame.\n  window.render = render;\n  window.__amv = {\n    duration: D.duration,\n    fps: D.fps,\n    exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },\n  };\n  fitStage();\n  // Poster: show the fully faded-in title card, but playback still starts at 0.\n  render(Math.min(1, segs[0].end));\n  updateUi(0);\n})();\n";
 
 // src/cli.js
-import { join as join7, resolve as resolve2, dirname as dirname2, basename as basename2 } from "node:path";
+import { join as join7, resolve as resolve3, dirname as dirname2, basename as basename3 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -759,6 +775,7 @@ var zh_default = {
     mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
     copy: "\u590D\u5236\u6E90\u7A3F",
     done: "\u5DF2\u590D\u5236 \u2713",
+    copyCode: "\u590D\u5236",
     toc: "\u76EE\u5F55",
     flow: "\u6D41\u7A0B\u56FE",
     sequence: "\u65F6\u5E8F\u56FE",
@@ -784,6 +801,7 @@ var zh_Hant_default = {
     mode: { auto: "\u8DDF\u96A8\u7CFB\u7D71", light: "\u6DFA\u8272", dark: "\u6DF1\u8272" },
     copy: "\u8907\u88FD\u6E90\u7A3F",
     done: "\u5DF2\u8907\u88FD \u2713",
+    copyCode: "\u8907\u88FD",
     toc: "\u76EE\u9304",
     flow: "\u6D41\u7A0B\u5716",
     sequence: "\u6642\u5E8F\u5716",
@@ -803,6 +821,7 @@ var en_default = {
     mode: { auto: "Auto", light: "Light", dark: "Dark" },
     copy: "Copy source",
     done: "Copied \u2713",
+    copyCode: "Copy",
     toc: "Contents",
     flow: "Flowchart",
     sequence: "Sequence diagram",
@@ -827,6 +846,7 @@ var ja_default = {
     mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
+    copyCode: "\u30B3\u30D4\u30FC",
     toc: "\u76EE\u6B21",
     flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
     sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
@@ -1435,10 +1455,11 @@ function splitSections(lines, start) {
       flushMd();
       const close = findFenceClose(lines, i, fence[1]);
       if (close === -1) throw new ParseError(`fenced block ${fence[1]}${fence[2]} is not closed`, i + 1);
+      const bare = fence[2].includes("=");
       current.blocks.push({
         type: "fence",
-        lang: fence[2].toLowerCase(),
-        args: fence[3].trim(),
+        lang: bare ? "" : fence[2].toLowerCase(),
+        args: (bare ? `${fence[2]} ${fence[3]}` : fence[3]).trim(),
         text: lines.slice(i + 1, close).join("\n"),
         line: i + 1
       });
@@ -2870,7 +2891,7 @@ function statusHtml(word, label = "") {
   return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text}</span>`;
 }
 var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
-var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+([^<]*?))?\s*<\/td>/g;
+var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
 function figure(img) {
   const alt = img.match(/\salt="([^"]*)"/)?.[1];
   return `<figure class="am-figure">${img}${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`;
@@ -2878,11 +2899,15 @@ function figure(img) {
 function decorate(html) {
   return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
 }
+var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
+}
 function md(text) {
-  return decorate(marked.parse(String(text ?? "")));
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
 }
 function mdInline(text) {
-  return marked.parseInline(String(text ?? ""));
+  return marked.parseInline(wrapSpacedImages(String(text ?? "")));
 }
 
 // src/svg/text.js
@@ -6006,6 +6031,7 @@ var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
 var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
 var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
+var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
 var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
 var ImageError = class extends Error {
   constructor(message, ref) {
@@ -6042,7 +6068,12 @@ function readImage(ref, baseDir) {
   }
   return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
 }
-function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map() } = {}) {
+function assertNoImageText(html) {
+  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
+  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
+}
+function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
+  if (checkText) assertNoImageText(html);
   return html.replace(IMG_SRC, (whole, before, src) => {
     const ref = decodeRef(src);
     if (NOT_LOCAL.test(ref)) return whole;
@@ -6053,6 +6084,132 @@ function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ n
 }
 function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
+}
+
+// src/code.js
+import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
+import { basename as basename2, extname as extname2, isAbsolute as isAbsolute2, relative, resolve as resolve2, sep } from "node:path";
+var MAX_CODE_LINES = 200;
+var LONG_CODE_LINES = 40;
+var MAX_FILE_BYTES = 2 * 1024 * 1024;
+var KEYS = /* @__PURE__ */ new Set(["src", "lines", "hl", "title", "start"]);
+var CODE_EXAMPLE = "```ts src=server/routes.ts lines=18-30 hl=22\n```";
+var SECRET_FILE = new RegExp([
+  "^\\.env(?!\\.(?:example|sample|template)$)(?:\\..*)?$",
+  "^(?:\\.netrc|\\.npmrc|\\.yarnrc(?:\\.yml)?|\\.pypirc|\\.pgpass|\\.my\\.cnf|\\.git-credentials|\\.htpasswd)$",
+  "^(?:id_(?:rsa|dsa|ecdsa|ed25519).*|credentials.*|secrets?(?:\\..*)?|.*_history|.*\\.local\\.json)$",
+  "\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$"
+].join("|"), "i");
+var SECRET_DIR = /* @__PURE__ */ new Set([".git", ".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"]);
+var SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
+var CodeError = class extends Error {
+  constructor(message, line = 0) {
+    super(message);
+    this.name = "CodeError";
+    this.line = line;
+  }
+};
+function parseRange(value, name) {
+  const m = String(value).match(/^(\d+)(?:-(\d+))?$/);
+  if (!m) throw new CodeError(`${name}="${value}" is not a line range; write ${name}=18-30 or ${name}=18`);
+  const from = Number(m[1]);
+  const to = m[2] === void 0 ? from : Number(m[2]);
+  if (from < 1 || to < from) throw new CodeError(`${name}="${value}": the first line must be 1 or more and not after the last line`);
+  return { from, to };
+}
+function parseHighlight(value) {
+  const set = /* @__PURE__ */ new Set();
+  for (const part of String(value).split(",").map((s) => s.trim()).filter(Boolean)) {
+    const { from, to } = parseRange(part, "hl");
+    for (let n = from; n <= to; n++) set.add(n);
+  }
+  return set;
+}
+function parseCodeArgs(args) {
+  const attrs = parseAttrs(args);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value !== true && !KEYS.has(key)) throw new CodeError(`unknown code block setting "${key}"; use ${[...KEYS].join(", ")}`);
+  }
+  const text = (key) => typeof attrs[key] === "string" || typeof attrs[key] === "number" ? String(attrs[key]) : void 0;
+  return { src: text("src"), lines: text("lines"), hl: text("hl"), title: text("title"), start: text("start") };
+}
+function localPath2(ref, baseDir) {
+  const path = resolve2(baseDir, ref);
+  const rel = relative(baseDir, path);
+  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute2(rel) ? null : path;
+}
+function readSlice(ref, range, baseDir) {
+  const path = localPath2(ref, baseDir);
+  if (!path) return null;
+  if (SECRET_FILE.test(basename2(path)) || relative(baseDir, path).split(sep).some((part) => SECRET_DIR.has(part))) {
+    throw new CodeError(`"${ref}" is a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  }
+  let size;
+  try {
+    const stat = statSync2(path);
+    if (!stat.isFile()) throw new CodeError(`"${ref}" is not a file`);
+    size = stat.size;
+  } catch (err) {
+    if (err instanceof CodeError) throw err;
+    return null;
+  }
+  if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
+  const buf = readFileSync3(path);
+  if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
+  if (SECRET_TEXT.test(buf.toString("utf8"))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
+  const all = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
+  const from = range?.from ?? 1;
+  const to = range?.to ?? all.length;
+  if (to > all.length) throw new CodeError(`"${ref}" has ${all.length} lines; lines=${range.from}-${range.to} goes past the end`);
+  return all.slice(from - 1, to);
+}
+var EMBEDDED_BLOCK = /<figure class="am-codeblock"[^>]*?\sdata-am-src="([^"]*)"(?:\sdata-am-lines="([^"]*)")?[^>]*>([\s\S]*?)<\/figure>/g;
+var LINE_SPAN = /<span class="am-ln[^"]*"[^>]*>([\s\S]*?)<\/span>/g;
+function readEmbeddedCode(html) {
+  return new Map([...String(html).matchAll(EMBEDDED_BLOCK)].map(([, src, lines = "", inner]) => [
+    `${unescapeHtml(src)}#${lines}`,
+    [...inner.matchAll(LINE_SPAN)].map((m) => unescapeHtml(m[1]))
+  ]));
+}
+function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), ui = {}, copy = true } = {}) {
+  const opts = parseCodeArgs(args);
+  const range = opts.lines ? parseRange(opts.lines, "lines") : null;
+  if (range && !opts.src) throw new CodeError("lines= needs src=; for code you type, use start= to number the lines");
+  let body;
+  let first = 1;
+  if (opts.src) {
+    if (text.trim()) throw new CodeError("a block with src= takes its code from the file; leave the block empty");
+    body = readSlice(opts.src, range, baseDir) ?? known.get(`${opts.src}#${opts.lines ?? ""}`);
+    if (!body) {
+      const where2 = localPath2(opts.src, baseDir) ? "not found" : `outside the current folder ${baseDir}; only files inside it are quoted`;
+      throw new CodeError(`Code file "${opts.src}" is ${where2}`);
+    }
+    first = range?.from ?? 1;
+  } else {
+    body = text.split("\n");
+    if (opts.start) first = parseRange(opts.start, "start").from;
+  }
+  if (body.length > MAX_CODE_LINES) throw new CodeError(`the block has ${body.length} lines; quote ${MAX_CODE_LINES} lines at most, and pick the lines that make the point`);
+  const slice = body.join("\n");
+  if (SECRET_TEXT.test(slice)) throw new CodeError(`${opts.src ? `"${opts.src}"` : "the block"} looks like it holds a key or a token; it is not embedded. Quote other lines or write a sketch`);
+  const last = first + body.length - 1;
+  const hl = opts.hl ? parseHighlight(opts.hl) : /* @__PURE__ */ new Set();
+  const outside = [...hl].find((n) => n < first || n > last);
+  if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not in the block (lines ${first}-${last})`);
+  const shownLang = lang || (opts.src ? extname2(opts.src).slice(1).toLowerCase() : "");
+  const numbered = Boolean(opts.src || opts.start);
+  const where = opts.src ? `${opts.src}${range ? `:${range.from === range.to ? range.from : `${range.from}-${range.to}`}` : ""}` : "";
+  const title = opts.title ?? where;
+  const lines = body.map((l3, i) => {
+    const n = first + i;
+    return `<span class="am-ln${hl.has(n) ? " am-ln--hl" : ""}"${numbered ? ` data-n="${n}"` : ""}>${esc(l3)}</span>`;
+  }).join("");
+  const source = opts.src ? ` data-am-src="${esc(opts.src)}"${opts.lines ? ` data-am-lines="${esc(opts.lines)}"` : ""}` : "";
+  const button = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? "Copied \u2713")}">${esc(ui.copyCode ?? "Copy")}</button>` : "";
+  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && where ? ` title="${esc(where)}"` : ""}>${esc(title)}</span>${shownLang ? `<span class="am-code-lang">${esc(shownLang)}</span>` : ""}${button}</figcaption>`;
+  const html = `<figure class="am-codeblock"${source}>${head}<pre class="am-code${numbered ? " am-code--num" : ""}"><code${shownLang ? ` data-lang="${esc(shownLang)}"` : ""}>${lines}</code></pre></figure>`;
+  const warning = body.length > LONG_CODE_LINES ? `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` : null;
+  return { html, file: where || null, warning };
 }
 
 // src/render.js
@@ -6072,7 +6229,7 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
-function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, knownImages } = {}) {
+function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -6083,9 +6240,9 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
-  const stats = { panels: doc2.panels.length, components: {} };
+  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages } };
+  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const introHtml = renderBlocks(doc2.intro, ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const body = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui });
@@ -6098,12 +6255,13 @@ function hasVisuals({ intro, panels }) {
 function renderBlocks(blocks, ctx) {
   return blocks.map((b) => embedImages(b, b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join("\n");
 }
+var MARKDOWN_FENCES = /* @__PURE__ */ new Set(["callout", "kv", "tree", "timeline"]);
 function embedImages(block2, html, ctx) {
   try {
-    return inlineImages(html, ctx.images);
+    return inlineImages(html, { ...ctx.images, checkText: block2.type === "md" || MARKDOWN_FENCES.has(block2.lang) });
   } catch (err) {
     if (!(err instanceof ImageError)) throw err;
-    const idx = block2.text.split("\n").findIndex((l3) => l3.includes(err.ref));
+    const idx = block2.text.split("\n").findIndex((l3) => l3.includes(err.ref) || l3.includes(encodeURI(err.ref)));
     const first = block2.type === "md" ? block2.line : block2.line + 1;
     throw new RenderError(err.message, { line: first + Math.max(idx, 0), component: "image", example: IMAGE_EXAMPLE });
   }
@@ -6112,9 +6270,7 @@ function renderFence(block2, ctx) {
   const { lang, args, text, line } = block2;
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
-  if (!comp) {
-    return `<pre class="am-code"><code${lang ? ` data-lang="${esc(lang)}"` : ""}>${esc(text)}</code></pre>`;
-  }
+  if (!comp) return codeBlock(block2, ctx);
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui });
@@ -6125,6 +6281,17 @@ function renderFence(block2, ctx) {
       component: lang,
       example: comp.example
     });
+  }
+}
+function codeBlock(block2, ctx) {
+  try {
+    const { html, file, warning } = renderCode(block2, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
+    if (file && ctx.stats.code) ctx.stats.code.push(file);
+    if (warning && ctx.stats.codeWarnings) ctx.stats.codeWarnings.push({ line: block2.line, message: warning });
+    return html;
+  } catch (err) {
+    if (!(err instanceof CodeError)) throw err;
+    throw new RenderError(err.message, { line: block2.line + err.line, component: "code", example: CODE_EXAMPLE });
   }
 }
 function timestamp(d = /* @__PURE__ */ new Date()) {
@@ -6249,7 +6416,7 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync as readFileSync3, writeFileSync, existsSync as existsSync2, rmSync, mkdtempSync, renameSync } from "node:fs";
+import { mkdirSync, readFileSync as readFileSync4, writeFileSync, existsSync as existsSync2, rmSync, mkdtempSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as join2 } from "node:path";
 
@@ -6404,7 +6571,7 @@ function systemVoice(platform, which) {
       synth: (text, { language } = {}) => withTemp(async (file) => {
         const v = voices[language];
         await run("say", [...v ? ["-v", v] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
-        return readWav(readFileSync3(file));
+        return readWav(readFileSync4(file));
       })
     };
   }
@@ -6417,7 +6584,7 @@ function systemVoice(platform, which) {
       usesLanguage: true,
       synth: (text, { language } = {}) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[language] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
-        return readWav(readFileSync3(file));
+        return readWav(readFileSync4(file));
       })
     };
   }
@@ -6437,14 +6604,14 @@ function pickMacVoices(out) {
   };
 }
 function run(cmd, args) {
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     p.stderr.on("data", (d) => {
       err += d;
     });
     p.on("error", reject);
-    p.on("close", (code) => code === 0 ? resolve3() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
+    p.on("close", (code) => code === 0 ? resolve4() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
   });
 }
 function textFile(wavFile, text) {
@@ -6517,7 +6684,7 @@ ${texts[i]}`).digest("hex")}.pcm`);
 }
 function readCache(file) {
   if (!existsSync2(file)) return null;
-  const buf = readFileSync3(file);
+  const buf = readFileSync4(file);
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
@@ -6787,14 +6954,14 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
     });
     ffmpeg.stdin.on("error", () => {
     });
-    const done = new Promise((resolve3, reject) => {
+    const done = new Promise((resolve4, reject) => {
       ffmpeg.on("error", (e) => {
         exited = true;
         reject(new ExportError(`Cannot run ffmpeg: ${e.message}`));
       });
       ffmpeg.on("close", (code) => {
         exited = true;
-        if (code === 0) resolve3();
+        if (code === 0) resolve4();
         else reject(new ExportError(`ffmpeg failed (${code}): ${ffErr.slice(0, 300)}`));
       });
     });
@@ -6832,7 +6999,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   }
 }
 function devtoolsUrl(chrome, timeoutMs = 2e4) {
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     let buf = "";
     const fail = (msg) => {
       clearTimeout(timer);
@@ -6848,13 +7015,13 @@ ${tail}` : msg));
       const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
       if (m) {
         clearTimeout(timer);
-        resolve3(m[1]);
+        resolve4(m[1]);
       }
     });
   });
 }
 function connect(url) {
-  return new Promise((resolve3, reject) => {
+  return new Promise((resolve4, reject) => {
     const ws = new WebSocket(url);
     const pending = /* @__PURE__ */ new Map();
     const waiters = /* @__PURE__ */ new Map();
@@ -6872,7 +7039,7 @@ function connect(url) {
         waiters.delete(msg.method);
       }
     });
-    ws.addEventListener("open", () => resolve3({
+    ws.addEventListener("open", () => resolve4({
       send(method, params = {}, sessionId) {
         return new Promise((ok, fail) => {
           const msgId = ++id;
@@ -6901,13 +7068,13 @@ import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync3 } from "node:
 import { join as join5 } from "node:path";
 
 // src/state.js
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync3, mkdirSync as mkdirSync2, renameSync as renameSync2 } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, mkdirSync as mkdirSync2, renameSync as renameSync2 } from "node:fs";
 import { join as join4 } from "node:path";
 var DAY = 24 * 60 * 60 * 1e3;
 var statePath = (home) => join4(home, "state.json");
 function readState(home) {
   try {
-    const data = JSON.parse(readFileSync4(statePath(home), "utf8"));
+    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
     return data && typeof data === "object" && !Array.isArray(data) ? data : {};
   } catch {
     return {};
@@ -7068,7 +7235,7 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
 }
 
 // src/config.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync4 } from "node:fs";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync4 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
 import { join as join6, dirname } from "node:path";
 var ConfigError = class extends Error {
@@ -7116,7 +7283,7 @@ function readStored(env) {
   const file = configPath(env);
   if (!existsSync4(file)) return { stored: {} };
   try {
-    const data = JSON.parse(readFileSync5(file, "utf8"));
+    const data = JSON.parse(readFileSync6(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
   } catch (e) {
     return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
@@ -7231,7 +7398,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|image|video|patch|theme]  show component syntax / page draft format / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -7265,17 +7432,35 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
 
 ![What the picture shows](/absolute/path/to/screenshot.png)
 
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
-- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
 - http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
 - Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
+var CODE_HELP = `Code blocks: real code from a file, or code you type
+
+\`\`\`ts src=server/routes.ts lines=18-30 hl=22
+\`\`\`
+
+\`\`\`ts title="limits.ts \xB7 sketch"
+export const LIMIT = 50
+\`\`\`
+
+- A fence whose language is not a component is a code block. Each block gets a header and a Copy button.
+- src= quotes a file: the CLI reads the lines, so you do not type them, and the code is the real code. Leave the block empty.
+  The path is read from the current folder, and only files inside it are quoted. lines=18-30 (or lines=18) picks the lines; without it the whole file is quoted.
+- The header shows path:lines, or title= when you set it. Write "sketch" in the title of code that does not exist yet.
+- hl=22 or hl=20-22,25 highlights lines by their shown number. start=38 numbers a typed block from 38.
+- 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
+- Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ \u2026) and files with anything that looks like a key or a token are refused.
+- The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.`;
 var RAW_HELP = `LANG \u2014 embed as-is (escape hatch)
 
 When the fence language is LANG, the content goes into the page unprocessed. Use it only when no component can show the content;
@@ -7399,7 +7584,7 @@ async function withSource(arg, io, fail, fn3) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync6(resolve2(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync7(resolve3(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -7408,7 +7593,7 @@ async function withSource(arg, io, fail, fn3) {
     fail("\u2717 The draft is empty");
     return 2;
   }
-  return fn3(src, arg === "-" ? cwd : dirname2(resolve2(cwd, arg)));
+  return fn3(src, arg === "-" ? cwd : dirname2(resolve3(cwd, arg)));
 }
 async function readStream(stream) {
   const chunks = [];
@@ -7428,7 +7613,7 @@ function cmdRender(src, opts, ctx, baseDir) {
   const { theme, mode, style } = config.values;
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -7488,10 +7673,10 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     return 2;
   }
   const cwd = io.cwd ?? process.cwd();
-  const file = resolve2(cwd, htmlArg);
+  const file = resolve3(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync6(file, "utf8");
+    html = readFileSync7(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -7505,7 +7690,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync6(resolve2(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync7(resolve3(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -7538,7 +7723,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       if (!validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, knownImages: readEmbeddedImages(html) });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html) });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -7609,7 +7794,7 @@ function themeWarnings({ fail, themes: themes2 }) {
   themes2.warnings.forEach((w) => fail(`! ${w}`));
 }
 function outputPath(dir, title, opts, { env, io }) {
-  if (opts.out) return resolve2(io.cwd ?? process.cwd(), opts.out);
+  if (opts.out) return resolve3(io.cwd ?? process.cwd(), opts.out);
   return join7(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function emit(result, file, { print }, note = "") {
@@ -7617,6 +7802,12 @@ function emit(result, file, { print }, note = "") {
   writeFileSync5(file, result.html);
   print(`\u2713 ${file}`);
   print(`  ${summaryLine(result)}${note}`);
+  if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
+  const long = result.stats.codeWarnings ?? [];
+  if (long.length) {
+    print(`  code ${count(long.length, "warning")} (trim the block and run again, or keep it if every line matters):`);
+    long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
+  }
   printWarnings(result.warnings, print, result.meta.style);
 }
 function summaryLine(result) {
@@ -7754,6 +7945,7 @@ function cmdList({ print, fail, themes: themes2 }) {
   print("\nComponents (fence language):");
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print("  html/svg  embed as-is (escape hatch)");
+  print("  <other>   code block; src=path lines=a-b quotes a file (am help code)");
   print("\nSyntax: am help <component>; draft format: am help format");
 }
 function specimenDraft(name, mode) {
@@ -7774,8 +7966,8 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve2(io.cwd ?? process.cwd(), target) : join7(amHome(env), "themes", `${target}.json`);
-  const name = isFile ? basename2(path).replace(/\.json$/i, "") : target;
+  const path = isFile ? resolve3(io.cwd ?? process.cwd(), target) : join7(amHome(env), "themes", `${target}.json`);
+  const name = isFile ? basename3(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
   if (!isFile && getTheme(name)) {
@@ -7811,13 +8003,14 @@ function cmdHelp(name, { print, fail }) {
   if (!name) return print(USAGE), 0;
   if (name === "format") return print(FORMAT), 0;
   if (name === "image") return print(IMAGE_HELP), 0;
+  if (name === "code") return print(CODE_HELP), 0;
   if (name === "video") return print(VIDEO_FORMAT), 0;
   if (name === "patch") return print(PATCH_HELP), 0;
   if (name === "theme") return print(THEME_HELP), 0;
   if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, image, video, patch, theme`);
+    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}

@@ -21,7 +21,8 @@ export function statusHtml(word, label = '') {
 // A paragraph that holds only an image becomes a figure; the alt text is its caption.
 const IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
 
-const CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+([^<]*?))?\s*<\/td>/g;
+// The status word must open the cell; the label after it may hold inline HTML (code, em, strong, a) but never crosses a cell boundary.
+const CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
 
 function figure(img) {
   const alt = img.match(/\salt="([^"]*)"/)?.[1];
@@ -36,10 +37,18 @@ function decorate(html) {
     .replace(CELL_STATUS, (_, attrs, word, label = '') => `<td${attrs}>${statusHtml(word, label)}</td>`);
 }
 
+// CommonMark takes a space in a link destination only inside <…>, so marked would leave ![alt](a b.png) as text. Wrap such a destination; code spans are skipped.
+// A destination may hold balanced (…) such as "Screenshot (1).png".
+const SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = '') => (code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`));
+}
+
 export function md(text) {
-  return decorate(marked.parse(String(text ?? '')));
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ''))));
 }
 
 export function mdInline(text) {
-  return marked.parseInline(String(text ?? ''));
+  return marked.parseInline(wrapSpacedImages(String(text ?? '')));
 }

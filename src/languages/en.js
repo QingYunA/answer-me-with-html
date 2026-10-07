@@ -5,7 +5,7 @@ export default {
   ui: {
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
-    copy: 'Copy source', done: 'Copied ✓',
+    copy: 'Copy source', done: 'Copied ✓', copyCode: 'Copy',
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
   },
   videoUi: { play: 'Play', pause: 'Pause', chapters: 'Chapters' },

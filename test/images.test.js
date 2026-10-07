@@ -69,6 +69,71 @@ test('image: a missing file, a non-image file and a file over the limit are erro
   assert.throws(() => renderDoc(draft(`![Big](${big})`)), /the limit is 5 MB/);
 });
 
+test('image: a space in the path still makes a figure, alone on a line or in a callout', () => {
+  mkdirSync(join(dir, 'ui shots'), { recursive: true });
+  writeFileSync(join(dir, 'ui shots', 'spectator view.png'), PNG);
+  const abs = join(dir, 'ui shots', 'spectator view.png');
+  for (const src of [draft(`![The spectator screen](${abs})`), `## A\n\`\`\`callout info Note\n![The spectator screen](${abs})\n\`\`\`\n`]) {
+    const { html } = renderDoc(src);
+    assert.ok(html.includes(DATA_URI));
+    assert.ok(html.includes('<figure class="am-figure">'));
+    assert.ok(!html.includes('<p>![The spectator screen]'));
+  }
+});
+
+test('image: a space in the path keeps a title, and a missing or non-image file is still an error', () => {
+  const abs = join(dir, 'ui shots', 'spectator view.png');
+  assert.ok(renderDoc(draft(`![UI](${abs} "A title")`)).html.includes(DATA_URI));
+  for (const [line, pattern] of [
+    ['![Gone](/nonexistent dir/a b.png)', /Image not found: "\/nonexistent dir\/a b\.png"/],
+    [`![Text](${join(dir, 'ui shots', 'my notes.txt')})`, /is not an image file/],
+  ]) {
+    assert.throws(() => renderDoc(draft(line)), (e) => e instanceof RenderError && e.line === 5 && e.component === 'image' && pattern.test(e.message));
+  }
+});
+
+test('image: a space in a code span is left alone', () => {
+  const { html } = renderDoc(draft('Write `![alt](a b.png)` like this.'));
+  assert.ok(html.includes('![alt](a b.png)'));
+});
+
+test('image: an image that marked leaves as text is an error at its line', () => {
+  assert.throws(() => renderDoc(draft('![Odd](/a b/c <1>.png)')), (e) => e instanceof RenderError && e.line === 5 && e.component === 'image' && /was not read as an image/.test(e.message));
+});
+
+test('image: parentheses next to a space in the path still make a figure', () => {
+  const abs = join(dir, 'ui shots', 'Screenshot (1).png');
+  writeFileSync(abs, PNG);
+  assert.ok(renderDoc(draft(`![UI](${abs})`)).html.includes(DATA_URI));
+  assert.ok(renderDoc(draft(`![UI](${abs} "A title") and (more)`)).html.includes(DATA_URI));
+});
+
+test('image: the error names the line even when the draft writes the path as %20', () => {
+  assert.throws(() => renderDoc(draft('Intro.\n\n![Gone](/nonexistent%20dir/a.png)')), (e) => e instanceof RenderError && e.line === 7 && e.component === 'image');
+});
+
+test('image: ![a](b) typed in a raw html block or diagram text stays literal and passes', () => {
+  assert.ok(renderDoc('## A\n```html\n<p>![a](b.png)</p>\n```\n').html.includes('<p>![a](b.png)</p>'));
+  assert.doesNotThrow(() => renderDoc('## A\n```flow\nA[![a](b)] -> B\n```\n'));
+});
+
+test('image: an image in a tree label works, with or without a space in the path', () => {
+  for (const name of ['ui shots/spectator view.png', 'shots/ui.png']) {
+    assert.ok(renderDoc(`## A\n\`\`\`tree\n![UI](${join(dir, name)})\n\`\`\`\n`).html.includes(DATA_URI), name);
+  }
+});
+
+test('image: a space in the path works in kv, tree and timeline text too', () => {
+  const abs = join(dir, 'ui shots', 'spectator view.png');
+  for (const fence of [`kv\nshot: ![UI](${abs})`, `tree\n![UI](${abs})`, `timeline\n2026 | ![UI](${abs}) | done`]) {
+    assert.ok(renderDoc(`## A\n\`\`\`${fence}\n\`\`\`\n`).html.includes(DATA_URI), fence);
+  }
+});
+
+test('image: a reference-style image with a space in its definition is an error, not text', () => {
+  assert.throws(() => renderDoc(draft('![Odd][r]\n\n[r]: /a b/c.png')), (e) => e instanceof RenderError && e.line === 5 && /was not read as an image/.test(e.message));
+});
+
 test('image: a relative path in the message names the folder it was read from', () => {
   assert.throws(() => renderDoc(draft('![Gone](gone.png)'), {}, {}, { baseDir: dir }), (e) => e.message.includes(`relative paths are read from ${dir}`));
 });
