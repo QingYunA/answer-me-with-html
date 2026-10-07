@@ -23,6 +23,7 @@ export default {
     },
     toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
     expand: '拡大表示', close: '閉じる', diagram: 'ダイアグラム',
+    delta: { added: '追加', removed: '削除', changed: '変更', view: '表示', before: '変更前', changes: '差分', after: '変更後' },
   },
   videoUi: { play: '再生', pause: '一時停止', chapters: '章' },
 };

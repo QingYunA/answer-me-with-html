@@ -15,6 +15,7 @@ export default {
     },
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', colon: ': ', sep: ', ',
     expand: 'Expand diagram', close: 'Close', diagram: 'Diagram viewer',
+    delta: { added: 'added', removed: 'removed', changed: 'changed', view: 'View', before: 'Before', changes: 'Changes', after: 'After' },
   },
   videoUi: { play: 'Play', pause: 'Pause', chapters: 'Chapters' },
 };

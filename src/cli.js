@@ -496,8 +496,17 @@ function emit(result, file, { print }, note = '') {
     print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
   }
+  printComponentWarnings(result.stats.componentWarnings, print);
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
+}
+
+// What a component noticed in its own block (a group box that would be empty after a change). The page is still written.
+function printComponentWarnings(notes = [], print) {
+  if (!notes.length) return;
+  print(`  diagram ${count(notes.length, 'warning')} (the page is written; fix the draft if that is not what you meant):`);
+  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
+  if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 
 // Raw HTML the render changed (a placeholder shown as text, a tag or attribute removed). Not STE warnings: they never fail style: strict.

@@ -1,0 +1,57 @@
+/* Change markers (only on pages that have one): added, removed and changed items, a corner badge, the count row and the Before / Changes / After switch.
+   The colors are the theme's --ok, --err and --warn, so every theme and mode works. A view hides items with visibility, so nothing moves. */
+[data-delta-view="before"] [data-delta="added"], [data-delta-view="after"] [data-delta="removed"] { visibility: hidden; }
+
+.am-delta-badge--added { --badge: var(--ok, #1f9d4d); }
+.am-delta-badge--removed { --badge: var(--err, #c62828); }
+.am-delta-badge--changed { --badge: var(--warn, #a8620a); }
+
+/* flow */
+.am-diagram .am-node[data-delta="added"] .am-node-shape { stroke: var(--ok, #1f9d4d); }
+.am-diagram .am-node[data-delta="removed"] .am-node-shape { stroke: var(--err, #c62828); }
+.am-diagram .am-node[data-delta="changed"] .am-node-shape { stroke: var(--warn, #a8620a); }
+.am-diagram .am-node[data-delta="added"] > text { fill: var(--ok, #1f9d4d); }
+.am-diagram .am-node[data-delta="removed"] > text { fill: var(--err, #c62828); }
+.am-diagram [data-delta="added"] > .am-edge { stroke: var(--ok, #1f9d4d); }
+.am-diagram [data-delta="removed"] > .am-edge { stroke: var(--err, #c62828); }
+.am-arrow--added { fill: var(--ok, #1f9d4d); }
+.am-arrow--removed { fill: var(--err, #c62828); }
+.am-diagram [data-delta="added"] > .am-edge-label text { fill: var(--ok, #1f9d4d); }
+.am-diagram [data-delta="removed"] > .am-edge-label text { fill: var(--err, #c62828); }
+.am-diagram .am-cluster[data-delta="added"] { stroke: var(--ok, #1f9d4d); }
+.am-diagram .am-cluster[data-delta="removed"] { stroke: var(--err, #c62828); }
+.am-diagram .am-cluster-label[data-delta="added"] { fill: var(--ok, #1f9d4d); }
+.am-diagram .am-cluster-label[data-delta="removed"] { fill: var(--err, #c62828); }
+.am-diagram g[data-delta="removed"]:not(.am-delta-badge), .am-diagram .am-cluster[data-delta="removed"], .am-diagram .am-cluster-label[data-delta="removed"] { opacity: 0.55; }
+.am-diagram .am-node[data-delta="removed"] > text, .am-diagram g[data-delta="removed"] > .am-edge-label text, .am-diagram .am-cluster-label[data-delta="removed"] { text-decoration: line-through; }
+.am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
+.am-diagram .am-delta-badge text { fill: var(--paper, #ffffff); font: 700 11px var(--font-sans, sans-serif); text-decoration: none; }
+
+/* tree */
+.am-tree .am-delta-badge {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 15px; height: 15px; flex: none;
+  border-radius: 50%; background: var(--badge); color: var(--paper); font: 700 11px/1 var(--font-mono, monospace); text-decoration: none;
+}
+.am-tree-box[data-delta] { position: relative; }
+.am-tree-box > .am-delta-badge { position: absolute; top: -8px; right: -8px; }
+.am-tree-label > .am-delta-badge { margin-right: 6px; vertical-align: 1px; }
+.am-tree-box[data-delta="added"] { border-color: var(--ok); }
+.am-tree-box[data-delta="removed"] { border-color: var(--err); opacity: 0.55; text-decoration: line-through; }
+.am-tree-box[data-delta="changed"] { border-color: var(--warn); }
+.am-tree-list li[data-delta="added"] > .am-tree-label { color: var(--ok); }
+.am-tree-list li[data-delta="removed"] > .am-tree-label { color: var(--err); text-decoration: line-through; }
+.am-tree-list li[data-delta="changed"] > .am-tree-label { color: var(--warn); }
+.am-tree-list li[data-delta="removed"] > .am-tree-label, .am-tree-list li[data-delta="removed"] > .am-tree-sub { opacity: 0.55; }
+
+/* the count row and the switch */
+.am-delta-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 10px; text-align: left; font: 12px/1.3 var(--font-mono, monospace); }
+.am-delta-count--added { color: var(--ok); }
+.am-delta-count--removed { color: var(--err); }
+.am-delta-count--changed { color: var(--warn); }
+.am-delta-switch { display: inline-flex; margin-left: auto; border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius); overflow: hidden; }
+.am-delta-switch[hidden] { display: none; }
+.am-delta-switch button { font: inherit; padding: 3px 10px; color: var(--ink-2); background: var(--paper); border: 0; border-left: 1px solid var(--line-2); cursor: pointer; }
+.am-delta-switch button:first-child { border-left: 0; }
+.am-delta-switch button[aria-pressed="true"] { color: var(--ink); background: var(--accent-bg); font-weight: 600; }
+.am-delta-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media print { .am-delta-switch { display: none !important; } }

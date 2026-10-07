@@ -1,6 +1,6 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
-import { renderBlocks, LintError, timestamp } from '../render.js';
+import { renderBlocks, LintError, timestamp, hasDelta } from '../render.js';
 import { resolveLanguage, detectLang, baseLanguage } from '../language.js';
 import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
@@ -36,7 +36,7 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
-  const stats = { panels: video.scenes.length, components: {}, htmlWarnings: [] };
+  const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
@@ -122,7 +122,7 @@ ${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: embedded.find((t) 
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${videoCss(embedded, { diff: scenesHtml.includes('class="am-codeblock am-codeblock--diff"') })}
+${videoCss(embedded, { diff: scenesHtml.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(scenesHtml) })}
 </style>
 </head>
 <body>

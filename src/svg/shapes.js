@@ -21,8 +21,10 @@ export function smoothPath(points) {
   return parts.join(' ');
 }
 
-export function arrowDefs(uid) {
-  return `<defs><marker id="${uid}-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow" d="M0,0 L10,5 L0,10 z"/></marker></defs>`;
+// variants: extra arrowheads, "added" and "removed" for change markers; each one is a marker named <uid>-arrow-<variant>.
+export function arrowDefs(uid, variants = []) {
+  const marker = (name, cls) => `<marker id="${uid}-arrow${name}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow${cls}" d="M0,0 L10,5 L0,10 z"/></marker>`;
+  return `<defs>${[marker('', ''), ...variants.map((v) => marker(`-${v}`, ` am-arrow--${v}`))].join('')}</defs>`;
 }
 
 // Lay out multi-line text vertically centred on (cx, cy).

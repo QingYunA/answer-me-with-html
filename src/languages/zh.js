@@ -17,6 +17,7 @@ export default {
     },
     toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
     expand: '展开查看图表', close: '关闭', diagram: '图表查看',
+    delta: { added: '新增', removed: '删除', changed: '修改', view: '视图', before: '改前', changes: '变更', after: '改后' },
   },
   videoUi: { play: '播放', pause: '暂停', chapters: '章节' },
 };
