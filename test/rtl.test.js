@@ -341,3 +341,44 @@ test('flow: two crowded groups side by side both find a clear place', () => {
   assert.equal(labels.length, 2);
   for (const which of [0, 1]) assert.deepEqual(labelClashes(svg, 'ltr', which), []);
 });
+
+// The Reply sheet on a right-to-left page shows the reply drawn, each line in its own direction; Copy still copies the Markdown.
+test('rtl: the reply view draws each line of the reply in its own direction, without the Markdown markup', async () => {
+  const { replyViewHtml } = await import('../src/runtime/reply-view.js');
+  const ui = { decisions: 'החלטות', comments: 'הערות', confirmed: 'אושר', untouched: 'לא נענה', was: 'היה', typed: 'שורות שמתחילות ב-">" הוקלדו.' };
+  const text = replyText({
+    title: 'סקירת הענף hebrew-rtl',
+    decisions: [{ panel: 'E', question: 'איזה מטמון?', picked: ['Redis'], suggested: ['Memcached'], touched: true }],
+    comments: [{ panel: 'A', title: 'מה השתנה', text: 'נראה טוב\nAlso check **bold** <b>' }],
+    ui,
+    rtl: true,
+  });
+  const html = replyViewHtml(text);
+  const rows = [...html.matchAll(/<div class="([^"]*)"(?: dir="(\w+)")?>(.*?)<\/div>/g)].map(([, cls, dir, inner]) => ({ cls, dir, inner }));
+  const row = (cls) => rows.find((r) => r.cls === cls);
+  assert.equal(row('am-rv-h1').dir, 'rtl');
+  assert.match(row('am-rv-h1').inner, /^Re: סקירת הענף hebrew-rtl$/);
+  // "1. [E] question": the number and the panel letter are isolated, so they stay at the start of the right-to-left line.
+  assert.equal(row('am-rv-q').dir, 'rtl');
+  assert.match(row('am-rv-q').inner, /^<bdi>1\.<\/bdi> <bdi class="am-rv-tag">E<\/bdi> איזה מטמון\?$/);
+  // A Latin answer is isolated left to right inside the right-to-left line; the note is right to left.
+  assert.match(row('am-rv-a').inner, /^← <strong><bdi dir="ltr">Redis<\/bdi><\/strong> <em><bdi dir="rtl">\(היה: Memcached\)<\/bdi><\/em>$/);
+  // "A · title" reads right to left, so the panel letter comes first for a Hebrew reader.
+  assert.match(row('am-rv-c').inner, /<bdi dir="rtl">A · מה השתנה<\/bdi>/);
+  // Comment lines are shown as typed (escaped, no bold), each in its own direction.
+  const quotes = rows.filter((r) => r.cls === 'am-rv-quote');
+  assert.deepEqual(quotes.map((q) => q.dir), ['rtl', 'ltr']);
+  assert.equal(quotes[1].inner, 'Also check **bold** &lt;b&gt;');
+  // No line keeps the Markdown markers the textarea showed.
+  for (const r of rows.filter((x) => x.cls !== 'am-rv-quote')) assert.doesNotMatch(r.inner.replace(/<[^>]+>/g, ''), /\*\*|^#|^\d+\. \[|^- /);
+});
+
+test('rtl: only a right-to-left page carries the reply view, and the copied reply text is unchanged', () => {
+  const he = renderDoc(draft('he', FLOW)).html;
+  const en = renderDoc(draft('en', '## A Flow\n```flow LR\nDraft -> am\n```\n')).html;
+  assert.match(he, /am-reply-view/);
+  assert.doesNotMatch(en, /am-reply-view|replyViewHtml/);
+  // The view is drawn from the textarea, which still holds replyText's Markdown: Copy copies the textarea.
+  assert.match(he, /navigator\.clipboard\.writeText\(text\.value\)/);
+  assert.match(RTL_CSS, /\.am-reply--view textarea/);
+});

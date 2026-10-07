@@ -34,3 +34,25 @@ html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi /
 @media (max-width: 760px) {
   html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }
 }
+
+/* Reply sheet: a textarea gives the whole Markdown reply one direction, so "1. [E] ..." and "# Re: ..." came out reordered.
+   src/runtime/reply-view.js draws the reply instead, each line in its own direction; the textarea stays as the copy source. */
+html[dir="rtl"] .am-reply--view textarea {
+  position: absolute; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; resize: none;
+}
+html[dir="rtl"] .am-reply-view {
+  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;
+}
+html[dir="rtl"] .am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+html[dir="rtl"] .am-reply-view > div { text-align: start; unicode-bidi: isolate; }
+html[dir="rtl"] .am-rv-gap { height: .5em; }
+html[dir="rtl"] .am-rv-h1 { font-weight: 700; font-size: 15px; }
+html[dir="rtl"] .am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+html[dir="rtl"] .am-rv-tag {
+  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;
+  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+html[dir="rtl"] .am-rv-a { padding-inline-start: 1.6em; }
+html[dir="rtl"] .am-rv-a em { color: var(--ink-2); }
+html[dir="rtl"] .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }

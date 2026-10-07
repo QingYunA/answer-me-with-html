@@ -3,6 +3,13 @@
 // src/assets.js (development) and scripts/build.mjs (bundle) both call this with their own file reader, so the two cannot drift apart.
 const unexport = (code) => code.replace(/^export /gm, '');
 
+// Right-to-left pages also get the drawn view of the reply (reply-view.js), after the page script.
+export function composeRtlRuntime(read) {
+  return `(() => {
+${unexport(read('reply-view.js'))}})();
+`;
+}
+
 export function composeRuntime(read) {
   return `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('layout-plan.js'))}\n${read('layout-dom.js')}})();\n`;
 }

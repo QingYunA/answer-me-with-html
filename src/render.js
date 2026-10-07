@@ -8,7 +8,7 @@ import { pageCss } from './themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
-import { VERSION, RUNTIME_JS, DELTA_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, RTL_JS, DELTA_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -211,7 +211,7 @@ ${body}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${colophon(language)}
 ${sourceTag(source)}
 <script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}</script>
+${RUNTIME_JS}${language.dir === 'rtl' ? RTL_JS : ''}${hasDelta(body) ? DELTA_JS : ''}</script>
 </body>
 </html>
 `;
