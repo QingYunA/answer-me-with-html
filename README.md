@@ -124,11 +124,12 @@ No setup is needed after install. **We recommend turning on [always-on mode](#al
 | "Redis or Memcached?" | A comparison table with ✓ and ✗, then a verdict |
 | "What's wrong with this paragraph?" | Each sentence annotated, with the problem words and fixes |
 | "How did Kubernetes come about?" | A timeline with the key moments highlighted |
+| "Plan the cache change" | The real code from your files, and the open decisions as options you answer on the page |
 | "How do I show hidden files with `ls`?" | No page. A one-line question gets a one-line answer |
 
 The agent decides when a page is worth it: related concepts, multi-step flows, multi-way comparisons. You can also just say "explain it in HTML".
 
-Pages are saved in `~/.answer-me-with-html/pages/`. The buttons in the top-right corner switch the theme and light/dark mode, and copy the Markdown that produced the page.
+Pages are saved in `~/.answer-me-with-html/pages/`. The buttons in the top-right corner switch the theme and light/dark mode, collect your reply, and copy the Markdown that produced the page.
 
 ## Explainer videos (3Blue1Brown style)
 
@@ -261,6 +262,8 @@ The CLI does the rest. It picks the template, places the panels, applies the the
 - **One file, no dependencies:** Each page is a single `.html` with no CDN links or web fonts. It opens offline and is easy to share.
 - **Languages:** Simplified Chinese, Traditional Chinese, English and Japanese are fully supported: page buttons, theme names, fonts and the video player. Any other language gets the right `lang` attribute and English buttons. Write `lang: zh-Hant` (or `zh-TW`) for Traditional Chinese, or `lang: fr` for French; see the [reference](docs/reference.md#languages).
 - **Writing check:** Drafts are checked against rules adapted from ASD-STE100: long sentences, wordy phrases, passive voice. It only warns unless you ask for strict mode.
+- **Real code, not retyped:** A code block can quote a file: ```` ```ts src=server/routes.ts lines=18-30 ````. The CLI reads the lines, so the model types no code and the code on the page is the real code, with line numbers and a Copy button. Only files inside the current folder are read, and files that hold keys are refused.
+- **Answer on the page:** Comment on any panel, and pick options in the decisions the agent asks (`ask`). The Reply button turns your answers and comments into one message to paste back to the agent.
 - **Keeps its source:** Every page embeds the Markdown that made it. Click "Copy source" to get it back.
 
 <table>
@@ -288,6 +291,8 @@ The agent picks a component by the shape of the information:
 | `annot` | Word-by-word notes on a sentence |
 | `kv` | Metadata, a drawing's title block |
 | `callout` | A conclusion, a tip, a warning |
+| `ask` | A decision you make on the page; the agent's suggestion starts selected |
+| Code block | Real code quoted from a file (`src=` `lines=`), or a sketch |
 | Table | Multi-way comparison. Write `ok` / `no` / `warn` in a cell to get ✓ ✗ ! |
 
 The draft format (frontmatter, `span`, `rows`, raw `html` / `svg` blocks) and how to call the CLI without an agent are in the [reference](docs/reference.md). Full syntax for a component: `am help <component>`.
