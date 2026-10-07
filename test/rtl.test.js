@@ -288,3 +288,56 @@ src/
   const en = renderDoc('---\nlang: en\n---\n## A T\n```tree list\nsrc/\n  + a.js\n  + b.js\n```\n').html;
   assert.match(en, />\+2 added</);
 });
+
+// Group names never sit on an edge, an edge label or a node: in TB and BT, in LR and RL, on left-to-right and right-to-left pages.
+function labelClashes(svg, dir, which = 0) {
+  const label = [...svg.matchAll(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)">([^<]*)<\/text>/g)][which];
+  const [x, y] = [Number(label[1]), Number(label[2])];
+  const name = label[3].replace(/[⁦-⁩]/g, '');
+  const w = name.length * (dir === 'rtl' ? 6.2 : 6.6);
+  const box = dir === 'rtl' ? [x - w, y - 11, x, y + 3] : [x, y - 11, x + w, y + 3];
+  const inside = (p) => p[0] > box[0] && p[0] < box[2] && p[1] > box[1] && p[1] < box[3];
+  const clashes = [];
+  for (const [, d] of svg.matchAll(/class="am-edge[^"]*" d="([^"]+)"/g)) {
+    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    for (let k = 1; k < pts.length; k++) {
+      for (let t = 0; t <= 1; t += 0.02) {
+        const p = [pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * t, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * t];
+        if (inside(p)) clashes.push(`edge ${d}`);
+      }
+    }
+  }
+  const rects = [...svg.matchAll(/<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g), ...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)];
+  for (const m of rects) {
+    const [rx, ry, rw, rh] = m.slice(1).map(Number);
+    if (rx < box[2] && box[0] < rx + rw && ry < box[3] && box[1] < ry + rh) clashes.push(`box at ${rx},${ry}`);
+  }
+  return [...new Set(clashes)];
+}
+
+const CROWDED = {
+  TB: 'קובץ PDF -> pdf_to_text.py: טקסט בסדר קריאה\npdf_to_text.py -> אינדקס: brainrag index\nאינדקס -> חיפוש\ngroup הכנה (פעם אחת): pdf_to_text.py, אינדקס',
+  BT: 'Source file -> Convert: text in reading order\nConvert -> Index: build\nIndex -> Search\ngroup Preparation (one time only): Convert, Index',
+  LR: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+  RL: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+};
+
+for (const [rankdir, text] of Object.entries(CROWDED)) {
+  for (const dir of ['ltr', 'rtl']) {
+    test(`flow: a group name stays clear of edges and nodes (${rankdir}, ${dir})`, () => {
+      const svg = flow(text, rankdir, dir);
+      assert.deepEqual(labelClashes(svg, dir), []);
+      // The name stays inside its box.
+      const [bx, , bw] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/).slice(1).map(Number);
+      const x = Number(svg.match(/<text class="am-cluster-label" x="([\d.]+)"/)[1]);
+      assert.ok(x >= bx && x <= bx + bw);
+    });
+  }
+}
+
+test('flow: two crowded groups side by side both find a clear place', () => {
+  const svg = flow('A -> B\nA -> C\nB -> D\nC -> D\ngroup Left side group label: B\ngroup Right side group label: C', 'TB', 'ltr');
+  const labels = [...svg.matchAll(/<text class="am-cluster-label"[^>]*>/g)];
+  assert.equal(labels.length, 2);
+  for (const which of [0, 1]) assert.deepEqual(labelClashes(svg, 'ltr', which), []);
+});
