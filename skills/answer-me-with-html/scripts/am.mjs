@@ -2361,8 +2361,8 @@ function measure(str, size = 13, { mono = false } = {}) {
   for (const ch of String(str ?? "")) units += charWidth(ch, mono);
   return Math.round(units * size * 100) / 100;
 }
-var HAN_KANA = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef\u3000-\u303f]/;
-var HANGUL = /[\uac00-\ud7af]/;
+var HANGUL_SYLLABLE = /[가-힯]/;
+var HAN_KANA = new RegExp(CJK_RE.source.replace(HANGUL_SYLLABLE.source.slice(1, -1), ""));
 var UNSPACED = [
   ["th", new RegExp("\\p{Script=Thai}", "u")],
   ["lo", new RegExp("\\p{Script=Lao}", "u")],
@@ -2390,7 +2390,7 @@ function runUnits(run2, maxWidth, size, opts) {
     const [locale] = unspaced;
     return words(run2, locale).flatMap((w) => measure(w, size, opts) > maxWidth ? graphemes(w, locale) : [w]);
   }
-  return HANGUL.test(run2) && measure(run2, size, opts) > maxWidth ? graphemes(run2, "ko") : [run2];
+  return HANGUL_SYLLABLE.test(run2) && measure(run2, size, opts) > maxWidth ? graphemes(run2, "ko") : [run2];
 }
 function tokenize(str, maxWidth, size, opts) {
   const chars = [...String(str)];
@@ -5689,7 +5689,7 @@ var SCRIPT_LANGUAGES = [
   [new RegExp("\\p{Script=Arabic}", "u"), "ar"],
   [new RegExp("\\p{Script=Cyrillic}", "u"), "ru"]
 ];
-var HANGUL2 = new RegExp("\\p{Script=Hangul}", "u");
+var HANGUL = new RegExp("\\p{Script=Hangul}", "u");
 var SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
 var TRADITIONAL = new Set(TRADITIONAL_ONLY);
 function hanLanguage(text) {
@@ -5710,7 +5710,7 @@ function detectLang(text) {
   for (const ch of draft) {
     if (isCJK(ch)) {
       cjk++;
-      if (HANGUL2.test(ch)) hangul++;
+      if (HANGUL.test(ch)) hangul++;
     } else if (/[a-z]/i.test(ch)) {
       latin++;
     } else {

@@ -79,10 +79,16 @@ test('wrap: a Thai word wider than the line falls back to graphemes, so a combin
 });
 
 test('wrap: the other scripts that write no space between words are split the same way', () => {
-  for (const [text, width] of [['ກວດສອບການເຊື່ອມຕໍ່', 90], ['ពិនិត្យការតភ្ជាប់', 90], ['စစ်ဆေးပါ', 90]]) {
-    const lines = wrap(text, width, 13);
+  const samples = [
+    'ກວດສອບການເຊື່ອມຕໍ່ຂໍ້ມູນແລ້ວລອງອີກຄັ້ງ', // Lao
+    'ពិនិត្យការតភ្ជាប់ទិន្នន័យហើយព្យាយាមម្តងទៀត', // Khmer
+    'ဒေတာဘေ့စ်ချိတ်ဆက်မှုကိုစစ်ဆေးပြီးထပ်ကြိုးစားပါ', // Myanmar
+  ];
+  for (const text of samples) {
+    const lines = wrap(text, 150, 13);
+    assert.ok(lines.length > 1, `no wrap: ${text}`);
     assert.equal(lines.join(''), text);
-    for (const l of lines) assert.ok(measure(l, 13) <= width, `line too wide: ${l}`);
+    for (const l of lines) assert.ok(measure(l, 13) <= 150, `line too wide: ${l}`);
   }
 });
 

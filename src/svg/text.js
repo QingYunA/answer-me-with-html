@@ -46,8 +46,11 @@ export function measure(str, size = 13, { mono = false } = {}) {
 // separates words with spaces, or one word of a script that writes no space at all (Thai and its neighbours, split with
 // the dictionary of the language; Node ships the full ICU data). A word wider than the line falls back to graphemes, the
 // smallest units a reader still sees as whole, so a combining mark never leaves its base character.
-const HAN_KANA = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef\u3000-\u303f]/;
-const HANGUL = /[\uac00-\ud7af]/;
+const HANGUL_SYLLABLE = /[가-힯]/;
+// One layout unit per character: Han, kana, jamo, compatibility ideographs and the fullwidth blocks. That is the CJK
+// class above without the Hangul syllables, which Korean writes apart with spaces (see runUnits). The ranges are taken
+// from CJK_RE, so the two classes cannot drift apart.
+const HAN_KANA = new RegExp(CJK_RE.source.replace(HANGUL_SYLLABLE.source.slice(1, -1), ''));
 // Scripts that write no space between words, with the locale whose dictionary splits them.
 const UNSPACED = [
   ['th', /\p{Script=Thai}/u],
@@ -66,7 +69,7 @@ function segmenter(locale, granularity) {
 // The smallest units a reader sees as whole.
 const graphemes = (text, locale) => [...segmenter(locale, 'grapheme').segment(text)].map((g) => g.segment);
 
-// Words of a script that writes none of them apart. Punctuation stays with the word it follows, so a line never ends on a lone full stop.
+// Words of a script that writes none of them apart. Punctuation stays with the word it follows, so a line never starts with a lone full stop.
 function words(text, locale) {
   const out = [];
   for (const s of segmenter(locale, 'word').segment(text)) {
@@ -84,7 +87,7 @@ function runUnits(run, maxWidth, size, opts) {
     return words(run, locale).flatMap((w) => (measure(w, size, opts) > maxWidth ? graphemes(w, locale) : [w]));
   }
   // Korean writes spaces between words, so a word stays whole unless the line cannot hold it.
-  return HANGUL.test(run) && measure(run, size, opts) > maxWidth ? graphemes(run, 'ko') : [run];
+  return HANGUL_SYLLABLE.test(run) && measure(run, size, opts) > maxWidth ? graphemes(run, 'ko') : [run];
 }
 
 function tokenize(str, maxWidth, size, opts) {
