@@ -1,5 +1,11 @@
 (() => {
   const root = document.documentElement;
+  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;
+  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.
+  const carrier = document.querySelector('.am-toolbar');
+  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {
+    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));
+  }
   // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.
   for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {
     const select = document.querySelector(`select[data-am="${name}"]`);

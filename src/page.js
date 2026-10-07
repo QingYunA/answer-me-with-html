@@ -12,6 +12,12 @@ export function rootTag({ lang, theme, mode, style, voice, video = false }) {
   return `<html lang="${lang}" data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
 }
 
+// Copies of the root settings, written on the toolbar. A host that serves the page inside its own document leaves the real <html>
+// without them; the page runtime sets back whatever the root lacks from these (see the first statement of src/runtime/page.js).
+export function rootCarrierAttrs({ lang, theme, mode, style }) {
+  return ` data-am-root-lang="${lang}" data-am-root-theme="${esc(theme)}" data-am-root-mode="${esc(mode)}" data-am-root-style="${esc(style)}"`;
+}
+
 export function audioTag(wav) {
   return `${AUDIO_OPEN} preload="auto" src="data:audio/wav;base64,${wav.toString('base64')}"></audio>`;
 }
