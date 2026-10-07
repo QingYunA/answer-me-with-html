@@ -136,6 +136,20 @@ test('cli lint: checks only; warnings under strict return 1; off skips the check
   assert.equal((await run(['lint', '-', '--style', 'x'], { stdin: bad })).code, 2);
 });
 
+test('cli lint: reports the same warnings as render, in the language of the draft', async () => {
+  const th = `---\nlang: th\n---\n## A Section\n${'ฉันกินข้าว'.repeat(10)}\n`; // lang-ok: draft text under test
+  const fr = '---\nlang: fr\n---\n## A Section\nPlease utilize the valve, and prior to the test make sure it was closed by the operator.\n';
+  const warnLines = (out) => out.split('\n').filter((l) => /^ {2}L\d+ \[/.test(l));
+  for (const stdin of [th, fr, GOOD]) {
+    const lint = warnLines((await run(['lint', '-'], { stdin })).out);
+    const render = warnLines((await run(['render', '-'], { stdin })).out);
+    assert.deepEqual(lint, render, `lint and render disagree on: ${stdin.slice(0, 40)}`);
+  }
+  // The language-neutral rules measure the Thai sentence in words; the English rules stay out of the French draft.
+  assert.match(warnLines((await run(['lint', '-'], { stdin: th })).out)[0], /\[sentence-length\].*30 words/);
+  assert.deepEqual(warnLines((await run(['lint', '-'], { stdin: fr })).out), []);
+});
+
 test('cli list / help', async () => {
   assert.match((await run(['list'])).out, /flow\s+Flowchart/);
   const h = await run(['help', 'sequence']);

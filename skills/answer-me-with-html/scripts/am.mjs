@@ -7660,7 +7660,8 @@ function cmdLint(src, opts, { print, fail }) {
     fail(`\u2717 Invalid style value "${style}". Choose one of: ${CHOICES.style.join(" | ")}`);
     return 2;
   }
-  const warnings = style === "off" ? [] : lintDoc(doc2);
+  const language = resolveLanguage({ declared: doc2.meta.lang, text: src });
+  const warnings = style === "off" ? [] : lintDoc(doc2, language);
   printWarnings(warnings, print, style);
   return style === "strict" && warnings.length ? 1 : 0;
 }

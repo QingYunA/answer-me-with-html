@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
+import { resolveLanguage } from './language.js';
 import { COMPONENTS } from './components/index.js';
 import { themeNames, getTheme, loadThemes } from './themes/registry.js';
 import { readThemeFile } from './themes/user.js';
@@ -549,7 +550,10 @@ function cmdLint(src, opts, { print, fail }) {
     fail(`✗ Invalid style value "${style}". Choose one of: ${CHOICES.style.join(' | ')}`);
     return 2;
   }
-  const warnings = style === 'off' ? [] : lintDoc(doc);
+  // The language decides the rule family, exactly as it does in render and video: a draft whose language has no rules of
+  // its own must be measured with the language-neutral ones, and must not get the Chinese or English rules.
+  const language = resolveLanguage({ declared: doc.meta.lang, text: src });
+  const warnings = style === 'off' ? [] : lintDoc(doc, language);
   printWarnings(warnings, print, style);
   return style === 'strict' && warnings.length ? 1 : 0;
 }
