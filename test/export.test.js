@@ -11,8 +11,11 @@ import { renderVideo } from '../src/video/render.js';
 
 const chrome = findChrome();
 const canRun = Boolean(chrome) && typeof WebSocket !== 'undefined' && process.platform !== 'win32';
+// On a busy CI runner Chrome has taken 13 s to print its DevTools URL in a passing run, and more than the
+// 20 s default in failing ones (issue #74). A crash still fails at once; only a slow start gets more time.
+const CHROME_START_TIMEOUT_MS = 90000;
 
-test('exportMp4: throws ExportError when ffmpeg exits midway, without crashing or hanging', { skip: !canRun && 'needs Chrome and Node 22+', timeout: 60000 }, async () => {
+test('exportMp4: throws ExportError when ffmpeg exits midway, without crashing or hanging', { skip: !canRun && 'needs Chrome and Node 22+', timeout: 150000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'am-export-fail-'));
   try {
     const fake = join(dir, 'ffmpeg');
@@ -25,7 +28,7 @@ test('exportMp4: throws ExportError when ffmpeg exits midway, without crashing o
     const prevPath = process.env.PATH;
     process.env.PATH = env.PATH; // hasCommand and spawn both look up ffmpeg on PATH
     try {
-      await assert.rejects(exportMp4(page, join(dir, 'v.mp4'), { env }), (e) => e instanceof ExportError && /ffmpeg failed \(1\)/.test(e.message));
+      await assert.rejects(exportMp4(page, join(dir, 'v.mp4'), { env, startTimeoutMs: CHROME_START_TIMEOUT_MS }), (e) => e instanceof ExportError && /ffmpeg failed \(1\)/.test(e.message));
     } finally {
       process.env.PATH = prevPath;
     }

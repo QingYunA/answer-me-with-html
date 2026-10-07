@@ -15,6 +15,7 @@ export class ExportError extends Error {
 }
 
 const CDP_TIMEOUT_MS = 30000;
+const CHROME_START_TIMEOUT_MS = 20000;
 
 const CHROME_PATHS = {
   darwin: [
@@ -38,7 +39,7 @@ export function findChrome(env = process.env, platform = process.platform) {
   return list.find((p) => (p.includes('/') || p.includes('\\') ? existsSync(p) : hasCommand(p))) ?? null;
 }
 
-export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onProgress = () => {} } = {}) {
+export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onProgress = () => {}, startTimeoutMs = CHROME_START_TIMEOUT_MS } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('MP4 export needs Node.js 22 or later (built-in WebSocket)');
   if (!hasCommand('ffmpeg')) throw new ExportError('MP4 export needs ffmpeg: on macOS run brew install ffmpeg; on Linux install it with the package manager');
   const chromePath = findChrome(env);
@@ -52,7 +53,7 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   let cdp = null;
   try {
-    cdp = await connect(await devtoolsUrl(chrome));
+    cdp = await connect(await devtoolsUrl(chrome, startTimeoutMs));
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const page = (method, params) => cdp.send(method, params, sessionId);
@@ -123,7 +124,7 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
 
 // Waits for Chrome to print its DevTools URL. A failure message carries the end of Chrome's stderr,
 // so a crash at start can be told apart from a slow start.
-export function devtoolsUrl(chrome, timeoutMs = 20000) {
+export function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     let buf = '';
     const fail = (msg) => {
@@ -131,7 +132,7 @@ export function devtoolsUrl(chrome, timeoutMs = 20000) {
       const tail = buf.trim().split('\n').slice(-5).join('\n');
       reject(new ExportError(tail ? `${msg}. Chrome stderr:\n${tail}` : msg));
     };
-    const timer = setTimeout(() => fail('Chrome did not start in time'), timeoutMs);
+    const timer = setTimeout(() => fail(`Chrome did not start in time (${timeoutMs / 1000} s)`), timeoutMs);
     chrome.on('error', (e) => fail(`Cannot start Chrome: ${e.message}`));
     chrome.on('close', (code, signal) => fail(`Chrome exited (${code ?? signal}) before it started`));
     chrome.stderr.on('data', (d) => {

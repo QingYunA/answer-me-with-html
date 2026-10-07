@@ -6986,6 +6986,7 @@ var ExportError = class extends Error {
   }
 };
 var CDP_TIMEOUT_MS = 3e4;
+var CHROME_START_TIMEOUT_MS = 2e4;
 var CHROME_PATHS = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -7007,7 +7008,7 @@ function findChrome(env = process.env, platform = process.platform) {
   return list.find((p) => p.includes("/") || p.includes("\\") ? existsSync3(p) : hasCommand(p)) ?? null;
 }
 async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onProgress = () => {
-} } = {}) {
+}, startTimeoutMs = CHROME_START_TIMEOUT_MS } = {}) {
   if (typeof WebSocket === "undefined") throw new ExportError("MP4 export needs Node.js 22 or later (built-in WebSocket)");
   if (!hasCommand("ffmpeg")) throw new ExportError("MP4 export needs ffmpeg: on macOS run brew install ffmpeg; on Linux install it with the package manager");
   const chromePath = findChrome(env);
@@ -7027,7 +7028,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   ], { stdio: ["ignore", "ignore", "pipe"] });
   let cdp = null;
   try {
-    cdp = await connect(await devtoolsUrl(chrome));
+    cdp = await connect(await devtoolsUrl(chrome, startTimeoutMs));
     const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
     const page = (method, params) => cdp.send(method, params, sessionId);
@@ -7121,7 +7122,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
     }
   }
 }
-function devtoolsUrl(chrome, timeoutMs = 2e4) {
+function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
   return new Promise((resolve4, reject) => {
     let buf = "";
     const fail = (msg) => {
@@ -7130,7 +7131,7 @@ function devtoolsUrl(chrome, timeoutMs = 2e4) {
       reject(new ExportError(tail ? `${msg}. Chrome stderr:
 ${tail}` : msg));
     };
-    const timer = setTimeout(() => fail("Chrome did not start in time"), timeoutMs);
+    const timer = setTimeout(() => fail(`Chrome did not start in time (${timeoutMs / 1e3} s)`), timeoutMs);
     chrome.on("error", (e) => fail(`Cannot start Chrome: ${e.message}`));
     chrome.on("close", (code, signal) => fail(`Chrome exited (${code ?? signal}) before it started`));
     chrome.stderr.on("data", (d) => {
