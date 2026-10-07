@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redis vs Memcached for Caching</title>
+<style>
+  :root{--red:#d82c20;--blue:#2b6cb0;--ink:#1d2433;--mut:#5b6577;--bg:#f6f7fb;--card:#fff;--line:#e2e6ee}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  header{background:linear-gradient(90deg,var(--red),var(--blue));color:#fff;padding:48px 24px;text-align:center}
+  header h1{margin:0 0 8px;font-size:2.1rem}
+  header p{margin:0;opacity:.92}
+  main{max-width:960px;margin:0 auto;padding:24px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;margin:20px 0}
+  h2{margin-top:0;font-size:1.4rem}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:700px){.cols{grid-template-columns:1fr}}
+  .box{border-radius:10px;padding:16px;border:1px solid var(--line)}
+  .r{border-top:5px solid var(--red)} .m{border-top:5px solid var(--blue)}
+  .box h3{margin:0 0 6px}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#f0f2f8}
+  td:nth-child(2){border-left:3px solid var(--red)} td:nth-child(3){border-left:3px solid var(--blue)}
+  svg{width:100%;height:auto;display:block;margin:8px 0}
+  .pick{background:#eef7ee;border-color:#bfe0bf}
+  code{background:#eef0f6;padding:1px 6px;border-radius:4px;font-size:.9em}
+  ul{padding-left:20px}
+  footer{text-align:center;color:var(--mut);padding:20px;font-size:.85rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>Redis vs Memcached</h1>
+  <p>Which in-memory cache should you pick?</p>
+</header>
+<main>
+
+<section>
+  <h2>The short version</h2>
+  <p><strong>Memcached</strong> is a minimal, multi-threaded, volatile key→blob cache. <strong>Redis</strong> is an in-memory data structure server that can cache, persist, replicate, and do much more. Both deliver sub-millisecond reads. For most new projects, <strong>Redis is the safer default</strong>; Memcached wins in a narrow case of simple, huge, throughput-bound caching.</p>
+</section>
+
+<section>
+  <h2>Architecture at a glance</h2>
+  <svg viewBox="0 0 900 300" role="img" aria-label="Architecture diagram comparing Redis and Memcached">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5b6577"/></marker>
+    </defs>
+    <!-- Redis -->
+    <text x="215" y="24" text-anchor="middle" font-size="18" font-weight="700" fill="#d82c20">Redis</text>
+    <rect x="20" y="40" width="390" height="240" rx="12" fill="#fff5f4" stroke="#d82c20"/>
+    <rect x="40" y="60" width="350" height="60" rx="8" fill="#d82c20"/>
+    <text x="215" y="86" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Command thread (mostly single-threaded)</text>
+    <text x="215" y="106" text-anchor="middle" fill="#fff" font-size="12">+ I/O threads, background persistence</text>
+    <rect x="40" y="135" width="350" height="70" rx="8" fill="#fff" stroke="#d82c20"/>
+    <text x="215" y="158" text-anchor="middle" font-size="13">Strings · Hashes · Lists · Sets</text>
+    <text x="215" y="178" text-anchor="middle" font-size="13">Sorted sets · Streams · Bitmaps · Geo</text>
+    <rect x="40" y="220" width="165" height="45" rx="8" fill="#fff" stroke="#d82c20" stroke-dasharray="4"/>
+    <text x="122" y="248" text-anchor="middle" font-size="12">RDB / AOF persistence</text>
+    <rect x="225" y="220" width="165" height="45" rx="8" fill="#fff" stroke="#d82c20" stroke-dasharray="4"/>
+    <text x="307" y="248" text-anchor="middle" font-size="12">Replicas · Cluster</text>
+    <!-- Memcached -->
+    <text x="685" y="24" text-anchor="middle" font-size="18" font-weight="700" fill="#2b6cb0">Memcached</text>
+    <rect x="490" y="40" width="390" height="240" rx="12" fill="#f0f6fd" stroke="#2b6cb0"/>
+    <rect x="510" y="60" width="110" height="60" rx="8" fill="#2b6cb0"/>
+    <rect x="630" y="60" width="110" height="60" rx="8" fill="#2b6cb0"/>
+    <rect x="750" y="60" width="110" height="60" rx="8" fill="#2b6cb0"/>
+    <text x="565" y="95" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Thread 1</text>
+    <text x="685" y="95" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Thread 2</text>
+    <text x="805" y="95" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Thread N</text>
+    <rect x="510" y="135" width="350" height="70" rx="8" fill="#fff" stroke="#2b6cb0"/>
+    <text x="685" y="165" text-anchor="middle" font-size="13">Slab allocator: key → opaque blob</text>
+    <text x="685" y="185" text-anchor="middle" font-size="12" fill="#5b6577">LRU eviction · TTL</text>
+    <rect x="510" y="220" width="350" height="45" rx="8" fill="#fff" stroke="#2b6cb0" stroke-dasharray="4"/>
+    <text x="685" y="248" text-anchor="middle" font-size="12">No persistence · No replication · Sharding done by client</text>
+  </svg>
+</section>
+
+<section>
+  <h2>Typical cache-aside flow</h2>
+  <svg viewBox="0 0 900 150" role="img" aria-label="Cache-aside flow">
+    <rect x="20" y="50" width="150" height="50" rx="8" fill="#e8ecf7" stroke="#5b6577"/>
+    <text x="95" y="80" text-anchor="middle" font-size="14">App</text>
+    <rect x="370" y="10" width="170" height="50" rx="8" fill="#fff5f4" stroke="#d82c20"/>
+    <text x="455" y="40" text-anchor="middle" font-size="13">Cache (Redis / Memcached)</text>
+    <rect x="730" y="90" width="150" height="50" rx="8" fill="#e8ecf7" stroke="#5b6577"/>
+    <text x="805" y="120" text-anchor="middle" font-size="14">Database</text>
+    <path d="M170 62L368 36" stroke="#5b6577" stroke-width="2" fill="none" marker-end="url(#a)"/>
+    <text x="260" y="38" font-size="12" fill="#5b6577">1. GET key</text>
+    <path d="M170 90L728 115" stroke="#5b6577" stroke-width="2" fill="none" marker-end="url(#a)" stroke-dasharray="5"/>
+    <text x="400" y="118" font-size="12" fill="#5b6577">2. on miss: query DB</text>
+    <path d="M728 130L180 100" stroke="none" fill="none"/>
+    <path d="M300 140C300 140 440 80 455 62" stroke="#5b6577" stroke-width="2" fill="none" marker-end="url(#a)"/>
+    <text x="240" y="145" font-size="12" fill="#5b6577">3. SET key (with TTL)</text>
+  </svg>
+  <p>Both work identically here; the differences are in what else the cache can do and how it fails.</p>
+</section>
+
+<section>
+  <h2>Side-by-side</h2>
+  <table>
+    <tr><th>Aspect</th><th>Redis</th><th>Memcached</th></tr>
+    <tr><td>Data model</td><td>Rich structures: strings, hashes, lists, sets, sorted sets, streams, etc.</td><td>Plain key → byte blob</td></tr>
+    <tr><td>Threading</td><td>Single-threaded command execution (I/O threads optional)</td><td>Multi-threaded; scales across cores for simple ops</td></tr>
+    <tr><td>Persistence</td><td>RDB snapshots, AOF log</td><td>None; restart = cold cache</td></tr>
+    <tr><td>Replication / HA</td><td>Built-in replicas, Sentinel, Cluster</td><td>None built in; client-side sharding</td></tr>
+    <tr><td>Eviction</td><td>Several policies (LRU, LFU, TTL, random, noeviction)</td><td>LRU (segmented)</td></tr>
+    <tr><td>Memory efficiency</td><td>Higher per-key overhead; fragmentation possible</td><td>Slab allocator, low overhead for small uniform values</td></tr>
+    <tr><td>Max value size</td><td>512 MB</td><td>1 MB by default</td></tr>
+    <tr><td>Atomic ops / scripting</td><td>Transactions, Lua, functions, pub/sub</td><td>incr/decr, CAS only</td></tr>
+    <tr><td>Operational complexity</td><td>More knobs to tune and monitor</td><td>Very simple</td></tr>
+    <tr><td>Licensing</td><td>Recent versions are source-available/AGPL-option; forks like Valkey are BSD</td><td>BSD</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>When to choose which</h2>
+  <div class="cols">
+    <div class="box r">
+      <h3>Choose Redis if you…</h3>
+      <ul>
+        <li>need more than plain get/set (counters, leaderboards, queues, sessions, rate limiting)</li>
+        <li>want the cache to survive restarts or fail over automatically</li>
+        <li>cache large or structured values and want partial updates</li>
+        <li>prefer one tool for cache, pub/sub, and light data work</li>
+      </ul>
+    </div>
+    <div class="box m">
+      <h3>Choose Memcached if you…</h3>
+      <ul>
+        <li>only need a simple, ephemeral, string/blob cache</li>
+        <li>want to saturate many cores with huge request volumes</li>
+        <li>cache small, uniform items and want minimal memory overhead</li>
+        <li>value operational simplicity and a permissive license</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="pick">
+  <h2>Recommendation</h2>
+  <p><strong>Default to Redis</strong> (or its open fork Valkey if licensing matters). It does everything Memcached does, is fast enough for nearly every workload, and gives you room to grow into persistence, HA, and richer data types. <strong>Pick Memcached</strong> only if your needs are strictly simple key/value caching at very high multi-core throughput, or you already run it successfully.</p>
+  <p>Whichever you use: set TTLs, plan for cache stampedes, and make sure your app tolerates a cold cache.</p>
+</section>
+
+</main>
+<footer>Self-contained page · no external resources</footer>
+</body>
+</html>

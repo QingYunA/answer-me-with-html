@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>一个 Agent Skill：遇到复杂问题，Agent 不再甩给你一堵文字墙，而是给你一页能看懂的 HTML。<br>模型要写的 token，只有它直接手写 HTML 的约 1/7。</b>
+  <b>一个 Agent Skill：遇到复杂问题，Agent 不再甩给你一堵文字墙，而是给你一页能看懂的 HTML。<br>模型要写的 token，只有它直接手写 HTML 的约 1/8。</b>
 </p>
 
 <p align="center">
@@ -42,23 +42,29 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 ## 为什么不直接让 AI 输出 HTML？
 
-当然可以，现在的模型写 HTML 已经写得不错了。问题在于输出 token 的账：每一行 CSS、每一层 `div`、每一个 SVG 坐标，都得模型一个字一个字地打出来，而你在屏幕前等的正是这些输出 token。
+当然可以，现在的模型写 HTML 已经写得不错了。但它写的大部分都不是内容。我们数了 9 页模型直接手写的 HTML，平均 4,893 个 token：
 
-用这个 skill，模型只写内容。同一个模型、同样的问题，在普通的 Claude Code 环境里两种方式各做一遍（3 个题目 × 每题 3 次，取中位数，Claude Sonnet 5.5）：
+| 页面里的部分 | 占比 | 用这个 skill 后 |
+| :--- | ---: | :--- |
+| SVG 图：坐标和路径 | 47% | 由 CLI 生成 |
+| CSS | 15% | 由 CLI 生成 |
+| HTML 标签 | 17% | 由 CLI 生成 |
+| 正文文字 | 21% | 模型来写，写成 Markdown |
+
+用这个 skill，模型只写一份 Markdown 稿件。同样的问题，稿件平均 612 个 token，**约为手写 HTML 的 1/8**。要写的少，等的时间就短（3 个题目 × 每题 3 次，取中位数，Claude Sonnet 5.5，普通的 Claude Code 环境）：
 
 | | 直接要 HTML | Answer me with HTML | |
 | :--- | ---: | ---: | :--- |
-| 输出 token | 5,341 | **870** | **少 6.1 倍** |
-| 耗时 | 33 秒 | **12 秒** | **快 2.8 倍** |
-| 单次花费 | $0.092 | **$0.067** | **便宜 27%** |
+| 模型要写的 token | 4,893 | **612** | **少 8 倍** |
+| 耗时 | 31 秒 | **12 秒** | **快 2.6 倍** |
 
 <p align="center">
   <img src="docs/images/plain-vs-skill.png" alt="同一个 TCP 问题的两种做法" width="100%">
 </p>
 
-<p align="center"><sub>这是基准测试中的一次运行：同样的提示词、同一个模型，两页都能用。这一次直接写 HTML 花了 9,351 个输出 token，用 skill 只花了 899 个。上表是多次运行的中位数。</sub></p>
+<p align="center"><sub>这是更早一次基准测试中的一次运行，环境加载很重：同样的提示词、同一个模型，两页都能用。这一次直接写 HTML 花了 9,351 个输出 token，用 skill 只花了 899 个。</sub></p>
 
-提速在两种环境里都成立，花费则取决于你的环境加载了多少上下文：skill 会多两轮很短的对话，每一轮都要重读上下文。环境很重时（约 5.1 万个 token 的工具、规则和 skill），多出的两轮比省下的 token 更贵，我们测到 skill 贵约 20%。
+这些页面和它们的 token 数都存放在 [bench/corpus/](bench/corpus) 里，运行 `node bench/corpus.mjs` 每次都得到同样的数字。花费降得比 token 少，这里约便宜 15%，因为每一轮都还要读系统提示、你的问题和对话记录，用不用 skill 都一样。详见[花费都花在哪](bench/README.md#where-the-cost-goes)。
 
 解释视频的差距更大。我们让模型做一个 3Blue1Brown 风格的 TCP 握手视频，不配音，两种方式各做一遍：
 
@@ -129,6 +135,10 @@ cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answe
 要不要出页面由 Agent 判断：概念之间关系复杂、有多步流程、要做多维对比，才会出页面。你也可以直接说"用 HTML 讲一下……"。
 
 页面保存在 `~/.answer-me-with-html/pages/`。页面右上角可以切换主题、切换亮暗、汇总你的回复，也可以复制生成这一页的 Markdown 原稿。
+
+## 和 Archify、GenUI 插件有什么不同？
+
+[Archify](https://github.com/tt-a1i/archify) 根据一份 JSON 规格画一张可交互的图。[dsh-genui](https://github.com/omdsh-dev/dsh-genui) 这类 GenUI 插件在某一个聊天应用里显示组件。这个 skill 把整个问题答成一页：正文、表格、代码和图都有，模型只写一份 Markdown 稿件，任何能运行 shell 命令的 Agent 都能用。详见[完整对比](docs/compare.zh-CN.md)。
 
 ## 解释视频（3Blue1Brown 风格）
 

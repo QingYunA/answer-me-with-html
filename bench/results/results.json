@@ -1,6 +1,6 @@
 {
   "model": "sonnet",
-  "date": "2026-10-02T14:08:32.301Z",
+  "date": "2026-10-07T13:33:13.116Z",
   "reps": 3,
   "rows": [
     {
@@ -9,11 +9,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 8968,
-      "seconds": 56,
-      "costUSD": 0.2475,
+      "outputTokens": 6859,
+      "seconds": 46,
+      "costUSD": 0.4186,
       "turns": 2,
-      "htmlBytes": 17242
+      "inputTokens": 4,
+      "cacheWriteTokens": 140013,
+      "cacheReadTokens": 0,
+      "htmlBytes": 11736
     },
     {
       "topic": "tcp",
@@ -21,11 +24,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 972,
-      "seconds": 11,
-      "costUSD": 0.2631,
+      "outputTokens": 1149,
+      "seconds": 12.3,
+      "costUSD": 0.2883,
       "turns": 4,
-      "htmlBytes": 30740
+      "inputTokens": 8,
+      "cacheWriteTokens": 96035,
+      "cacheReadTokens": 183331,
+      "htmlBytes": 80317
     },
     {
       "topic": "cache",
@@ -33,11 +39,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 6092,
-      "seconds": 43.4,
-      "costUSD": 0.2093,
+      "outputTokens": 8146,
+      "seconds": 54.3,
+      "costUSD": 0.3485,
       "turns": 2,
-      "htmlBytes": 12434
+      "inputTokens": 4,
+      "cacheWriteTokens": 99504,
+      "cacheReadTokens": 91354,
+      "htmlBytes": 15831
     },
     {
       "topic": "cache",
@@ -45,11 +54,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 935,
-      "seconds": 27.7,
-      "costUSD": 0.2625,
+      "outputTokens": 1031,
+      "seconds": 14.9,
+      "costUSD": 0.1153,
       "turns": 4,
-      "htmlBytes": 31590
+      "inputTokens": 8,
+      "cacheWriteTokens": 21349,
+      "cacheReadTokens": 257898,
+      "htmlBytes": 80581
     },
     {
       "topic": "git",
@@ -57,11 +69,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 5560,
-      "seconds": 39.8,
-      "costUSD": 0.2019,
+      "outputTokens": 6627,
+      "seconds": 44.6,
+      "costUSD": 0.1439,
       "turns": 2,
-      "htmlBytes": 11430
+      "inputTokens": 4,
+      "cacheWriteTokens": 17272,
+      "cacheReadTokens": 172067,
+      "htmlBytes": 12808
     },
     {
       "topic": "git",
@@ -69,11 +84,14 @@
       "rep": 1,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 862,
-      "seconds": 12.1,
-      "costUSD": 0.2615,
+      "outputTokens": 1031,
+      "seconds": 14.4,
+      "costUSD": 0.1153,
       "turns": 4,
-      "htmlBytes": 32330
+      "inputTokens": 8,
+      "cacheWriteTokens": 21358,
+      "cacheReadTokens": 257894,
+      "htmlBytes": 81316
     },
     {
       "topic": "tcp",
@@ -81,11 +99,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 7024,
-      "seconds": 49.9,
-      "costUSD": 0.221,
+      "outputTokens": 8194,
+      "seconds": 51.8,
+      "costUSD": 0.1635,
       "turns": 2,
-      "htmlBytes": 13448
+      "inputTokens": 4,
+      "cacheWriteTokens": 18851,
+      "cacheReadTokens": 172073,
+      "htmlBytes": 14125
     },
     {
       "topic": "tcp",
@@ -93,11 +114,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 1019,
-      "seconds": 10.5,
-      "costUSD": 0.2639,
+      "outputTokens": 1341,
+      "seconds": 14.3,
+      "costUSD": 0.1192,
       "turns": 4,
-      "htmlBytes": 30872
+      "inputTokens": 6,
+      "cacheWriteTokens": 21677,
+      "cacheReadTokens": 257724,
+      "htmlBytes": 81888
     },
     {
       "topic": "cache",
@@ -105,11 +129,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 6367,
-      "seconds": 45,
-      "costUSD": 0.2131,
+      "outputTokens": 5372,
+      "seconds": 40,
+      "costUSD": 0.1282,
       "turns": 2,
-      "htmlBytes": 13113
+      "inputTokens": 4,
+      "cacheWriteTokens": 16015,
+      "cacheReadTokens": 172071,
+      "htmlBytes": 10674
     },
     {
       "topic": "cache",
@@ -117,11 +144,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 868,
-      "seconds": 11.8,
-      "costUSD": 0.2616,
+      "outputTokens": 1031,
+      "seconds": 14.3,
+      "costUSD": 0.4853,
       "turns": 4,
-      "htmlBytes": 28911
+      "inputTokens": 6,
+      "cacheWriteTokens": 182364,
+      "cacheReadTokens": 95409,
+      "htmlBytes": 80707
     },
     {
       "topic": "git",
@@ -129,11 +159,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 5178,
-      "seconds": 36.3,
-      "costUSD": 0.1964,
+      "outputTokens": 6674,
+      "seconds": 46.4,
+      "costUSD": 0.5351,
       "turns": 2,
-      "htmlBytes": 10303
+      "inputTokens": 4,
+      "cacheWriteTokens": 187324,
+      "cacheReadTokens": 0,
+      "htmlBytes": 13342
     },
     {
       "topic": "git",
@@ -141,11 +174,14 @@
       "rep": 2,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 762,
-      "seconds": 10.1,
-      "costUSD": 0.26,
+      "outputTokens": 1101,
+      "seconds": 16.5,
+      "costUSD": 0.1471,
       "turns": 4,
-      "htmlBytes": 30656
+      "inputTokens": 6,
+      "cacheWriteTokens": 34995,
+      "cacheReadTokens": 242849,
+      "htmlBytes": 82787
     },
     {
       "topic": "tcp",
@@ -153,11 +189,14 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 9307,
-      "seconds": 56.7,
-      "costUSD": 0.252,
+      "outputTokens": 8283,
+      "seconds": 53.4,
+      "costUSD": 0.1646,
       "turns": 2,
-      "htmlBytes": 17770
+      "inputTokens": 4,
+      "cacheWriteTokens": 18921,
+      "cacheReadTokens": 172071,
+      "htmlBytes": 16001
     },
     {
       "topic": "tcp",
@@ -165,11 +204,14 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 918,
-      "seconds": 13.7,
-      "costUSD": 0.2623,
+      "outputTokens": 1075,
+      "seconds": 14.5,
+      "costUSD": 0.1159,
       "turns": 4,
-      "htmlBytes": 30633
+      "inputTokens": 8,
+      "cacheWriteTokens": 21408,
+      "cacheReadTokens": 257898,
+      "htmlBytes": 80367
     },
     {
       "topic": "cache",
@@ -177,11 +219,14 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 4791,
-      "seconds": 32.4,
-      "costUSD": 0.1912,
+      "outputTokens": 10599,
+      "seconds": 68.1,
+      "costUSD": 0.1935,
       "turns": 2,
-      "htmlBytes": 9631
+      "inputTokens": 4,
+      "cacheWriteTokens": 21237,
+      "cacheReadTokens": 172071,
+      "htmlBytes": 21090
     },
     {
       "topic": "cache",
@@ -189,11 +234,14 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 953,
-      "seconds": 15.7,
-      "costUSD": 0.2628,
+      "outputTokens": 1067,
+      "seconds": 13.6,
+      "costUSD": 0.1466,
       "turns": 4,
-      "htmlBytes": 31651
+      "inputTokens": 6,
+      "cacheWriteTokens": 34947,
+      "cacheReadTokens": 242851,
+      "htmlBytes": 80435
     },
     {
       "topic": "git",
@@ -201,11 +249,14 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 8034,
-      "seconds": 52.3,
-      "costUSD": 0.2318,
+      "outputTokens": 4915,
+      "seconds": 34.7,
+      "costUSD": 0.3011,
       "turns": 2,
-      "htmlBytes": 14602
+      "inputTokens": 4,
+      "cacheWriteTokens": 93684,
+      "cacheReadTokens": 88740,
+      "htmlBytes": 9745
     },
     {
       "topic": "git",
@@ -213,69 +264,72 @@
       "rep": 3,
       "ok": true,
       "attempts": 1,
-      "outputTokens": 971,
-      "seconds": 12.2,
-      "costUSD": 0.263,
+      "outputTokens": 915,
+      "seconds": 14.4,
+      "costUSD": 0.2778,
       "turns": 4,
-      "htmlBytes": 33637
+      "inputTokens": 8,
+      "cacheWriteTokens": 93203,
+      "cacheReadTokens": 178111,
+      "htmlBytes": 80133
     }
   ],
   "summary": {
     "perTopic": {
       "tcp/plain": {
         "runs": 3,
-        "outputTokens": 8968,
-        "seconds": 56,
-        "costUSD": 0.2475,
+        "outputTokens": 8194,
+        "seconds": 51.8,
+        "costUSD": 0.1646,
         "turns": 2
       },
       "tcp/skill": {
         "runs": 3,
-        "outputTokens": 972,
-        "seconds": 11,
-        "costUSD": 0.2631,
+        "outputTokens": 1149,
+        "seconds": 14.3,
+        "costUSD": 0.1192,
         "turns": 4
       },
       "cache/plain": {
         "runs": 3,
-        "outputTokens": 6092,
-        "seconds": 43.4,
-        "costUSD": 0.2093,
+        "outputTokens": 8146,
+        "seconds": 54.3,
+        "costUSD": 0.1935,
         "turns": 2
       },
       "cache/skill": {
         "runs": 3,
-        "outputTokens": 935,
-        "seconds": 15.7,
-        "costUSD": 0.2625,
+        "outputTokens": 1031,
+        "seconds": 14.3,
+        "costUSD": 0.1466,
         "turns": 4
       },
       "git/plain": {
         "runs": 3,
-        "outputTokens": 5560,
-        "seconds": 39.8,
-        "costUSD": 0.2019,
+        "outputTokens": 6627,
+        "seconds": 44.6,
+        "costUSD": 0.3011,
         "turns": 2
       },
       "git/skill": {
         "runs": 3,
-        "outputTokens": 862,
-        "seconds": 12.1,
-        "costUSD": 0.2615,
+        "outputTokens": 1031,
+        "seconds": 14.4,
+        "costUSD": 0.1471,
         "turns": 4
       }
     },
     "overall": {
       "plain": {
-        "outputTokens": 6873.333333333333,
-        "seconds": 46.4,
-        "costUSD": 0.21956666666666666,
+        "outputTokens": 7655.666666666667,
+        "seconds": 50.23333333333333,
+        "costUSD": 0.21973333333333334,
         "turns": 2
       },
       "skill": {
-        "outputTokens": 923,
-        "seconds": 12.933333333333332,
-        "costUSD": 0.2623666666666667,
+        "outputTokens": 1070.3333333333333,
+        "seconds": 14.333333333333334,
+        "costUSD": 0.13763333333333336,
         "turns": 4
       }
     }

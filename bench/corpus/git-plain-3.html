@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>git merge vs git rebase</title>
+<style>
+  :root { --bg:#fafaf8; --fg:#1f2328; --muted:#59636e; --card:#fff; --line:#d8dee4; --accent:#0969da; --main:#2da44e; --feat:#bf5af2; --new:#e36209; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 system-ui,-apple-system,Segoe UI,sans-serif; }
+  main { max-width:900px; margin:0 auto; padding:40px 20px 80px; }
+  h1 { font-size:2.2rem; margin:0 0 .3em; }
+  h2 { margin-top:2.2em; border-bottom:1px solid var(--line); padding-bottom:.3em; }
+  p.lead { color:var(--muted); font-size:1.15rem; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  code { background:#eef1f4; padding:.1em .35em; border-radius:4px; font-size:.9em; }
+  pre { background:#1f2328; color:#e6edf3; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:.9rem; line-height:1.5; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 20px; margin:16px 0; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px){ .grid{grid-template-columns:1fr;} }
+  svg { width:100%; height:auto; display:block; }
+  table { border-collapse:collapse; width:100%; background:var(--card); }
+  th, td { border:1px solid var(--line); padding:8px 12px; text-align:left; vertical-align:top; }
+  th { background:#eef1f4; }
+  .warn { border-left:4px solid var(--new); background:#fff8f0; }
+  .legend span { display:inline-block; margin-right:16px; font-size:.9rem; color:var(--muted); }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>git merge vs git rebase</h1>
+  <p class="lead">Both commands integrate changes from one branch into another. They differ in what they do to your commit history: <strong>merge preserves it</strong>, <strong>rebase rewrites it</strong>.</p>
+
+  <h2>The starting point</h2>
+  <p>You branched <code>feature</code> off <code>main</code>. Since then, both branches gained new commits, so they have diverged.</p>
+  <div class="card">
+    <svg viewBox="0 0 640 170" role="img" aria-label="Diverged branches">
+      <defs>
+        <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8c959f"/></marker>
+      </defs>
+      <g stroke="#8c959f" stroke-width="2" marker-end="url(#a)" fill="none">
+        <line x1="92" y1="50" x2="48" y2="50"/><line x1="172" y1="50" x2="128" y2="50"/><line x1="252" y1="50" x2="208" y2="50"/>
+        <path d="M172,50 C160,95 160,115 190,120"/>
+        <line x1="292" y1="120" x2="248" y2="120"/>
+      </g>
+      <g stroke="none">
+        <circle cx="30" cy="50" r="18" fill="var(--main)"/><circle cx="110" cy="50" r="18" fill="var(--main)"/><circle cx="190" cy="50" r="18" fill="var(--main)"/><circle cx="270" cy="50" r="18" fill="var(--main)"/>
+        <circle cx="210" cy="120" r="18" fill="var(--feat)"/><circle cx="310" cy="120" r="18" fill="var(--feat)"/>
+      </g>
+      <g font-size="13" fill="#fff" text-anchor="middle" font-family="monospace">
+        <text x="30" y="55">A</text><text x="110" y="55">B</text><text x="190" y="55">C</text><text x="270" y="55">D</text>
+        <text x="210" y="125">E</text><text x="310" y="125">F</text>
+      </g>
+      <g font-size="14" font-weight="600">
+        <text x="300" y="55" fill="var(--main)">← main</text>
+        <text x="340" y="125" fill="var(--feat)">← feature</text>
+      </g>
+    </svg>
+    <div class="legend"><span><i class="dot" style="background:var(--main)"></i>main commits</span><span><i class="dot" style="background:var(--feat)"></i>feature commits</span><span><i class="dot" style="background:var(--new)"></i>newly created commits</span></div>
+  </div>
+
+  <h2>git merge</h2>
+  <pre>git switch main
+git merge feature</pre>
+  <p>Git finds the common ancestor (<code>C</code>), combines both sides, and creates a new <strong>merge commit</strong> with <em>two parents</em>. No existing commit is altered. The history records exactly what happened: two lines of work that joined.</p>
+  <div class="card">
+    <svg viewBox="0 0 640 170" role="img" aria-label="After merge">
+      <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8c959f"/></marker></defs>
+      <g stroke="#8c959f" stroke-width="2" marker-end="url(#b)" fill="none">
+        <line x1="92" y1="50" x2="48" y2="50"/><line x1="172" y1="50" x2="128" y2="50"/><line x1="252" y1="50" x2="208" y2="50"/>
+        <path d="M172,50 C160,95 160,115 190,120"/>
+        <line x1="292" y1="120" x2="248" y2="120"/>
+        <line x1="372" y1="50" x2="288" y2="50"/>
+        <path d="M382,64 C380,100 370,115 328,120"/>
+      </g>
+      <circle cx="30" cy="50" r="18" fill="var(--main)"/><circle cx="110" cy="50" r="18" fill="var(--main)"/><circle cx="190" cy="50" r="18" fill="var(--main)"/><circle cx="270" cy="50" r="18" fill="var(--main)"/>
+      <circle cx="210" cy="120" r="18" fill="var(--feat)"/><circle cx="310" cy="120" r="18" fill="var(--feat)"/>
+      <circle cx="390" cy="50" r="18" fill="var(--new)"/>
+      <g font-size="13" fill="#fff" text-anchor="middle" font-family="monospace">
+        <text x="30" y="55">A</text><text x="110" y="55">B</text><text x="190" y="55">C</text><text x="270" y="55">D</text>
+        <text x="210" y="125">E</text><text x="310" y="125">F</text><text x="390" y="55">M</text>
+      </g>
+      <g font-size="14" font-weight="600">
+        <text x="420" y="55" fill="var(--main)">← main</text>
+        <text x="340" y="125" fill="var(--feat)">← feature</text>
+      </g>
+    </svg>
+  </div>
+  <ul>
+    <li><strong>History:</strong> non-linear, with a branch-and-join shape.</li>
+    <li><strong>Commits:</strong> <code>E</code> and <code>F</code> keep their original hashes and timestamps.</li>
+    <li><strong>Conflicts:</strong> resolved once, in the merge commit.</li>
+    <li><strong>Fast-forward:</strong> if <code>main</code> has not moved, git just slides the pointer forward and creates no merge commit (use <code>--no-ff</code> to force one).</li>
+  </ul>
+
+  <h2>git rebase</h2>
+  <pre>git switch feature
+git rebase main</pre>
+  <p>Git takes the commits unique to <code>feature</code> (<code>E</code>, <code>F</code>), sets them aside, moves the branch base to the tip of <code>main</code> (<code>D</code>), and <strong>replays</strong> each commit on top. Each replayed commit has a different parent, so it gets a <strong>new hash</strong>: <code>E′</code>, <code>F′</code>. The originals become unreachable (still recoverable via <code>git reflog</code> for a while).</p>
+  <div class="card">
+    <svg viewBox="0 0 640 170" role="img" aria-label="After rebase">
+      <defs><marker id="c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#8c959f"/></marker></defs>
+      <g stroke="#8c959f" stroke-width="2" marker-end="url(#c)" fill="none">
+        <line x1="92" y1="50" x2="48" y2="50"/><line x1="172" y1="50" x2="128" y2="50"/><line x1="252" y1="50" x2="208" y2="50"/>
+        <line x1="332" y1="50" x2="288" y2="50"/><line x1="412" y1="50" x2="368" y2="50"/>
+      </g>
+      <g stroke="#8c959f" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#c)" fill="none" opacity=".55">
+        <path d="M172,50 C160,95 160,115 190,120"/><line x1="292" y1="120" x2="248" y2="120"/>
+      </g>
+      <circle cx="30" cy="50" r="18" fill="var(--main)"/><circle cx="110" cy="50" r="18" fill="var(--main)"/><circle cx="190" cy="50" r="18" fill="var(--main)"/><circle cx="270" cy="50" r="18" fill="var(--main)"/>
+      <circle cx="350" cy="50" r="18" fill="var(--new)"/><circle cx="430" cy="50" r="18" fill="var(--new)"/>
+      <circle cx="210" cy="120" r="18" fill="none" stroke="var(--feat)" stroke-width="2" stroke-dasharray="4 3"/><circle cx="310" cy="120" r="18" fill="none" stroke="var(--feat)" stroke-width="2" stroke-dasharray="4 3"/>
+      <g font-size="13" text-anchor="middle" font-family="monospace">
+        <g fill="#fff"><text x="30" y="55">A</text><text x="110" y="55">B</text><text x="190" y="55">C</text><text x="270" y="55">D</text><text x="350" y="55">E′</text><text x="430" y="55">F′</text></g>
+        <g fill="var(--feat)" opacity=".7"><text x="210" y="125">E</text><text x="310" y="125">F</text></g>
+      </g>
+      <g font-size="14" font-weight="600">
+        <text x="460" y="45" fill="var(--feat)">← feature</text>
+        <text x="270" y="22" fill="var(--main)" text-anchor="middle">main</text>
+        <text x="340" y="150" fill="var(--muted)" font-weight="400" font-size="12">old E, F: abandoned (reachable only via reflog)</text>
+      </g>
+    </svg>
+  </div>
+  <p>Now <code>feature</code> is a straight line on top of <code>main</code>. To finish, merge it into <code>main</code>; that is a clean fast-forward:</p>
+  <pre>git switch main
+git merge feature   # fast-forward, no merge commit</pre>
+  <ul>
+    <li><strong>History:</strong> linear, as if you had started your work after <code>D</code>.</li>
+    <li><strong>Commits:</strong> new hashes (and new committer timestamps); contents may differ if conflicts were resolved.</li>
+    <li><strong>Conflicts:</strong> may need to be resolved once <em>per replayed commit</em>.</li>
+    <li><strong>Interactive:</strong> <code>git rebase -i</code> lets you squash, reorder, edit, or drop commits.</li>
+  </ul>
+
+  <h2>Side by side</h2>
+  <table>
+    <tr><th></th><th>merge</th><th>rebase</th></tr>
+    <tr><td>Existing commits</td><td>Untouched</td><td>Copied to new commits; originals abandoned</td></tr>
+    <tr><td>Resulting shape</td><td>Branching, with merge commits</td><td>Linear</td></tr>
+    <tr><td>Records true chronology</td><td>Yes</td><td>No: history is rewritten</td></tr>
+    <tr><td>Safe on shared branches</td><td>Yes</td><td>No, unless everyone coordinates</td></tr>
+    <tr><td>Conflict resolution</td><td>Once</td><td>Possibly per commit</td></tr>
+    <tr><td>Undo</td><td><code>git revert -m 1 &lt;merge&gt;</code> or reset</td><td><code>git reflog</code> then <code>git reset --hard</code></td></tr>
+    <tr><td>Bisect / log readability</td><td>Noisier graph</td><td>Cleaner, easier to follow</td></tr>
+  </table>
+
+  <h2>The golden rule</h2>
+  <div class="card warn">
+    <strong>Never rebase commits that others have already pulled.</strong> Rebasing changes commit hashes. If teammates built work on the old commits, their history and yours now disagree, which leads to duplicated commits and painful reconciliation. Pushing a rebased branch needs <code>git push --force-with-lease</code>, so only do that on branches that are yours alone.
+  </div>
+
+  <h2>Which should I use?</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Reach for merge when…</h3>
+      <ul>
+        <li>The branch is shared or public.</li>
+        <li>You want an exact record of how work was integrated.</li>
+        <li>You are bringing a finished feature into <code>main</code> and want a visible join point.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Reach for rebase when…</h3>
+      <ul>
+        <li>Updating your private feature branch with the latest <code>main</code>.</li>
+        <li>Cleaning up local commits before opening a pull request.</li>
+        <li>Your team prefers a linear history.</li>
+      </ul>
+    </div>
+  </div>
+  <p>A common workflow combines them: <strong>rebase locally to stay current and tidy, then merge (or fast-forward) to integrate.</strong></p>
+</main>
+</body>
+</html>

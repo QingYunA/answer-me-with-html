@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TCP Three-Way Handshake and Four-Way Teardown</title>
+<style>
+  :root { --bg:#f7f8fa; --fg:#1d2430; --muted:#5b6575; --card:#fff; --accent:#2563eb; --accent2:#d97706; --line:#d5dae2; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.65 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  header { background:#1d2430; color:#fff; padding:2.5rem 1.5rem; text-align:center; }
+  header h1 { margin:0 0 .4rem; font-size:2rem; }
+  header p { margin:0; color:#b8c2d1; }
+  main { max-width:900px; margin:0 auto; padding:1.5rem; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1.5rem 1.75rem; margin:1.5rem 0; }
+  h2 { margin-top:0; border-bottom:2px solid var(--accent); padding-bottom:.4rem; }
+  h3 { margin-bottom:.3rem; }
+  code { background:#eef1f6; padding:.1em .35em; border-radius:4px; font-size:.92em; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; font-size:.95rem; }
+  th, td { border:1px solid var(--line); padding:.5rem .7rem; text-align:left; vertical-align:top; }
+  th { background:#eef1f6; }
+  svg { display:block; width:100%; height:auto; margin:1rem auto; background:#fbfcfe; border:1px solid var(--line); border-radius:8px; }
+  .note { background:#fff7e6; border-left:4px solid var(--accent2); padding:.7rem 1rem; border-radius:4px; margin:1rem 0; }
+  footer { text-align:center; color:var(--muted); padding:1rem 0 2rem; font-size:.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TCP Connection Lifecycle</h1>
+  <p>The three-way handshake and the four-way teardown</p>
+</header>
+<main>
+
+<section>
+  <h2>Why TCP needs these exchanges</h2>
+  <p>TCP is a reliable, ordered, connection-oriented byte stream. Before data flows, both ends must agree they are willing to talk and must exchange <strong>initial sequence numbers (ISNs)</strong>, which let each side number bytes, detect loss and reorder segments. When finished, each direction of the stream is closed independently so no in-flight data is lost.</p>
+  <p>The relevant header flags are <code>SYN</code> (synchronize sequence numbers), <code>ACK</code> (acknowledgment field is valid), <code>FIN</code> (sender has no more data) and <code>RST</code> (abort).</p>
+</section>
+
+<section>
+  <h2>1. Three-way handshake (connection setup)</h2>
+  <svg viewBox="0 0 700 380" role="img" aria-label="Three-way handshake diagram">
+    <defs>
+      <marker id="a1" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#2563eb"/></marker>
+    </defs>
+    <text x="130" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1d2430">Client</text>
+    <text x="570" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1d2430">Server</text>
+    <line x1="130" y1="45" x2="130" y2="360" stroke="#8892a3" stroke-width="2" stroke-dasharray="6 4"/>
+    <line x1="570" y1="45" x2="570" y2="360" stroke="#8892a3" stroke-width="2" stroke-dasharray="6 4"/>
+
+    <text x="120" y="75" text-anchor="end" font-size="12" fill="#5b6575">CLOSED</text>
+    <text x="580" y="75" font-size="12" fill="#5b6575">LISTEN</text>
+
+    <line x1="130" y1="100" x2="568" y2="165" stroke="#2563eb" stroke-width="2.5" marker-end="url(#a1)"/>
+    <text x="350" y="115" text-anchor="middle" font-size="14" font-weight="bold" fill="#2563eb" transform="rotate(8.4 350 115)">SYN, seq=x</text>
+    <text x="120" y="105" text-anchor="end" font-size="12" fill="#5b6575">SYN_SENT</text>
+
+    <line x1="570" y1="195" x2="132" y2="260" stroke="#2563eb" stroke-width="2.5" marker-end="url(#a1)"/>
+    <text x="350" y="212" text-anchor="middle" font-size="14" font-weight="bold" fill="#2563eb" transform="rotate(-8.4 350 212)">SYN-ACK, seq=y, ack=x+1</text>
+    <text x="580" y="180" font-size="12" fill="#5b6575">SYN_RCVD</text>
+
+    <line x1="130" y1="290" x2="568" y2="335" stroke="#2563eb" stroke-width="2.5" marker-end="url(#a1)"/>
+    <text x="350" y="305" text-anchor="middle" font-size="14" font-weight="bold" fill="#2563eb" transform="rotate(5.9 350 305)">ACK, seq=x+1, ack=y+1</text>
+    <text x="120" y="275" text-anchor="end" font-size="12" fill="#5b6575">ESTABLISHED</text>
+    <text x="580" y="350" font-size="12" fill="#5b6575">ESTABLISHED</text>
+  </svg>
+
+  <table>
+    <tr><th>Step</th><th>Direction</th><th>Segment</th><th>Meaning</th></tr>
+    <tr><td>1</td><td>Client → Server</td><td><code>SYN</code>, seq = x</td><td>"I want to connect; my ISN is x." Client enters <code>SYN_SENT</code>.</td></tr>
+    <tr><td>2</td><td>Server → Client</td><td><code>SYN+ACK</code>, seq = y, ack = x+1</td><td>"Got it; here is my ISN y." Server enters <code>SYN_RCVD</code>.</td></tr>
+    <tr><td>3</td><td>Client → Server</td><td><code>ACK</code>, ack = y+1</td><td>"Got yours too." Both sides are <code>ESTABLISHED</code>; data may already ride on this segment.</td></tr>
+  </table>
+
+  <h3>Why three and not two?</h3>
+  <p>Each side must prove it can both send and receive, and each ISN must be acknowledged. Two messages would leave the server unsure the client received its ISN, and would let stale duplicate SYNs from old connections create phantom half-open connections. The third segment confirms the client's view is current.</p>
+  <div class="note"><strong>Practical notes:</strong> a SYN consumes one sequence number, which is why the ACK is x+1. Servers defend against SYN floods with SYN cookies. Options such as MSS, window scaling, SACK and timestamps are negotiated in the SYN and SYN-ACK. TCP Fast Open can carry data in the SYN on repeat connections.</div>
+</section>
+
+<section>
+  <h2>2. Four-way teardown (connection close)</h2>
+  <p>TCP is full-duplex: each direction is a separate stream and is closed on its own with a <code>FIN</code>. That is why closing usually takes four segments. After one side sends FIN, it can still <em>receive</em> data (a "half-close").</p>
+  <svg viewBox="0 0 700 460" role="img" aria-label="Four-way teardown diagram">
+    <defs>
+      <marker id="a2" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#d97706"/></marker>
+    </defs>
+    <text x="130" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1d2430">Active closer</text>
+    <text x="570" y="30" text-anchor="middle" font-size="18" font-weight="bold" fill="#1d2430">Passive closer</text>
+    <line x1="130" y1="45" x2="130" y2="440" stroke="#8892a3" stroke-width="2" stroke-dasharray="6 4"/>
+    <line x1="570" y1="45" x2="570" y2="440" stroke="#8892a3" stroke-width="2" stroke-dasharray="6 4"/>
+
+    <text x="120" y="65" text-anchor="end" font-size="12" fill="#5b6575">ESTABLISHED</text>
+    <text x="580" y="65" font-size="12" fill="#5b6575">ESTABLISHED</text>
+
+    <line x1="130" y1="85" x2="568" y2="130" stroke="#d97706" stroke-width="2.5" marker-end="url(#a2)"/>
+    <text x="350" y="100" text-anchor="middle" font-size="14" font-weight="bold" fill="#d97706" transform="rotate(5.9 350 100)">FIN, seq=u</text>
+    <text x="120" y="100" text-anchor="end" font-size="12" fill="#5b6575">FIN_WAIT_1</text>
+
+    <line x1="570" y1="160" x2="132" y2="205" stroke="#d97706" stroke-width="2.5" marker-end="url(#a2)"/>
+    <text x="350" y="170" text-anchor="middle" font-size="14" font-weight="bold" fill="#d97706" transform="rotate(-5.9 350 170)">ACK, ack=u+1</text>
+    <text x="580" y="148" font-size="12" fill="#5b6575">CLOSE_WAIT</text>
+    <text x="120" y="220" text-anchor="end" font-size="12" fill="#5b6575">FIN_WAIT_2</text>
+
+    <text x="350" y="245" text-anchor="middle" font-size="12" font-style="italic" fill="#5b6575">(server may still send remaining data)</text>
+
+    <line x1="570" y1="270" x2="132" y2="315" stroke="#d97706" stroke-width="2.5" marker-end="url(#a2)"/>
+    <text x="350" y="280" text-anchor="middle" font-size="14" font-weight="bold" fill="#d97706" transform="rotate(-5.9 350 280)">FIN, seq=w</text>
+    <text x="580" y="290" font-size="12" fill="#5b6575">LAST_ACK</text>
+
+    <line x1="130" y1="345" x2="568" y2="390" stroke="#d97706" stroke-width="2.5" marker-end="url(#a2)"/>
+    <text x="350" y="355" text-anchor="middle" font-size="14" font-weight="bold" fill="#d97706" transform="rotate(5.9 350 355)">ACK, ack=w+1</text>
+    <text x="120" y="360" text-anchor="end" font-size="12" fill="#5b6575">TIME_WAIT</text>
+    <text x="580" y="410" font-size="12" fill="#5b6575">CLOSED</text>
+    <text x="120" y="430" text-anchor="end" font-size="12" fill="#5b6575">CLOSED after 2×MSL</text>
+  </svg>
+
+  <table>
+    <tr><th>Step</th><th>Direction</th><th>Segment</th><th>Meaning</th></tr>
+    <tr><td>1</td><td>Active → Passive</td><td><code>FIN</code></td><td>"I have no more data to send." Enters <code>FIN_WAIT_1</code>.</td></tr>
+    <tr><td>2</td><td>Passive → Active</td><td><code>ACK</code></td><td>Acknowledges the FIN. Passive side is in <code>CLOSE_WAIT</code>; active side moves to <code>FIN_WAIT_2</code>.</td></tr>
+    <tr><td>3</td><td>Passive → Active</td><td><code>FIN</code></td><td>Once the application finishes and calls <code>close()</code>, the passive side sends its own FIN and enters <code>LAST_ACK</code>.</td></tr>
+    <tr><td>4</td><td>Active → Passive</td><td><code>ACK</code></td><td>Final acknowledgment. Active side enters <code>TIME_WAIT</code>; passive side goes straight to <code>CLOSED</code>.</td></tr>
+  </table>
+
+  <h3>TIME_WAIT</h3>
+  <p>The side that closes first lingers in <code>TIME_WAIT</code> for <strong>2×MSL</strong> (maximum segment lifetime; commonly 60 seconds total on Linux). This ensures that (a) the last ACK can be retransmitted if it was lost, since the peer would resend its FIN, and (b) delayed segments from the old connection expire so they cannot corrupt a new connection reusing the same 4-tuple.</p>
+
+  <div class="note"><strong>Variations:</strong> if the passive side has nothing left to send, it may combine its ACK and FIN into one segment, making a "three-way" close. If both sides send FIN simultaneously, they pass through <code>CLOSING</code> to <code>TIME_WAIT</code>. An <code>RST</code> aborts a connection immediately without this graceful exchange.</div>
+</section>
+
+<section>
+  <h2>Quick reference: state summary</h2>
+  <table>
+    <tr><th>Phase</th><th>Client / active closer states</th><th>Server / passive closer states</th></tr>
+    <tr><td>Setup</td><td>CLOSED → SYN_SENT → ESTABLISHED</td><td>CLOSED → LISTEN → SYN_RCVD → ESTABLISHED</td></tr>
+    <tr><td>Teardown</td><td>ESTABLISHED → FIN_WAIT_1 → FIN_WAIT_2 → TIME_WAIT → CLOSED</td><td>ESTABLISHED → CLOSE_WAIT → LAST_ACK → CLOSED</td></tr>
+  </table>
+</section>
+
+</main>
+<footer>Self-contained page · inline CSS and SVG only</footer>
+</body>
+</html>
