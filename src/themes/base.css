@@ -305,10 +305,11 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }
 
 .am-diagram-expand {
-  /* In flow and sticky: it sits at the right edge and stays in view when the diagram scrolls sideways. */
+  /* In flow and sticky: it sits at the right edge and stays in view when the diagram scrolls sideways.
+     It takes its own row above the drawing, so it never covers a node at the top-right corner of the drawing. */
   position: sticky; left: calc(100% - 36px); z-index: 2;
   display: flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; padding: 0; margin: 8px 8px -36px auto;
+  width: 28px; height: 28px; padding: 0; margin: 0 8px 4px auto;
   color: var(--ink-2); background: var(--paper);
   border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);
   cursor: pointer; opacity: 0.72;

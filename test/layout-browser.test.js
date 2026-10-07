@@ -621,6 +621,21 @@ test('e2e: the expand button stays in view when a wide diagram scrolls sideways'
   assert.equal(await evaluate(inView), true, 'expand button stays inside the visible part of a scrolled diagram');
 });
 
+test('e2e: the expand button does not cover a node at the right edge of the drawing', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\ntitle: Expand overlap\nlang: en\ntheme: blueprint\n---\n## A Flow plan {span=2}\n```flow LR\nClient -> Gateway\nGateway -> [(Cache)]: lookup\nCache -> Service: miss\nGateway -> Service\n*Service\n```\n');
+  const file = join(tmp, 'expand-overlap.html');
+  writeFileSync(file, html);
+  await open(file, PHONE);
+  const clear = `(() => {
+    const d = document.querySelector('.am-diagram');
+    const b = d.querySelector('.am-diagram-expand').getBoundingClientRect();
+    const s = d.querySelector(':scope > svg').getBoundingClientRect();
+    return b.bottom <= s.top;
+  })()`;
+  assert.equal(await evaluate(clear), true, 'expand button sits above the drawing, not on it');
+});
+
 // A host that serves the page inside its own document drops the page's <html> tag, so the real root has none of the page's settings.
 const inHost = (html, rootAttrs = '') => `<!doctype html><html${rootAttrs}><body>${html.replace(/<!doctype[^>]*>\s*/i, '').replace(/<html[^>]*>/i, '').replace(/<\/html>/i, '')}`;
 const ROOT_ATTRS = "[...['lang','data-theme','data-mode','data-style']].map((a) => document.documentElement.getAttribute(a))";
