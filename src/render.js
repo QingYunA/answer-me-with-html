@@ -74,7 +74,8 @@ function embedImages(block, html, ctx) {
     return inlineImages(html, ctx.images);
   } catch (err) {
     if (!(err instanceof ImageError)) throw err;
-    const idx = block.text.split('\n').findIndex((l) => l.includes(err.ref));
+    // The draft may write the path as decoded (a b.png) or percent-encoded (a%20b.png).
+    const idx = block.text.split('\n').findIndex((l) => l.includes(err.ref) || l.includes(encodeURI(err.ref)));
     const first = block.type === 'md' ? block.line : block.line + 1;
     throw new RenderError(err.message, { line: first + Math.max(idx, 0), component: 'image', example: IMAGE_EXAMPLE });
   }

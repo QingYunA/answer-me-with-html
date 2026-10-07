@@ -2872,8 +2872,12 @@ function figure(img) {
 function decorate(html) {
   return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
 }
+var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
+}
 function md(text) {
-  return decorate(marked.parse(String(text ?? "")));
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
 }
 function mdInline(text) {
   return marked.parseInline(String(text ?? ""));
@@ -5997,6 +6001,7 @@ var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
 var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
 var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
+var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
 var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
 var ImageError = class extends Error {
   constructor(message, ref) {
@@ -6033,7 +6038,12 @@ function readImage(ref, baseDir) {
   }
   return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
 }
+function assertNoImageText(html) {
+  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").match(TEXT_IMAGE);
+  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
+}
 function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map() } = {}) {
+  assertNoImageText(html);
   return html.replace(IMG_SRC, (whole, before, src) => {
     const ref = decodeRef(src);
     if (NOT_LOCAL.test(ref)) return whole;
@@ -6094,7 +6104,7 @@ function embedImages(block2, html, ctx) {
     return inlineImages(html, ctx.images);
   } catch (err) {
     if (!(err instanceof ImageError)) throw err;
-    const idx = block2.text.split("\n").findIndex((l3) => l3.includes(err.ref));
+    const idx = block2.text.split("\n").findIndex((l3) => l3.includes(err.ref) || l3.includes(encodeURI(err.ref)));
     const first = block2.type === "md" ? block2.line : block2.line + 1;
     throw new RenderError(err.message, { line: first + Math.max(idx, 0), component: "image", example: IMAGE_EXAMPLE });
   }
@@ -7261,7 +7271,7 @@ var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a
 ![What the picture shows](/absolute/path/to/screenshot.png)
 
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
-- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
 - http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.

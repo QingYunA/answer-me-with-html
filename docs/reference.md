@@ -38,7 +38,7 @@ For something a diagram cannot show, such as a real screen, use an image that al
 ```
 
 - Put the image alone on its line. The alt text becomes its caption, so write what the picture shows. The writing check reads it.
-- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin.
+- Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, so the page stays one file that opens offline. A wide image scales down to its panel.
 - `http(s)` URLs and `data:` URIs are left as they are. A URL needs the network when the page is opened.
 - The page keeps the path of each image. `am patch` embeds the image again from the file, or from the page when the file has moved.

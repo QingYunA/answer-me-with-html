@@ -37,8 +37,16 @@ function decorate(html) {
     .replace(CELL_STATUS, (_, attrs, word, label = '') => `<td${attrs}>${statusHtml(word, label)}</td>`);
 }
 
+// CommonMark takes a space in a link destination only inside <…>, so marked would leave ![alt](a b.png) as text. Wrap such a destination; code spans are skipped.
+// A destination may hold balanced (…) such as "Screenshot (1).png".
+const SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = '') => (code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`));
+}
+
 export function md(text) {
-  return decorate(marked.parse(String(text ?? '')));
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ''))));
 }
 
 export function mdInline(text) {
