@@ -19,15 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/zh/"><b>官网</b></a>：在浏览器里直接试用真实的渲染器
-</p>
-
-<p align="center">
-  <a href="README.md">English</a> · <b>简体中文</b>
-</p>
-
-<p align="center">
-  <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="#配置">配置</a> · <a href="#原理">原理</a> · <a href="docs/reference.zh-CN.md">参考文档</a>
+  <a href="https://qingyuna.github.io/answer-me-with-html/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
 </p>
 
 <p align="center">

@@ -20,15 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/"><b>Website</b></a>: try the real renderer in your browser
-</p>
-
-<p align="center">
-  <b>English</b> · <a href="README.zh-CN.md">简体中文</a>
-</p>
-
-<p align="center">
-  <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="#settings">Settings</a> · <a href="#how-it-works">How it works</a> · <a href="docs/reference.md">Reference</a>
+  <a href="https://qingyuna.github.io/answer-me-with-html/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
