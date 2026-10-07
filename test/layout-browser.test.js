@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
+import { renderDoc } from '../src/render.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHROME = findChrome();
@@ -616,4 +617,25 @@ test('e2e: the expand button stays in view when a wide diagram scrolls sideways'
     return b.left >= r.left && b.right <= r.right;
   })()`;
   assert.equal(await evaluate(inView), true, 'expand button stays inside the visible part of a scrolled diagram');
+});
+
+// A host that serves the page inside its own document drops the page's <html> tag, so the real root has none of the page's settings.
+const inHost = (html, rootAttrs = '') => `<!doctype html><html${rootAttrs}><body>${html.replace(/<!doctype[^>]*>\s*/i, '').replace(/<html[^>]*>/i, '').replace(/<\/html>/i, '')}`;
+const ROOT_ATTRS = "[...['lang','data-theme','data-mode','data-style']].map((a) => document.documentElement.getAttribute(a))";
+
+test('e2e: a page inside a host document gets its theme, mode, style and language back on the root', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\ntemplate: doc\nlang: ja\ntheme: blueprint\nmode: dark\nstyle: off\n---\n## A Note\nText.\n');
+  const bare = join(tmp, 'host-bare.html');
+  writeFileSync(bare, inHost(html));
+  await open(bare, DESKTOP);
+  assert.deepEqual(await evaluate(ROOT_ATTRS), ['ja', 'blueprint', 'dark', 'off']);
+  assert.equal(await evaluate("document.querySelector('select[data-am=theme]').value"), 'blueprint');
+  assert.equal(await evaluate("document.querySelector('select[data-am=mode]').value"), 'dark');
+  assert.notEqual(await evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()"), '', 'theme variables resolve');
+  // A value the host root already has, even an empty one, is not replaced.
+  const own = join(tmp, 'host-own.html');
+  writeFileSync(own, inHost(html, ' lang="fr" data-theme=""'));
+  await open(own, DESKTOP);
+  assert.deepEqual(await evaluate(ROOT_ATTRS), ['fr', '', 'dark', 'off']);
 });
