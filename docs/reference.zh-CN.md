@@ -193,3 +193,43 @@ AM_EOF
 
 - `/answer-me-with-html:clean`（插件），或者直接说"清理一下页面"：先预演，再问你。
 - `am clean`：删除 30 天前的页面和视频，清空配音缓存。`--days N` 改天数，`--all` 删除全部页面和视频，`--dry-run` 只看不删。配置和主题始终保留。如果 `pages`、`videos` 或 `cache` 本身是软链接，会被跳过：`am clean` 不会碰链接指向的文件，用量统计和清理提示也不再计入。如果这些目录无法遍历（比如没有读权限），同样会被跳过：其中的文件不计入用量统计和清理提示，显示的大小可能低于实际占用，清理也不会删除它们。
+
+**旧的高频模式插件。** 仓库里已经删掉它，但你本机的副本会一直注入提醒，直到你卸载。先执行 `/plugin uninstall answer-me-with-html-always@answer-me-with-html`，再按 [README](../README.zh-CN.md#高频模式推荐) 加上高频模式的规则。
+
+## 配置
+
+| 配置项 | 默认值 | 作用 |
+| :--- | :--- | :--- |
+| `open` | `on` | 生成后自动用浏览器打开。嫌弹窗打扰就关掉 |
+| `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
+| `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
+| `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
+| `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
+| `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
+
+配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
+
+## 少一点主动
+
+默认情况下，只要页面更好懂，agent 就会出页面。嫌太多的话，有两种办法。两种都不要和高频模式同时用。
+
+**只在你用话要求时出。** 把这条规则加到你的规则文件里，例如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`：
+
+> 除非我要求生成页面、图示或可视化讲解，或者说我没看懂，否则不要使用 answer-me-with-html skill。
+
+这条规则在更新后还在。agent 仍然看得到这个 skill，所以靠自己的判断遵守规则。
+
+**只用斜杠命令触发（Claude Code）。** 在已安装的 `SKILL.md` 的 frontmatter 里加一行 `disable-model-invocation: true`，例如 `~/.claude/skills/answer-me-with-html/SKILL.md`。之后 agent 完全看不到这个 skill，只有你输入 `/answer-me-with-html` 才会出页面。更新会替换这个文件，更新后要重新加这一行。见 [Claude Code skills 文档](https://code.claude.com/docs/en/skills)。
+
+## 写作检查
+
+Answer me with HTML 把其中容易用机器检查的部分做成了中英双语版，每次渲染时顺带检查：
+
+- **句长:** 操作步骤不超过 20 个英文词或 35 个汉字，描述性句子不超过 25 词或 45 字。每段最多 6 句。
+- **用词:** 英文换成常见词，比如 utilize 改成 use、prior to 改成 before。中文删掉虚动词，比如"进行优化"直接写"优化"。
+- **句式:** 提示英文被动语态、一句里用了三个以上的"的"，以及"赋能""闭环"这类套话。
+- **中文词表:** 错别字（登陆→登录）、含糊的量词（尽快、若干、大概、多次）、数字后的"以上 / 以下 / 以内"，以及一词多写（单击→点击、键入→输入、入参→参数）。只收几乎不会误报的词，取自[简明技术中文](https://github.com/mzopedia/simplified-technical-chinese)，一套参照 STE 方法整理的中文受控写作规范。
+- **日文:** 含假名的稿件按日文处理：页面按钮用日文，页面带 `lang="ja"`。只检查句长和段长，字数上限同中文。要强制指定，在稿件里写 `lang: ja`。
+- **其他语言:** 其他语言只检查长度：句子按词数计（中日文按字数计），段落按句数计。英文和中文的词表、被动语态规则都不会作用在它身上。
+
+用 `/answer-me-with-html:config style strict` 调整严格程度，或者在单篇稿件里写 `style:`。

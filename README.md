@@ -28,6 +28,10 @@
 </p>
 
 <p align="center">
+  <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="#settings">Settings</a> · <a href="#how-it-works">How it works</a> · <a href="docs/reference.md">Reference</a>
+</p>
+
+<p align="center">
   <img src="docs/images/text-vs-page.png" alt="The same TCP question answered in plain text and with the skill: a wall of terminal text on the left, one readable page with diagrams on the right" width="100%">
 </p>
 
@@ -67,18 +71,11 @@ With this skill the model writes only a Markdown draft. For the same questions t
   <img src="docs/images/plain-vs-skill.png" alt="The same TCP question answered both ways" width="100%">
 </p>
 
-<p align="center"><sub>One run from an earlier benchmark in a heavily loaded setup: same prompt, same model, and both pages are usable. This run took 9,351 output tokens for the plain page and 899 with the skill.</sub></p>
+<p align="center"><sub>The same question, the same model, answered both ways. Both pages are usable.</sub></p>
 
 The token counts are saved in [bench/corpus/tokens.json](bench/corpus/tokens.json), so `node bench/corpus.mjs` gives the same numbers every time. The pages themselves are a [download](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip). The bill drops less than the writing, about 15% here, because every turn also reads the system prompt, your question and the conversation, with or without the skill. See [where the cost goes](bench/README.md#where-the-cost-goes).
 
-Explainer videos show a bigger gap. We asked for the TCP handshake as a 3Blue1Brown-style video, no voice, both ways:
-
-| | Write the video page by hand | `am video` | |
-| :--- | ---: | ---: | :--- |
-| Output tokens | 27,839 | **1,566** | **17.8× fewer** |
-| Time | 202 s | **17 s** | **11.8× faster** |
-
-That is one topic and five runs (3 by hand, 2 with `am video`, medians), so read it as a rough size, not a precise ratio. Per-topic numbers and the script to reproduce them are in [bench/](bench/README.md).
+Explainer videos save even more: about 18× fewer output tokens and 12× faster in [a small test](bench/README.md#explainer-videos).
 
 ## Install
 
@@ -145,9 +142,9 @@ Pages are saved in `~/.answer-me-with-html/pages/`. The buttons in the top-right
 
 [Archify](https://github.com/tt-a1i/archify) makes one interactive diagram from a JSON spec. GenUI plugins such as [dsh-genui](https://github.com/omdsh-dev/dsh-genui) show components inside one chat app. This skill answers the whole question as one page: text, tables, code and diagrams, from a Markdown draft, in any agent that can run a shell command. See the [full comparison](docs/compare.md).
 
-## Explainer videos (3Blue1Brown style)
+## Explainer videos
 
-Karpathy's ladder for understanding LLM output ends with explainer videos. Ask for one: "make a 3b1b-style video on the TCP handshake".
+Karpathy's ladder for understanding LLM output ends with explainer videos. Ask for one in 3Blue1Brown style: "make a 3b1b-style video on the TCP handshake".
 
 <p align="center"><img src="docs/images/video-en.png" alt="Four frames from a generated explainer video in the blueprint style: title card, a sequence diagram with the Server highlighted, a flow diagram, and a comparison table" width="820"></p>
 
@@ -163,15 +160,7 @@ Server -> Client: SYN-ACK
 > The [Server] answers with a SYN-ACK.
 ````
 
-`am video` turns it into a player page:
-
-- **Built step by step.** When the Nth line of narration plays, the Nth step of the diagram appears. Arrows draw themselves. If there are more lines than steps, the extra lines at the start act as an intro.
-- **Camera focus.** `[Server]` in the narration pushes the camera toward that node and highlights it. The diagram never leaves the frame.
-- **Objects carry over.** A node with the same name in the next scene glides to its new place instead of cutting.
-- **Narration.** It uses ElevenLabs if `ELEVENLABS_API_KEY` is set (optional; [setup guide](docs/elevenlabs.md)), the system voice otherwise, and captions only if neither exists. Each beat lasts as long as its audio, so picture and voice stay in sync.
-- **One file.** The page has the audio inside and plays offline. Add `--mp4` for a 1080p video file. This needs Chrome, ffmpeg and Node.js 22+ on your machine.
-
-The draft for the example video ([examples/video-tcp.en.md](examples/video-tcp.en.md)) is 1.3 KB, a few hundred output tokens. The agent only makes videos when you ask. A local voice server, themes and export time are in [video details](docs/video.md). Full syntax: `am help video`.
+`am video` turns it into a player page. The diagram builds step by step with the narration, and the camera follows the node named in brackets. The voice is inside the page, so it plays offline. Add `--mp4` for a video file. The agent only makes videos when you ask. Details: [video guide](docs/video.md).
 
 ## Settings
 
@@ -183,52 +172,21 @@ Change settings with a slash command. There are no config files to edit by hand.
 | Any agent | `/answer-me-with-html config open off`, or just say "stop opening the browser" |
 | Terminal | `am config` to view, `am config set open off` to change, `am config reset` to restore defaults |
 
-| Key | Default | What it does |
-| :--- | :--- | :--- |
-| `open` | `on` | Open each page in the browser after it is made. Turn it off if pop-ups interrupt you |
-| `theme` | `auto` | Default theme: `auto` (paper for long text, blueprint for diagrams), `blueprint`, `shadcn`, `paper`, or your own theme |
-| `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
-| `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
-| `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
-| `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
-
-Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
+The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `update_check` and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
 
 ## Always-on mode (recommended)
 
 With always-on mode, **every conclusion comes with a page**: whenever the agent gives a conclusion, summary, plan or comparison, even a short one, it adds a small page with 2 to 4 panels and puts the path at the end of the reply. These pages never pop open, so they don't interrupt you. Casual chat and replies with no conclusion stay as they are. Claude Code makes no pages in plan mode.
 
-We recommend turning it on: you stop having to ask for a page, and a short conclusion gets the same readable format as a long one. The cost is a short draft per reply, and the pages pile up in `~/.answer-me-with-html/` (clear them with `am clean`).
-
-It is off by default: the agent makes a page only for questions that need one. To turn it on, add one rule to your agent's rules file.
-
-Paste this to your agent so it writes the rule into its own rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
+It is off by default. We recommend it: you stop asking for pages, and short answers read as well as long ones. Pages pile up in `~/.answer-me-with-html/`; clear them with `am clean`. To turn it on, paste this to your agent so it writes the rule into its rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
 
 > Turn on always-on mode for Answer me with HTML: add a global rule — "[answer-me-with-html always-on] Whenever a reply gives a conclusion, summary, plan, comparison, review or explanation, even a short one, also make a page with the answer-me-with-html skill (2 to 4 panels for routine answers), render it with --no-open before you write the reply, and end the reply with a file:// link to the page. Skip casual chat, one- or two-sentence replies with no conclusion, pure command output, and requests for plain text."
 
-To turn it off, delete that rule from the file.
-
-**Installed the old `answer-me-with-html-always` plugin?** It is gone from this repository, but your copy keeps adding the reminder until you remove it. Run `/plugin uninstall answer-me-with-html-always@answer-me-with-html`, then paste the rule above.
-
-## Less proactive
-
-By default the agent makes a page whenever one would help. If that is too much, pick one of two ways. Do not combine either with always-on mode.
-
-**Only when you ask in words.** Add this rule to your rules file, such as `~/.claude/CLAUDE.md` or `AGENTS.md`:
-
-> Do not use the answer-me-with-html skill unless I ask for a page, a diagram or a visual explanation, or say I don't get it.
-
-The rule survives updates. The agent still sees the skill, so it follows the rule by judgment.
-
-**Only with the slash command (Claude Code).** Add `disable-model-invocation: true` to the frontmatter of the installed `SKILL.md`, such as `~/.claude/skills/answer-me-with-html/SKILL.md`. The agent then never sees the skill, and a page appears only when you type `/answer-me-with-html`. An update replaces the file, so add the line again afterwards. See the [Claude Code skills docs](https://code.claude.com/docs/en/skills).
+To turn it off, delete that rule. Want fewer pages instead? See [less proactive](docs/reference.md#less-proactive).
 
 ## Updating and cleaning up
 
-Updates are manual. Once a week a background check reads the latest version number from GitHub (nothing about you or your pages is sent), and the agent mentions a new version when there is one. Turn it off with `/answer-me-with-html:config update_check off`. To update, run `npx skills update answer-me-with-html -y`, or tell your agent "update answer-me-with-html".
-
-Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. When the folder gets large, the agent asks before cleaning, and nothing is deleted without your OK. Say "clean up the pages", or run `am clean --dry-run` to preview.
-
-Update steps for other install methods and every `am clean` option: [reference](docs/reference.md#updating-and-cleaning-up).
+Updates are manual. Once a week the agent checks GitHub for a new version number and tells you; nothing about you is sent. To update, tell your agent "update answer-me-with-html". Pages pile up in `~/.answer-me-with-html/`. Say "clean up the pages", and the agent asks before it deletes anything. Other install methods and every option: [reference](docs/reference.md#updating-and-cleaning-up).
 
 ## Background
 
@@ -274,9 +232,9 @@ The CLI does the rest. It picks the template, places the panels, applies the the
 - **Fixes its own mistakes:** When a draft has an error, the CLI returns the line number, the component and a correct example. The agent fixes it in one try.
 - **Three themes:** `blueprint` looks like an engineering drawing, `shadcn` uses clean cards, and `paper` is set for long reading. By default the CLI picks paper for long text and blueprint for diagrams. All have light and dark modes, and you can add your own.
 - **One file, no dependencies:** Each page is a single `.html` with no CDN links or web fonts. It opens offline and is easy to share.
-- **Languages:** Simplified Chinese, Traditional Chinese, English and Japanese are fully supported: page buttons, theme names, fonts and the video player. Any other language gets the right `lang` attribute and English buttons. Write `lang: zh-Hant` (or `zh-TW`) for Traditional Chinese, or `lang: fr` for French; see the [reference](docs/reference.md#languages).
+- **Languages:** Chinese (Simplified and Traditional), English and Japanese get their own buttons and fonts. Other languages work with English buttons. See [languages](docs/reference.md#languages).
 - **Writing check:** Drafts are checked against rules adapted from ASD-STE100: long sentences, wordy phrases, passive voice. It only warns unless you ask for strict mode.
-- **Real code, not retyped:** A code block can quote a file: ```` ```ts src=server/routes.ts lines=18-30 ````. The CLI reads the lines, so the model types no code and the code on the page is the real code, with line numbers and a Copy button. Only files inside the current folder are read, and files that hold keys are refused.
+- **Real code, not retyped:** A code block can quote lines from your files (`src=` `lines=`), so the code on the page is the real code. Files outside the folder and files that hold keys are refused.
 - **Answer on the page:** Comment on any panel, and pick options in the decisions the agent asks (`ask`). The Reply button turns your answers and comments into one message to paste back to the agent.
 - **Keeps its source:** Every page embeds the Markdown that made it. Click "Copy source" to get it back.
 
@@ -315,16 +273,7 @@ The draft format (frontmatter, `span`, `rows`, raw `html` / `svg` blocks) and ho
 
 [ASD-STE100](https://www.asd-ste100.org/) is a controlled form of English first used for aircraft maintenance manuals. Its rules are concrete: keep sentences short, give each word one meaning, write steps as commands. Karpathy noted that asking an LLM to follow these rules makes its writing much easier to read.
 
-Answer me with HTML turns the parts a machine can check into an English and Chinese rule set, and runs it on every render:
-
-- **Length:** Steps stay under 20 English words or 35 Chinese characters. Descriptions stay under 25 words or 45 characters. Paragraphs have at most 6 sentences.
-- **Words:** Prefer common words: "use", not "utilize"; "before", not "prior to". In Chinese, drop empty verbs: write 优化, not 进行优化.
-- **Chinese vocabulary:** Common typos (登陆 → 登录), vague quantities (尽快, 若干, 大概, 多次), 以上 / 以下 / 以内 after a number (the endpoint is ambiguous), and one-meaning-one-word choices (单击 → 点击, 键入 → 输入, 入参 → 参数). Only the entries that are almost never wrong, taken from [Simplified Technical Chinese](https://github.com/mzopedia/simplified-technical-chinese), a controlled Chinese modelled on the STE method.
-- **Style:** Flags English passive voice, three or more 的 in one sentence, and stock phrases such as 赋能 and 闭环.
-- **Japanese:** A draft with kana is treated as Japanese: the page buttons are in Japanese and the page gets `lang="ja"`. Only the length rules apply, with the Chinese character limits. Write `lang: ja` in the draft to force it.
-- **Other languages:** Any other language gets only the length rules: sentences in words (characters for Chinese and Japanese text), paragraphs in sentences. The English and Chinese word lists and the passive-voice rule do not run on it.
-
-Set the strictness with `/answer-me-with-html:config style strict`, or per page with `style:` in the draft.
+Every render checks the parts a machine can check: sentence length, plain words, passive voice, and common Chinese typos and vague words. It only warns by default. Set `/answer-me-with-html:config style strict` to refuse drafts that fail, or `style:` in one draft. The full rule list: [reference](docs/reference.md#writing-check).
 
 ## Development
 

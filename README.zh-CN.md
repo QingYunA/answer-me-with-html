@@ -27,6 +27,10 @@
 </p>
 
 <p align="center">
+  <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="#配置">配置</a> · <a href="#原理">原理</a> · <a href="docs/reference.zh-CN.md">参考文档</a>
+</p>
+
+<p align="center">
   <img src="docs/images/text-vs-page-zh.png" alt="同一个 TCP 问题的两种回答：左边是终端里的一堵文字墙，右边是带图表的一页能看懂的页面" width="100%">
 </p>
 
@@ -66,18 +70,11 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
   <img src="docs/images/plain-vs-skill.png" alt="同一个 TCP 问题的两种做法" width="100%">
 </p>
 
-<p align="center"><sub>这是更早一次基准测试中的一次运行，环境加载很重：同样的提示词、同一个模型，两页都能用。这一次直接写 HTML 花了 9,351 个输出 token，用 skill 只花了 899 个。</sub></p>
+<p align="center"><sub>同一个问题、同一个模型，两种做法各答一遍，两页都能用。</sub></p>
 
 token 数存在 [bench/corpus/tokens.json](bench/corpus/tokens.json) 里，运行 `node bench/corpus.mjs` 每次都得到同样的数字。页面本身可以[下载](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip)。花费降得比 token 少，这里约便宜 15%，因为每一轮都还要读系统提示、你的问题和对话记录，用不用 skill 都一样。详见[花费都花在哪](bench/README.md#where-the-cost-goes)。
 
-解释视频的差距更大。我们让模型做一个 3Blue1Brown 风格的 TCP 握手视频，不配音，两种方式各做一遍：
-
-| | 手写视频页 | `am video` | |
-| :--- | ---: | ---: | :--- |
-| 输出 token | 27,839 | **1,566** | **少 17.8 倍** |
-| 耗时 | 202 秒 | **17 秒** | **快 11.8 倍** |
-
-这只是一个题目、5 次运行（手写 3 次，`am video` 2 次，取中位数），看个大概量级，不是精确倍数。每个题目的数据和复现脚本见 [bench/](bench/README.md)。
+解释视频省得更多：在[一次小测试](bench/README.md#explainer-videos)里，输出 token 少约 18 倍，快约 12 倍。
 
 ## 安装
 
@@ -144,9 +141,9 @@ cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answe
 
 [Archify](https://github.com/tt-a1i/archify) 根据一份 JSON 规格画一张可交互的图。[dsh-genui](https://github.com/omdsh-dev/dsh-genui) 这类 GenUI 插件在某一个聊天应用里显示组件。这个 skill 把整个问题答成一页：正文、表格、代码和图都有，模型只写一份 Markdown 稿件，任何能运行 shell 命令的 Agent 都能用。详见[完整对比](docs/compare.zh-CN.md)。
 
-## 解释视频（3Blue1Brown 风格）
+## 解释视频
 
-Karpathy 说的"理解 LLM 输出"阶梯，最后一级是解释视频。直接说"给 TCP 握手做个 3b1b 风格的视频"就行。
+Karpathy 说的"理解 LLM 输出"阶梯，最后一级是 3Blue1Brown 风格的解释视频。直接说"给 TCP 握手做个 3b1b 风格的视频"就行。
 
 <p align="center"><img src="docs/images/video-zh.png" alt="blueprint 风格解释视频中的四帧：片头、高亮 Server 的时序图、流程图、对比表" width="820"></p>
 
@@ -162,15 +159,7 @@ Server -> Client: SYN-ACK
 > [Server] 听到了，回一个 SYN-ACK："收到，我这边也没问题。"
 ````
 
-`am video` 把它做成一个播放页：
-
-- **逐步构建**：第 N 句旁白播出时，图上出现第 N 步，箭头会一笔画出来。旁白比步数多时，多出的前几句当开场白。
-- **镜头聚焦**：旁白里写 `[Server]`，镜头推向这个节点并高亮。整张图始终留在画面里，不会被裁掉。
-- **跨场景变形**：下一个场景里同名的节点，会从旧位置平滑移到新位置，而不是硬切。
-- **配音**：设置了 `ELEVENLABS_API_KEY` 就用 ElevenLabs（可选，[配置指南](docs/elevenlabs.zh-CN.md)），否则用系统语音，都没有就只出字幕。每一拍的时长等于这句音频的长度，所以音画同步。
-- **单个文件**：音频内嵌在页面里，离线也能播。加 `--mp4` 另存 1080p 视频文件，需要本机有 Chrome、ffmpeg 和 Node.js 22+。
-
-示例视频（[examples/video-tcp.md](examples/video-tcp.md)）的稿件只有 835 个字符，也就是几百个输出 token。只有你要视频时 Agent 才会做视频。本地配音服务、主题、导出时间等细节见[解释视频的细节](docs/video.zh-CN.md)；完整语法：`am help video`。
+`am video` 把它做成一个播放页：图随旁白一步步画出来，镜头跟着方括号里的节点走。配音内嵌在页面里，离线也能播。加 `--mp4` 可以另存视频文件。只有你要视频时 Agent 才会做。细节见[解释视频的细节](docs/video.zh-CN.md)。
 
 ## 配置
 
@@ -182,52 +171,21 @@ Server -> Client: SYN-ACK
 | 任意 Agent | `/answer-me-with-html config open off`，或者直接说"别再自动弹浏览器了" |
 | 终端 | `am config` 查看，`am config set open off` 修改，`am config reset` 恢复默认 |
 
-| 配置项 | 默认值 | 作用 |
-| :--- | :--- | :--- |
-| `open` | `on` | 生成后自动用浏览器打开。嫌弹窗打扰就关掉 |
-| `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
-| `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
-| `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
-| `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
-| `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
-
-配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
+配置项有 `open`（自动打开浏览器）、`theme`、`mode`（亮色或暗色）、`style`（写作检查）、`update_check` 和 `voice`（视频配音）。默认值和可选值见[参考](docs/reference.zh-CN.md#配置)。
 
 ## 高频模式（推荐）
 
 打开高频模式后，**每个结论都会附一页**：只要这一轮给出了结论、总结、方案或对比，哪怕回答很短，Agent 也会顺手出一页 2～4 个面板的小页面，并在回复最后附上路径。这些页面只生成、不弹出，不会打断你手上的事。闲聊、没有结论的一两句话不受影响。Claude Code 处于 plan 模式时不会出页面。
 
-建议打开：不用每次开口要页面，短结论也能得到和长篇一样好读的版式。代价是每次回复多写一份短稿，页面会堆在 `~/.answer-me-with-html/` 里（用 `am clean` 清理）。
-
-默认是关的：只有问题需要时 Agent 才会出页面。想打开，在 Agent 的规则文件里加一条规则就行。
-
-把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`）：
+默认是关的。建议打开：不用每次开口要页面，短结论也和长篇一样好读。页面会堆在 `~/.answer-me-with-html/` 里，用 `am clean` 清理。想打开，把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`）：
 
 > 帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后附上页面的 file:// 链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。"
 
-想关掉，把这条规则从文件里删掉即可。
-
-**装过旧的 `answer-me-with-html-always` 插件？** 仓库里已经删掉它，但你本机的副本会一直注入提醒，直到你卸载。先执行 `/plugin uninstall answer-me-with-html-always@answer-me-with-html`，再贴上面的规则。
-
-## 少一点主动
-
-默认情况下，只要页面更好懂，agent 就会出页面。嫌太多的话，有两种办法。两种都不要和高频模式同时用。
-
-**只在你用话要求时出。** 把这条规则加到你的规则文件里，例如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`：
-
-> 除非我要求生成页面、图示或可视化讲解，或者说我没看懂，否则不要使用 answer-me-with-html skill。
-
-这条规则在更新后还在。agent 仍然看得到这个 skill，所以靠自己的判断遵守规则。
-
-**只用斜杠命令触发（Claude Code）。** 在已安装的 `SKILL.md` 的 frontmatter 里加一行 `disable-model-invocation: true`，例如 `~/.claude/skills/answer-me-with-html/SKILL.md`。之后 agent 完全看不到这个 skill，只有你输入 `/answer-me-with-html` 才会出页面。更新会替换这个文件，更新后要重新加这一行。见 [Claude Code skills 文档](https://code.claude.com/docs/en/skills)。
+想关掉，把这条规则删掉即可。想让页面少一点？见[少一点主动](docs/reference.zh-CN.md#少一点主动)。
 
 ## 更新与清理
 
-需要手动更新。工具每周在后台向 GitHub 查询一次最新版本号（不上传任何内容），有新版本时 Agent 会提醒你。关掉提醒：`/answer-me-with-html:config update_check off`。更新：`npx skills update answer-me-with-html -y`，或直接对 Agent 说"更新一下 answer-me-with-html"。
-
-页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录变大时 Agent 会先问你，没有你的同意，什么都不会删。直接说"清理一下页面"，或者运行 `am clean --dry-run` 先看看会删什么。
-
-其他安装方式的更新步骤和 `am clean` 的全部选项：[参考](docs/reference.zh-CN.md#更新与清理)。
+需要手动更新。Agent 每周向 GitHub 查一次最新版本号，有新版本就告诉你，不会上传任何内容。想更新，对 Agent 说"更新一下 answer-me-with-html"。页面会堆在 `~/.answer-me-with-html/` 里，说"清理一下页面"，Agent 会先问你再删。其他安装方式和全部选项见[参考](docs/reference.zh-CN.md#更新与清理)。
 
 ## 为什么做这个
 
@@ -273,9 +231,9 @@ SYN_RCVD -> *ESTABLISHED: 收 ACK
 - **出错能自己改:** 稿件写错时，CLI 会给出行号、组件名和一段正确示例。Agent 照着改一次就行。
 - **三套主题:** blueprint 是图纸风，shadcn 是卡片风，paper 适合读长文。默认由 CLI 按内容自动选：长文用 paper，有图表用 blueprint。三套都带亮色和暗色，页面上可以用下拉框随时切换，也可以添加你自己的主题。
 - **单文件、零依赖:** 产物是一个 `.html`，不引用任何 CDN 或外部字体。断网也能打开，发给别人也能看。
-- **多语言:** 简体中文、繁体中文、英文和日文是完整支持：页面按钮、主题名、字体和视频播放器都有对应语言。其他语言会得到正确的 `lang` 属性和英文按钮。繁体中文在稿头写 `lang: zh-Hant`（或 `zh-TW`），法文写 `lang: fr`，详见[参考文档](docs/reference.zh-CN.md#语言)。
+- **多语言:** 简体中文、繁体中文、英文和日文都有对应的按钮和字体。其他语言也能用，按钮是英文。详见[语言](docs/reference.zh-CN.md#语言)。
 - **写作检查:** 按 ASD-STE100 的思路检查稿件里的文字。句子太长、用词太绕、被动语态都会提醒。默认只提醒，不拦着。
-- **真实代码，不靠手抄:** 代码块可以直接引用文件：```` ```ts src=server/routes.ts lines=18-30 ````。CLI 读取这些行，模型不用手抄，页面上的代码就是真实代码，带行号和复制按钮。只读取当前目录里的文件，存放密钥的文件会被拒绝。
+- **真实代码，不靠手抄:** 代码块可以直接引用你文件里的几行（`src=` `lines=`），页面上的代码就是真实代码。当前目录以外的文件和存放密钥的文件会被拒绝。
 - **在页面上回复:** 可以对任意面板写评论，也可以在 Agent 提出的决定（`ask`）里选选项。点"回复"按钮，你的选择和评论会合成一段文字，贴回给 Agent 即可。
 - **能找回原稿:** 每页都内嵌了生成它的 Markdown。点"复制源稿"就能拿回来改。
 
@@ -314,16 +272,7 @@ Agent 会按信息的形状挑组件：
 
 [ASD-STE100](https://www.asd-ste100.org/) 是一套受控英语，最早用来写飞机维修手册。它的规定很具体：句子不能太长，一个词只表达一个意思，操作步骤要用祈使句。Karpathy 提到，让 LLM 按这套规则写，读起来会清楚很多。
 
-Answer me with HTML 把其中容易用机器检查的部分做成了中英双语版，每次渲染时顺带检查：
-
-- **句长:** 操作步骤不超过 20 个英文词或 35 个汉字，描述性句子不超过 25 词或 45 字。每段最多 6 句。
-- **用词:** 英文换成常见词，比如 utilize 改成 use、prior to 改成 before。中文删掉虚动词，比如"进行优化"直接写"优化"。
-- **句式:** 提示英文被动语态、一句里用了三个以上的"的"，以及"赋能""闭环"这类套话。
-- **中文词表:** 错别字（登陆→登录）、含糊的量词（尽快、若干、大概、多次）、数字后的"以上 / 以下 / 以内"，以及一词多写（单击→点击、键入→输入、入参→参数）。只收几乎不会误报的词，取自[简明技术中文](https://github.com/mzopedia/simplified-technical-chinese)，一套参照 STE 方法整理的中文受控写作规范。
-- **日文:** 含假名的稿件按日文处理：页面按钮用日文，页面带 `lang="ja"`。只检查句长和段长，字数上限同中文。要强制指定，在稿件里写 `lang: ja`。
-- **其他语言:** 其他语言只检查长度：句子按词数计（中日文按字数计），段落按句数计。英文和中文的词表、被动语态规则都不会作用在它身上。
-
-用 `/answer-me-with-html:config style strict` 调整严格程度，或者在单篇稿件里写 `style:`。
+每次渲染都会检查其中容易用机器检查的部分：句长、常用词、被动语态，以及中文的错别字和含糊词。默认只提醒。用 `/answer-me-with-html:config style strict` 让不达标的稿件不生成，或者在单篇稿件里写 `style:`。完整规则见[参考](docs/reference.zh-CN.md#写作检查)。
 
 ## 开发
 
