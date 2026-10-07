@@ -3,6 +3,7 @@
 // with the model's own tokenizer, and saves them to bench/corpus/tokens.json. Needs Claude Code and no API key:
 // each file is sent once inside a prompt, and its count is the prompt's input tokens minus the input tokens
 // of the same prompt with no file.
+// The corpus is a release download: unzip bench-corpus-2026-10-07.zip into bench/corpus/ first.
 // Usage: node bench/count-tokens.mjs [model]
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -12,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 const MODEL = process.argv[2] || 'sonnet';
 const DIR = fileURLToPath(new URL('corpus', import.meta.url));
+const FILES = readdirSync(DIR).filter((f) => /\.(html|md)$/.test(f)).sort();
+if (!FILES.length) throw new Error('bench/corpus has no pages: unzip bench-corpus-2026-10-07.zip from the v0.4.14 release into it.');
 const work = mkdtempSync(join(tmpdir(), 'bench-tokens-'));
 
 // Total input tokens the main model read for one prompt.
@@ -42,7 +45,7 @@ const again = inputTokens('');
 if (base !== again) throw new Error(`The empty prompt read ${base} and then ${again} tokens; counts would not be exact.`);
 
 const tokens = {};
-for (const f of readdirSync(DIR).filter((f) => /\.(html|md)$/.test(f)).sort()) {
+for (const f of FILES) {
   tokens[f] = inputTokens(readFileSync(join(DIR, f), 'utf8')) - base;
   console.log(f, tokens[f]);
 }

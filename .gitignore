@@ -7,6 +7,10 @@ bench/results/**/*.html
 bench/results/**/*.png
 bench/en/
 
+# The token corpus is a release download; only its counts (tokens.json) are in git.
+bench/corpus/*.html
+bench/corpus/*.md
+
 # 社交媒体宣传图（本地制作，不入库）
 docs/social/
 

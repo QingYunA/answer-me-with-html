@@ -6,7 +6,7 @@ Numbers come straight from `claude -p --output-format json`: `modelUsage.outputT
 
 ## What the model writes (fixed)
 
-[corpus/](corpus) keeps the 9 hand-written HTML pages and the 9 Markdown drafts from the plain-setup run below. [count-tokens.mjs](count-tokens.mjs) counted their tokens with the model's own tokenizer (Claude Sonnet 5.5, no API key needed) and saved them in `corpus/tokens.json`. `node bench/corpus.mjs` reports them:
+The corpus is the 9 hand-written HTML pages and the 9 Markdown drafts from the plain-setup run below. It is a [release download](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip), kept out of git because plugin installs copy the whole repository. [count-tokens.mjs](count-tokens.mjs) counted their tokens with the model's own tokenizer (Claude Sonnet 5.5, no API key needed) and saved them in [corpus/tokens.json](corpus/tokens.json). To count again, unzip the download into `bench/corpus/` and run `node bench/count-tokens.mjs`. `node bench/corpus.mjs` reports them:
 
 | | Hand-written HTML | Markdown draft |
 | :--- | ---: | ---: |
@@ -112,7 +112,7 @@ Each run happens in a fresh temp folder. The "direct" runs may only use the Writ
 
 同一个问题、同一个模型，各出一页。每格是 3 次运行的中位数（Claude Sonnet 5.5，2026-10-07）。上表即结果。
 
-- **模型要写的 token（固定）：** [corpus/](corpus) 存有下面普通环境那次运行的 9 页手写 HTML 和 9 份 Markdown 稿件，用模型自己的分词器数过 token，结果存在 `corpus/tokens.json`。`node bench/corpus.mjs` 输出：手写 HTML 平均 4,893 个 token，其中 SVG 占 47%、CSS 15%、标签 17%、正文 21%；稿件平均 612 个 token，少 8.0 倍。语料和计数都不变，这些数字就不变。
+- **模型要写的 token（固定）：** 语料是下面普通环境那次运行的 9 页手写 HTML 和 9 份 Markdown 稿件，可以[下载](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip)，不入库。用模型自己的分词器数过 token，结果存在 [corpus/tokens.json](corpus/tokens.json)。`node bench/corpus.mjs` 输出：手写 HTML 平均 4,893 个 token，其中 SVG 占 47%、CSS 15%、标签 17%、正文 21%；稿件平均 612 个 token，少 8.0 倍。语料和计数都不变，这些数字就不变。
 - **输出 token 和耗时大幅下降：** 模型只写简短的 Markdown 稿件，CSS、版面和所有 SVG 坐标都由 CLI 生成。
 - **普通环境**（`BENCH_LEAN=1`，每轮读约 2.5 万个 token 的上下文）：输出 token 4,932 → 1,007（少 4.9 倍），耗时 31 秒 → 12 秒（快 2.6 倍），花费 $0.091 → $0.077（便宜 15%），9 次配对里 skill 每次都更便宜。
 - **加载很重的环境**（我们自己的 Claude Code 配置，每轮读约 8.6 万个 token）：输出 token 7,656 → 1,070（少 7.2 倍），耗时 50 秒 → 14 秒（快 3.5 倍），花费 $0.220 → $0.138（便宜 37%），9 次里 8 次更便宜。这里花费主要看缓存：18 次里有 7 次缓存没命中，整段上下文被重新写入，单次花费 $0.28–0.54。2026-10-02 那次测到 skill 贵约 20%，但那次没有记录缓存数据，无法判断有几次没命中。

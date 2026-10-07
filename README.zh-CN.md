@@ -64,7 +64,7 @@ https://github.com/user-attachments/assets/1f13b1fe-70a9-4c39-8530-b12e553e17ea
 
 <p align="center"><sub>这是更早一次基准测试中的一次运行，环境加载很重：同样的提示词、同一个模型，两页都能用。这一次直接写 HTML 花了 9,351 个输出 token，用 skill 只花了 899 个。</sub></p>
 
-这些页面和它们的 token 数都存放在 [bench/corpus/](bench/corpus) 里，运行 `node bench/corpus.mjs` 每次都得到同样的数字。花费降得比 token 少，这里约便宜 15%，因为每一轮都还要读系统提示、你的问题和对话记录，用不用 skill 都一样。详见[花费都花在哪](bench/README.md#where-the-cost-goes)。
+token 数存在 [bench/corpus/tokens.json](bench/corpus/tokens.json) 里，运行 `node bench/corpus.mjs` 每次都得到同样的数字。页面本身可以[下载](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip)。花费降得比 token 少，这里约便宜 15%，因为每一轮都还要读系统提示、你的问题和对话记录，用不用 skill 都一样。详见[花费都花在哪](bench/README.md#where-the-cost-goes)。
 
 解释视频的差距更大。我们让模型做一个 3Blue1Brown 风格的 TCP 握手视频，不配音，两种方式各做一遍：
 

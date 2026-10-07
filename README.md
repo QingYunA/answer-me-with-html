@@ -65,7 +65,7 @@ With this skill the model writes only a Markdown draft. For the same questions t
 
 <p align="center"><sub>One run from an earlier benchmark in a heavily loaded setup: same prompt, same model, and both pages are usable. This run took 9,351 output tokens for the plain page and 899 with the skill.</sub></p>
 
-The pages are kept in [bench/corpus/](bench/corpus), with their token counts, so `node bench/corpus.mjs` gives the same numbers every time. The bill drops less than the writing, about 15% here, because every turn also reads the system prompt, your question and the conversation, with or without the skill. See [where the cost goes](bench/README.md#where-the-cost-goes).
+The token counts are saved in [bench/corpus/tokens.json](bench/corpus/tokens.json), so `node bench/corpus.mjs` gives the same numbers every time. The pages themselves are a [download](https://github.com/QingYunA/answer-me-with-html/releases/download/v0.4.14/bench-corpus-2026-10-07.zip). The bill drops less than the writing, about 15% here, because every turn also reads the system prompt, your question and the conversation, with or without the skill. See [where the cost goes](bench/README.md#where-the-cost-goes).
 
 Explainer videos show a bigger gap. We asked for the TCP handshake as a 3Blue1Brown-style video, no voice, both ways:
 
