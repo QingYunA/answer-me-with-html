@@ -9,7 +9,8 @@ html[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }
    fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */
 html[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,
 html[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,
-html[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar {
+html[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,
+html[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {
   font-family: var(--font-sans); letter-spacing: normal; text-transform: none;
 }
 html[dir="rtl"] .am-head h1 { letter-spacing: normal; }
@@ -21,5 +22,15 @@ html[dir="rtl"] .am-diagram svg { direction: rtl; }
 html[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }
 html[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }
 
-/* The limits value ("420 / max 1000 KB") is a formula: it reads left to right as one piece. */
-html[dir="rtl"] .am-lim-val { direction: ltr; unicode-bidi: isolate; }
+/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left
+   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the
+   start of its note would otherwise run together as one left-to-right piece. */
+html[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }
+
+/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of
+   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */
+html[dir="rtl"] .am-timeline--h { container-type: inline-size; }
+html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }
+@media (max-width: 760px) {
+  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }
+}

@@ -2,6 +2,7 @@
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
 import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
+import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 
@@ -229,7 +230,7 @@ function layout({ nodes, edges, groups }, rankdir, id, ui, pageDir = 'ltr') {
     const mark = deltaAttr(grp.state);
     // The group name sits in the corner where reading starts (top left, or top right on a right-to-left page); the badge in the other one.
     const [labelX, badgeX] = rtl ? [x + c.width - 8, x] : [x + 8, x + c.width];
-    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(y + 14)}">${esc(grp.name)}</text>${badgeSvg(grp.state, badgeX, y)}`;
+    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(y + 14)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y)}`;
   });
 
   // In video mode, items appear step by step by source line: edges written on one line and nodes first seen there form one step.
@@ -242,14 +243,14 @@ function layout({ nodes, edges, groups }, rankdir, id, ui, pageDir = 'ltr') {
     const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>`;
     if (!e.label) return `${open}${path}</g>`;
     const w = measure(e.label, EDGE_FS) + 10;
-    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH)}</g></g>`;
+    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH, '', pageDir)}</g></g>`;
   });
 
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x, y } = g.node(key.get(n.id));
     const { width: w, height: h, lines } = sizes.get(n.id);
     const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h, rtl));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH)}${badge}</g>`;
+    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH, '', pageDir)}${badge}</g>`;
   });
 
   const { width, height } = g.graph();

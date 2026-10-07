@@ -14,15 +14,24 @@ export default {
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
     copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',
     reply: {
-      button: 'תגובה', comment: 'הערה', commentHint: 'ההערה שלך על הלוח הזה', title: 'התגובה שלך',
+      button: 'תגובה', comment: 'הערה', commentHint: 'ההערה שלך על החלק הזה', title: 'התגובה שלך',
       hint: 'העתיקו והדביקו אותה בצ׳אט.', copy: 'העתקת התגובה', close: 'סגירה', suggested: 'מומלץ',
-      empty: 'בחרו אפשרויות, או כתבו הערה על לוח קודם.', decisions: 'החלטות', comments: 'הערות',
+      empty: 'קודם בחרו אפשרות או כתבו הערה על אחד החלקים.', decisions: 'החלטות', comments: 'הערות',
       confirmed: 'ההמלצה אושרה', untouched: 'לא נענה; ההמלצה נשארה', was: 'היה',
       typed: 'שורות שמתחילות ב-">" הן טקסט שהקורא הקליד.',
     },
     toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', colon: ': ', sep: ', ',
     expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים',
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
+    generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },
   },
+  // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.
+  metaKeys: {
+    author: 'מאת', by: 'מאת', date: 'תאריך', updated: 'עודכן', time: 'שעה', source: 'מקור', sources: 'מקורות', version: 'גרסה',
+    status: 'סטטוס', owner: 'אחראי', team: 'צוות', project: 'פרויקט', audience: 'קהל יעד', reviewer: 'בודק', reviewers: 'בודקים',
+    license: 'רישיון', licence: 'רישיון', model: 'מודל', repo: 'ריפו', branch: 'ענף', tags: 'תגיות', for: 'עבור', ref: 'הפניה',
+  },
+  // The render time under the page reads day.month.year, the Israeli way.
+  dateOrder: 'dmy',
   videoUi: { play: 'הפעלה', pause: 'השהיה', chapters: 'פרקים' },
 };

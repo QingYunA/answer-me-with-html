@@ -26,10 +26,14 @@ ${head}<div class="am-panel-body">${panel.html}</div>
 
 const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang']);
 
-export function headHtml(meta, introHtml) {
+// language: the page language. Its metaKeys name common keys in the page language (author in Hebrew). On a right-to-left page the value
+// sits in its own <bdi>, so a key and a value of different directions do not run together ("date7.10.2026").
+export function headHtml(meta, introHtml, language = {}) {
   const extras = Object.entries(meta).filter(([k, v]) => !RESERVED.has(k) && v !== '');
+  const names = language.metaKeys ?? {};
+  const value = (v) => (language.dir === 'rtl' ? `<bdi>${esc(v)}</bdi>` : esc(v));
   const metaRow = extras.length
-    ? `<div class="am-head-meta">${extras.map(([k, v]) => `<span><b>${esc(k)}</b>${esc(v)}</span>`).join('')}</div>`
+    ? `<div class="am-head-meta">${extras.map(([k, v]) => `<span><b>${esc(names[k.toLowerCase()] ?? k)}</b>${value(v)}</span>`).join('')}</div>`
     : '';
   const sub = meta.subtitle ? `<p class="am-sub">${esc(meta.subtitle)}</p>` : '';
   const intro = introHtml ? `<div class="am-intro am-md">${introHtml}</div>` : '';

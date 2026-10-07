@@ -1,6 +1,7 @@
 // Sequence diagram: participants laid out horizontally, messages top to bottom. Spacing derives from message label widths, so labels are never squeezed.
 import { esc, measure, wrap } from '../svg/text.js';
 import { f, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
+import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 
 const FS = 13;
@@ -119,14 +120,14 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
       if (s.a === s.b) {
         const x = X(xs[s.a]);
         const labelX = x + dx * 40;
-        body.push(s.lines.map((l, k) => `<text x="${f(labelX)}" y="${f(y + k * LH + 4)}" dominant-baseline="central">${esc(l)}</text>`).join(''));
+        body.push(s.lines.map((l, k) => `<text x="${f(labelX)}" y="${f(y + k * LH + 4)}" dominant-baseline="central">${esc(svgLine(l, dir))}</text>`).join(''));
         body.push(`<path class="${cls}" d="M${f(x)},${f(y)} H${f(x + dx * 30)} V${f(y + 20)} H${f(x + dx * 2)}"${marker}/>`, step);
         y += Math.max(s.lines.length * LH, 20) + 28;
       } else {
         y += s.lines.length * LH;
         const [x1, x2] = [X(xs[s.a]), X(xs[s.b])];
         const mx = (x1 + x2) / 2;
-        body.push(s.lines.map((l, k) => `<text x="${f(mx)}" y="${f(y - 10 - (s.lines.length - 1 - k) * LH)}" text-anchor="middle">${esc(l)}</text>`).join(''));
+        body.push(s.lines.map((l, k) => `<text x="${f(mx)}" y="${f(y - 10 - (s.lines.length - 1 - k) * LH)}" text-anchor="middle">${esc(svgLine(l, dir))}</text>`).join(''));
         body.push(`<path class="${cls}" d="M${f(x1)},${f(y)} L${f(x2 + (x2 > x1 ? -2 : 2))},${f(y)}"${marker}/>`, step);
         y += 24;
       }
@@ -138,13 +139,13 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
       const h = s.lines.length * LH + 12;
       const cx = (lo + hi) / 2;
       body.push(`<rect class="am-note" x="${f(cx - w / 2)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="2"/>`);
-      body.push(textLines(s.lines, cx, y + h / 2, LH, ' font-size="12"'));
+      body.push(textLines(s.lines, cx, y + h / 2, LH, ' font-size="12"', dir));
       y += h + 16;
     } else {
       const w = Math.max(...s.lines.map((l) => measure(l, 12))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y + 10)}" x2="${f(width - MARGIN)}" y2="${f(y + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y)}" width="${f(w)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ' font-size="12"'));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ' font-size="12"', dir));
       y += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k}">${body.slice(start).join('')}</g>`);
@@ -155,7 +156,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
     const x = X(xs[i]);
     return `<line class="am-lifeline" x1="${f(x)}" y1="${TOP + ACTOR_H}" x2="${f(x)}" y2="${f(height - 4)}"/>`
       + `<g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>`
-      + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
+      + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"', dir)}</g>`;
   });
   return `${svgOpen(width, height, diagramLabel(ui, 'sequence', ps), dir)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
 }

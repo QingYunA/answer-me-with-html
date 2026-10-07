@@ -142,7 +142,7 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right. Hebrew has its own labels; the other right-to-left languages use English labels.
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels.
 
 | Script in the text | Detected as |
 | :--- | :--- |

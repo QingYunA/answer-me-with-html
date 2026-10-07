@@ -1,5 +1,6 @@
 // Shared helpers for SVG fragments: number formatting, smooth polylines, arrow markers, multi-line text.
 import { esc } from './text.js';
+import { svgLine } from '../bidi.js';
 
 export const f = (n) => String(Math.round(n * 10) / 10);
 
@@ -27,11 +28,12 @@ export function arrowDefs(uid, variants = []) {
   return `<defs>${[marker('', ''), ...variants.map((v) => marker(`-${v}`, ` am-arrow--${v}`))].join('')}</defs>`;
 }
 
-// Lay out multi-line text vertically centred on (cx, cy).
-export function textLines(lines, cx, cy, lineHeight, attrs = '') {
+// Lay out multi-line text vertically centred on (cx, cy). dir: the page direction; on a right-to-left page a line with no
+// right-to-left letter is isolated as left to right (src/bidi.js), so a wrapped `src/` or `lint:` keeps its punctuation in place.
+export function textLines(lines, cx, cy, lineHeight, attrs = '', dir = 'ltr') {
   const top = cy - ((lines.length - 1) * lineHeight) / 2;
   return lines
-    .map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(line)}</text>`)
+    .map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`)
     .join('');
 }
 

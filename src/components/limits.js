@@ -31,10 +31,11 @@ label | limit | unit         ← limit only: the bar fills to the limit
 \`\`\`
 - A row turns red when the value is over the limit. The limit may be written as "max 20".`,
   example: '```limits\nProcedural sentence | 13 / 20 | words\nDescriptive sentence | max 25 | words\nNoun cluster | 4 / 3 | words | over\n```',
-  render(text, { dir = 'ltr' } = {}) {
+  render(text, { dir = 'ltr', ui } = {}) {
     const rows = contentLines(text).map(({ text: t, line }) => parseRow(t, line));
     if (!rows.length) throw new ComponentError('limits needs at least one line', 1);
-    return `<div class="am-limits">${rows.map((row) => rowHtml(row, dir === 'rtl' ? 'right' : 'left')).join('')}</div>`;
+    const words = { ...EN_WORDS, ...ui?.limits };
+    return `<div class="am-limits">${rows.map((row) => rowHtml(row, dir === 'rtl' ? 'right' : 'left', words)).join('')}</div>`;
   },
 };
 
@@ -49,12 +50,17 @@ function parseRow(t, line) {
   return { label, value, limit, unit, note };
 }
 
+// The value text in the page language: "13 / max 20 words" in English; src/languages/<id>.js sets its own. Without a context (component
+// unit tests) it is English.
+const EN_WORDS = { value: '{value} / max {limit}', limit: 'max {limit}' };
+const fill = (template, value, limit) => template.replace('{value}', value).replace('{limit}', limit);
+
 // side: where the scale starts, the left, or the right on a right-to-left page.
-function rowHtml({ label, value, limit, unit, note }, side = 'left') {
+function rowHtml({ label, value, limit, unit, note }, side = 'left', words = EN_WORDS) {
   const { max, step } = niceScale(Math.max(limit, value ?? 0));
   const shown = value ?? limit;
   const over = value !== null && value > limit;
-  const valText = `${value !== null ? `${value} / ` : ''}max ${limit}${unit ? ` ${unit}` : ''}`;
+  const valText = `${value !== null ? fill(words.value, value, limit) : fill(words.limit, value, limit)}${unit ? ` ${unit}` : ''}`;
   const ticks = [];
   if (step > 0 && max > 0) {
     for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="${side}: ${pct(round(v), max)}">${round(v)}</span>`);
