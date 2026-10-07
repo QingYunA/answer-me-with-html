@@ -1,6 +1,6 @@
 // Sequence diagram: participants laid out horizontally, messages top to bottom. Spacing derives from message label widths, so labels are never squeezed.
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
+import { f, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
 import { ComponentError, contentLines } from './error.js';
 
 const FS = 13;
@@ -57,13 +57,13 @@ note A, C: note across several participants
 \`\`\`
 - Argument num: number the messages.`,
   example: '```sequence\nClient -> Server: SYN\nServer --> Client: SYN-ACK\nClient -> Server: ACK\nnote Client, Server: ESTABLISHED\n```',
-  render(text, { args, uid, ui }) {
+  render(text, { args, uid, ui, dir = 'ltr' }) {
     const model = parseSequence(text);
-    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid(), ui })}</figure>`;
+    return `<figure class="am-diagram am-seq">${layout(model, { num: /\bnum\b/.test(args), id: uid(), ui, dir })}</figure>`;
   },
 };
 
-function layout({ participants: ps, steps }, { num, id, ui }) {
+function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
   const idx = new Map(ps.map((p, i) => [p, i]));
   const actorW = ps.map((p) => Math.max(measure(p, FS) + 28, 84));
   const gaps = ps.slice(1).map((_, i) => (actorW[i] + actorW[i + 1]) / 2 + 28);
@@ -99,6 +99,12 @@ function layout({ participants: ps, steps }, { num, id, ui }) {
   const xs = [MARGIN + extraLeft + actorW[0] / 2];
   gaps.forEach((g) => xs.push(xs.at(-1) + g));
   const width = xs.at(-1) + actorW.at(-1) / 2 + MARGIN + extraRight;
+  // The layout above runs left to right. A right-to-left page draws its mirror image: the first participant on the right,
+  // self calls and step numbers on the other side (dx flips the offsets). Text anchors keep their names: the svg's
+  // direction="rtl" turns "start" into the right end of the text, which is the mirror of the left-to-right placement.
+  const rtl = dir === 'rtl';
+  const X = mirror(width, rtl);
+  const dx = rtl ? -1 : 1;
 
   const body = [];
   let y = TOP + ACTOR_H + 22;
@@ -109,23 +115,23 @@ function layout({ participants: ps, steps }, { num, id, ui }) {
       n++;
       const cls = `am-edge${s.dashed ? ' am-edge--dashed' : ''}`;
       const marker = ` marker-end="url(#${id}-arrow)"`;
-      const step = num ? `<text class="am-step" x="${f(xs[s.a] + (s.b >= s.a ? 6 : -6))}" y="${f(y + s.lines.length * LH - 6)}" text-anchor="${s.b >= s.a ? 'start' : 'end'}">${n}</text>` : '';
+      const step = num ? `<text class="am-step" x="${f(X(xs[s.a]) + dx * (s.b >= s.a ? 6 : -6))}" y="${f(y + s.lines.length * LH - 6)}" text-anchor="${s.b >= s.a ? 'start' : 'end'}">${n}</text>` : '';
       if (s.a === s.b) {
-        const x = xs[s.a];
-        const labelX = x + 40;
+        const x = X(xs[s.a]);
+        const labelX = x + dx * 40;
         body.push(s.lines.map((l, k) => `<text x="${f(labelX)}" y="${f(y + k * LH + 4)}" dominant-baseline="central">${esc(l)}</text>`).join(''));
-        body.push(`<path class="${cls}" d="M${f(x)},${f(y)} H${f(x + 30)} V${f(y + 20)} H${f(x + 2)}"${marker}/>`, step);
+        body.push(`<path class="${cls}" d="M${f(x)},${f(y)} H${f(x + dx * 30)} V${f(y + 20)} H${f(x + dx * 2)}"${marker}/>`, step);
         y += Math.max(s.lines.length * LH, 20) + 28;
       } else {
         y += s.lines.length * LH;
-        const [x1, x2] = [xs[s.a], xs[s.b]];
+        const [x1, x2] = [X(xs[s.a]), X(xs[s.b])];
         const mx = (x1 + x2) / 2;
         body.push(s.lines.map((l, k) => `<text x="${f(mx)}" y="${f(y - 10 - (s.lines.length - 1 - k) * LH)}" text-anchor="middle">${esc(l)}</text>`).join(''));
         body.push(`<path class="${cls}" d="M${f(x1)},${f(y)} L${f(x2 + (x2 > x1 ? -2 : 2))},${f(y)}"${marker}/>`, step);
         y += 24;
       }
     } else if (s.kind === 'note') {
-      const xsOver = s.over.map((p) => xs[idx.get(p)]);
+      const xsOver = s.over.map((p) => X(xs[idx.get(p)]));
       const lo = Math.min(...xsOver);
       const hi = Math.max(...xsOver);
       const w = Math.max(s.w, hi - lo + 40);
@@ -146,10 +152,10 @@ function layout({ participants: ps, steps }, { num, id, ui }) {
   const height = y + 6;
 
   const actors = ps.map((p, i) => {
-    const x = xs[i];
+    const x = X(xs[i]);
     return `<line class="am-lifeline" x1="${f(x)}" y1="${TOP + ACTOR_H}" x2="${f(x)}" y2="${f(height - 4)}"/>`
       + `<g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>`
       + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"')}</g>`;
   });
-  return `${svgOpen(width, height, diagramLabel(ui, 'sequence', ps))}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
+  return `${svgOpen(width, height, diagramLabel(ui, 'sequence', ps), dir)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
 }

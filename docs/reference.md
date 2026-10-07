@@ -137,9 +137,12 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 | `zh-Hant`, `zh-TW`, `zh-HK`, `zh-MO` | as written | Traditional Chinese, with Traditional fonts first |
 | `en`, `en-US` and other English tags | as written | English |
 | `ja`, `ja-JP` | as written | Japanese, with Japanese fonts first |
+| `he`, `he-IL` | as written | Hebrew, with Hebrew fonts first; the page is right to left |
 | any other tag, such as `fr` or `ko` | as written | English labels |
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
+
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right. Hebrew has its own labels; the other right-to-left languages use English labels.
 
 | Script in the text | Detected as |
 | :--- | :--- |

@@ -1,0 +1,25 @@
+/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout
+   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */
+
+/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */
+html[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }
+html[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }
+
+/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width
+   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */
+html[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,
+html[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,
+html[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar {
+  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;
+}
+html[dir="rtl"] .am-head h1 { letter-spacing: normal; }
+
+/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */
+html[dir="rtl"] .am-diagram svg { direction: rtl; }
+
+/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */
+html[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }
+html[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }
+
+/* The limits value ("420 / max 1000 KB") is a formula: it reads left to right as one piece. */
+html[dir="rtl"] .am-lim-val { direction: ltr; unicode-bidi: isolate; }

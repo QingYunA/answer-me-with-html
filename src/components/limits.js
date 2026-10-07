@@ -31,10 +31,10 @@ label | limit | unit         ← limit only: the bar fills to the limit
 \`\`\`
 - A row turns red when the value is over the limit. The limit may be written as "max 20".`,
   example: '```limits\nProcedural sentence | 13 / 20 | words\nDescriptive sentence | max 25 | words\nNoun cluster | 4 / 3 | words | over\n```',
-  render(text) {
+  render(text, { dir = 'ltr' } = {}) {
     const rows = contentLines(text).map(({ text: t, line }) => parseRow(t, line));
     if (!rows.length) throw new ComponentError('limits needs at least one line', 1);
-    return `<div class="am-limits">${rows.map(rowHtml).join('')}</div>`;
+    return `<div class="am-limits">${rows.map((row) => rowHtml(row, dir === 'rtl' ? 'right' : 'left')).join('')}</div>`;
   },
 };
 
@@ -49,18 +49,19 @@ function parseRow(t, line) {
   return { label, value, limit, unit, note };
 }
 
-function rowHtml({ label, value, limit, unit, note }) {
+// side: where the scale starts, the left, or the right on a right-to-left page.
+function rowHtml({ label, value, limit, unit, note }, side = 'left') {
   const { max, step } = niceScale(Math.max(limit, value ?? 0));
   const shown = value ?? limit;
   const over = value !== null && value > limit;
   const valText = `${value !== null ? `${value} / ` : ''}max ${limit}${unit ? ` ${unit}` : ''}`;
   const ticks = [];
   if (step > 0 && max > 0) {
-    for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="left: ${pct(round(v), max)}">${round(v)}</span>`);
+    for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="${side}: ${pct(round(v), max)}">${round(v)}</span>`);
   }
   return `<div class="am-lim${over ? ' is-over' : ''}">
 <div class="am-lim-head"><span>${esc(label)}${note ? `<span class="am-lim-note">${esc(note)}</span>` : ''}</span><span class="am-lim-val">${esc(valText)}</span></div>
-<div class="am-lim-track"><div class="am-lim-fill" style="width: ${pct(shown, max)}"></div><div class="am-lim-mark" style="left: ${pct(limit, max)}"></div></div>
+<div class="am-lim-track"><div class="am-lim-fill" style="width: ${pct(shown, max)}"></div><div class="am-lim-mark" style="${side}: ${pct(limit, max)}"></div></div>
 <div class="am-lim-ticks" aria-hidden="true">${ticks.join('')}</div>
 </div>`;
 }

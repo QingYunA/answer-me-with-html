@@ -17,6 +17,7 @@ export const inlineAssets = {
         `export const RUNTIME_JS = ${JSON.stringify(composeRuntime((file) => read(`../src/runtime/${file}`)))};`,
         `export const DIFF_CSS = ${JSON.stringify(read('../src/themes/diff.css'))};`,
         `export const DELTA_CSS = ${JSON.stringify(read('../src/themes/delta.css'))};`,
+        `export const RTL_CSS = ${JSON.stringify(read('../src/themes/rtl.css'))};`,
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
         `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,
         `export const VIDEO_JS = ${JSON.stringify(read('../src/runtime/video.js'))};`,

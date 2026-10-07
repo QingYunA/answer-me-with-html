@@ -53,7 +53,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
 
   const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
+  const ctx = { seq: 0, stats, ui, dir: language.dir, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
   if (loose) throw new RenderError(`${loose.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: loose.line, component: loose.lang, example: COMPONENTS.get(loose.lang).example });
   const introHtml = renderBlocks(doc.intro, ctx);
@@ -116,7 +116,7 @@ function renderFence(block, ctx) {
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
-    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, video: ctx.video, warn });
+    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn });
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -172,7 +172,7 @@ function shell({ meta, language, body, source, embedded }) {
   const { ui, labelKey } = language;
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
-  const root = { lang: language.htmlLang, theme: meta.theme, mode: meta.mode, style: meta.style };
+  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -181,7 +181,7 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body) })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl' })}
 </style>
 </head>
 <body>

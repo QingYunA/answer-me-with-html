@@ -1,7 +1,7 @@
 // Flow / architecture diagram: the model writes only relations (A -> B: label), dagre computes coordinates, this file draws the layout as SVG.
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
+import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 
@@ -47,11 +47,11 @@ Client -> Gateway
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
-  render(text, { args, uid, ui, warn, video }) {
+  render(text, { args, uid, ui, warn, video, dir: pageDir = 'ltr' }) {
     const model = parseFlow(text);
     model.warnings.forEach((w) => warn?.(w));
-    const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui)}</figure>`;
+    const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
+    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -196,7 +196,7 @@ function nodeSize(node) {
   return { lines, width: size[0], height: size[1] };
 }
 
-function layout({ nodes, edges, groups }, rankdir, id, ui) {
+function layout({ nodes, edges, groups }, rankdir, id, ui, pageDir = 'ltr') {
   const g = new dagre.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -218,13 +218,18 @@ function layout({ nodes, edges, groups }, rankdir, id, ui) {
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
   dagre.layout(g);
+  // A right-to-left page mirrors the finished layout: every direction then reads from the right, and LR runs right to left.
+  const rtl = pageDir === 'rtl';
+  if (rtl) mirrorLayout(g);
 
   const clusters = groups.map((grp, i) => {
     const c = g.node(gkey(i));
     const x = c.x - c.width / 2;
     const y = c.y - c.height / 2;
     const mark = deltaAttr(grp.state);
-    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(x + 8)}" y="${f(y + 14)}">${esc(grp.name)}</text>${badgeSvg(grp.state, x + c.width, y)}`;
+    // The group name sits in the corner where reading starts (top left, or top right on a right-to-left page); the badge in the other one.
+    const [labelX, badgeX] = rtl ? [x + c.width - 8, x] : [x + 8, x + c.width];
+    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(y + 14)}">${esc(grp.name)}</text>${badgeSvg(grp.state, badgeX, y)}`;
   });
 
   // In video mode, items appear step by step by source line: edges written on one line and nodes first seen there form one step.
@@ -243,14 +248,14 @@ function layout({ nodes, edges, groups }, rankdir, id, ui) {
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x, y } = g.node(key.get(n.id));
     const { width: w, height: h, lines } = sizes.get(n.id);
-    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h));
+    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h, rtl));
     return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH)}${badge}</g>`;
   });
 
   const { width, height } = g.graph();
   const label = diagramLabel(ui, 'flow', [...nodes.keys()].slice(0, 8));
   const heads = ['added', 'removed'].filter((state) => edges.some((e) => e.state === state));
-  return `${svgOpen(width, height, label)}${arrowDefs(id, heads)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
+  return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
@@ -259,11 +264,26 @@ function badgeSvg(state, x, y) {
   return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 
-// Where the badge sits: the top right corner, pulled in where the shape has no corner there.
-function badgePoint(shape, x, y, w, h) {
-  if (shape === 'diamond') return [x + w / 4, y - h / 4];
-  if (shape === 'round') return [x + w / 2 - h * 0.15, y - h / 2 + h * 0.15];
-  return [x + w / 2, y - h / 2];
+// Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.
+function badgePoint(shape, x, y, w, h, rtl = false) {
+  const s = rtl ? -1 : 1;
+  if (shape === 'diamond') return [x + s * (w / 4), y - h / 4];
+  if (shape === 'round') return [x + s * (w / 2 - h * 0.15), y - h / 2 + h * 0.15];
+  return [x + s * (w / 2), y - h / 2];
+}
+
+// Mirror a finished dagre layout left to right, in place: node and group centres, edge points and edge label positions.
+function mirrorLayout(g) {
+  const flip = mirror(g.graph().width, true);
+  for (const v of g.nodes()) {
+    const node = g.node(v);
+    node.x = flip(node.x);
+  }
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
+    if (edge.x !== undefined) edge.x = flip(edge.x);
+  }
 }
 
 function shapeSvg(shape, x, y, w, h) {

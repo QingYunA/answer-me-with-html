@@ -107,7 +107,7 @@ if (replyBtn) {
     const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));
     const empty = !decisions.length && !comments.some((c) => c.text.trim());
     const title = document.querySelector('.am-head h1')?.textContent.trim() ?? document.title;
-    return empty ? '' : replyText({ title, decisions, comments, ui });
+    return empty ? '' : replyText({ title, decisions, comments, ui, rtl: document.documentElement.dir === 'rtl' });
   };
 
   replyBtn.addEventListener('click', () => {
