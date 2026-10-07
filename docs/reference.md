@@ -65,6 +65,23 @@ Quote code that exists in the project instead of typing it:
 - A block longer than 40 lines gets a warning; more than 200 lines is an error. Files that hold keys by convention (`.env`, `*.pem`, `id_rsa`, `.ssh/`, `.git/` …) and files with anything that looks like a key or a token are refused. The rules follow html-plan's.
 - The render lists every file it embedded. The page keeps the path; `am patch` reads the file again, or keeps the page's copy when the file has moved.
 
+To show a change, paste a unified diff in a `diff` fence and the CLI draws it:
+
+````markdown
+```diff file=src/code.js
+@@ -60,3 +60,3 @@
+ export function parseCodeArgs(args) {
+-  const attrs = parseAttrs(args);
++  const attrs = parseAttrs(args, { diff: true });
+   const opts = {};
+```
+````
+
+- Lines starting with `+` are added (green), `-` removed (red), a space is context. `@@ -60,3 +60,3 @@` starts a hunk: it shows as a thin row and sets the line numbers, in two gutters (old and new). Without `@@`, `start=N` numbers from N; with neither, the block has no numbers.
+- `file=` names the file in the header, and the language label comes from its extension. A `+++ b/path` line names it when `file=` is missing. The header also shows a stat such as `+1 −1`. Copy copies the diff as written.
+- `hl=` uses new-side numbers. `diff --git`, `---`, `+++` and `\ No newline at end of file` lines are accepted and not drawn.
+- A line that does not start with `+`, `-`, a space or `@@` is an error, and so is a cut (`...`): split the diff into two hunks. A hunk whose counts do not match its `@@` header is a warning. `src=` is not supported with `diff`: paste the diff. The limits are the same as for other code blocks.
+
 Full syntax: `am help code`.
 
 ## Images

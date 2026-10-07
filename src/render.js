@@ -12,7 +12,7 @@ import { VERSION, RUNTIME_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
-import { renderCode, CodeError, CODE_EXAMPLE } from './code.js';
+import { renderCode, CodeError } from './code.js';
 
 
 export class RenderError extends Error {
@@ -129,13 +129,13 @@ function renderFence(block, ctx) {
 // A fence that is not a component is code. In a video the block has no copy button.
 function codeBlock(block, ctx) {
   try {
-    const { html, file, warning } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: !ctx.video });
+    const { html, file, warnings } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: !ctx.video });
     if (file && ctx.stats.code) ctx.stats.code.push(file);
-    if (warning && ctx.stats.codeWarnings) ctx.stats.codeWarnings.push({ line: block.line, message: warning });
+    if (ctx.stats.codeWarnings) ctx.stats.codeWarnings.push(...warnings.map((w) => ({ line: block.line, ...w })));
     return html;
   } catch (err) {
     if (!(err instanceof CodeError)) throw err;
-    throw new RenderError(err.message, { line: block.line + err.line, component: 'code', example: CODE_EXAMPLE });
+    throw new RenderError(err.message, { line: block.line + err.line, component: 'code', example: err.example });
   }
 }
 
@@ -177,7 +177,7 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded)}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"') })}
 </style>
 </head>
 <body>

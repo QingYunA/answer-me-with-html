@@ -1,5 +1,6 @@
 // Code blocks: any fence that is not a component. ```ts src=path lines=a-b reads real code from a file, so the model does not type it.
 // The page shows a header (title, or path:lines, and the language), optional line numbers, highlighted lines and a copy button.
+// A ```diff fence is a diff block: the model pastes a unified diff and src/diff.js draws it (red and green lines, old and new numbers, a +N −N stat).
 // The page keeps the path and lines in data-am-src / data-am-lines; `am patch` reads the code back when the file has moved.
 
 import { readFileSync, statSync } from 'node:fs';
@@ -7,12 +8,14 @@ import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path
 import { parseAttrs } from './parse.js';
 import { esc } from './svg/text.js';
 import { unescapeHtml } from './page.js';
+import { parseDiff, diffRowsHtml, DiffError, DIFF_EXAMPLE } from './diff.js';
 
 export const MAX_CODE_LINES = 200;
 // Longer than this, readers skim past the block; the render warns but still writes the page.
 export const LONG_CODE_LINES = 40;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const KEYS = new Set(['src', 'lines', 'hl', 'title', 'start']);
+const DIFF_KEYS = new Set([...KEYS, 'file']);
 
 export const CODE_EXAMPLE = '```ts src=server/routes.ts lines=18-30 hl=22\n```';
 
@@ -30,10 +33,11 @@ const SECRET_DIR = new Set(['.git', '.ssh', '.aws', '.azure', '.gnupg', '.kube',
 const SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 
 export class CodeError extends Error {
-  constructor(message, line = 0) {
+  constructor(message, line = 0, example = CODE_EXAMPLE) {
     super(message);
     this.name = 'CodeError';
     this.line = line;
+    this.example = example;
   }
 }
 
@@ -57,13 +61,14 @@ function parseHighlight(value) {
   return set;
 }
 
-export function parseCodeArgs(args) {
+export function parseCodeArgs(args, diff = false) {
   const attrs = parseAttrs(args);
+  const keys = diff ? DIFF_KEYS : KEYS;
   for (const [key, value] of Object.entries(attrs)) {
-    if (value !== true && !KEYS.has(key)) throw new CodeError(`unknown code block setting "${key}"; use ${[...KEYS].join(', ')}`);
+    if (value !== true && !keys.has(key)) throw new CodeError(`unknown code block setting "${key}"; use ${[...keys].join(', ')}`, 0, diff ? DIFF_EXAMPLE : CODE_EXAMPLE);
   }
   const text = (key) => (typeof attrs[key] === 'string' || typeof attrs[key] === 'number' ? String(attrs[key]) : undefined);
-  return { src: text('src'), lines: text('lines'), hl: text('hl'), title: text('title'), start: text('start') };
+  return { src: text('src'), lines: text('lines'), hl: text('hl'), title: text('title'), start: text('start'), file: text('file') };
 }
 
 // The file under baseDir, or null when the path leaves it. Only the folder the agent works in is quoted, so a draft
@@ -113,10 +118,12 @@ export function readEmbeddedCode(html) {
 }
 
 // block: { lang, args, text }. code: { baseDir, known } where relative src paths are read and the fallback for moved files.
-// Returns { html, file, warning } where file names the embedded slice ("path:18-30"), or is null, and warning is a
-// message for a long block (the page is still written).
+// Returns { html, file, warnings } where file names the embedded slice ("path:18-30"), or is null, and warnings are
+// [{ rule, message }] for a long block or a diff hunk that does not add up (the page is still written).
 export function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = new Map(), ui = {}, copy = true } = {}) {
-  const opts = parseCodeArgs(args);
+  const isDiff = lang === 'diff';
+  const opts = parseCodeArgs(args, isDiff);
+  if (isDiff && opts.src) throw new CodeError('a diff block takes the diff you paste; src= is not supported for it yet, so paste the diff into the block', 0, DIFF_EXAMPLE);
   const range = opts.lines ? parseRange(opts.lines, 'lines') : null;
   if (range && !opts.src) throw new CodeError('lines= needs src=; for code you type, use start= to number the lines');
   let body;
@@ -137,6 +144,10 @@ export function renderCode({ lang, args, text }, { baseDir = process.cwd(), know
   const slice = body.join('\n');
   if (SECRET_TEXT.test(slice)) throw new CodeError(`${opts.src ? `"${opts.src}"` : 'the block'} looks like it holds a key or a token; it is not embedded. Quote other lines or write a sketch`);
 
+  const copyButton = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? 'Copied ✓')}">${esc(ui.copyCode ?? 'Copy')}</button>` : '';
+  const long = body.length > LONG_CODE_LINES ? [{ rule: 'code-length', message: `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` }] : [];
+  if (isDiff) return renderDiff(text, opts, { copyButton, long });
+
   const last = first + body.length - 1;
   const hl = opts.hl ? parseHighlight(opts.hl) : new Set();
   const outside = [...hl].find((n) => n < first || n > last);
@@ -151,9 +162,27 @@ export function renderCode({ lang, args, text }, { baseDir = process.cwd(), know
     return `<span class="am-ln${hl.has(n) ? ' am-ln--hl' : ''}"${numbered ? ` data-n="${n}"` : ''}>${esc(l)}</span>`;
   }).join('');
   const source = opts.src ? ` data-am-src="${esc(opts.src)}"${opts.lines ? ` data-am-lines="${esc(opts.lines)}"` : ''}` : '';
-  const button = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? 'Copied ✓')}">${esc(ui.copyCode ?? 'Copy')}</button>` : '';
-  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && where ? ` title="${esc(where)}"` : ''}>${esc(title)}</span>${shownLang ? `<span class="am-code-lang">${esc(shownLang)}</span>` : ''}${button}</figcaption>`;
+  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && where ? ` title="${esc(where)}"` : ''}>${esc(title)}</span>${shownLang ? `<span class="am-code-lang">${esc(shownLang)}</span>` : ''}${copyButton}</figcaption>`;
   const html = `<figure class="am-codeblock"${source}>${head}<pre class="am-code${numbered ? ' am-code--num' : ''}"><code${shownLang ? ` data-lang="${esc(shownLang)}"` : ''}>${lines}</code></pre></figure>`;
-  const warning = body.length > LONG_CODE_LINES ? `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` : null;
-  return { html, file: where || null, warning };
+  return { html, file: where || null, warnings: long };
+}
+
+// A diff block: the header shows file= (or the +++ path) with a +N −N stat; hl= counts new-side lines.
+function renderDiff(text, opts, { copyButton, long }) {
+  const diff = (() => {
+    try { return parseDiff(text, opts.start ? parseRange(opts.start, 'start').from : undefined); } catch (err) {
+      if (err instanceof DiffError) throw new CodeError(err.message, err.line, DIFF_EXAMPLE);
+      throw err;
+    }
+  })();
+  const hl = opts.hl ? parseHighlight(opts.hl) : new Set();
+  if (hl.size && !diff.numbered) throw new CodeError('hl= on a diff needs line numbers: add an @@ header or start=');
+  const outside = [...hl].find((n) => !diff.newLines.has(n));
+  if (outside !== undefined) throw new CodeError(`hl=${opts.hl}: line ${outside} is not a new-side line of the diff`);
+  const file = opts.file ?? diff.title;
+  const shownLang = extname(file).slice(1).toLowerCase() || 'diff';
+  const stat = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">−${diff.del}</span></span>`;
+  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ''}>${esc(opts.title ?? file)}</span>${stat}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
+  const html = `<figure class="am-codeblock am-codeblock--diff">${head}<pre class="am-code am-code--diff${diff.numbered ? ' am-code--dnum' : ''}"><code data-lang="${esc(shownLang)}">${diffRowsHtml(diff, hl)}</code></pre></figure>`;
+  return { html, file: null, warnings: [...diff.warnings, ...long] };
 }

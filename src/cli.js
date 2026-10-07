@@ -105,9 +105,30 @@ export const LIMIT = 50
   The path is read from the current folder, and only files inside it are quoted. lines=18-30 (or lines=18) picks the lines; without it the whole file is quoted.
 - The header shows path:lines, or title= when you set it. Write "sketch" in the title of code that does not exist yet.
 - hl=22 or hl=20-22,25 highlights lines by their shown number. start=38 numbers a typed block from 38.
+- A diff: a fence with the language diff holds a unified diff you paste, and the CLI draws it (see below).
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ …) and files with anything that looks like a key or a token are refused.
-- The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.`;
+- The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
+
+Diff blocks: show a change
+
+\`\`\`diff file=src/code.js
+@@ -60,3 +60,3 @@
+ export function parseCodeArgs(args) {
+-  const attrs = parseAttrs(args);
++  const attrs = parseAttrs(args, { diff: true });
+   const opts = {};
+\`\`\`
+
+- Paste the unified diff. Each line starts with + (added, green), - (removed, red) or a space (context); a line with nothing on it counts as context.
+- @@ -60,3 +60,3 @@ starts a hunk: the CLI shows it as a thin row and numbers the lines from it, with two gutters, old and new. Without @@, start=N numbers from N; with neither, the block has no numbers.
+- file= names the file in the header, and the language label comes from its extension. A +++ b/path line names it when file= is missing; title= wins over both.
+- The header shows a stat after the title: +1 −1. Copy copies the diff as written.
+- hl= uses new-side numbers and needs numbers (@@ or start=).
+- diff --git, index, ---, +++ and "\\ No newline at end of file" lines are accepted and not drawn.
+- Cut lines (a line with only ... or …) are an error: the gutter cannot know how many lines were skipped. Split the diff into two hunks, each with its own @@ header.
+- A hunk whose line counts do not match its @@ header is a warning. src= is not supported for a diff yet: paste the diff.
+- The limits are the same as for other code blocks: a warning above ${LONG_CODE_LINES} lines, an error above ${MAX_CODE_LINES}, and the key and token check.`;
 
 const RAW_HELP = `LANG — embed as-is (escape hatch)
 
@@ -472,7 +493,7 @@ function emit(result, file, { print }, note = '') {
   const long = result.stats.codeWarnings ?? [];
   if (long.length) {
     print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
-    long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
+    long.forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
   }
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);

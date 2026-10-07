@@ -122,7 +122,7 @@ ${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: embedded.find((t) 
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${videoCss(embedded)}
+${videoCss(embedded, { diff: scenesHtml.includes('class="am-codeblock am-codeblock--diff"') })}
 </style>
 </head>
 <body>

@@ -65,6 +65,23 @@ A -> B: 标签
 - 代码块超过 40 行会收到提醒，超过 200 行会报错。按惯例存放密钥的文件（`.env`、`*.pem`、`id_rsa`、`.ssh/`、`.git/` 等），以及任何位置含有疑似密钥或 token 的文件，都会被拒绝。规则与 html-plan 一致。
 - 渲染结果会列出嵌入了哪些文件。页面会记住路径；`am patch` 会重新读取文件，文件已经移动时，就用页面里已有的那份。
 
+要展示一处改动，在 `diff` fence 里贴上 unified diff，CLI 负责绘制：
+
+````markdown
+```diff file=src/code.js
+@@ -60,3 +60,3 @@
+ export function parseCodeArgs(args) {
+-  const attrs = parseAttrs(args);
++  const attrs = parseAttrs(args, { diff: true });
+   const opts = {};
+```
+````
+
+- 以 `+` 开头的行是新增（绿色），`-` 是删除（红色），空格开头是上下文。`@@ -60,3 +60,3 @@` 开始一个 hunk：显示为一条细分隔行，并决定行号，旧行号和新行号各占一列。没有 `@@` 时，`start=N` 从 N 开始编号；两者都没有，就不显示行号。
+- `file=` 写在标题栏里，语言标签取自它的扩展名；没有 `file=` 时，用 `+++ b/path` 那一行的路径。标题栏还会显示统计，例如 `+1 −1`。复制按钮按原样复制 diff。
+- `hl=` 用新文件一侧的行号。`diff --git`、`---`、`+++` 和 `\ No newline at end of file` 行可以保留，但不会显示。
+- 不以 `+`、`-`、空格或 `@@` 开头的行会报错，`...` 这样的省略行也会报错：请拆成两个 hunk。hunk 的行数与 `@@` 头不符会收到提醒。`diff` 暂不支持 `src=`：请直接贴 diff。限制与其他代码块相同。
+
 完整写法：`am help code`。
 
 ## 图片

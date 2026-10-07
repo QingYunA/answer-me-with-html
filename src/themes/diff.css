@@ -1,0 +1,24 @@
+/* Diff block (only on pages that have one): red and green lines, a hunk row, and two gutters, old and new, drawn from data-o / data-n.
+   The hues are fixed and mixed into the theme's own --fill and --ink, so they read as green and red in every theme, light and dark. */
+.am-codeblock--diff { --diff-add: #1f9d4d; --diff-del: #d1344a; }
+.am-code-stat { display: inline-flex; gap: 6px; flex: none; font: 12px/1.3 var(--font-mono); }
+.am-code-stat-add { color: color-mix(in srgb, var(--diff-add) 75%, var(--ink)); }
+.am-code-stat-del { color: color-mix(in srgb, var(--diff-del) 75%, var(--ink)); }
+.am-code--diff .am-ln { display: flex; padding: 0 14px 0 0; }
+.am-code--diff:not(.am-code--dnum) .am-ln { padding-left: 14px; }
+.am-code--dnum .am-ln::before, .am-code--dnum .am-ln::after {
+  flex: none; box-sizing: content-box; width: 3.5ch; padding: 0 6px; text-align: right; color: var(--ink-3);
+  user-select: none; -webkit-user-select: none;
+}
+.am-code--dnum .am-ln::before { content: attr(data-o); order: -2; }
+.am-code--dnum .am-ln::after { content: attr(data-n); order: -1; margin-right: 10px; }
+.am-ln--add { background: color-mix(in srgb, var(--diff-add) 14%, var(--fill)); }
+.am-ln--del { background: color-mix(in srgb, var(--diff-del) 14%, var(--fill)); }
+.am-ln--add::before, .am-ln--add::after { background: color-mix(in srgb, var(--diff-add) 28%, var(--fill)); }
+.am-ln--del::before, .am-ln--del::after { background: color-mix(in srgb, var(--diff-del) 28%, var(--fill)); }
+.am-code--diff .am-ln--hl { box-shadow: none; }
+.am-code--diff .am-ln--hl::before { box-shadow: inset 3px 0 0 var(--accent); }
+.am-code--diff .am-ln--ctx.am-ln--hl { background: var(--accent-bg); }
+.am-code--diff .am-ln--hunk { display: block; min-height: 0; padding: 1px 14px; font-size: 11.5px; color: var(--ink-3); background: color-mix(in srgb, var(--accent) 8%, var(--fill)); }
+.am-code--dnum .am-ln--hunk::before, .am-code--dnum .am-ln--hunk::after { content: none; }
+.am-code--diff .am-ln--meta { display: none; }
