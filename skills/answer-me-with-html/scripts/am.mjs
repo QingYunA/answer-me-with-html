@@ -5527,14 +5527,12 @@ function sentenceLength(sentence) {
   const words3 = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
   return cjk >= 4 || cjk > words3 ? { lang: "zh", count: cjk + words3 } : { lang: "en", count: words3 };
 }
-var NO_SPACES = new RegExp("\\p{Script=Thai}", "u");
 var CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
-var thaiWords;
 function neutralLength(sentence) {
   const han = sentence.match(CJK_TEXT)?.length ?? 0;
   const rest = sentence.replace(CJK_TEXT, " ");
-  thaiWords ??= new Intl.Segmenter("th", { granularity: "word" });
-  const words3 = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  const unspaced = UNSPACED.find(([, re3]) => re3.test(rest));
+  const words3 = unspaced ? [...segmenter(unspaced[0], "word").segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
   return han >= 4 || han > words3 ? { lang: "zh", count: han + words3 } : { lang: "en", count: words3 };
 }
 var RULE_LANGUAGES = /* @__PURE__ */ new Set(["zh", "en", "ja"]);

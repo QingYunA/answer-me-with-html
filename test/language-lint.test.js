@@ -43,6 +43,20 @@ test('writing check: Thai is measured in words found by word segmentation', () =
   assert.match(long[0].message, /words/);
 });
 
+test('writing check: Lao, Khmer and Myanmar are measured like Thai, in words found by word segmentation', () => {
+  const samples = { th: 'ฉันกินข้าว', lo: 'ກວດສອບການເຊື່ອມຕໍ່', km: 'ពិនិត្យការតភ្ជាប់', my: 'ဒေတာဘေ့စ်ချိတ်ဆက်မှု' }; // lang-ok: draft text under test
+  const countOf = (w) => Number(w[0].message.match(/(\d+) words/)[1]);
+  for (const [lang, word] of Object.entries(samples)) {
+    assert.deepEqual(warn(lang, word), [], `${lang}: a short sentence stays quiet`); // lang-ok: draft text under test
+    const long = warn(lang, word.repeat(10)); // lang-ok: draft text under test
+    assert.deepEqual(rules(long), ['sentence-length'], lang);
+    assert.match(long[0].message, /max 25/, lang);
+  }
+  // Ten repeats: 30 words in the three scripts whose dictionaries split them like Thai, 60 in Myanmar.
+  const counts = ['th', 'lo', 'km', 'my'].map((lang) => countOf(warn(lang, samples[lang].repeat(10)))); // lang-ok: draft text under test
+  assert.deepEqual(counts, [30, 30, 30, 60]);
+});
+
 test('writing check: a language without rules still gets the paragraph-length rule', () => {
   const seven = Array.from({ length: 7 }, (_, i) => `Phrase ${i}.`).join(' ');
   assert.deepEqual(rules(warn('fr', seven)), ['paragraph-length']);

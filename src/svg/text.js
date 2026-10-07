@@ -51,8 +51,9 @@ const HANGUL_SYLLABLE = /[가-힯]/;
 // class above without the Hangul syllables, which Korean writes apart with spaces (see runUnits). The ranges are taken
 // from CJK_RE, so the two classes cannot drift apart.
 const HAN_KANA = new RegExp(CJK_RE.source.replace(HANGUL_SYLLABLE.source.slice(1, -1), ''));
-// Scripts that write no space between words, with the locale whose dictionary splits them.
-const UNSPACED = [
+// Scripts that write no space between words, with the locale whose dictionary splits them. The writing check measures
+// sentence length with the same list (src/lint/ste.js), so a "word" means the same thing in both places.
+export const UNSPACED = [
   ['th', /\p{Script=Thai}/u],
   ['lo', /\p{Script=Lao}/u],
   ['km', /\p{Script=Khmer}/u],
@@ -60,7 +61,8 @@ const UNSPACED = [
 ];
 const SEGMENTERS = new Map();
 
-function segmenter(locale, granularity) {
+// Segmenters are cached: building one costs more than segmenting a sentence.
+export function segmenter(locale, granularity) {
   const key = `${locale}:${granularity}`;
   if (!SEGMENTERS.has(key)) SEGMENTERS.set(key, new Intl.Segmenter(locale, { granularity }));
   return SEGMENTERS.get(key);
