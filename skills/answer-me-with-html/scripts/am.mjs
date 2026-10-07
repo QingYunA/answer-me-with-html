@@ -2361,13 +2361,64 @@ function measure(str, size = 13, { mono = false } = {}) {
   for (const ch of String(str ?? "")) units += charWidth(ch, mono);
   return Math.round(units * size * 100) / 100;
 }
-function tokenize(str) {
-  return String(str).match(/[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]|[^\s⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]+|\s+/g) ?? [];
+var HAN_KANA = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef\u3000-\u303f]/;
+var HANGUL = /[\uac00-\ud7af]/;
+var UNSPACED = [
+  ["th", new RegExp("\\p{Script=Thai}", "u")],
+  ["lo", new RegExp("\\p{Script=Lao}", "u")],
+  ["km", new RegExp("\\p{Script=Khmer}", "u")],
+  ["my", new RegExp("\\p{Script=Myanmar}", "u")]
+];
+var SEGMENTERS = /* @__PURE__ */ new Map();
+function segmenter(locale, granularity) {
+  const key = `${locale}:${granularity}`;
+  if (!SEGMENTERS.has(key)) SEGMENTERS.set(key, new Intl.Segmenter(locale, { granularity }));
+  return SEGMENTERS.get(key);
+}
+var graphemes = (text, locale) => [...segmenter(locale, "grapheme").segment(text)].map((g) => g.segment);
+function words(text, locale) {
+  const out = [];
+  for (const s of segmenter(locale, "word").segment(text)) {
+    if (out.length && !s.isWordLike) out[out.length - 1] += s.segment;
+    else out.push(s.segment);
+  }
+  return out;
+}
+function runUnits(run2, maxWidth, size, opts) {
+  const unspaced = UNSPACED.find(([, re3]) => re3.test(run2));
+  if (unspaced) {
+    const [locale] = unspaced;
+    return words(run2, locale).flatMap((w) => measure(w, size, opts) > maxWidth ? graphemes(w, locale) : [w]);
+  }
+  return HANGUL.test(run2) && measure(run2, size, opts) > maxWidth ? graphemes(run2, "ko") : [run2];
+}
+function tokenize(str, maxWidth, size, opts) {
+  const chars = [...String(str)];
+  const out = [];
+  let i = 0;
+  while (i < chars.length) {
+    const ch = chars[i];
+    if (HAN_KANA.test(ch)) {
+      out.push(ch);
+      i++;
+    } else if (/\s/u.test(ch)) {
+      let j2 = i;
+      while (j2 < chars.length && /\s/u.test(chars[j2])) j2++;
+      out.push(chars.slice(i, j2).join(""));
+      i = j2;
+    } else {
+      let j2 = i;
+      while (j2 < chars.length && !/\s/u.test(chars[j2]) && !HAN_KANA.test(chars[j2])) j2++;
+      out.push(...runUnits(chars.slice(i, j2).join(""), maxWidth, size, opts));
+      i = j2;
+    }
+  }
+  return out;
 }
 function wrap(str, maxWidth, size = 13, opts = {}) {
   const lines = [];
   let line = "";
-  for (const tok of tokenize(str)) {
+  for (const tok of tokenize(str, maxWidth, size, opts)) {
     if (/^\s+$/.test(tok)) {
       if (line) line += " ";
       continue;
@@ -2389,11 +2440,11 @@ function esc(str) {
 }
 
 // src/raw-html.js
-var words = (list) => new Set(list.split(" "));
-var NEVER = words("title textarea style xmp iframe noembed noframes script plaintext link meta base object embed frame frameset template html head body noscript svg math");
-var PHRASING = words("a abbr b bdi bdo br cite code data del dfn em i img ins kbd mark q rp rt ruby s samp small span strong sub sup time u var wbr");
-var BLOCK = words("address area article aside audio blockquote button canvas caption col colgroup datalist dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr input label legend li main map menu meter nav ol optgroup option output p picture pre progress search section select slot source summary table tbody td tfoot th thead tr track ul video acronym big center font strike tt");
-var VOID = words("br wbr img");
+var words2 = (list) => new Set(list.split(" "));
+var NEVER = words2("title textarea style xmp iframe noembed noframes script plaintext link meta base object embed frame frameset template html head body noscript svg math");
+var PHRASING = words2("a abbr b bdi bdo br cite code data del dfn em i img ins kbd mark q rp rt ruby s samp small span strong sub sup time u var wbr");
+var BLOCK = words2("address area article aside audio blockquote button canvas caption col colgroup datalist dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr input label legend li main map menu meter nav ol optgroup option output p picture pre progress search section select slot source summary table tbody td tfoot th thead tr track ul video acronym big center font strike tt");
+var VOID = words2("br wbr img");
 var REASON = {
   never: (t) => `${t} is shown as text; raw markup belongs in an html fence`,
   unknown: (t) => `${t} is not an HTML element, shown as text; put code in backticks`,
@@ -2452,7 +2503,7 @@ var readTag = (text) => {
   return bogus && { text, label: bogus[0] };
 };
 var ATTR = /\s*([^\s"'<>/=]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s>]*))?/g;
-var URL_ATTRS = words("href src action xlink:href poster cite background");
+var URL_ATTRS = words2("href src action xlink:href poster cite background");
 var ENTITY = /&#x([0-9a-f]+);?|&#(\d+);?|&(tab|newline|colon);?/gi;
 var NAMED = { tab: "	", newline: "\n", colon: ":" };
 function decode(text) {
@@ -5473,8 +5524,8 @@ function splitSentences(text) {
 }
 function sentenceLength(sentence) {
   const cjk = [...sentence].filter(isCJK).filter((c) => !/[，。！？；：、（）「」『』“”‘’《》]/.test(c)).length;
-  const words2 = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return cjk >= 4 || cjk > words2 ? { lang: "zh", count: cjk + words2 } : { lang: "en", count: words2 };
+  const words3 = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
+  return cjk >= 4 || cjk > words3 ? { lang: "zh", count: cjk + words3 } : { lang: "en", count: words3 };
 }
 var NO_SPACES = new RegExp("\\p{Script=Thai}", "u");
 var CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
@@ -5483,8 +5534,8 @@ function neutralLength(sentence) {
   const han = sentence.match(CJK_TEXT)?.length ?? 0;
   const rest = sentence.replace(CJK_TEXT, " ");
   thaiWords ??= new Intl.Segmenter("th", { granularity: "word" });
-  const words2 = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
-  return han >= 4 || han > words2 ? { lang: "zh", count: han + words2 } : { lang: "en", count: words2 };
+  const words3 = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  return han >= 4 || han > words3 ? { lang: "zh", count: han + words3 } : { lang: "en", count: words3 };
 }
 var RULE_LANGUAGES = /* @__PURE__ */ new Set(["zh", "en", "ja"]);
 function ruleFamily(language) {
@@ -5638,7 +5689,7 @@ var SCRIPT_LANGUAGES = [
   [new RegExp("\\p{Script=Arabic}", "u"), "ar"],
   [new RegExp("\\p{Script=Cyrillic}", "u"), "ru"]
 ];
-var HANGUL = new RegExp("\\p{Script=Hangul}", "u");
+var HANGUL2 = new RegExp("\\p{Script=Hangul}", "u");
 var SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
 var TRADITIONAL = new Set(TRADITIONAL_ONLY);
 function hanLanguage(text) {
@@ -5659,7 +5710,7 @@ function detectLang(text) {
   for (const ch of draft) {
     if (isCJK(ch)) {
       cjk++;
-      if (HANGUL.test(ch)) hangul++;
+      if (HANGUL2.test(ch)) hangul++;
     } else if (/[a-z]/i.test(ch)) {
       latin++;
     } else {
@@ -6110,8 +6161,8 @@ function estimateSeconds(text) {
     if (isCJK(ch)) cjk++;
     latin += isCJK(ch) ? " " : ch;
   }
-  const words2 = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return Math.max(1.6, cjk / 4.2 + words2 / 2.6 + 0.3);
+  const words3 = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
+  return Math.max(1.6, cjk / 4.2 + words3 / 2.6 + 0.3);
 }
 var TIMING = Object.freeze({
   title: 2.4,

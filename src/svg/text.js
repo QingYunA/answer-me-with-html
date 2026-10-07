@@ -42,15 +42,79 @@ export function measure(str, size = 13, { mono = false } = {}) {
   return Math.round(units * size * 100) / 100;
 }
 
-// Split into unbreakable layout units: one Han character is a unit, a run of non-space Latin characters is a unit.
-function tokenize(str) {
-  return String(str).match(/[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]|[^\s⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]+|\s+/g) ?? [];
+// Split into unbreakable layout units. A unit is one Han, kana or fullwidth character, one word of a script that
+// separates words with spaces, or one word of a script that writes no space at all (Thai and its neighbours, split with
+// the dictionary of the language; Node ships the full ICU data). A word wider than the line falls back to graphemes, the
+// smallest units a reader still sees as whole, so a combining mark never leaves its base character.
+const HAN_KANA = /[\u2e80-\u9fff\uf900-\ufaff\ufe30-\ufe4f\uff00-\uffef\u3000-\u303f]/;
+const HANGUL = /[\uac00-\ud7af]/;
+// Scripts that write no space between words, with the locale whose dictionary splits them.
+const UNSPACED = [
+  ['th', /\p{Script=Thai}/u],
+  ['lo', /\p{Script=Lao}/u],
+  ['km', /\p{Script=Khmer}/u],
+  ['my', /\p{Script=Myanmar}/u],
+];
+const SEGMENTERS = new Map();
+
+function segmenter(locale, granularity) {
+  const key = `${locale}:${granularity}`;
+  if (!SEGMENTERS.has(key)) SEGMENTERS.set(key, new Intl.Segmenter(locale, { granularity }));
+  return SEGMENTERS.get(key);
+}
+
+// The smallest units a reader sees as whole.
+const graphemes = (text, locale) => [...segmenter(locale, 'grapheme').segment(text)].map((g) => g.segment);
+
+// Words of a script that writes none of them apart. Punctuation stays with the word it follows, so a line never ends on a lone full stop.
+function words(text, locale) {
+  const out = [];
+  for (const s of segmenter(locale, 'word').segment(text)) {
+    if (out.length && !s.isWordLike) out[out.length - 1] += s.segment;
+    else out.push(s.segment);
+  }
+  return out;
+}
+
+// One run of characters with no space in it.
+function runUnits(run, maxWidth, size, opts) {
+  const unspaced = UNSPACED.find(([, re]) => re.test(run));
+  if (unspaced) {
+    const [locale] = unspaced;
+    return words(run, locale).flatMap((w) => (measure(w, size, opts) > maxWidth ? graphemes(w, locale) : [w]));
+  }
+  // Korean writes spaces between words, so a word stays whole unless the line cannot hold it.
+  return HANGUL.test(run) && measure(run, size, opts) > maxWidth ? graphemes(run, 'ko') : [run];
+}
+
+function tokenize(str, maxWidth, size, opts) {
+  const chars = [...String(str)];
+  const out = [];
+  let i = 0;
+  while (i < chars.length) {
+    const ch = chars[i];
+    if (HAN_KANA.test(ch)) {
+      out.push(ch);
+      i++;
+    } else if (/\s/u.test(ch)) {
+      let j = i;
+      while (j < chars.length && /\s/u.test(chars[j])) j++;
+      out.push(chars.slice(i, j).join(''));
+      i = j;
+    } else {
+      let j = i;
+      while (j < chars.length && !/\s/u.test(chars[j]) && !HAN_KANA.test(chars[j])) j++;
+      out.push(...runUnits(chars.slice(i, j).join(''), maxWidth, size, opts));
+      i = j;
+    }
+  }
+  return out;
 }
 
 export function wrap(str, maxWidth, size = 13, opts = {}) {
   const lines = [];
   let line = '';
-  for (const tok of tokenize(str)) {
+  for (const tok of tokenize(str, maxWidth, size, opts)) {
     if (/^\s+$/.test(tok)) {
       if (line) line += ' ';
       continue;

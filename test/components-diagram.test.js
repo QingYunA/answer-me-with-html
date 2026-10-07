@@ -4,6 +4,7 @@ import { COMPONENTS, ComponentError } from '../src/components/index.js';
 import { parseFlow } from '../src/components/flow.js';
 import { parseSequence } from '../src/components/sequence.js';
 import { smoothPath } from '../src/svg/shapes.js';
+import { measure } from '../src/svg/text.js';
 
 const ctx = (args = '') => ({ args, uid: () => 'u1' });
 const render = (name, text, args) => COMPONENTS.get(name).render(text, ctx(args));
@@ -114,4 +115,23 @@ test('flow: lays out nodes whose names equal dagre reserved ids or internal grou
   assert.match(render('flow', '\u0000 -> B'), /<svg/);
   assert.match(render('flow', '__group0 -> B\ngroup G: B'), /am-cluster/);
   assert.match(render('flow', 'g0 -> n0\ngroup g0: n0'), /am-cluster/);
+});
+
+// Wrapping by script (issue #85): a Korean label breaks at its spaces, and a Thai one inside the node budget, which is 150 for flow.
+const textLines = (svg) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+
+test('flow: a Korean label breaks at a space, not inside a word', () => {
+  assert.deepEqual(textLines(render('flow', '데이터베이스 연결을 확인하고 재시도합니다')), ['데이터베이스 연결을', '확인하고 재시도합니다']);
+});
+
+test('flow: a Thai label wraps inside the node budget instead of one wide line', () => {
+  const lines = textLines(render('flow', 'ตรวจสอบการเชื่อมต่อฐานข้อมูลแล้วลองอีกครั้ง'));
+  assert.ok(lines.length > 1);
+  for (const l of lines) assert.ok(measure(l, 13) <= 150, `line too wide: ${l}`);
+});
+
+test('sequence: Korean and Thai messages wrap the same way', () => {
+  assert.deepEqual(textLines(render('sequence', 'A -> B: 데이터베이스 연결을 확인하고 재시도합니다')), ['A', 'B', '데이터베이스 연결을 확인하고', '재시도합니다']);
+  const thai = textLines(render('sequence', 'A -> B: ตรวจสอบการเชื่อมต่อฐานข้อมูลแล้วลองอีกครั้ง'));
+  for (const l of thai) assert.ok(measure(l, 13) <= 240, `line too wide: ${l}`);
 });
