@@ -27,7 +27,7 @@ src/
     old-flow.js
 \`\`\`
   - Indentation still sets the level. The children of a + or - node inherit it; a child that carries a different marker is an error. ~ marks one node and is not inherited.
-  - Added is drawn in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node gets a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the tree.
+  - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the tree: Before and After show the tree as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a label that starts with "- ", write \\- item.`,
   example: '```tree\nASD-STE100 | Simplified Technical English\n  Part 1: Writing rules\n    `Section 1` Words\n  Part 2: Dictionary\n    Approved words | one word, one meaning\n```',
   render(text, { args, ui, video }) {
@@ -45,7 +45,7 @@ function treeHtml(roots, listMode, ui) {
     return `<div class="am-tree">${rootBox(root, ui, true)}${listHtml(root.children, ui)}</div>`;
   }
   if (!listMode && roots.length <= 4) {
-    return `<div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${roots.map((n) => colHtml(n, ui)).join('')}</div></div>`;
+    return `<div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${colsHtml(roots, ui)}</div></div>`;
   }
   return `<div class="am-tree">${listHtml(roots, ui)}</div>`;
 }
@@ -95,27 +95,53 @@ const labelHtml = (label) => mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\
 // data-delta is the node's change state; the root wrapper and the column carry it too, so a view can hide their connector lines with the node.
 const vattrs = (n) => ` data-key="${esc(n.label)}" data-step="${n.step}"${deltaAttr(n.state)}`;
 
+// The state a view hides: Before has no added node, After has no removed node.
+const HIDDEN_IN = { before: 'added', after: 'removed' };
+
+// The connector of sibling i in a view that hides some siblings must run from the parent to the last sibling that stays. Plain CSS cannot know which
+// one that is, so the markup says: data-line-before / data-line-after, written only where the view differs from the usual look
+// (a list line: full, short for the last sibling, none; a column bar: full, start, end, none). An unmarked tree gets none.
+function lineAttrs(siblings, i, cols) {
+  const n = siblings.length;
+  return Object.entries(HIDDEN_IN).map(([view, hidden]) => {
+    const shown = siblings.map((x) => x.state !== hidden);
+    const first = shown.indexOf(true);
+    const last = shown.lastIndexOf(true);
+    const natural = cols ? (n === 1 ? 'none' : i === 0 ? 'start' : i === n - 1 ? 'end' : 'full') : (i < n - 1 ? 'full' : 'short');
+    const kind = cols
+      ? (first === last || i < first || i > last ? 'none' : i === first ? 'start' : i === last ? 'end' : 'full')
+      : (i < last ? 'full' : i === last ? 'short' : 'none');
+    return kind === natural ? '' : ` data-line-${view}="${kind}"`;
+  }).join('');
+}
+
+// The line from a root down to its columns has nothing to reach in a view that hides every column.
+const dropAttrs = (children) => Object.entries(HIDDEN_IN).map(([view, hidden]) => (children.every((c) => c.state === hidden) ? ` data-line-${view}="none"` : '')).join('');
+
 const boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${mdInline(n.sub)}</small>` : ''}`;
 
 function rootBox(root, ui, solo = false) {
-  return `<div class="am-tree-root${solo ? ' am-tree-root--solo' : ''}"${deltaAttr(root.state)}><div class="am-tree-box am-tree-box--root"${vattrs(root)}>${boxInner(root, ui)}</div></div>`;
+  const drop = solo ? '' : dropAttrs(root.children);
+  return `<div class="am-tree-root${solo ? ' am-tree-root--solo' : ''}"${deltaAttr(root.state)}${drop}><div class="am-tree-box am-tree-box--root"${vattrs(root)}>${boxInner(root, ui)}</div></div>`;
 }
 
-function colHtml(node, ui) {
+function colHtml(node, ui, siblings, i) {
   const children = node.children.length ? listHtml(node.children, ui) : '';
-  return `<div class="am-tree-col"${deltaAttr(node.state)}><div class="am-tree-box${node.hi ? ' am-tree-box--hi' : ''}"${vattrs(node)}>${boxInner(node, ui)}</div>${children}</div>`;
+  return `<div class="am-tree-col"${deltaAttr(node.state)}${lineAttrs(siblings, i, true)}><div class="am-tree-box${node.hi ? ' am-tree-box--hi' : ''}"${vattrs(node)}>${boxInner(node, ui)}</div>${children}</div>`;
 }
+
+const colsHtml = (nodes, ui) => nodes.map((n, i) => colHtml(n, ui, nodes, i)).join('');
 
 function orgHtml(root, ui) {
-  return `<div class="am-tree">${rootBox(root, ui)}<div class="am-tree-cols" style="--n: ${root.children.length}">${root.children.map((n) => colHtml(n, ui)).join('')}</div></div>`;
+  return `<div class="am-tree">${rootBox(root, ui)}<div class="am-tree-cols" style="--n: ${root.children.length}">${colsHtml(root.children, ui)}</div></div>`;
 }
 
 function listHtml(nodes, ui) {
-  return `<ul class="am-tree-list">${nodes.map((n) => liHtml(n, ui)).join('')}</ul>`;
+  return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, nodes, i)).join('')}</ul>`;
 }
 
-function liHtml(n, ui) {
+function liHtml(n, ui, siblings, i) {
   const sub = n.sub ? `<span class="am-tree-sub">${mdInline(n.sub)}</span>` : '';
-  const kids = n.children.length ? `<ul>${n.children.map((c) => liHtml(c, ui)).join('')}</ul>` : '';
-  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
+  const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k)).join('')}</ul>` : '';
+  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
 }

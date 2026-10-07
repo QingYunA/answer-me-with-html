@@ -134,7 +134,7 @@ test('the warning reaches the render result with the draft line, and the page is
 // ── flow: drawing ──
 test('flow: marked items carry data-delta, a corner badge and the count row; the switch is hidden until the page script shows it', () => {
   const html = render('flow', FLOW, 'LR');
-  assert.match(html, /^<figure class="am-diagram am-flow" data-delta-view="changes"><svg/);
+  assert.match(html, /^<figure class="am-diagram am-flow am-view-changes"><svg/);
   assert.equal((html.match(/<g class="am-node [^"]*" data-key="[^"]*" data-step="\d+" data-delta="added"/g) || []).length, 1);
   assert.equal((html.match(/<g class="am-node [^"]*" data-key="[^"]*" data-step="\d+" data-delta="changed"/g) || []).length, 1);
   assert.equal((html.match(/<g data-step="\d+" data-delta="added">/g) || []).length, 2);
@@ -204,13 +204,13 @@ test('tree: the marker comes after the indentation; indentation still sets the l
   const html = treeOf(TREE);
   assert.match(html, /<li data-key="delta.js" data-step="2" data-delta="added">/);
   assert.match(html, /<li data-key="flow.js" data-step="3" data-delta="changed">/);
-  assert.match(html, /<li data-key="legacy\/" data-step="5" data-delta="removed">/);
-  assert.match(html, /<li data-key="components\/" data-step="1"><span class="am-tree-label">components\/<\/span><ul>/);
+  assert.match(html, /<li data-key="legacy\/" data-step="5" data-delta="removed"[^>]*>/);
+  assert.match(html, /<li data-key="components\/" data-step="1"[^>]*><span class="am-tree-label">components\/<\/span><ul>/);
 });
 
 test('tree: children inherit + and -, ~ is not inherited, and the badge shows on every node', () => {
   const html = treeOf(TREE);
-  assert.match(html, /<li data-key="old-flow.js" data-step="6" data-delta="removed">/);
+  assert.match(html, /<li data-key="old-flow.js" data-step="6" data-delta="removed"[^>]*>/);
   const kids = treeOf('A\n  ~ B\n    C\n  + D\n    E\n    F');
   assert.match(kids, /data-key="B" data-step="1" data-delta="changed"/);
   assert.match(kids, /data-key="C" data-step="2"><span/);
@@ -245,17 +245,17 @@ test('tree: a marker without a space, or escaped with a backslash, is a plain la
 
 test('tree: a marker combines with the * highlight and with the label | note form', () => {
   const html = treeOf('A\n  + *New | a note');
-  assert.match(html, /<li class="am-tree-hi" data-key="New" data-step="1" data-delta="added">/);
+  assert.match(html, /<li class="am-tree-hi" data-key="New" data-step="1" data-delta="added"[^>]*>/);
   assert.match(html, /am-tree-sub">a note</);
 });
 
 test('tree: org chart mode marks the root, columns and boxes, and hides in a view by data-delta alone', () => {
   const html = treeOf('Root\n  + New\n  - Old\n  ~ Same', '');
-  assert.match(html, /<div class="am-tree-col" data-delta="added"><div class="am-tree-box" data-key="New"[^>]*data-delta="added">/);
-  assert.match(html, /<div class="am-tree-col" data-delta="removed">/);
+  assert.match(html, /<div class="am-tree-col" data-delta="added"[^>]*><div class="am-tree-box" data-key="New"[^>]*data-delta="added">/);
+  assert.match(html, /<div class="am-tree-col" data-delta="removed"[^>]*>/);
   const gone = treeOf('- Root\n  A\n  B', '');
-  assert.match(gone, /<div class="am-tree-root" data-delta="removed"><div class="am-tree-box am-tree-box--root"[^>]*data-delta="removed">/);
-  assert.match(gone, /<div class="am-tree-col" data-delta="removed">/);
+  assert.match(gone, /<div class="am-tree-root" data-delta="removed"[^>]*><div class="am-tree-box am-tree-box--root"[^>]*data-delta="removed">/);
+  assert.match(gone, /<div class="am-tree-col" data-delta="removed"[^>]*>/);
 });
 
 test('tree: several roots can carry their own markers', () => {
@@ -270,9 +270,9 @@ test('tree: a tree without markers has no delta markup and keeps its first eleme
   assert.match(html, /^<div class="am-tree">/);
 });
 
-test('tree: the switch state sits on the tree element when it has markers', () => {
+test('tree: the view class sits on the tree element when it has markers', () => {
   const html = treeOf(TREE);
-  assert.match(html, /^<div class="am-tree" data-delta-view="changes">/);
+  assert.match(html, /^<div class="am-tree am-view-changes">/);
   assert.match(html, /<div class="am-delta-bar">.*<\/div><\/div>$/);
 });
 
@@ -286,22 +286,21 @@ const page = (fence) => `---\ntitle: T\nlang: en\n---\n## A Panel\n${fence}\n`;
 test('page: the delta styles and script come only with a page that has markers', () => {
   const marked = renderDoc(page(`\`\`\`flow\n${FLOW}\n\`\`\``)).html;
   const plain = renderDoc(page('```flow\nA -> B\n```')).html;
-  assert.match(marked, /\[data-delta-view="before"\] \[data-delta="added"\]/);
-  assert.match(marked, /data-delta-view/);
+  assert.match(marked, /\.am-view-before \[data-delta="added"\]/);
   assert.match(marked, /\.am-delta-switch/);
   assert.doesNotMatch(plain, /data-delta|am-delta/);
   assert.equal(pageCss(undefined, {}).includes('data-delta'), false);
 });
 
 test('page: a tree with markers brings the same styles and script', () => {
-  assert.match(renderDoc(page(`\`\`\`tree\n${TREE}\n\`\`\``)).html, /\[data-delta-view="after"\] \[data-delta="removed"\]/);
+  assert.match(renderDoc(page(`\`\`\`tree\n${TREE}\n\`\`\``)).html, /\.am-view-after \[data-delta="removed"\]/);
 });
 
-test('page: the view switch script changes data-delta-view on its diagram and the pressed button', () => {
+test('page: the view switch script swaps the am-view class of its diagram and the pressed button', () => {
   const { html } = renderDoc(page(`\`\`\`flow\n${FLOW}\n\`\`\``));
   const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
   assert.match(script, /\.am-delta-switch/);
-  assert.match(script, /deltaView/);
+  assert.match(script, /am-view-\$\{/);
 });
 
 test('video: marked items use the same colors and badges, with no switch', async () => {
@@ -351,7 +350,7 @@ test('cli patch: a page with change markers keeps them, with their styles and sc
     assert.equal(p.code, 0, p.err);
     const html = readFileSync(join(dir, 'out', 'page.html'), 'utf8');
     assert.match(html, /data-delta="added"/);
-    assert.match(html, /\[data-delta-view="before"\]/);
+    assert.match(html, /\.am-view-before \[data-delta="added"\]/);
     assert.match(html, /New text\./);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -371,5 +370,89 @@ test('cli: am help flow and am help tree document the markers', async () => {
     assert.match((await run(dir, ['help', 'tree'])).out, /\\- item/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── only the Changes view is styled ──
+const cssOf = () => pageCss(undefined, { delta: true }).split('/* Change markers')[1];
+const rules = (css) => [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ selector: m[1].trim(), body: m[2] }));
+
+test('delta css: every color, strike-through, fade and arrowhead rule is scoped to the Changes view', () => {
+  const styled = rules(cssOf()).filter((r) => /data-delta="(added|removed|changed)"|am-arrow--/.test(r.selector) && /stroke|fill|color|opacity|text-decoration/.test(r.body));
+  assert.ok(styled.length > 10);
+  for (const r of styled) {
+    for (const sel of r.selector.split(',').map((s) => s.trim())) {
+      if (/am-view-(before|after)/.test(sel) && /visibility: hidden/.test(r.body)) continue;
+      assert.match(sel, /^\.am-view-changes /, `not scoped to the Changes view: ${sel}`);
+    }
+  }
+});
+
+test('delta css: Before hides added items and badges, After hides removed items and badges, and nothing leaves the layout', () => {
+  const css = cssOf();
+  assert.match(css, /\.am-view-before \[data-delta="added"\], \.am-view-after \[data-delta="removed"\] \{ visibility: hidden; \}/);
+  assert.match(css, /\.am-view-before \.am-delta-badge, \.am-view-after \.am-delta-badge \{ visibility: hidden; \}/);
+  assert.doesNotMatch(css, /display: none[^}]*\}\s*\n?[^{}]*data-delta="/);
+});
+
+// ── connector lines in a view that hides siblings ──
+// The data-line-* hooks of the list item or column that holds the node `key`.
+const hooks = (html, key) => {
+  const tag = html.match(new RegExp(`<li[^>]*data-key="${key}"[^>]*>`)) ?? html.match(new RegExp(`<div class="am-tree-col"[^>]*>(?=<div class="am-tree-box[^"]*" data-key="${key}")`));
+  assert.ok(tag, `no node ${key}`);
+  return [...tag[0].matchAll(/data-line-(?:before|after)="\w+"/g)].map((m) => m[0]).join(' ');
+};
+
+test('tree list: the sibling before a hidden last sibling ends its line in that view, and a hidden sibling keeps the line whole', () => {
+  const html = treeOf('A\n  p\n  + q\n  r\n  - s', 'list');
+  assert.equal(hooks(html, 'p'), '');
+  assert.equal(hooks(html, 'q'), '', 'before: q is hidden, the line still runs through its place');
+  assert.equal(hooks(html, 'r'), 'data-line-after="short"', 'after: s is gone, r is the last one left');
+  assert.equal(hooks(html, 's'), 'data-line-after="none"');
+  const added = treeOf('A\n  p\n  + q', 'list');
+  assert.equal(hooks(added, 'p'), 'data-line-before="short"');
+  assert.equal(hooks(added, 'q'), 'data-line-before="none"');
+});
+
+test('tree list: the children of a hidden node draw no line in that view', () => {
+  const html = treeOf('A\n  p\n  - b\n    c\n    d', 'list');
+  assert.equal(hooks(html, 'p'), 'data-line-after="short"');
+  assert.equal(hooks(html, 'b'), 'data-line-after="none"');
+  assert.equal(hooks(html, 'c'), 'data-line-after="none"');
+  assert.equal(hooks(html, 'd'), 'data-line-after="none"');
+});
+
+test('tree org chart: the bar over the columns runs from the first to the last column that stays', () => {
+  const html = treeOf('Root\n  + a\n  b\n  - c\n  d', '');
+  assert.equal(hooks(html, 'a'), 'data-line-before="none"');
+  assert.equal(hooks(html, 'b'), 'data-line-before="start"');
+  assert.equal(hooks(html, 'c'), '', 'a hidden column between two that stay keeps its stretch of the bar');
+  assert.equal(hooks(html, 'd'), '');
+  const end = treeOf('Root\n  a\n  b\n  + c', '');
+  assert.equal(hooks(end, 'b'), 'data-line-before="end"');
+  assert.equal(hooks(end, 'c'), 'data-line-before="none"');
+});
+
+test('tree columns of several roots follow the same rule', () => {
+  const html = treeOf('x\n- y\n+ z', '');
+  assert.equal(hooks(html, 'x'), '');
+  assert.equal(hooks(html, 'y'), 'data-line-before="end"');
+  assert.equal(hooks(html, 'z'), 'data-line-before="none"');
+});
+
+test('tree org chart: the line from a root has nothing to reach in a view that hides every column', () => {
+  assert.match(treeOf('Root\n  + a\n  + b', ''), /<div class="am-tree-root" data-line-before="none">/);
+  assert.match(treeOf('Root\n  - a\n  - b', ''), /<div class="am-tree-root" data-line-after="none">/);
+});
+
+test('tree: a tree without markers has no connector hooks', () => {
+  for (const args of ['list', '']) assert.doesNotMatch(treeOf('Root\n  a\n  b\n    c\n    d\n  e', args), /data-line/);
+});
+
+test('delta css: the connector hooks redraw the stretches in Before and After', () => {
+  const css = cssOf();
+  for (const view of ['before', 'after']) {
+    for (const kind of ['full', 'short', 'none']) assert.match(css, new RegExp(`\\.am-view-${view} \\.am-tree-list li\\[data-line-${view}="${kind}"\\]::after`));
+    for (const kind of ['full', 'start', 'end', 'none']) assert.match(css, new RegExp(`\\.am-view-${view} \\.am-tree-col\\[data-line-${view}="${kind}"\\]::before`));
   }
 });

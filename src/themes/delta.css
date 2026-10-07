@@ -1,29 +1,31 @@
-/* Change markers (only on pages that have one): added, removed and changed items, a corner badge, the count row and the Before / Changes / After switch.
+/* Change markers (only on pages that have one). Only the Changes view (.am-view-changes) draws change styling: colors, strike-through, faded items
+   and badges. Before and After look like a plain diagram, and the items that do not exist in the view are hidden.
    The colors are the theme's --ok, --err and --warn, so every theme and mode works. A view hides items with visibility, so nothing moves. */
-[data-delta-view="before"] [data-delta="added"], [data-delta-view="after"] [data-delta="removed"] { visibility: hidden; }
+.am-view-before [data-delta="added"], .am-view-after [data-delta="removed"] { visibility: hidden; }
+.am-view-before .am-delta-badge, .am-view-after .am-delta-badge { visibility: hidden; }
 
 .am-delta-badge--added { --badge: var(--ok, #1f9d4d); }
 .am-delta-badge--removed { --badge: var(--err, #c62828); }
 .am-delta-badge--changed { --badge: var(--warn, #a8620a); }
 
 /* flow */
-.am-diagram .am-node[data-delta="added"] .am-node-shape { stroke: var(--ok, #1f9d4d); }
-.am-diagram .am-node[data-delta="removed"] .am-node-shape { stroke: var(--err, #c62828); }
-.am-diagram .am-node[data-delta="changed"] .am-node-shape { stroke: var(--warn, #a8620a); }
-.am-diagram .am-node[data-delta="added"] > text { fill: var(--ok, #1f9d4d); }
-.am-diagram .am-node[data-delta="removed"] > text { fill: var(--err, #c62828); }
-.am-diagram [data-delta="added"] > .am-edge { stroke: var(--ok, #1f9d4d); }
-.am-diagram [data-delta="removed"] > .am-edge { stroke: var(--err, #c62828); }
-.am-arrow--added { fill: var(--ok, #1f9d4d); }
-.am-arrow--removed { fill: var(--err, #c62828); }
-.am-diagram [data-delta="added"] > .am-edge-label text { fill: var(--ok, #1f9d4d); }
-.am-diagram [data-delta="removed"] > .am-edge-label text { fill: var(--err, #c62828); }
-.am-diagram .am-cluster[data-delta="added"] { stroke: var(--ok, #1f9d4d); }
-.am-diagram .am-cluster[data-delta="removed"] { stroke: var(--err, #c62828); }
-.am-diagram .am-cluster-label[data-delta="added"] { fill: var(--ok, #1f9d4d); }
-.am-diagram .am-cluster-label[data-delta="removed"] { fill: var(--err, #c62828); }
-.am-diagram g[data-delta="removed"]:not(.am-delta-badge), .am-diagram .am-cluster[data-delta="removed"], .am-diagram .am-cluster-label[data-delta="removed"] { opacity: 0.55; }
-.am-diagram .am-node[data-delta="removed"] > text, .am-diagram g[data-delta="removed"] > .am-edge-label text, .am-diagram .am-cluster-label[data-delta="removed"] { text-decoration: line-through; }
+.am-view-changes .am-node[data-delta="added"] .am-node-shape { stroke: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] .am-node-shape { stroke: var(--err, #c62828); }
+.am-view-changes .am-node[data-delta="changed"] .am-node-shape { stroke: var(--warn, #a8620a); }
+.am-view-changes .am-node[data-delta="added"] > text { fill: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] > text { fill: var(--err, #c62828); }
+.am-view-changes [data-delta="added"] > .am-edge { stroke: var(--ok, #1f9d4d); }
+.am-view-changes [data-delta="removed"] > .am-edge { stroke: var(--err, #c62828); }
+.am-view-changes .am-arrow--added { fill: var(--ok, #1f9d4d); }
+.am-view-changes .am-arrow--removed { fill: var(--err, #c62828); }
+.am-view-changes [data-delta="added"] > .am-edge-label text { fill: var(--ok, #1f9d4d); }
+.am-view-changes [data-delta="removed"] > .am-edge-label text { fill: var(--err, #c62828); }
+.am-view-changes .am-cluster[data-delta="added"] { stroke: var(--ok, #1f9d4d); }
+.am-view-changes .am-cluster[data-delta="removed"] { stroke: var(--err, #c62828); }
+.am-view-changes .am-cluster-label[data-delta="added"] { fill: var(--ok, #1f9d4d); }
+.am-view-changes .am-cluster-label[data-delta="removed"] { fill: var(--err, #c62828); }
+.am-view-changes g[data-delta="removed"]:not(.am-delta-badge), .am-view-changes .am-cluster[data-delta="removed"], .am-view-changes .am-cluster-label[data-delta="removed"] { opacity: 0.55; }
+.am-view-changes .am-node[data-delta="removed"] > text, .am-view-changes g[data-delta="removed"] > .am-edge-label text, .am-view-changes .am-cluster-label[data-delta="removed"] { text-decoration: line-through; }
 .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
 .am-diagram .am-delta-badge text { fill: var(--paper, #ffffff); font: 700 11px var(--font-sans, sans-serif); text-decoration: none; }
 
@@ -35,13 +37,26 @@
 .am-tree-box[data-delta] { position: relative; }
 .am-tree-box > .am-delta-badge { position: absolute; top: -8px; right: -8px; }
 .am-tree-label > .am-delta-badge { margin-right: 6px; vertical-align: 1px; }
-.am-tree-box[data-delta="added"] { border-color: var(--ok); }
-.am-tree-box[data-delta="removed"] { border-color: var(--err); opacity: 0.55; text-decoration: line-through; }
-.am-tree-box[data-delta="changed"] { border-color: var(--warn); }
-.am-tree-list li[data-delta="added"] > .am-tree-label { color: var(--ok); }
-.am-tree-list li[data-delta="removed"] > .am-tree-label { color: var(--err); text-decoration: line-through; }
-.am-tree-list li[data-delta="changed"] > .am-tree-label { color: var(--warn); }
-.am-tree-list li[data-delta="removed"] > .am-tree-label, .am-tree-list li[data-delta="removed"] > .am-tree-sub { opacity: 0.55; }
+.am-view-changes .am-tree-box[data-delta="added"] { border-color: var(--ok); }
+.am-view-changes .am-tree-box[data-delta="removed"] { border-color: var(--err); opacity: 0.55; text-decoration: line-through; }
+.am-view-changes .am-tree-box[data-delta="changed"] { border-color: var(--warn); }
+.am-view-changes .am-tree-list li[data-delta="added"] > .am-tree-label { color: var(--ok); }
+.am-view-changes .am-tree-list li[data-delta="removed"] > .am-tree-label { color: var(--err); text-decoration: line-through; }
+.am-view-changes .am-tree-list li[data-delta="changed"] > .am-tree-label { color: var(--warn); }
+.am-view-changes .am-tree-list li[data-delta="removed"] > .am-tree-label, .am-view-changes .am-tree-list li[data-delta="removed"] > .am-tree-sub { opacity: 0.55; }
+
+/* Connector lines in a view that hides siblings. A hidden node keeps its stretch of the line, so the line stays whole between the nodes that remain and
+   stops at the last one; the markup (data-line-before / data-line-after, see src/components/tree.js) names the stretches that differ from the usual look. */
+.am-view-before .am-tree-list li::after, .am-view-after .am-tree-list li::after,
+.am-view-before .am-tree-col::before, .am-view-after .am-tree-col::before { visibility: visible; }
+.am-view-before .am-tree-list li[data-line-before="full"]::after, .am-view-after .am-tree-list li[data-line-after="full"]::after { bottom: 0; height: auto; }
+.am-view-before .am-tree-list li[data-line-before="short"]::after, .am-view-after .am-tree-list li[data-line-after="short"]::after { bottom: auto; height: 0.95em; }
+.am-view-before .am-tree-list li[data-line-before="none"]::after, .am-view-after .am-tree-list li[data-line-after="none"]::after,
+.am-view-before .am-tree-col[data-line-before="none"]::before, .am-view-after .am-tree-col[data-line-after="none"]::before,
+.am-view-before .am-tree-root[data-line-before="none"]::after, .am-view-after .am-tree-root[data-line-after="none"]::after { display: none; }
+.am-view-before .am-tree-col[data-line-before="full"]::before, .am-view-after .am-tree-col[data-line-after="full"]::before { left: 0; right: 0; }
+.am-view-before .am-tree-col[data-line-before="start"]::before, .am-view-after .am-tree-col[data-line-after="start"]::before { left: 50%; right: 0; }
+.am-view-before .am-tree-col[data-line-before="end"]::before, .am-view-after .am-tree-col[data-line-after="end"]::before { left: 0; right: 50%; }
 
 /* the count row and the switch */
 .am-delta-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 10px; text-align: left; font: 12px/1.3 var(--font-mono, monospace); }

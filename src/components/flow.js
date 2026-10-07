@@ -44,7 +44,7 @@ Client -> Gateway
   - A marker applies to every link on its line. A node is removed when it appears only on - lines, added when it appears only on + lines, and unchanged when it also appears on an unmarked line, even if its links changed. ~ Node on a line without an arrow marks that node as changed.
   - ~ on a line with an arrow is an error: remove the old link with - and add the new one with +. That is also how a link's label changes. The same link both unmarked and marked is an error too.
   - + group Name: A, B and - group Name: A, B mark a group box. A group that is not removed and holds only removed nodes is a warning. Markers combine with * and every shape bracket.
-  - Added is drawn in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node gets a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
+  - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
   render(text, { args, uid, ui, warn, video }) {

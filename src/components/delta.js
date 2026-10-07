@@ -26,8 +26,9 @@ export function deltaBadge(state, ui) {
   return `<span class="am-delta-badge am-delta-badge--${state}" role="img" aria-label="${esc(labelsOf(ui)[state])}">${SIGN[state]}</span>`;
 }
 
-// Adds the count row and the view switch at the end of a drawn component (html is one element) when any of its items is marked, and gives that element
-// data-delta-view, which the switch sets. Without a marker the html is returned as it is. The bar sits inside the element, so the figure that holds the
+// Adds the count row and the view switch at the end of a drawn component (html is one element whose last attribute is class) when any of its items is marked,
+// and gives that element the class am-view-changes; the switch swaps it for am-view-before or am-view-after. A class, not an attribute, because the video
+// copies a host's classes onto its morph ghosts. Without a marker the html is returned as it is. The bar sits inside the element, so the figure that holds the
 // diagram stays the only child of its panel and the sheet layout sizes it as before.
 // states: the state of every marked or unmarked item (null for unmarked). The switch needs the page script, so it starts hidden, and a video leaves it out.
 export function withDelta(html, states, { ui, video = false } = {}) {
@@ -39,5 +40,5 @@ export function withDelta(html, states, { ui, video = false } = {}) {
   const switcher = video ? '' : `<span class="am-delta-switch" role="group" aria-label="${esc(t.view)}" hidden>${views}</span>`;
   const open = html.indexOf('>');
   const close = html.lastIndexOf('</');
-  return `${html.slice(0, open)} data-delta-view="changes"${html.slice(open, close)}<div class="am-delta-bar">${counts}${switcher}</div>${html.slice(close)}`;
+  return `${html.slice(0, open - 1)} am-view-changes"${html.slice(open, close)}<div class="am-delta-bar">${counts}${switcher}</div>${html.slice(close)}`;
 }
