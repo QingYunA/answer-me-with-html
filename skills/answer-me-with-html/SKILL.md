@@ -25,17 +25,7 @@ Reply to the user, and write the draft, in the user's language.
 
 Arguments for this call: `$ARGUMENTS`
 
-When the arguments start with `config` (for example `/answer-me-with-html config open off`), this turn handles settings only and produces no page:
-
-- `config`: run `am config` to show the current settings, then let the user choose. Where the agent has a choice tool such as AskUserQuestion, use it: at most 4 settings at a time, these first: `open`, `theme`, `mode`, `style`, with the current value marked in the options. Otherwise ask in plain text.
-- `config <key> <value>`: run `am config set <key> <value>`.
-- `config reset [key]`: run `am config reset [key]`.
-
-When the user asks in natural language ("stop opening the browser", "use the card theme by default"), also convert it to `am config set`. Settings: `open` (auto-open the browser), `theme`, `mode`, `style`, `voice` (video narration), `update_check` (new-version notices). Run `am config` to see all descriptions.
-
-When the arguments start with `clean`, or the user asks to clean up pages / the cache: first run `am clean --dry-run` and tell the user how many items and how much space will be deleted. Run `am clean` only after the user agrees (add `--all` to delete all pages and videos, `--days N` to change how many days to keep).
-
-When the arguments start with `update`, or the user asks to update this skill: update according to how it was installed. Installed with `npx skills`: run `npx skills update answer-me-with-html -y`. Installed as a Claude Code plugin: run `claude plugin update answer-me-with-html@answer-me-with-html` (or ask the user to click Update now in `/plugin` → Installed), then ask the user to run `/reload-plugins`. Installed with git clone: run `git pull && npm install` in the repository directory.
+When the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `${CLAUDE_SKILL_DIR}/references/settings.md` and follow it. That turn produces no page.
 
 ## 1. Decide: produce a page or not
 
@@ -185,35 +175,4 @@ A reply starts with `# Re: <page title>` and lists `Decisions` and `Comments`, i
 
 Use only when the user explicitly asks for a video ("make a video", "explain it as a video", "3b1b style", "explainer video"). Do not produce a video unasked in always-on mode either.
 
-A video draft has the same format as a page draft, with one extra rule: lines starting with `>` are narration, one beat per line.
-
-````bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" video - --no-open <<'AM_EOF'
----
-title: The TCP three-way handshake
-subtitle: Why three
----
-> Opening narration (optional).
-
-## Both ends are waiting
-```sequence
-Client -> Server: SYN
-Server -> Client: SYN-ACK
-Client -> Server: ACK
-```
-> First the client sends SYN to ask for a connection.
-> [Server] answers with SYN-ACK.
-> The client replies with ACK, and the connection is open.
-AM_EOF
-````
-
-- One `## ` is one scene. Put one component (or one table, one list) in a scene as the picture, and write 2–5 narration lines below it.
-- When the Nth narration line plays, the picture shows step N. In flow / sequence / tree every source line is one step; timeline, limits, table rows and list items step by entry. So the line order of the component is the order of the explanation. When there are more narration lines than steps, the extra first lines serve as an opening and show nothing new.
-- Write `[name]` in narration: the camera zooms in on the node or actor with that name and highlights it. The name must match how it is written in the component.
-- Nodes with the same name in adjacent scenes move smoothly to their new position. To keep the viewer following one object, reuse the same name in the next scene.
-- 3–6 scenes per video, one or two sentences per narration line.
-- Narration is read aloud, so write it as speech, as if explaining to someone face to face: transitions like `你看`, `那问题来了`, `我们换个角度看` are fine, and characters' "lines" go in quotes. Do not write it like a manual (`客户端发送 SYN 报文以请求建立连接`). Sentence length is still subject to the STE check.
-- The look follows the theme in the settings by default (usually the blueprint drawing style). When the user wants "that dark 3b1b style", write `theme: 3b1b` in the frontmatter.
-- Narration voice: the default is `--voice auto`: ElevenLabs when `ELEVENLABS_API_KEY` is set, otherwise system TTS (macOS say), and subtitles only when neither is available. When the user says "no sound", add `--voice off`. When the user runs a local OpenAI-compatible speech service and has set `AM_TTS_URL`, use `--voice local`.
-- The output is a single-file player page under `~/.answer-me-with-html/videos/` (audio embedded). When the user wants a video file, add `--mp4`; this needs Chrome, ffmpeg and Node.js 22+ on the machine, and export takes about 1.3 times the video length.
-- Full syntax: `am help video`. In the terminal, reply with one sentence plus the player page link (and the MP4 link), written as in step 5 of section 2.
+Before you write a video draft, read `${CLAUDE_SKILL_DIR}/references/video.md` and follow it.

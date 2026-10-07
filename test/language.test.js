@@ -125,7 +125,7 @@ const SCOPE = [
   { files: () => ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'], part: 'whole' },
   { files: () => ['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS)), part: 'strings' },
   { files: () => ['src/lint/ste.js'], part: 'lintMessages' },
-  { files: () => ['skills/answer-me-with-html/SKILL.md'], part: 'skill' },
+  { files: () => ['skills/answer-me-with-html/SKILL.md', ...filesIn('skills/answer-me-with-html/references', /\.md$/)], part: 'skill' },
   { files: () => ['CONTRIBUTING.md', ...commandFiles()], part: 'whole' },
   {
     files: () => [...['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS_CSS)), ...['bench', 'docs/demo'].flatMap((d) => filesIn(d, JS))],
