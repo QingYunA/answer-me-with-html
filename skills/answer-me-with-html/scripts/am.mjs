@@ -6071,20 +6071,18 @@ function readEmbeddedImages(html) {
 import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
 import { basename as basename2, extname as extname2, isAbsolute as isAbsolute2, relative, resolve as resolve2, sep } from "node:path";
 var MAX_CODE_LINES = 200;
+var LONG_CODE_LINES = 40;
 var MAX_FILE_BYTES = 2 * 1024 * 1024;
 var KEYS = /* @__PURE__ */ new Set(["src", "lines", "hl", "title", "start"]);
 var CODE_EXAMPLE = "```ts src=server/routes.ts lines=18-30 hl=22\n```";
-var SECRET_FILE = /^(?:\.env(?!\.(?:example|sample|template)$)(?:\..+)?|\.npmrc|\.netrc|\.pgpass|\.git-credentials|\.\w*_history|id_(?:rsa|dsa|ecdsa|ed25519)|credentials(?:\.\w+)?|.+\.(?:pem|key|p12|pfx|jks|keystore))$/i;
-var SECRET_DIR = /* @__PURE__ */ new Set([".ssh", ".aws", ".gnupg", ".kube", ".docker"]);
-var SECRET_TEXT = new RegExp([
-  "-----BEGIN [A-Z ]*PRIVATE KEY-----",
-  "\\bAKIA[0-9A-Z]{16}\\b",
-  "\\bgh[pousr]_[A-Za-z0-9]{36,}",
-  "\\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}",
-  "\\bxox[abprs]-[A-Za-z0-9-]{10,}",
-  "\\bAIza[0-9A-Za-z_-]{35}",
-  `(?:api[_-]?key|secret|token|password)["']?\\s*[:=]\\s*["'][A-Za-z0-9_\\-+/=]{20,}["']`
+var SECRET_FILE = new RegExp([
+  "^\\.env(?!\\.(?:example|sample|template)$)(?:\\..*)?$",
+  "^(?:\\.netrc|\\.npmrc|\\.yarnrc(?:\\.yml)?|\\.pypirc|\\.pgpass|\\.my\\.cnf|\\.git-credentials|\\.htpasswd)$",
+  "^(?:id_(?:rsa|dsa|ecdsa|ed25519).*|credentials.*|secrets?(?:\\..*)?|.*_history|.*\\.local\\.json)$",
+  "\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$"
 ].join("|"), "i");
+var SECRET_DIR = /* @__PURE__ */ new Set([".git", ".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"]);
+var SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 var CodeError = class extends Error {
   constructor(message, line = 0) {
     super(message);
@@ -6139,6 +6137,7 @@ function readSlice(ref, range, baseDir) {
   if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
   const buf = readFileSync3(path);
   if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
+  if (SECRET_TEXT.test(buf.toString("utf8"))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
   const all = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
   const from = range?.from ?? 1;
   const to = range?.to ?? all.length;
@@ -6190,7 +6189,8 @@ function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* 
   const button = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? "Copied \u2713")}">${esc(ui.copyCode ?? "Copy")}</button>` : "";
   const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && where ? ` title="${esc(where)}"` : ""}>${esc(title)}</span>${shownLang ? `<span class="am-code-lang">${esc(shownLang)}</span>` : ""}${button}</figcaption>`;
   const html = `<figure class="am-codeblock"${source}>${head}<pre class="am-code${numbered ? " am-code--num" : ""}"><code${shownLang ? ` data-lang="${esc(shownLang)}"` : ""}>${lines}</code></pre></figure>`;
-  return { html, file: where || null };
+  const warning = body.length > LONG_CODE_LINES ? `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` : null;
+  return { html, file: where || null, warning };
 }
 
 // src/render.js
@@ -6221,7 +6221,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
-  const stats = { panels: doc2.panels.length, components: {}, code: [] };
+  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const introHtml = renderBlocks(doc2.intro, ctx);
@@ -6265,8 +6265,9 @@ function renderFence(block2, ctx) {
 }
 function codeBlock(block2, ctx) {
   try {
-    const { html, file } = renderCode(block2, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
+    const { html, file, warning } = renderCode(block2, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
     if (file && ctx.stats.code) ctx.stats.code.push(file);
+    if (warning && ctx.stats.codeWarnings) ctx.stats.codeWarnings.push({ line: block2.line, message: warning });
     return html;
   } catch (err) {
     if (!(err instanceof CodeError)) throw err;
@@ -7436,8 +7437,8 @@ export const LIMIT = 50
   The path is read from the current folder, and only files inside it are quoted. lines=18-30 (or lines=18) picks the lines; without it the whole file is quoted.
 - The header shows path:lines, or title= when you set it. Write "sketch" in the title of code that does not exist yet.
 - hl=22 or hl=20-22,25 highlights lines by their shown number. start=38 numbers a typed block from 38.
-- At most ${MAX_CODE_LINES} lines in a block; 10 to 30 lines make the point best.
-- Files that hold keys by convention (.env, *.pem, id_rsa, ~/.ssh \u2026) and lines that look like a key or a token are refused.
+- 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
+- Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ \u2026) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.`;
 var RAW_HELP = `LANG \u2014 embed as-is (escape hatch)
 
@@ -7781,6 +7782,11 @@ function emit(result, file, { print }, note = "") {
   print(`\u2713 ${file}`);
   print(`  ${summaryLine(result)}${note}`);
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
+  const long = result.stats.codeWarnings ?? [];
+  if (long.length) {
+    print(`  code ${count(long.length, "warning")} (trim the block and run again, or keep it if every line matters):`);
+    long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
+  }
   printWarnings(result.warnings, print, result.meta.style);
 }
 function summaryLine(result) {

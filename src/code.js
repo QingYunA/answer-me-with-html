@@ -9,25 +9,25 @@ import { esc } from './svg/text.js';
 import { unescapeHtml } from './page.js';
 
 export const MAX_CODE_LINES = 200;
+// Longer than this, readers skim past the block; the render warns but still writes the page.
+export const LONG_CODE_LINES = 40;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const KEYS = new Set(['src', 'lines', 'hl', 'title', 'start']);
 
 export const CODE_EXAMPLE = '```ts src=server/routes.ts lines=18-30 hl=22\n```';
 
-// Files that hold keys or passwords by convention. Example and template env files are fine.
-const SECRET_FILE = /^(?:\.env(?!\.(?:example|sample|template)$)(?:\..+)?|\.npmrc|\.netrc|\.pgpass|\.git-credentials|\.\w*_history|id_(?:rsa|dsa|ecdsa|ed25519)|credentials(?:\.\w+)?|.+\.(?:pem|key|p12|pfx|jks|keystore))$/i;
-// Folders that hold keys and logins; nothing inside them is quoted.
-const SECRET_DIR = new Set(['.ssh', '.aws', '.gnupg', '.kube', '.docker']);
-// Text that looks like a private key or an API token.
-const SECRET_TEXT = new RegExp([
-  '-----BEGIN [A-Z ]*PRIVATE KEY-----',
-  '\\bAKIA[0-9A-Z]{16}\\b',
-  '\\bgh[pousr]_[A-Za-z0-9]{36,}',
-  '\\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}',
-  '\\bxox[abprs]-[A-Za-z0-9-]{10,}',
-  '\\bAIza[0-9A-Za-z_-]{35}',
-  '(?:api[_-]?key|secret|token|password)["\']?\\s*[:=]\\s*["\'][A-Za-z0-9_\\-+/=]{20,}["\']',
+// The secret rules follow html-plan's pack.mjs (anthropics/claude-plugins-community), so both tools refuse the same files.
+// Files that hold keys, passwords or private data by convention. Example and template env files are fine.
+const SECRET_FILE = new RegExp([
+  '^\\.env(?!\\.(?:example|sample|template)$)(?:\\..*)?$',
+  '^(?:\\.netrc|\\.npmrc|\\.yarnrc(?:\\.yml)?|\\.pypirc|\\.pgpass|\\.my\\.cnf|\\.git-credentials|\\.htpasswd)$',
+  '^(?:id_(?:rsa|dsa|ecdsa|ed25519).*|credentials.*|secrets?(?:\\..*)?|.*_history|.*\\.local\\.json)$',
+  '\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$',
 ].join('|'), 'i');
+// Folders that hold keys, logins or a repository's internals; nothing inside them is quoted.
+const SECRET_DIR = new Set(['.git', '.ssh', '.aws', '.azure', '.gnupg', '.kube', '.docker', '.password-store']);
+// Text that looks like a private key, a token or a password. A file with one anywhere is not quoted at all.
+const SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 
 export class CodeError extends Error {
   constructor(message, line = 0) {
@@ -93,6 +93,7 @@ function readSlice(ref, range, baseDir) {
   if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
   const buf = readFileSync(path);
   if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
+  if (SECRET_TEXT.test(buf.toString('utf8'))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
   const all = buf.toString('utf8').replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
   const from = range?.from ?? 1;
   const to = range?.to ?? all.length;
@@ -112,7 +113,8 @@ export function readEmbeddedCode(html) {
 }
 
 // block: { lang, args, text }. code: { baseDir, known } where relative src paths are read and the fallback for moved files.
-// Returns { html, file } where file names the embedded slice ("path:18-30"), or is null.
+// Returns { html, file, warning } where file names the embedded slice ("path:18-30"), or is null, and warning is a
+// message for a long block (the page is still written).
 export function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = new Map(), ui = {}, copy = true } = {}) {
   const opts = parseCodeArgs(args);
   const range = opts.lines ? parseRange(opts.lines, 'lines') : null;
@@ -152,5 +154,6 @@ export function renderCode({ lang, args, text }, { baseDir = process.cwd(), know
   const button = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? 'Copied ✓')}">${esc(ui.copyCode ?? 'Copy')}</button>` : '';
   const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && where ? ` title="${esc(where)}"` : ''}>${esc(title)}</span>${shownLang ? `<span class="am-code-lang">${esc(shownLang)}</span>` : ''}${button}</figcaption>`;
   const html = `<figure class="am-codeblock"${source}>${head}<pre class="am-code${numbered ? ' am-code--num' : ''}"><code${shownLang ? ` data-lang="${esc(shownLang)}"` : ''}>${lines}</code></pre></figure>`;
-  return { html, file: where || null };
+  const warning = body.length > LONG_CODE_LINES ? `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` : null;
+  return { html, file: where || null, warning };
 }

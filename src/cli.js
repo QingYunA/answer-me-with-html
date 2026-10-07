@@ -21,7 +21,7 @@ import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS,
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
-import { readEmbeddedCode, MAX_CODE_LINES } from './code.js';
+import { readEmbeddedCode, MAX_CODE_LINES, LONG_CODE_LINES } from './code.js';
 import { languageIds } from './languages/registry.js';
 
 const MAX_LISTED_WARNINGS = 20;
@@ -104,8 +104,8 @@ export const LIMIT = 50
   The path is read from the current folder, and only files inside it are quoted. lines=18-30 (or lines=18) picks the lines; without it the whole file is quoted.
 - The header shows path:lines, or title= when you set it. Write "sketch" in the title of code that does not exist yet.
 - hl=22 or hl=20-22,25 highlights lines by their shown number. start=38 numbers a typed block from 38.
-- At most ${MAX_CODE_LINES} lines in a block; 10 to 30 lines make the point best.
-- Files that hold keys by convention (.env, *.pem, id_rsa, ~/.ssh …) and lines that look like a key or a token are refused.
+- 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
+- Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ …) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.`;
 
 const RAW_HELP = `LANG — embed as-is (escape hatch)
@@ -468,6 +468,11 @@ function emit(result, file, { print }, note = '') {
   print(`  ${summaryLine(result)}${note}`);
   // The code the page now holds, so the user can check it before sharing the page.
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(', ')}`);
+  const long = result.stats.codeWarnings ?? [];
+  if (long.length) {
+    print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
+    long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
+  }
   printWarnings(result.warnings, print, result.meta.style);
 }
 

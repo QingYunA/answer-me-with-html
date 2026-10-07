@@ -88,6 +88,7 @@ AM_EOF
 4. Read the output:
    - `✓ <path>`: success. Whether the browser opens automatically depends on the user's settings (`am config`); `--no-open` affects only this run.
    - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again.
+   - `code n warnings`: a code block is longer than 40 lines. Cut it to the lines that make the point and render again, or keep it if every line matters.
    - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, keep the page and say so.
    - `! Cleanup hint: …` or `! Update hint: …`: pass it on to the user in one sentence at the end of the reply, and ask whether to clean up / update. **Do not run am clean or the update command yourself**; wait until the user agrees. The CLI throttles these: the cleanup hint appears at most once every 7 days, the update hint at most once every 3 days.
 5. Reply in the terminal with only 2–3 lines: one core conclusion + the page link. Do not paste the draft or the HTML back into the terminal. Write this reply after the render, as the last step of the turn: render the page first, then reply. No tool call comes after the reply.
@@ -149,7 +150,7 @@ Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.
 - One panel, one question. With more than 8 panels, split the page or cut panels.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
-- Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–30 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.
+- Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–40 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.
 - Use an image only for what a diagram cannot show, such as a real UI. Use an existing file by its absolute path (PNG, JPG, GIF, WebP, AVIF or SVG, up to 5 MB). The alt text is the caption, so write what the picture shows. Never generate or invent an image. See `am help image`.
 - Do not invent data. Without real numbers, do not use limits; mark illustrative data as "illustrative" in the description.
 

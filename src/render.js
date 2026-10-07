@@ -51,7 +51,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {}, code: [] };
+  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const introHtml = renderBlocks(doc.intro, ctx);
@@ -103,8 +103,9 @@ function renderFence(block, ctx) {
 // A fence that is not a component is code. ctx.code is absent in a video, where the block has no copy button.
 function codeBlock(block, ctx) {
   try {
-    const { html, file } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
+    const { html, file, warning } = renderCode(block, { ...ctx.code, ui: ctx.ui, copy: Boolean(ctx.code) });
     if (file && ctx.stats.code) ctx.stats.code.push(file);
+    if (warning && ctx.stats.codeWarnings) ctx.stats.codeWarnings.push({ line: block.line, message: warning });
     return html;
   } catch (err) {
     if (!(err instanceof CodeError)) throw err;

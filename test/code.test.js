@@ -11,7 +11,7 @@ import { readPage } from '../src/page.js';
 import { main } from '../src/cli.js';
 
 let dir;
-const LINES = Array.from({ length: 40 }, (_, i) => `const line${i + 1} = ${i + 1};`);
+const LINES = Array.from({ length: 41 }, (_, i) => `const line${i + 1} = ${i + 1};`);
 before(() => {
   dir = mkdtempSync(join(tmpdir(), 'am-code-'));
   mkdirSync(join(dir, 'src'));
@@ -21,6 +21,10 @@ before(() => {
   mkdirSync(join(dir, '.ssh'));
   writeFileSync(join(dir, '.ssh', 'config'), 'Host x\n');
   writeFileSync(join(dir, '.git-credentials'), 'https://x\n');
+  mkdirSync(join(dir, '.git'));
+  writeFileSync(join(dir, '.git', 'config'), '[core]\n');
+  writeFileSync(join(dir, 'secrets.json'), '{}\n');
+  writeFileSync(join(dir, 'late-leak.ts'), `export const a = 1;\nexport const b = 2;\n${'// filler\n'.repeat(30)}const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.x';\n`);
   writeFileSync(join(dir, 'leak.js'), "const key = 'AKIAABCDEFGHIJKLMNOP';\n");
   writeFileSync(join(dir, 'blob.bin'), Buffer.from([1, 0, 2]));
   writeFileSync(join(dir, 'big.txt'), Array.from({ length: MAX_CODE_LINES + 1 }, () => 'x').join('\n'));
@@ -91,7 +95,10 @@ test('code: errors name the line of the fence', () => {
     ['```ts src=/etc/hosts', /is outside the current folder/],
     ['```txt src=.ssh/config', /holds keys or passwords by convention/],
     ['```txt src=.git-credentials', /holds keys or passwords by convention/],
-    ['```ts src=src/app.ts lines=39-45', /has 40 lines; lines=39-45 goes past the end/],
+    ['```ini src=.git/config', /holds keys or passwords by convention/],
+    ['```json src=secrets.json', /holds keys or passwords by convention/],
+    ['```ts src=late-leak.ts lines=1-2', /somewhere in the file; no part of it is embedded/],
+    ['```ts src=src/app.ts lines=39-45', /has 41 lines; lines=39-45 goes past the end/],
     ['```ts lines=1-2', /lines= needs src=/],
     ['```ts src=src/app.ts lines=1-3 hl=9', /line 9 is not in the block \(lines 1-3\)/],
     ['```ts src=src/app.ts lines=b-a', /is not a line range/],
@@ -191,4 +198,19 @@ test('cli patch: a page whose draft quotes a file outside the folder keeps its o
   assert.match(err.message, /outside the current folder/);
   const kept = renderDoc(draft(`\`\`\`ts src=${join(outside, 'private.ts')}`), {}, {}, { codeDir: dir, knownCode: readEmbeddedCode(known.html) });
   assert.match(kept.html, /secretPlan/);
+});
+
+test('code: a block longer than 40 lines renders with a warning; more than 200 lines is still an error', () => {
+  const { stats } = render(draft('```ts src=src/app.ts lines=1-40'));
+  assert.deepEqual(stats.codeWarnings, []);
+  const long = render(draft('```ts src=src/app.ts'));
+  assert.equal(long.stats.codeWarnings.length, 1);
+  assert.equal(long.stats.codeWarnings[0].line, 5);
+  assert.match(long.stats.codeWarnings[0].message, /the block has 41 lines; readers skim past long code/);
+});
+
+test('cli render: a long code block is listed as a code warning after the summary', async () => {
+  const r = await run(['render', '-', '-o', 'out/long.html'], draft('```ts src=src/app.ts'));
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /code 1 warning \(trim the block and run again, or keep it if every line matters\):\n  L5 \[code-length\] the block has 41 lines/);
 });
