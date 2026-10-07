@@ -393,6 +393,10 @@ test('delta css: Before hides added items and badges, After hides removed items 
   assert.match(css, /\.am-view-before \[data-delta="added"\], \.am-view-after \[data-delta="removed"\] \{ visibility: hidden; \}/);
   assert.match(css, /\.am-view-before \.am-delta-badge, \.am-view-after \.am-delta-badge \{ visibility: hidden; \}/);
   assert.doesNotMatch(css, /display: none[^}]*\}\s*\n?[^{}]*data-delta="/);
+  const rule = rules(css).find((r) => /\.am-tree-label > \.am-delta-badge/.test(r.selector) && /display: none/.test(r.body));
+  assert.ok(rule, 'a list label badge takes no space in Before and After');
+  assert.match(rule.selector, /\.am-view-before[^,]*,\s*\.am-view-after/);
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\.am-tree-box > \.am-delta-badge[^{]*\{[^}]*display: none/);
 });
 
 // ── connector lines in a view that hides siblings ──

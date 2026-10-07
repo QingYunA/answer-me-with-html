@@ -3,6 +3,8 @@
    The colors are the theme's --ok, --err and --warn, so every theme and mode works. A view hides items with visibility, so nothing moves. */
 .am-view-before [data-delta="added"], .am-view-after [data-delta="removed"] { visibility: hidden; }
 .am-view-before .am-delta-badge, .am-view-after .am-delta-badge { visibility: hidden; }
+/* A list label's badge is inline and would indent the label like a nesting level, so there it takes no space; the other badges are positioned and move nothing. */
+.am-view-before .am-tree-label > .am-delta-badge, .am-view-after .am-tree-label > .am-delta-badge { display: none; }
 
 .am-delta-badge--added { --badge: var(--ok, #1f9d4d); }
 .am-delta-badge--removed { --badge: var(--err, #c62828); }
