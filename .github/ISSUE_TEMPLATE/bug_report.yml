@@ -9,6 +9,16 @@ body:
 
         The draft is the best reproduction. Every rendered page carries its source: use the **Copy source** (复制源稿) button on the page, then cut it down to the smallest draft that still shows the problem.
 
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you report
+      options:
+        - label: I searched [existing issues](https://github.com/QingYunA/answer-me-with-html/issues?q=is%3Aissue) and this one is new.
+          required: true
+        - label: I can reproduce it on the latest version (`npx skills update` or `claude plugin update answer-me-with-html@answer-me-with-html`).
+          required: true
+
   - type: textarea
     id: what
     attributes:
@@ -64,7 +74,7 @@ body:
     attributes:
       label: Version
       description: Output of `am --version`, or the version shown at the bottom of a generated page.
-      placeholder: 0.4.7
+      placeholder: e.g. 0.4.13
     validations:
       required: true
 

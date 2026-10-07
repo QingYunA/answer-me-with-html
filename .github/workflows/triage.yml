@@ -1,0 +1,20 @@
+name: Triage
+
+# Issue forms add a type label, but issues opened blank or through the API or `gh issue create`
+# get none. Mark those for triage so they show up in the needs-triage list.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    if: github.event.issue.labels[0] == null
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh issue edit "$NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-triage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}

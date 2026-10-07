@@ -3,3 +3,6 @@ contact_links:
   - name: Documentation
     url: https://github.com/QingYunA/answer-me-with-html#readme
     about: Install, settings, components and the draft format.
+  - name: Questions and ideas
+    url: https://github.com/QingYunA/answer-me-with-html/discussions
+    about: Ask how to do something, or talk through an idea before you file it.
