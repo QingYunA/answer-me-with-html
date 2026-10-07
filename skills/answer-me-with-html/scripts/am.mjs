@@ -470,6 +470,8 @@ var he_default = {
     for: "\u05E2\u05D1\u05D5\u05E8",
     ref: "\u05D4\u05E4\u05E0\u05D9\u05D4"
   },
+  // The word after a change count above one ("+4 נוספו"); the ui.delta words are the singular, for one item and for a node badge.
+  deltaCounts: { added: "\u05E0\u05D5\u05E1\u05E4\u05D5", removed: "\u05D4\u05D5\u05E1\u05E8\u05D5", changed: "\u05E9\u05D5\u05E0\u05D5" },
   // The render time under the page reads day.month.year, the Israeli way.
   dateOrder: "dmy",
   videoUi: { play: "\u05D4\u05E4\u05E2\u05DC\u05D4", pause: "\u05D4\u05E9\u05D4\u05D9\u05D4", chapters: "\u05E4\u05E8\u05E7\u05D9\u05DD" }
@@ -1043,7 +1045,7 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith("#")) continue;
-    const m = raw.match(/^([\w-]+)\s*:\s*(.*)$/);
+    const m = raw.match(/^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u);
     if (!m) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
     entries[m[1]] = { value: coerce(m[1], unquote(m[2])), line: i + 1 };
   }
@@ -3023,7 +3025,8 @@ function withDelta(html, states, { ui, video = false } = {}) {
   const used = STATES.map((s) => [s, states.filter((x2) => x2 === s).length]).filter(([, n]) => n > 0);
   if (!used.length) return html;
   const t = labelsOf(ui);
-  const counts = used.map(([s, n]) => `<span class="am-delta-count am-delta-count--${s}">${SIGN[s]}${n} ${esc(t[s])}</span>`).join(" ");
+  const word = (s, n) => n === 1 ? t[s] : t.counts?.[s] ?? t[s];
+  const counts = used.map(([s, n]) => `<span class="am-delta-count am-delta-count--${s}">${SIGN[s]}${n} ${esc(word(s, n))}</span>`).join(" ");
   const views = ["before", "changes", "after"].map((v) => `<button type="button" data-view="${v}" aria-pressed="${v === "changes"}">${esc(t[v])}</button>`).join("");
   const switcher = video ? "" : `<span class="am-delta-switch" role="group" aria-label="${esc(t.view)}" hidden>${views}</span>`;
   const open = html.indexOf(">");
@@ -3212,23 +3215,17 @@ function isLtrOnly(text) {
   const s = decode2(text);
   return !RTL_LETTER.test(s) && [...s].some((ch) => LETTER.test(ch));
 }
+var hasRtl = (text) => RTL_LETTER.test(decode2(text));
 var decode2 = (text) => String(text ?? "").replace(/&(amp|lt|gt|quot|#39);/g, (_2, e) => ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" })[e]).replace(/&[#\w]+;/g, " ");
 var NEUTRAL = /[\p{P}\p{S}]/u;
 var WJ = String.fromCharCode(8288);
 var PREFIX = new RegExp("((?:^|[\\s(])\\p{Script=Hebrew}{1,3}-)(?=[^\\s-])", "gu");
-var SIGNED = /(^|[\s(])([+\-−±]\d[\d.,]*%?)/g;
+var SIGNED = /(^|[\s(])([+\-−±~]\d[\d.,]*%?)/g;
 var LRI = String.fromCharCode(8294);
 var PDI = String.fromCharCode(8297);
-var TERM = /^(\s*)([^\s:<>&][^:<>]{0,40}?):(?=\s|$)/;
-var termOf = (text) => {
-  const m = String(text).match(TERM);
-  return m && isLtrOnly(m[2]) ? m : null;
-};
 function svgLine(line, dir) {
   if (dir !== "rtl") return line;
-  if (isLtrOnly(line)) return `${LRI}${line}${PDI}`;
-  const term = termOf(line);
-  return term ? `${term[1]}${LRI}${term[2]}:${PDI}${line.slice(term[0].length)}` : line;
+  return isLtrOnly(line) ? `${LRI}${line}${PDI}` : line;
 }
 var INLINE = /* @__PURE__ */ new Set(["a", "abbr", "b", "cite", "code", "del", "dfn", "em", "i", "ins", "kbd", "mark", "q", "s", "samp", "strong", "sub", "sup", "u", "var"]);
 var SKIP = /* @__PURE__ */ new Set(["svg", "pre", "script", "style", "textarea", "select", "option", "title"]);
@@ -3254,8 +3251,6 @@ function isolateLtrRuns(html) {
         else if (/^<\/code>/i.test(t)) code--;
         return t.startsWith("<") || code > 0 ? t : t.replace(SIGNED, '$1<bdi dir="ltr">$2</bdi>').replace(PREFIX, `$1${WJ}`);
       });
-      const term = first >= 0 && !fixed[first].startsWith("<") ? termOf(fixed[first]) : null;
-      if (term) fixed[first] = `${term[1]}<bdi dir="ltr">${term[2]}:</bdi>${fixed[first].slice(term[0].length)}`;
       out.push(...fixed);
     }
     run2 = [];
@@ -5724,7 +5719,7 @@ var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "c
 function headHtml(meta, introHtml, language = {}) {
   const extras = Object.entries(meta).filter(([k2, v]) => !RESERVED.has(k2) && v !== "");
   const names = language.metaKeys ?? {};
-  const value = (v) => language.dir === "rtl" ? `<bdi>${esc(v)}</bdi>` : esc(v);
+  const value = (v) => language.dir === "rtl" ? `<bdi${hasRtl(v) ? ' dir="rtl"' : ""}>${esc(v)}</bdi>` : esc(v);
   const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k2, v]) => `<span><b>${esc(names[k2.toLowerCase()] ?? k2)}</b>${value(v)}</span>`).join("")}</div>` : "";
   const sub = meta.subtitle ? `<p class="am-sub">${esc(meta.subtitle)}</p>` : "";
   const intro = introHtml ? `<div class="am-intro am-md">${introHtml}</div>` : "";
@@ -6162,7 +6157,7 @@ function resolveLanguage({ declared, previous, text = "" }) {
     dir: directionOf(locale),
     supported: Boolean(entry),
     labelKey: labels.id,
-    ui: labels.ui,
+    ui: labels.deltaCounts ? { ...labels.ui, delta: { ...labels.ui.delta, counts: labels.deltaCounts } } : labels.ui,
     videoUi: labels.videoUi,
     metaKeys: labels.metaKeys ?? {},
     dateOrder: labels.dateOrder ?? "ymd"

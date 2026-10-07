@@ -31,6 +31,8 @@ export default {
     status: 'סטטוס', owner: 'אחראי', team: 'צוות', project: 'פרויקט', audience: 'קהל יעד', reviewer: 'בודק', reviewers: 'בודקים',
     license: 'רישיון', licence: 'רישיון', model: 'מודל', repo: 'ריפו', branch: 'ענף', tags: 'תגיות', for: 'עבור', ref: 'הפניה',
   },
+  // The word after a change count above one ("+4 נוספו"); the ui.delta words are the singular, for one item and for a node badge.
+  deltaCounts: { added: 'נוספו', removed: 'הוסרו', changed: 'שונו' },
   // The render time under the page reads day.month.year, the Israeli way.
   dateOrder: 'dmy',
   videoUi: { play: 'הפעלה', pause: 'השהיה', chapters: 'פרקים' },

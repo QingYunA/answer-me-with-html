@@ -106,7 +106,7 @@ export function resolveLanguage({ declared, previous, text = '' }) {
     dir: directionOf(locale),
     supported: Boolean(entry),
     labelKey: labels.id,
-    ui: labels.ui,
+    ui: labels.deltaCounts ? { ...labels.ui, delta: { ...labels.ui.delta, counts: labels.deltaCounts } } : labels.ui,
     videoUi: labels.videoUi,
     metaKeys: labels.metaKeys ?? {},
     dateOrder: labels.dateOrder ?? 'ymd',
