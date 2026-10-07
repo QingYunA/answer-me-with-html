@@ -117,6 +117,65 @@ test('flow: lays out nodes whose names equal dagre reserved ids or internal grou
   assert.match(render('flow', 'g0 -> n0\ngroup g0: n0'), /am-cluster/);
 });
 
+// A group name never sits on an edge, an edge label or a node, in any direction.
+function labelClashes(svg, which = 0) {
+  const label = [...svg.matchAll(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)">([^<]*)<\/text>/g)][which];
+  const [x, y] = [Number(label[1]), Number(label[2])];
+  const box = [x, y - 11, x + measure(label[3], 11, { mono: true }), y + 3];
+  const inside = (p) => p[0] > box[0] && p[0] < box[2] && p[1] > box[1] && p[1] < box[3];
+  const clashes = [];
+  for (const [, d] of svg.matchAll(/class="am-edge[^"]*" d="([^"]+)"/g)) {
+    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    for (let k = 1; k < pts.length; k++) {
+      for (let t = 0; t <= 1; t += 0.02) {
+        const p = [pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * t, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * t];
+        if (inside(p)) clashes.push(`edge ${d}`);
+      }
+    }
+  }
+  const rects = [
+    ...svg.matchAll(/<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
+    ...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
+  ];
+  for (const m of rects) {
+    const [rx, ry, rw, rh] = m.slice(1).map(Number);
+    if (rx < box[2] && box[0] < rx + rw && ry < box[3] && box[1] < ry + rh) clashes.push(`box at ${rx},${ry}`);
+  }
+  return [...new Set(clashes)];
+}
+
+const CROWDED = {
+  TB: 'Source PDF -> pdf_to_text.py: text in reading order\npdf_to_text.py -> Index: build\nIndex -> Search\ngroup Preparation (one time): pdf_to_text.py, Index',
+  BT: 'Source file -> Convert: text in reading order\nConvert -> Index: build\nIndex -> Search\ngroup Preparation (one time only): Convert, Index',
+  LR: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+  RL: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+};
+
+for (const [rankdir, text] of Object.entries(CROWDED)) {
+  test(`flow: a group name stays clear of edges and nodes (${rankdir})`, () => {
+    const svg = render('flow', text, rankdir);
+    assert.deepEqual(labelClashes(svg), []);
+    // The name stays inside its box.
+    const [bx, , bw] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/).slice(1).map(Number);
+    const x = Number(svg.match(/<text class="am-cluster-label" x="([\d.]+)"/)[1]);
+    assert.ok(x >= bx && x <= bx + bw);
+  });
+}
+
+test('flow: two crowded groups side by side both find a clear place', () => {
+  const svg = render('flow', 'A -> B\nA -> C\nB -> D\nC -> D\ngroup Left side group label: B\ngroup Right side group label: C');
+  const labels = [...svg.matchAll(/<text class="am-cluster-label"[^>]*>/g)];
+  assert.equal(labels.length, 2);
+  for (const which of [0, 1]) assert.deepEqual(labelClashes(svg, which), []);
+});
+
+test('flow: a group name that is already clear stays in the top left corner', () => {
+  const svg = render('flow', 'A -> B\nB -> C\ngroup G: B, C');
+  const [bx, by] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)"/).slice(1).map(Number);
+  const [lx, ly] = svg.match(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)"/).slice(1).map(Number);
+  assert.deepEqual([Math.round(lx - bx), Math.round(ly - by)], [8, 14]);
+});
+
 // Wrapping by script (issue #85): a Korean label breaks at its spaces, and a Thai one inside the node budget, which is 150 for flow.
 const textLines = (svg) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
 
