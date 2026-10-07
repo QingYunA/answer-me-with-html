@@ -3104,40 +3104,6 @@ var xn = k.parseInline;
 var Rn = T.parse;
 var Tn = R.lex;
 
-// src/markdown.js
-var marked = new F({ gfm: true });
-var STATUS = {
-  ok: { cls: "ok", icon: "\u2713" },
-  no: { cls: "no", icon: "\u2717" },
-  warn: { cls: "warn", icon: "!" }
-};
-var STATUS_ALIAS = { "\u2713": "ok", "\u2714": "ok", "\u2717": "no", "\u2718": "no", "\u26A0": "warn" };
-function statusHtml(word, label = "") {
-  const kind = STATUS[STATUS_ALIAS[word] ?? word];
-  if (!kind) return null;
-  const text = label.trim();
-  return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text}</span>`;
-}
-var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
-var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
-function figure(img) {
-  const alt = img.match(/\salt="([^"]*)"/)?.[1];
-  return `<figure class="am-figure">${img}${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`;
-}
-function decorate(html) {
-  return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
-}
-var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
-function wrapSpacedImages(text) {
-  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
-}
-function md(text) {
-  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
-}
-function mdInline(text) {
-  return marked.parseInline(wrapSpacedImages(String(text ?? "")));
-}
-
 // src/svg/text.js
 var CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 var NARROW = /* @__PURE__ */ new Set([..."iljtfrI.,:;|!'`()[]{}"]);
@@ -3197,6 +3163,234 @@ function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
 }
 
+// src/raw-html.js
+var words = (list) => new Set(list.split(" "));
+var NEVER = words("title textarea style xmp iframe noembed noframes script plaintext link meta base object embed frame frameset template html head body noscript svg math");
+var PHRASING = words("a abbr b bdi bdo br cite code data del dfn em i img ins kbd mark q rp rt ruby s samp small span strong sub sup time u var wbr");
+var BLOCK = words("address area article aside audio blockquote button canvas caption col colgroup datalist dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr input label legend li main map menu meter nav ol optgroup option output p picture pre progress search section select slot source summary table tbody td tfoot th thead tr track ul video acronym big center font strike tt");
+var VOID = words("br wbr img");
+var REASON = {
+  never: (t) => `${t} is shown as text; raw markup belongs in an html fence`,
+  unknown: (t) => `${t} is not an HTML element, shown as text; put code in backticks`,
+  block: (t) => `${t} is a block element and cannot sit inside a sentence, shown as text; put it on its own line`,
+  unclosed: (t) => `${t} has no closing tag in the same text, shown as text; put code in backticks`,
+  stray: (t) => `${t} has no opening tag in the same text, shown as text`,
+  open: (t) => `${t} is never closed with >, shown as text`,
+  comment: (t) => `${t} is never closed with -->, shown as text`,
+  bogus: (t) => `${t} is not a tag a page can hold, shown as text; put code in backticks`
+};
+function kind(name, inline2) {
+  if (NEVER.has(name)) return "never";
+  if (!PHRASING.has(name) && !BLOCK.has(name)) return "unknown";
+  return inline2 && !PHRASING.has(name) ? "block" : null;
+}
+var shown = (tag) => tag.label ?? `<${tag.close ? "/" : ""}${tag.name}>`;
+function hide(tag, reason, note2) {
+  note2(tag.text, REASON[reason](shown(tag)));
+  return esc(tag.text);
+}
+var SCAN = /<!--[\s\S]*?-->|<(!--|[?!]\[?\w*)|<(\/?)([A-Za-z][^\s/>]*)/g;
+var OPENING = /^ {0,3}<(\/?)([A-Za-z][^\s/>]*)/;
+var CHUNK = /"[^"]*"|'[^']*'|[^"'>]+/y;
+function tagEnd(text, from) {
+  let i = from;
+  while (i < text.length && text[i] !== ">") {
+    CHUNK.lastIndex = i;
+    if (!CHUNK.exec(text)) return -1;
+    i = CHUNK.lastIndex;
+  }
+  return i < text.length ? i + 1 : -1;
+}
+function readMatch(text, m) {
+  if (m[1]) {
+    const end2 = m[1] === "!--" ? -1 : text.indexOf(">", m.index);
+    return { reason: m[1] === "!--" ? "comment" : "bogus", tag: { text: end2 === -1 ? m[0] : text.slice(m.index, end2 + 1), label: m[0] } };
+  }
+  const end = tagEnd(text, m.index + m[0].length);
+  return { reason: end === -1 ? "open" : null, tag: { text: end === -1 ? m[0] : text.slice(m.index, end), close: m[2] === "/", name: m[3].toLowerCase() } };
+}
+function mapTags(text, decide, note2) {
+  let out = "";
+  let last = 0;
+  for (const m of text.matchAll(SCAN)) {
+    if (m.index < last || !m[1] && !m[3]) continue;
+    const { reason, tag } = readMatch(text, m);
+    out += text.slice(last, m.index) + (reason ? hide(tag, reason, note2) : decide(tag));
+    last = m.index + tag.text.length;
+  }
+  return out + text.slice(last);
+}
+var readTag = (text) => {
+  const m = /^<(\/?)([A-Za-z][^\s/>]*)/.exec(text);
+  if (m) return { text, close: m[1] === "/", name: m[2].toLowerCase() };
+  const bogus = /^<[?!](?!--)\[?\w*/.exec(text);
+  return bogus && { text, label: bogus[0] };
+};
+var ATTR = /\s*([^\s"'<>/=]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s>]*))?/g;
+var URL_ATTRS = words("href src action xlink:href poster cite background");
+var ENTITY = /&#x([0-9a-f]+);?|&#(\d+);?|&(tab|newline|colon);?/gi;
+var NAMED = { tab: "	", newline: "\n", colon: ":" };
+function decode(text) {
+  return text.replace(ENTITY, (_2, hex, dec, name) => {
+    if (name) return NAMED[name.toLowerCase()];
+    const code = hex ? parseInt(hex, 16) : Number(dec);
+    return code > 1114111 ? "" : String.fromCodePoint(code);
+  });
+}
+function unsafeUrl(element, attr, value) {
+  const url = decode(value.replace(/^["']|["']$/g, "")).replace(/[\x00-\x20\x7f]/g, "").toLowerCase();
+  if (/^(javascript|vbscript):/.test(url)) return true;
+  return url.startsWith("data:") && !(element === "img" && attr === "src" && url.startsWith("data:image/"));
+}
+function unsafe(element, attr, value) {
+  if (/^on|^(srcdoc|formaction)$/.test(attr)) return true;
+  return URL_ATTRS.has(attr) && unsafeUrl(element, attr, value);
+}
+function cleanTag(tag, note2) {
+  if (tag.close) return tag.text;
+  const head = 1 + tag.name.length;
+  const removed = [];
+  const attrs = tag.text.slice(head).replace(ATTR, (attr, name, value = "") => {
+    if (!unsafe(tag.name, name.toLowerCase(), value)) return attr;
+    removed.push(name);
+    return "";
+  });
+  if (removed.length) note2(tag.text, `removed ${removed.join(", ")} from <${tag.name}>${removed.some((n) => URL_ATTRS.has(n.toLowerCase())) ? " (unsafe URL)" : ""}`);
+  return tag.text.slice(0, head) + attrs;
+}
+function htmlTokens(tokens, out = []) {
+  for (const t of tokens ?? []) {
+    if (t.type === "html") out.push(t);
+    else htmlTokens(t.tokens, out);
+  }
+  return out;
+}
+function unpaired(found) {
+  const hidden = /* @__PURE__ */ new Map();
+  const open = [];
+  for (const item of found) {
+    const { tag } = item;
+    const reason = tag.label ? "bogus" : kind(tag.name, true);
+    if (reason) hidden.set(item, reason);
+    else if (VOID.has(tag.name)) continue;
+    else if (!tag.close) open.push(item);
+    else {
+      const i = open.findLastIndex((o) => o.tag.name === tag.name);
+      if (i === -1) hidden.set(item, "stray");
+      else open.splice(i).slice(1).forEach((o) => hidden.set(o, "unclosed"));
+    }
+  }
+  open.forEach((o) => hidden.set(o, "unclosed"));
+  return hidden;
+}
+function filterRun(tokens, note2) {
+  const found = htmlTokens(tokens).map((token) => ({ token, tag: readTag(token.text) })).filter((item) => item.tag);
+  const hidden = unpaired(found);
+  for (const item of found) {
+    const reason = hidden.get(item);
+    item.token.text = reason ? hide(item.tag, reason, note2) : cleanTag(item.tag, note2);
+  }
+}
+function filterInline(tokens, note2) {
+  filterRun(tokens, note2);
+  return tokens;
+}
+function relexReason(raw) {
+  const special = /^ {0,3}(<[?!](?!--)\[?\w*|<!--)/.exec(raw);
+  if (special) {
+    const comment = special[1] === "<!--";
+    return comment && raw.includes("-->") ? null : { reason: comment ? "comment" : "bogus", at: special[1], label: special[1] };
+  }
+  const m = OPENING.exec(raw);
+  if (!m) return null;
+  const tag = { close: m[1] === "/", name: m[2].toLowerCase() };
+  const reason = kind(tag.name, false) ?? (tag.name === "pre" && !tag.close && !/<\/pre>/i.test(raw) ? "unclosed" : null);
+  return reason && { reason, at: m[0].trim(), label: shown(tag) };
+}
+function relex(token, { reason, at: at3, label }, { lex, note: note2 }) {
+  note2(at3, REASON[reason](label));
+  return filterBlocks(lex(token.raw.replace("<", "&lt;")), { lex, note: note2 });
+}
+var filterHtmlBlock = (text, note2) => mapTags(text, (tag) => {
+  const reason = kind(tag.name, false);
+  return reason ? hide(tag, reason, note2) : cleanTag(tag, note2);
+}, note2);
+var tight = (block2) => block2.type === "paragraph" ? { ...block2, type: "text" } : block2;
+function filterBlocks(tokens, ctx) {
+  for (let k2 = 0; k2 < tokens.length; k2++) {
+    const t = tokens[k2];
+    const plan = t.type === "html" ? relexReason(t.raw) : null;
+    if (plan) {
+      const again = relex(t, plan, ctx);
+      tokens.splice(k2, 1, ...again);
+      k2 += again.length - 1;
+    } else if (t.type === "html") {
+      t.text = filterHtmlBlock(t.text, ctx.note);
+    } else if (t.type === "table") {
+      [...t.header, ...t.rows.flat()].forEach((cell) => filterRun(cell.tokens, ctx.note));
+    } else if (t.type === "list") {
+      t.items.forEach((item) => {
+        filterBlocks(item.tokens, ctx);
+        if (!t.loose) item.tokens = item.tokens.map(tight);
+      });
+    } else if (t.type === "blockquote") {
+      filterBlocks(t.tokens, ctx);
+    } else if (t.type === "paragraph" || t.type === "heading" || t.type === "text") {
+      filterRun(t.tokens, ctx.note);
+    }
+  }
+  return tokens;
+}
+
+// src/markdown.js
+var sink = null;
+var note = (at3, message) => sink?.push({ at: at3, message });
+function collectHtmlNotes(render) {
+  const outer = sink;
+  const notes = [];
+  sink = notes;
+  try {
+    return { result: render(), notes };
+  } finally {
+    sink = outer;
+  }
+}
+var marked = new F({ gfm: true });
+var inline = new F({ gfm: true });
+marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tokens, { lex: (source) => marked.lexer(source), note }) } });
+inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+var STATUS = {
+  ok: { cls: "ok", icon: "\u2713" },
+  no: { cls: "no", icon: "\u2717" },
+  warn: { cls: "warn", icon: "!" }
+};
+var STATUS_ALIAS = { "\u2713": "ok", "\u2714": "ok", "\u2717": "no", "\u2718": "no", "\u26A0": "warn" };
+function statusHtml(word, label = "") {
+  const kind2 = STATUS[STATUS_ALIAS[word] ?? word];
+  if (!kind2) return null;
+  const text = label.trim();
+  return `<span class="am-status am-status--${kind2.cls}"><span class="am-status-icon" aria-hidden="true">${kind2.icon}</span>${text}</span>`;
+}
+var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
+var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
+function figure(img) {
+  const alt = img.match(/\salt="([^"]*)"/)?.[1];
+  return `<figure class="am-figure">${img}${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`;
+}
+function decorate(html) {
+  return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
+}
+var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
+}
+function md(text) {
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
+}
+function mdInline(text) {
+  return inline.parseInline(wrapSpacedImages(String(text ?? "")));
+}
+
 // src/components/error.js
 var ComponentError = class extends Error {
   constructor(message, line = 0) {
@@ -3225,7 +3419,7 @@ Body (Markdown)
   example: "```callout warn Caution\nClose the valve before you remove the pump.\n```",
   render(text, { args }) {
     const [first = "", ...rest] = args.split(/\s+/).filter(Boolean);
-    const kind = KINDS.has(first) ? first : "info";
+    const kind2 = KINDS.has(first) ? first : "info";
     const title = (KINDS.has(first) ? rest.join(" ") : args).trim();
     if (!title && !text.trim()) throw new ComponentError("callout needs a title or a body", 1);
     const firstLine = contentLines(text)[0];
@@ -3237,7 +3431,7 @@ Body (Markdown)
     }
     const head = title ? `<div class="am-callout-title">${esc(title)}</div>` : "";
     const body = text.trim() ? `<div class="am-callout-body am-md">${md(text)}</div>` : "";
-    return `<div class="am-callout am-callout--${kind}" role="note">${head}${body}</div>`;
+    return `<div class="am-callout am-callout--${kind2}" role="note">${head}${body}</div>`;
   }
 };
 
@@ -3346,10 +3540,10 @@ function sentenceHtml(sentence, line) {
     const before = sentence.slice(last, m.index);
     out += esc(before);
     plain += before;
-    const [, seg, bang, note] = m;
+    const [, seg, bang, note2] = m;
     const x2 = measure(plain, TEXT_SIZE, { mono: true });
-    const noteHtml = note.trim() ? `<span class="am-seg-n" style="--row: ${placeNote(rows, x2, x2 + measure(note, NOTE_SIZE) + NOTE_GAP)}">${esc(note.trim())}</span>` : "";
-    out += `<span class="am-seg${bang ? " am-seg--err" : ""}"><span class="am-seg-t">${esc(seg)}</span>${noteHtml}</span>`;
+    const noteHtml2 = note2.trim() ? `<span class="am-seg-n" style="--row: ${placeNote(rows, x2, x2 + measure(note2, NOTE_SIZE) + NOTE_GAP)}">${esc(note2.trim())}</span>` : "";
+    out += `<span class="am-seg${bang ? " am-seg--err" : ""}"><span class="am-seg-t">${esc(seg)}</span>${noteHtml2}</span>`;
     plain += seg;
     last = m.index + m[0].length;
   }
@@ -3471,18 +3665,18 @@ label | limit | unit         \u2190 limit only: the bar fills to the limit
   }
 };
 function parseRow(t, line) {
-  const [label, spec = "", unit = "", note = ""] = fields(t);
+  const [label, spec = "", unit = "", note2 = ""] = fields(t);
   const [a, b] = spec.split("/").map((s) => s.trim());
   const nums = (b === void 0 ? [a] : [a, b]).map((s) => s?.match(NUM)?.[1]);
   if (!spec || nums.some((n) => n === void 0)) {
     throw new ComponentError(`limits line must be label | value / limit | unit: "${t}"`, line);
   }
   const [value, limit] = b === void 0 ? [null, Number(nums[0])] : nums.map(Number);
-  return { label, value, limit, unit, note };
+  return { label, value, limit, unit, note: note2 };
 }
-function rowHtml({ label, value, limit, unit, note }) {
+function rowHtml({ label, value, limit, unit, note: note2 }) {
   const { max, step } = niceScale(Math.max(limit, value ?? 0));
-  const shown = value ?? limit;
+  const shown2 = value ?? limit;
   const over2 = value !== null && value > limit;
   const valText = `${value !== null ? `${value} / ` : ""}max ${limit}${unit ? ` ${unit}` : ""}`;
   const ticks = [];
@@ -3490,8 +3684,8 @@ function rowHtml({ label, value, limit, unit, note }) {
     for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="left: ${pct(round(v), max)}">${round(v)}</span>`);
   }
   return `<div class="am-lim${over2 ? " is-over" : ""}">
-<div class="am-lim-head"><span>${esc(label)}${note ? `<span class="am-lim-note">${esc(note)}</span>` : ""}</span><span class="am-lim-val">${esc(valText)}</span></div>
-<div class="am-lim-track"><div class="am-lim-fill" style="width: ${pct(shown, max)}"></div><div class="am-lim-mark" style="left: ${pct(limit, max)}"></div></div>
+<div class="am-lim-head"><span>${esc(label)}${note2 ? `<span class="am-lim-note">${esc(note2)}</span>` : ""}</span><span class="am-lim-val">${esc(valText)}</span></div>
+<div class="am-lim-track"><div class="am-lim-fill" style="width: ${pct(shown2, max)}"></div><div class="am-lim-mark" style="left: ${pct(limit, max)}"></div></div>
 <div class="am-lim-ticks" aria-hidden="true">${ticks.join("")}</div>
 </div>`;
 }
@@ -3521,9 +3715,9 @@ function textLines(lines, cx, cy, lineHeight, attrs = "") {
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(line)}</text>`).join("");
 }
 var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", colon: ": ", sep: ", " };
-function diagramLabel(ui, kind, names) {
+function diagramLabel(ui, kind2, names) {
   const u = { ...EN_LABELS, ...ui };
-  return `${u[kind]}${u.colon}${names.join(u.sep)}`;
+  return `${u[kind2]}${u.colon}${names.join(u.sep)}`;
 }
 function svgOpen(width, height, label) {
   const w = Math.ceil(width);
@@ -5799,9 +5993,9 @@ The question, one sentence
     const options = rest.map(({ text: t, line }) => {
       const m = t.match(OPTION);
       if (!m) throw new ComponentError(`ask: "${t}" is not an option; start it with * (suggested) or -`, line);
-      const [label, note = ""] = fields(m[2]);
+      const [label, note2 = ""] = fields(m[2]);
       if (!label) throw new ComponentError("ask: an option needs a label before |", line);
-      return { label, note, suggested: m[1] === "*", line };
+      return { label, note: note2, suggested: m[1] === "*", line };
     });
     if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, first.line);
     const suggested = options.filter((o) => o.suggested).length;
@@ -6054,8 +6248,8 @@ function splitSentences(text) {
 }
 function sentenceLength(sentence) {
   const cjk = [...sentence].filter(isCJK).filter((c) => !/[，。！？；：、（）「」『』“”‘’《》]/.test(c)).length;
-  const words = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return cjk >= 4 || cjk > words ? { lang: "zh", count: cjk + words } : { lang: "en", count: words };
+  const words2 = sentence.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
+  return cjk >= 4 || cjk > words2 ? { lang: "zh", count: cjk + words2 } : { lang: "en", count: words2 };
 }
 var NO_SPACES = new RegExp("\\p{Script=Thai}", "u");
 var CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
@@ -6064,8 +6258,8 @@ function neutralLength(sentence) {
   const han = sentence.match(CJK_TEXT)?.length ?? 0;
   const rest = sentence.replace(CJK_TEXT, " ");
   thaiWords ??= new Intl.Segmenter("th", { granularity: "word" });
-  const words = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
-  return han >= 4 || han > words ? { lang: "zh", count: han + words } : { lang: "en", count: words };
+  const words2 = NO_SPACES.test(rest) ? [...thaiWords.segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  return han >= 4 || han > words2 ? { lang: "zh", count: han + words2 } : { lang: "en", count: words2 };
 }
 var RULE_LANGUAGES = /* @__PURE__ */ new Set(["zh", "en", "ja"]);
 function ruleFamily(language) {
@@ -6130,7 +6324,7 @@ function lintMarkdown(text, startLine, out, family) {
   });
   flush();
 }
-function checkUnit(text, line, kind, out, family) {
+function checkUnit(text, line, kind2, out, family) {
   const sentences = splitSentences(text);
   const zhFamily = family === "auto" || family === "zh";
   const ja = family === "ja" || zhFamily && isJapanese(text);
@@ -6138,11 +6332,11 @@ function checkUnit(text, line, kind, out, family) {
   const englishRules = family !== "neutral";
   for (const s of sentences) {
     const { lang, count: count2 } = family === "neutral" ? neutralLength(s) : sentenceLength(s);
-    const limit = LIMITS[lang][kind];
+    const limit = LIMITS[lang][kind2];
     if (count2 > limit) {
       const unit = lang === "zh" ? "characters" : "words";
       const preview = s.length > 24 ? `${s.slice(0, 24)}\u2026` : s;
-      out.push({ line, rule: "sentence-length", message: `${kind === "procedural" ? "step" : "sentence"} has ${count2} ${unit} (max ${limit}): "${preview}"` });
+      out.push({ line, rule: "sentence-length", message: `${kind2 === "procedural" ? "step" : "sentence"} has ${count2} ${unit} (max ${limit}): "${preview}"` });
     }
     if (englishRules && lang === "en" && PASSIVE.test(s)) {
       out.push({ line, rule: "passive", message: `possible passive voice: "${s.match(PASSIVE)[0]}"`, suggestion: "use active voice" });
@@ -6518,7 +6712,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
-  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [] };
+  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc2.intro.find((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
@@ -6533,7 +6727,24 @@ function hasVisuals({ intro, panels }) {
   return [...intro, ...panels.flatMap((p) => p.blocks)].some((b) => b.type === "fence" && (COMPONENTS.has(b.lang) || RAW_LANGS.has(b.lang)));
 }
 function renderBlocks(blocks, ctx) {
-  return blocks.map((b) => embedImages(b, b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join("\n");
+  return blocks.map((b) => {
+    const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx));
+    noteHtml(b, notes, ctx);
+    return embedImages(b, result, ctx);
+  }).join("\n");
+}
+function noteHtml(block2, notes, ctx) {
+  if (!notes.length || !ctx.stats.htmlWarnings) return;
+  const lines = block2.text.split("\n");
+  const first = block2.type === "md" ? block2.line : block2.line + 1;
+  const used = /* @__PURE__ */ new Map();
+  for (const { at: at3, message } of notes) {
+    const tag = at3.split("\n")[0];
+    const places = lines.flatMap((l3, i) => Array(l3.split(tag).length - 1).fill(i));
+    const n = used.get(tag) ?? 0;
+    used.set(tag, n + 1);
+    ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message });
+  }
 }
 var MARKDOWN_FENCES = /* @__PURE__ */ new Set(["callout", "kv", "tree", "timeline"]);
 function embedImages(block2, html, ctx) {
@@ -6655,8 +6866,8 @@ function estimateSeconds(text) {
     if (isCJK(ch)) cjk++;
     latin += isCJK(ch) ? " " : ch;
   }
-  const words = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return Math.max(1.6, cjk / 4.2 + words / 2.6 + 0.3);
+  const words2 = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
+  return Math.max(1.6, cjk / 4.2 + words2 / 2.6 + 0.3);
 }
 var TIMING = Object.freeze({
   title: 2.4,
@@ -7028,7 +7239,7 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const timeline = buildTimeline(video, durations);
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav2 = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
-  const stats = { panels: video.scenes.length, components: {} };
+  const stats = { panels: video.scenes.length, components: {}, htmlWarnings: [] };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
   const html = shell2({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
   return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
@@ -7714,6 +7925,7 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- A placeholder such as <host> is shown as text. Inside a sentence only text-level tags stay (b, i, kbd, sup, a, span, br, img ...), and tags that break the page (script, style, iframe ...) are shown as text too. Put raw markup in an html or svg fence and code in backticks.
 - Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
@@ -8079,18 +8291,26 @@ function outputPath(dir, title, opts, { env, io }) {
   if (opts.out) return resolve3(io.cwd ?? process.cwd(), opts.out);
   return join7(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
-function emit(result, file, { print }, note = "") {
+function emit(result, file, { print }, note2 = "") {
   mkdirSync4(dirname2(file), { recursive: true });
   writeFileSync5(file, result.html);
   print(`\u2713 ${file}`);
-  print(`  ${summaryLine(result)}${note}`);
+  print(`  ${summaryLine(result)}${note2}`);
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
   const long = result.stats.codeWarnings ?? [];
   if (long.length) {
     print(`  code ${count(long.length, "warning")} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
   }
+  printHtmlWarnings(result.stats.htmlWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
+}
+function printHtmlWarnings(notes = [], print) {
+  const lines = [...new Set(notes.toSorted((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
+  if (!lines.length) return;
+  print(`  html ${count(lines.length, "warning")} (the page differs from the draft here; fix the draft if that is not what you meant):`);
+  lines.slice(0, MAX_LISTED_WARNINGS).forEach((l3) => print(`  ${l3}`));
+  if (lines.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${lines.length - MAX_LISTED_WARNINGS} more`);
 }
 function summaryLine(result) {
   const { meta, stats } = result;
@@ -8222,8 +8442,8 @@ function cmdList({ print, fail, themes: themes2 }) {
   print("  doc     linear explainer: one-column reading, with contents when there are 3+ panels");
   print("  video   explainer video: render with am video, see am help video");
   print("\nThemes (theme):");
-  const note = (t) => t.user ? " (yours)" : t.scope.includes("page") ? "" : " (video only)";
-  for (const t of themes2.list("video")) print(`  ${t.name.padEnd(10)}${t.summary}${note(t)}`);
+  const note2 = (t) => t.user ? " (yours)" : t.scope.includes("page") ? "" : " (video only)";
+  for (const t of themes2.list("video")) print(`  ${t.name.padEnd(10)}${t.summary}${note2(t)}`);
   print("\nComponents (fence language):");
   for (const c of COMPONENTS.values()) print(`  ${c.name.padEnd(10)}${c.summary}`);
   print("  html/svg  embed as-is (escape hatch)");

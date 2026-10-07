@@ -76,6 +76,7 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- A placeholder such as <host> is shown as text. Inside a sentence only text-level tags stay (b, i, kbd, sup, a, span, br, img ...), and tags that break the page (script, style, iframe ...) are shown as text too. Put raw markup in an html or svg fence and code in backticks.
 - Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
@@ -473,7 +474,17 @@ function emit(result, file, { print }, note = '') {
     print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w) => print(`  L${w.line} [code-length] ${w.message}`));
   }
+  printHtmlWarnings(result.stats.htmlWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
+}
+
+// Raw HTML the render changed (a placeholder shown as text, a tag or attribute removed). Not STE warnings: they never fail style: strict.
+function printHtmlWarnings(notes = [], print) {
+  const lines = [...new Set(notes.toSorted((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
+  if (!lines.length) return;
+  print(`  html ${count(lines.length, 'warning')} (the page differs from the draft here; fix the draft if that is not what you meant):`);
+  lines.slice(0, MAX_LISTED_WARNINGS).forEach((l) => print(`  ${l}`));
+  if (lines.length > MAX_LISTED_WARNINGS) print(`  … ${lines.length - MAX_LISTED_WARNINGS} more`);
 }
 
 function summaryLine(result) {

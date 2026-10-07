@@ -1,8 +1,30 @@
-// Markdown → HTML (GFM). Three extras: tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure.
+// Markdown → HTML (GFM). Four extras: tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure;
+// raw HTML is filtered (see raw-html.js): a placeholder such as <host> shows as text, tags that break the page are escaped, event handlers and javascript: links are removed.
 
 import { Marked } from 'marked';
+import { filterBlocks, filterInline } from './raw-html.js';
+
+// What the raw-HTML filter changed while collectHtmlNotes is running. Rendering is synchronous, so nothing leaks between calls.
+let sink = null;
+const note = (at, message) => sink?.push({ at, message });
+
+// Runs render() and returns its result with the notes about the raw HTML it changed: [{ at, message }], at being the tag as the draft wrote it.
+export function collectHtmlNotes(render) {
+  const outer = sink;
+  const notes = [];
+  sink = notes;
+  try {
+    return { result: render(), notes };
+  } finally {
+    sink = outer;
+  }
+}
 
 const marked = new Marked({ gfm: true });
+// parseInline reads one run of inline text and hands the hook inline tokens, so it gets its own parser.
+const inline = new Marked({ gfm: true });
+marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tokens, { lex: (source) => marked.lexer(source), note }) } });
+inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
 
 const STATUS = {
   ok: { cls: 'ok', icon: '✓' },
@@ -50,5 +72,5 @@ export function md(text) {
 }
 
 export function mdInline(text) {
-  return marked.parseInline(wrapSpacedImages(String(text ?? '')));
+  return inline.parseInline(wrapSpacedImages(String(text ?? '')));
 }

@@ -1,7 +1,7 @@
 // Draft → single-file HTML. Pipeline: parse → STE lint → render panels (markdown / components / raw) → apply template → inline CSS and runtime.
 
 import { parseDoc, ParseError, applyOverrides, CHOICES } from './parse.js';
-import { md } from './markdown.js';
+import { md, collectHtmlNotes } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
 import { pageCss } from './themes/index.js';
@@ -51,7 +51,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [] };
+  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
@@ -69,7 +69,26 @@ function hasVisuals({ intro, panels }) {
 }
 
 export function renderBlocks(blocks, ctx) {
-  return blocks.map((b) => embedImages(b, b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), ctx)).join('\n');
+  return blocks.map((b) => {
+    const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)));
+    noteHtml(b, notes, ctx);
+    return embedImages(b, result, ctx);
+  }).join('\n');
+}
+
+// The raw-HTML notes of one block, each with the draft line of its tag. The nth note about the same tag points at its nth place in the block.
+function noteHtml(block, notes, ctx) {
+  if (!notes.length || !ctx.stats.htmlWarnings) return;
+  const lines = block.text.split('\n');
+  const first = block.type === 'md' ? block.line : block.line + 1;
+  const used = new Map();
+  for (const { at, message } of notes) {
+    const tag = at.split('\n')[0];
+    const places = lines.flatMap((l, i) => Array(l.split(tag).length - 1).fill(i));
+    const n = used.get(tag) ?? 0;
+    used.set(tag, n + 1);
+    ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message });
+  }
 }
 
 // Components that read their text as Markdown. Only there is ![a](b) an image the author meant; in raw html and in diagram text it is literal.

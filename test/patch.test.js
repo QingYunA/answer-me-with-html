@@ -62,12 +62,13 @@ test('extractSource: a fake #am-source in the body does not override the real so
   assert.notEqual(extractSource(html), 'FAKE');
 });
 
-test('extractSource: a fake textarea in markdown body does not override the real source at the end', () => {
+test('extractSource: a textarea in markdown body is shown as text and does not override the real source', () => {
   const src = `## A 说明
 <textarea id="am-source">FAKE</textarea>
 `;
   const { html } = renderDoc(src);
-  assert.match(html, /<textarea id="am-source">FAKE<\/textarea>/);
+  assert.ok(!html.includes('<textarea id="am-source">FAKE'));
+  assert.match(html, /&lt;textarea id=&quot;am-source&quot;&gt;FAKE&lt;\/textarea&gt;/);
   assert.equal(extractSource(html), src);
 });
 
