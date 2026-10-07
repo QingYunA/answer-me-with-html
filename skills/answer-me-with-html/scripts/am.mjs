@@ -2849,40 +2849,6 @@ var xn = k.parseInline;
 var Rn = T.parse;
 var Tn = R.lex;
 
-// src/markdown.js
-var marked = new F({ gfm: true });
-var STATUS = {
-  ok: { cls: "ok", icon: "\u2713" },
-  no: { cls: "no", icon: "\u2717" },
-  warn: { cls: "warn", icon: "!" }
-};
-var STATUS_ALIAS = { "\u2713": "ok", "\u2714": "ok", "\u2717": "no", "\u2718": "no", "\u26A0": "warn" };
-function statusHtml(word, label = "") {
-  const kind = STATUS[STATUS_ALIAS[word] ?? word];
-  if (!kind) return null;
-  const text = label.trim();
-  return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text}</span>`;
-}
-var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
-var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
-function figure(img) {
-  const alt = img.match(/\salt="([^"]*)"/)?.[1];
-  return `<figure class="am-figure">${img}${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`;
-}
-function decorate(html) {
-  return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
-}
-var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
-function wrapSpacedImages(text) {
-  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
-}
-function md(text) {
-  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
-}
-function mdInline(text) {
-  return marked.parseInline(String(text ?? ""));
-}
-
 // src/svg/text.js
 var CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 var NARROW = /* @__PURE__ */ new Set([..."iljtfrI.,:;|!'`()[]{}"]);
@@ -2940,6 +2906,79 @@ function wrap(str, maxWidth, size = 13, opts = {}) {
 var ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function esc(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
+}
+
+// src/markdown.js
+var marked = new F({ gfm: true });
+var INLINE_TAGS = /* @__PURE__ */ new Set([
+  "a",
+  "abbr",
+  "b",
+  "bdi",
+  "bdo",
+  "br",
+  "cite",
+  "code",
+  "data",
+  "del",
+  "dfn",
+  "em",
+  "i",
+  "ins",
+  "kbd",
+  "mark",
+  "q",
+  "rp",
+  "rt",
+  "ruby",
+  "s",
+  "samp",
+  "small",
+  "span",
+  "strong",
+  "sub",
+  "sup",
+  "time",
+  "u",
+  "var",
+  "wbr"
+]);
+var TAG_NAME = /^<(\/?)([A-Za-z][A-Za-z0-9-]*)/;
+function inlineTag(text) {
+  const name = text.match(TAG_NAME)?.[2].toLowerCase();
+  return name && !INLINE_TAGS.has(name) ? esc(text) : text;
+}
+marked.use({ renderer: { html: (token) => token.block ? token.text : inlineTag(token.text) } });
+var STATUS = {
+  ok: { cls: "ok", icon: "\u2713" },
+  no: { cls: "no", icon: "\u2717" },
+  warn: { cls: "warn", icon: "!" }
+};
+var STATUS_ALIAS = { "\u2713": "ok", "\u2714": "ok", "\u2717": "no", "\u2718": "no", "\u26A0": "warn" };
+function statusHtml(word, label = "") {
+  const kind = STATUS[STATUS_ALIAS[word] ?? word];
+  if (!kind) return null;
+  const text = label.trim();
+  return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text}</span>`;
+}
+var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
+var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;
+function figure(img) {
+  const alt = img.match(/\salt="([^"]*)"/)?.[1];
+  return `<figure class="am-figure">${img}${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`;
+}
+function decorate(html) {
+  return html.replace(/<table>/g, '<div class="am-table-wrap"><table>').replace(/<\/table>/g, "</table></div>").replace(IMAGE_ONLY, (_2, img) => figure(img)).replace(CELL_STATUS, (_2, attrs, word, label = "") => `<td${attrs}>${statusHtml(word, label)}</td>`);
+}
+var SPACED_IMAGE = /(`[^`\n]*`)|(!\[[^\]\n]*\]\()\s*((?:[^()<>"\n]|\([^()<>"\n]*\))*?)(\s+"[^"\n]*")?\s*\)/g;
+function wrapSpacedImages(text) {
+  return text.replace(SPACED_IMAGE, (whole, code, head, dest, title = "") => code || !/\s/.test(dest) ? whole : `${head}<${dest}>${title})`);
+}
+function md(text) {
+  return decorate(marked.parse(wrapSpacedImages(String(text ?? ""))));
+}
+function mdInline(text) {
+  return marked.parseInline(String(text ?? ""));
 }
 
 // src/components/error.js
@@ -7265,6 +7304,7 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- An inline tag in prose is kept only when it is a text-level element (b, em, code, br, a, span...). Any other tag is escaped and reads as the text you wrote, so a placeholder like <pid> or <host> stays visible. Put raw markup in an html / svg fence.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
 

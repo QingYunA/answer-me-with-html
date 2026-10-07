@@ -75,6 +75,7 @@ A -> B
 
 - "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
+- An inline tag in prose is kept only when it is a text-level element (b, em, code, br, a, span...). Any other tag is escaped and reads as the text you wrote, so a placeholder like <pid> or <host> stays visible. Put raw markup in an html / svg fence.
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
 const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file

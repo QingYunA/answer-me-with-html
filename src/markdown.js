@@ -1,8 +1,29 @@
-// Markdown → HTML (GFM). Three extras: tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure.
+// Markdown → HTML (GFM). Four extras: tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure; an inline tag that is not a text-level element reads as text.
 
 import { Marked } from 'marked';
+import { esc } from './svg/text.js';
 
 const marked = new Marked({ gfm: true });
+
+// A draft is prose, so an inline tag stays raw only when it is a text-level element: those cannot change the page's
+// structure, its styling or its one-file, offline promise. Every other inline tag becomes text.
+// A draft writes placeholders inside a sentence ("ssh user@<host>", "grep <pid>"). Emitted raw, the browser reads them
+// as unknown empty elements, so the words the author wrote disappear from the page; a raw <script> or <style> would
+// break the page itself. Raw markup belongs in an html / svg fence, which this never touches. A tag alone on its line
+// stays raw too: that is deliberate markup, in the same spirit as the fence.
+const INLINE_TAGS = new Set([
+  'a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'code', 'data', 'del', 'dfn', 'em', 'i', 'ins', 'kbd', 'mark',
+  'q', 'rp', 'rt', 'ruby', 's', 'samp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr',
+]);
+const TAG_NAME = /^<(\/?)([A-Za-z][A-Za-z0-9-]*)/;
+
+// Comments and declarations do not name a tag, so they pass through: they show nothing either way.
+function inlineTag(text) {
+  const name = text.match(TAG_NAME)?.[2].toLowerCase();
+  return name && !INLINE_TAGS.has(name) ? esc(text) : text;
+}
+
+marked.use({ renderer: { html: (token) => (token.block ? token.text : inlineTag(token.text)) } });
 
 const STATUS = {
   ok: { cls: 'ok', icon: '✓' },
