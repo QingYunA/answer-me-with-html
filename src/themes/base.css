@@ -422,8 +422,10 @@ code, pre, kbd { font-family: var(--font-mono); }
   .am-toc { position: static; }
   .am-timeline--h { grid-template-columns: minmax(0, 1fr); }
   .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
-  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. */
-  .am-md th, .am-md td { min-width: 6em; }
+  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about
+     two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)
+     gives a table panel the width its columns read well at. */
+  .am-md th, .am-md td { min-width: 8em; }
   .am-diagram svg { max-width: none; }
   .am-lightbox-header { top: 8px; left: 12px; right: 12px; }
   .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }
@@ -435,6 +437,12 @@ code, pre, kbd { font-family: var(--font-mono); }
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
+}
+/* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
+   (a wide table, a wide diagram): one panel per row instead. */
+@media print and (max-width: 1100px) {
+  .am-grid { grid-template-columns: minmax(0, 1fr); }
+  .am-grid > .am-panel { grid-column: auto !important; }
 }
 .am-panel--bare { border: 0; background: transparent; box-shadow: none; }
 .am-panel--bare > .am-panel-body { padding: 0; }
