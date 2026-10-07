@@ -1,32 +1,8 @@
 // Bundle the CLI into the single file skills/answer-me-with-html/scripts/am.mjs.
 // The bundle ships with the skill directory: after npx skills add / a plugin-marketplace install it runs with Node alone, no npm install.
 import { build } from 'esbuild';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { composeRuntime } from '../src/runtime/compose.js';
-
-// Normalize to LF so the bundle does not depend on the checkout's line-ending settings.
-const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n?/g, '\n');
-
-// Replace src/assets.js with inline strings, removing the runtime dependency on files on disk.
-const inlineAssets = {
-  name: 'inline-assets',
-  setup(b) {
-    b.onLoad({ filter: /src[\\/]assets\.js$/ }, () => ({
-      loader: 'js',
-      contents: [
-        `export const VERSION = ${JSON.stringify(JSON.parse(read('../package.json')).version)};`,
-        `export const BASE_CSS = ${JSON.stringify(read('../src/themes/base.css'))};`,
-        `export const RUNTIME_JS = ${JSON.stringify(composeRuntime((file) => read(`../src/runtime/${file}`)))};`,
-        `export const DIFF_CSS = ${JSON.stringify(read('../src/themes/diff.css'))};`,
-        `export const DELTA_CSS = ${JSON.stringify(read('../src/themes/delta.css'))};`,
-        `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
-        `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,
-        `export const VIDEO_JS = ${JSON.stringify(read('../src/runtime/video.js'))};`,
-      ].join('\n'),
-    }));
-  },
-};
+import { inlineAssets } from './inline-assets.mjs';
 
 await build({
   entryPoints: [fileURLToPath(new URL('../bin/am.js', import.meta.url))],

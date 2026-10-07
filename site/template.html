@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="{{LANG}}" data-base="{{BASE}}" data-version="{{VERSION}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{meta_title}}</title>
+<meta name="description" content="{{meta_desc}}">
+<link rel="canonical" href="{{canonical}}">
+<link rel="alternate" hreflang="en" href="https://qingyuna.github.io/answer-me-with-html/">
+<link rel="alternate" hreflang="zh-CN" href="https://qingyuna.github.io/answer-me-with-html/zh/">
+<link rel="alternate" hreflang="x-default" href="https://qingyuna.github.io/answer-me-with-html/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Answer me with HTML">
+<meta property="og:title" content="{{meta_title}}">
+<meta property="og:description" content="{{meta_desc}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="https://qingyuna.github.io/answer-me-with-html/images/{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{meta_title}}">
+<meta name="twitter:description" content="{{meta_desc}}">
+<meta name="twitter:image" content="https://qingyuna.github.io/answer-me-with-html/images/{{og_image}}">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#081322" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="{{BASE}}favicon.svg" type="image/svg+xml">
+<script>
+(function () {
+  var d = document.documentElement, s = null;
+  d.className += ' js';
+  try { s = localStorage.getItem('am-site-mode'); } catch (e) {}
+  d.setAttribute('data-mode', s === 'light' || s === 'dark' ? s : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  if (s === 'light' || s === 'dark') d.setAttribute('data-mode-locked', '');
+  try {
+    if (d.lang === 'en' && !localStorage.getItem('am-site-lang') && /^zh/i.test(navigator.language || '')) {
+      localStorage.setItem('am-site-lang', 'zh');
+      location.replace('{{ALT_HREF}}' + location.hash);
+    }
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="{{BASE}}assets/style.css">
+<link rel="modulepreload" href="{{BASE}}assets/main.js">
+<script type="module" src="{{BASE}}assets/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{skip}}</a>
+<svg width="0" height="0" class="defs" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><rect x="1" y="1" width="62" height="62" fill="var(--head-bg)"/><text x="32" y="40" text-anchor="middle" font-size="32" font-weight="700" fill="var(--head-fg)" font-family="var(--sans)">A</text><path d="M17 46 V51 H47 V46" fill="none" stroke="var(--brand-accent)" stroke-width="3"/></svg>
+      <span>Answer me with HTML</span>
+    </a>
+    <nav class="nav" aria-label="{{nav_label}}">
+      <a href="#top">{{nav_home}}</a>
+      <a href="#playground">{{nav_playground}}</a>
+      <a href="#video">{{nav_video}}</a>
+      <a href="#benchmark">{{nav_benchmark}}</a>
+      <a href="#install">{{nav_install}}</a>
+    </nav>
+    <div class="tools">
+      <a class="tool lang-switch" href="{{ALT_HREF}}" hreflang="{{alt_hreflang}}" lang="{{alt_hreflang}}" data-lang="{{alt_code}}" aria-label="{{alt_label_long}}">{{alt_label}}</a>
+      <button class="tool icon-btn" type="button" id="mode-toggle" aria-label="{{mode_toggle}}" title="{{mode_toggle}}">
+        <svg class="i-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <svg class="i-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <a class="tool gh" href="https://github.com/QingYunA/answer-me-with-html" aria-label="{{gh_label}}">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="gh-text">GitHub</span><span class="stars" data-stars="{{STARS}}">{{STARS}}</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ═══ SHEET 01 · HERO ═══ -->
+<section class="sheet hero" id="top" aria-labelledby="hero-title" data-sheet="01">
+  <div class="sheet-tag" aria-hidden="true"><span>SHEET 01 / 10</span><span>REV {{VERSION}}</span></div>
+  <div class="hero-top">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot" aria-hidden="true"></span>{{hero_eyebrow}}</p>
+      <h1 id="hero-title">{{hero_title}}</h1>
+      <p class="lede">{{hero_lede}}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#playground">{{cta_try}} <span aria-hidden="true">→</span></a>
+        <a class="btn" href="#install">{{cta_install}}</a>
+      </div>
+    </div>
+    <dl class="titleblock" aria-label="{{tb_label}}">
+      <div class="tb-wide"><dt>{{tb_project}}</dt><dd>Answer me with HTML</dd></div>
+      <div><dt>{{tb_rev}}</dt><dd class="mono">{{VERSION}}</dd></div>
+      <div><dt>{{tb_license}}</dt><dd class="mono">MIT</dd></div>
+      <div><dt>{{tb_output}}</dt><dd>{{tb_output_v}}</dd></div>
+      <div><dt>{{tb_file}}</dt><dd>{{tb_file_v}}</dd></div>
+      <div class="tb-wide"><dt>{{tb_works}}</dt><dd>Claude Code · Codex · Cursor · OpenCode · Pi</dd></div>
+    </dl>
+  </div>
+
+  <figure class="demo" id="hero-demo" aria-label="{{demo_label}}">
+    <div class="demo-head">
+      <span class="demo-step is-on" data-step="draft"><b>01</b> {{demo_file}}</span>
+      <svg class="demo-arrow" viewBox="0 0 40 10" width="40" height="10" aria-hidden="true"><path d="M0 5h37" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"/></svg>
+      <span class="demo-step" data-step="cli"><b>02</b> am render</span>
+      <svg class="demo-arrow" viewBox="0 0 40 10" width="40" height="10" aria-hidden="true"><path d="M0 5h37" stroke="currentColor" stroke-width="1.5" marker-end="url(#arr)"/></svg>
+      <span class="demo-step" data-step="page"><b>03</b> page.html</span>
+      <span class="demo-status mono" aria-live="polite"></span>
+    </div>
+    <div class="demo-body">
+      <div class="demo-editor" aria-hidden="true">
+        <div class="demo-gutter"></div>
+        <pre class="demo-code"><code><span class="caret"></span></code></pre>
+      </div>
+      <div class="demo-page">
+        <div class="demo-blank" aria-hidden="true"><span>{{demo_waiting}}</span></div>
+        <div class="demo-paper">
+          <iframe class="demo-frame" title="{{demo_frame_title}}" tabindex="-1" sandbox="allow-scripts" loading="eager"></iframe>
+          <noscript><iframe class="demo-frame demo-frame--static" title="{{demo_frame_title}}" src="{{BASE}}prerender/{{hero_prerender}}"></iframe></noscript>
+        </div>
+        <div class="plotter" aria-hidden="true"></div>
+      </div>
+    </div>
+    <figcaption class="demo-foot">
+      <span class="demo-note">{{demo_note}}</span>
+      <span class="demo-actions">
+        <button class="link-btn" type="button" id="demo-replay">↻ {{demo_replay}}</button>
+        <a class="link-btn" href="#playground" id="demo-edit">{{demo_edit}} →</a>
+      </span>
+    </figcaption>
+  </figure>
+  <div class="crosshair" aria-hidden="true"><i class="ch-x"></i><i class="ch-y"></i><span class="ch-read mono">X 0000 · Y 0000</span></div>
+</section>
+
+<!-- ═══ SHEET 02 · WALL OF TEXT VS PAGE ═══ -->
+<section class="sheet" id="compare" aria-labelledby="s2-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">A</span>
+    <h2 id="s2-title">{{s2_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 02 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s2_lede}}</p>
+  <div class="compare">
+    <button class="figure-zoom" type="button" data-zoom="{{BASE}}images/{{s2_image}}" data-zoom-alt="{{s2_image_alt}}" aria-label="{{s2_zoom}}">
+      <img src="{{BASE}}images/{{s2_image}}" alt="{{s2_image_alt}}" width="2400" height="1389" loading="lazy" decoding="async">
+      <span class="zoom-hint mono" aria-hidden="true">⤢ {{zoom_hint}}</span>
+    </button>
+    <p class="fig-cap mono"><span>FIG. 1</span>{{s2_caption}}</p>
+  </div>
+  <div class="examples">
+    <h3 class="minor">{{s2_ask_title}}</h3>
+    <table class="ask-table">
+      <thead><tr><th scope="col">{{s2_col_ask}}</th><th scope="col">{{s2_col_get}}</th></tr></thead>
+      <tbody>
+        <tr><td>{{ex1_q}}</td><td>{{ex1_a}}</td></tr>
+        <tr><td>{{ex2_q}}</td><td>{{ex2_a}}</td></tr>
+        <tr><td>{{ex3_q}}</td><td>{{ex3_a}}</td></tr>
+        <tr><td>{{ex4_q}}</td><td>{{ex4_a}}</td></tr>
+        <tr><td>{{ex5_q}}</td><td>{{ex5_a}}</td></tr>
+        <tr><td>{{ex6_q}}</td><td>{{ex6_a}}</td></tr>
+        <tr class="muted"><td>{{ex7_q}}</td><td>{{ex7_a}}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ SHEET 03 · HOW IT WORKS ═══ -->
+<section class="sheet" id="how" aria-labelledby="s3-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">B</span>
+    <h2 id="s3-title">{{s3_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 03 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s3_lede}}</p>
+
+  <figure class="pipeline draw-group" aria-labelledby="pipe-cap">
+    <svg class="pipe-h" viewBox="0 0 1100 260" role="img" aria-labelledby="pipe-cap">
+      <g class="pn">
+        <rect class="box" x="8" y="96" width="132" height="68"/>
+        <text class="t" x="74" y="126" text-anchor="middle">{{pipe_agent}}</text>
+        <text class="s" x="74" y="146" text-anchor="middle">{{pipe_agent_s}}</text>
+      </g>
+      <path class="draw edge" d="M140 130 H196" marker-end="url(#arr)"/>
+      <g class="pn">
+        <path class="box" d="M200 82 H300 L322 104 V178 H200 Z"/>
+        <path class="fold" d="M300 82 V104 H322"/>
+        <text class="t" x="261" y="126" text-anchor="middle">draft.md</text>
+        <text class="s" x="261" y="146" text-anchor="middle">{{pipe_draft_s}}</text>
+      </g>
+      <path class="draw edge" d="M322 130 H378" marker-end="url(#arr)"/>
+      <rect class="draw group" x="382" y="30" width="560" height="200"/>
+      <text class="g" x="396" y="52">am CLI</text>
+      <text class="g2" x="928" y="52" text-anchor="end">{{pipe_cli_s}}</text>
+      <g class="pn step"><rect class="box" x="400" y="102" width="112" height="56"/><text class="t" x="456" y="135" text-anchor="middle">parse</text><text class="s" x="456" y="182" text-anchor="middle">{{pipe_parse_s}}</text></g>
+      <path class="draw edge" d="M512 130 H536" marker-end="url(#arr)"/>
+      <g class="pn step"><rect class="box" x="540" y="102" width="112" height="56"/><text class="t" x="596" y="135" text-anchor="middle">{{pipe_ste}}</text><text class="s" x="596" y="182" text-anchor="middle">{{pipe_ste_s}}</text></g>
+      <path class="draw edge" d="M652 130 H676" marker-end="url(#arr)"/>
+      <g class="pn step key"><rect class="box" x="680" y="102" width="112" height="56"/><text class="t" x="736" y="135" text-anchor="middle">layout</text><text class="s" x="736" y="182" text-anchor="middle">{{pipe_layout_s}}</text></g>
+      <path class="draw edge" d="M792 130 H816" marker-end="url(#arr)"/>
+      <g class="pn step"><rect class="box" x="820" y="102" width="104" height="56"/><text class="t" x="872" y="135" text-anchor="middle">theme</text><text class="s" x="872" y="182" text-anchor="middle">{{pipe_theme_s}}</text></g>
+      <path class="draw edge" d="M942 130 H978" marker-end="url(#arr)"/>
+      <g class="pn">
+        <rect class="box" x="982" y="66" width="110" height="128"/>
+        <rect class="mini head" x="994" y="78" width="54" height="7"/>
+        <rect class="mini" x="994" y="94" width="52" height="34"/><rect class="mini" x="1052" y="94" width="28" height="34"/>
+        <rect class="mini" x="994" y="134" width="86" height="22"/>
+        <text class="t" x="1037" y="176" text-anchor="middle">page.html</text>
+        <text class="s" x="1037" y="214" text-anchor="middle">{{pipe_page_s}}</text>
+      </g>
+    </svg>
+    <svg class="pipe-v" viewBox="0 0 320 760" role="img" aria-labelledby="pipe-cap">
+      <g class="pn"><rect class="box" x="90" y="4" width="140" height="60"/><text class="t" x="160" y="31" text-anchor="middle">{{pipe_agent}}</text><text class="s" x="160" y="50" text-anchor="middle">{{pipe_agent_s}}</text></g>
+      <path class="draw edge" d="M160 64 V92" marker-end="url(#arr)"/>
+      <g class="pn"><path class="box" d="M100 96 H200 L220 116 V176 H100 Z"/><path class="fold" d="M200 96 V116 H220"/><text class="t" x="160" y="134" text-anchor="middle">draft.md</text><text class="s" x="160" y="154" text-anchor="middle">{{pipe_draft_s}}</text></g>
+      <path class="draw edge" d="M160 176 V208" marker-end="url(#arr)"/>
+      <rect class="draw group" x="20" y="212" width="280" height="356"/>
+      <text class="g" x="34" y="234">am CLI</text>
+      <g class="pn step"><rect class="box" x="60" y="250" width="110" height="48"/><text class="t" x="115" y="279" text-anchor="middle">parse</text><text class="s" x="184" y="279">{{pipe_parse_s}}</text></g>
+      <path class="draw edge" d="M115 298 V326" marker-end="url(#arr)"/>
+      <g class="pn step"><rect class="box" x="60" y="330" width="110" height="48"/><text class="t" x="115" y="359" text-anchor="middle">{{pipe_ste}}</text><text class="s" x="184" y="359">{{pipe_ste_s}}</text></g>
+      <path class="draw edge" d="M115 378 V406" marker-end="url(#arr)"/>
+      <g class="pn step key"><rect class="box" x="60" y="410" width="110" height="48"/><text class="t" x="115" y="439" text-anchor="middle">layout</text><text class="s" x="184" y="439">{{pipe_layout_s}}</text></g>
+      <path class="draw edge" d="M115 458 V486" marker-end="url(#arr)"/>
+      <g class="pn step"><rect class="box" x="60" y="490" width="110" height="48"/><text class="t" x="115" y="519" text-anchor="middle">theme</text><text class="s" x="184" y="519">{{pipe_theme_s}}</text></g>
+      <path class="draw edge" d="M160 568 V600" marker-end="url(#arr)"/>
+      <g class="pn"><rect class="box" x="100" y="604" width="120" height="128"/><rect class="mini head" x="112" y="616" width="56" height="7"/><rect class="mini" x="112" y="632" width="56" height="34"/><rect class="mini" x="174" y="632" width="34" height="34"/><rect class="mini" x="112" y="672" width="96" height="20"/><text class="t" x="160" y="716" text-anchor="middle">page.html</text></g>
+      <text class="s" x="160" y="752" text-anchor="middle">{{pipe_page_s}}</text>
+    </svg>
+    <figcaption id="pipe-cap" class="fig-cap mono"><span>FIG. 2</span>{{pipe_caption}}</figcaption>
+  </figure>
+
+  <div class="split">
+    <div class="split-col">
+      <div class="col-head"><span class="mono">{{s3_model_k}}</span><h3>{{s3_model_t}}</h3></div>
+      <div class="codebox">
+        <div class="codebox-head mono"><span>draft.md</span><span>{{s3_model_meta}}</span></div>
+        <pre class="code"><code>{{s3_draft_html}}</code></pre>
+      </div>
+    </div>
+    <div class="split-col">
+      <div class="col-head"><span class="mono">{{s3_cli_k}}</span><h3>{{s3_cli_t}}</h3></div>
+      <div class="sizes" id="sizes">
+        <div class="size-row">
+          <span class="size-label">{{s3_draft_label}}</span>
+          <span class="size-bar"><i class="bar-fill bar-accent" style="--w:{{w_draft}}"></i></span>
+          <span class="size-val mono"><b data-measure="draft">{{m_draft}}</b> KB</span>
+        </div>
+        <div class="size-row">
+          <span class="size-label">{{s3_page_label}}</span>
+          <span class="size-bar stack">
+            <i class="bar-fill seg seg-css" style="--w:{{w_css}}" title="CSS"></i><i class="bar-fill seg seg-js" style="--w:{{w_js}}" title="JS"></i><i class="bar-fill seg seg-svg" style="--w:{{w_svg}}" title="SVG"></i><i class="bar-fill seg seg-html" style="--w:{{w_html}}" title="HTML"></i>
+          </span>
+          <span class="size-val mono"><b data-measure="page">{{m_page}}</b> KB</span>
+        </div>
+        <ul class="size-keys mono">
+          <li><i class="key seg-css"></i>CSS <b data-measure="css">{{m_css}}</b> KB</li>
+          <li><i class="key seg-js"></i>{{s3_runtime}} <b data-measure="js">{{m_js}}</b> KB</li>
+          <li><i class="key seg-svg"></i>SVG <b data-measure="svg">{{m_svg}}</b> KB</li>
+          <li><i class="key seg-html"></i>HTML <b data-measure="html">{{m_html}}</b> KB</li>
+        </ul>
+      </div>
+      <dl class="facts">
+        <div><dt class="mono" data-measure="ratio">{{m_ratio}}</dt><dd>{{s3_fact_ratio}}</dd></div>
+        <div><dt class="mono" data-measure="coords">{{m_coords}}</dt><dd>{{s3_fact_coords}}</dd></div>
+        <div><dt class="mono" data-measure="rules">{{m_rules}}</dt><dd>{{s3_fact_rules}}</dd></div>
+        <div><dt class="mono">0</dt><dd>{{s3_fact_requests}}</dd></div>
+      </dl>
+      <p class="fine" data-measure-note>{{s3_measure_note}}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SHEET 04 · PLAYGROUND ═══ -->
+<section class="sheet" id="playground" aria-labelledby="s4-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">C</span>
+    <h2 id="s4-title">{{s4_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 04 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s4_lede}}</p>
+
+  <div class="pg" id="pg" data-state="loading">
+    <div class="pg-bar">
+      <div class="seg-tabs pg-presets" role="tablist" aria-label="{{pg_presets}}">
+        <button role="tab" type="button" data-preset="tcp" aria-selected="true">{{pre_tcp}}</button>
+        <button role="tab" type="button" data-preset="cache" aria-selected="false">{{pre_cache}}</button>
+        <button role="tab" type="button" data-preset="repo" aria-selected="false">{{pre_repo}}</button>
+        <button role="tab" type="button" data-preset="history" aria-selected="false">{{pre_history}}</button>
+        <button role="tab" type="button" data-preset="writing" aria-selected="false">{{pre_writing}}</button>
+        <button role="tab" type="button" data-preset="decision" aria-selected="false">{{pre_decision}}</button>
+      </div>
+      <div class="pg-opts">
+        <label class="sel"><span class="mono">{{pg_theme}}</span><select id="pg-theme"><option value="auto">auto</option></select></label>
+        <label class="sel"><span class="mono">{{pg_mode}}</span><select id="pg-mode"><option value="auto">{{pg_mode_auto}}</option><option value="light">{{pg_mode_light}}</option><option value="dark">{{pg_mode_dark}}</option></select></label>
+      </div>
+    </div>
+
+    <div class="pg-main">
+      <div class="pg-editor">
+        <div class="pane-head mono"><span id="pg-file">tcp.md</span><span id="pg-lines"></span></div>
+        <div class="editor">
+          <div class="editor-gutter" aria-hidden="true"><div class="gutter-in"></div></div>
+          <div class="editor-wrap">
+            <div class="editor-marks" aria-hidden="true"></div>
+            <textarea id="pg-input" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="{{pg_editor_label}}" aria-describedby="pg-editor-hint"></textarea>
+          </div>
+        </div>
+        <p class="pane-foot fine" id="pg-editor-hint">{{pg_editor_hint}}</p>
+      </div>
+      <div class="pg-preview">
+        <div class="pane-head mono"><span>{{pg_preview}}</span><span class="pg-live"><i aria-hidden="true"></i><span id="pg-live-text">{{pg_loading}}</span></span></div>
+        <div class="preview-box">
+          <iframe id="pg-frame" title="{{pg_frame_title}}" sandbox="allow-scripts allow-popups allow-modals"></iframe>
+          <div class="pg-error" id="pg-error" hidden role="alert">
+            <div class="err-head"><span class="err-badge mono">✗ <span id="err-where"></span></span><button type="button" class="link-btn" id="err-undo" hidden>{{pg_undo}}</button></div>
+            <p class="err-msg" id="err-msg"></p>
+            <div class="err-ex">
+              <div class="err-ex-head mono">{{pg_example}}</div>
+              <pre class="code"><code id="err-example"></code></pre>
+            </div>
+            <p class="fine">{{pg_error_note}}</p>
+          </div>
+          <div class="pg-loading" aria-hidden="true"><span class="mono">{{pg_loading}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pg-status">
+      <dl class="pg-stats mono" aria-live="polite">
+        <div><dt>{{pg_stat_time}}</dt><dd id="st-ms">—</dd></div>
+        <div><dt>{{pg_stat_size}}</dt><dd id="st-size">—</dd></div>
+        <div><dt>{{pg_stat_panels}}</dt><dd id="st-panels">—</dd></div>
+        <div class="st-wide"><dt>{{pg_stat_components}}</dt><dd id="st-comps">—</dd></div>
+        <div><dt>STE</dt><dd id="st-ste">—</dd></div>
+      </dl>
+      <div class="pg-actions">
+        <button type="button" class="btn btn-sm btn-warn" id="pg-break">{{pg_break}}</button>
+        <button type="button" class="btn btn-sm" id="pg-copy" data-done="{{copied}}">{{pg_copy}}</button>
+        <button type="button" class="btn btn-sm" id="pg-download">{{pg_download}}</button>
+      </div>
+    </div>
+    <ol class="pg-warnings" id="pg-warnings" aria-label="{{pg_warnings_label}}"></ol>
+    <p class="fine pg-note">{{pg_note}}</p>
+  </div>
+</section>
+
+<!-- ═══ SHEET 05 · COMPONENTS ═══ -->
+<section class="sheet" id="components" aria-labelledby="s5-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">D</span>
+    <h2 id="s5-title">{{s5_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 05 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s5_lede}}</p>
+  <ul class="cards" id="cards">
+    <li class="card" data-comp="flow"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">flow</code><span class="card-good">{{c_flow}}</span></span></button></li>
+    <li class="card" data-comp="sequence"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">sequence</code><span class="card-good">{{c_sequence}}</span></span></button></li>
+    <li class="card" data-comp="tree"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">tree</code><span class="card-good">{{c_tree}}</span></span></button></li>
+    <li class="card" data-comp="timeline"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">timeline</code><span class="card-good">{{c_timeline}}</span></span></button></li>
+    <li class="card" data-comp="limits"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">limits</code><span class="card-good">{{c_limits}}</span></span></button></li>
+    <li class="card" data-comp="annot"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">annot</code><span class="card-good">{{c_annot}}</span></span></button></li>
+    <li class="card" data-comp="kv"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">kv</code><span class="card-good">{{c_kv}}</span></span></button></li>
+    <li class="card" data-comp="callout"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">callout</code><span class="card-good">{{c_callout}}</span></span></button></li>
+    <li class="card" data-comp="ask"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">ask</code><span class="card-good">{{c_ask}}</span></span></button></li>
+    <li class="card" data-comp="code"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">{{c_code_name}}</code><span class="card-good">{{c_code}}</span></span></button></li>
+    <li class="card" data-comp="table"><button type="button" class="card-btn"><span class="thumb"></span><span class="card-meta"><code class="card-name">{{c_table_name}}</code><span class="card-good">{{c_table}}</span></span></button></li>
+    <li class="card card-note"><p>{{c_note}}</p><code class="mono">am help &lt;component&gt;</code></li>
+  </ul>
+</section>
+
+<!-- ═══ SHEET 06 · THEMES ═══ -->
+<section class="sheet" id="themes" aria-labelledby="s6-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">E</span>
+    <h2 id="s6-title">{{s6_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 06 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s6_lede}}</p>
+  <div class="themes">
+    <div class="themes-side">
+      <div class="seg-tabs seg-col" role="radiogroup" aria-label="{{s6_theme_label}}" id="th-theme">
+        <button type="button" role="radio" aria-checked="true" data-v="blueprint"><b>blueprint</b><span>{{th_blueprint}}</span></button>
+        <button type="button" role="radio" aria-checked="false" data-v="shadcn"><b>shadcn</b><span>{{th_shadcn}}</span></button>
+        <button type="button" role="radio" aria-checked="false" data-v="paper"><b>paper</b><span>{{th_paper}}</span></button>
+      </div>
+      <div class="seg-tabs" role="radiogroup" aria-label="{{s6_mode_label}}" id="th-mode">
+        <button type="button" role="radio" aria-checked="true" data-v="light">{{pg_mode_light}}</button>
+        <button type="button" role="radio" aria-checked="false" data-v="dark">{{pg_mode_dark}}</button>
+      </div>
+      <p class="fine">{{s6_note}}</p>
+    </div>
+    <div class="themes-view">
+      <div class="pane-head mono"><span id="th-label">blueprint · light</span><span id="th-ms"></span></div>
+      <div class="themes-box"><iframe id="th-frame" title="{{s6_frame_title}}" sandbox="allow-scripts" tabindex="-1"></iframe></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SHEET 07 · VIDEO ═══ -->
+<section class="sheet" id="video" aria-labelledby="s7-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">F</span>
+    <h2 id="s7-title">{{s7_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 07 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s7_lede}}</p>
+  <div class="video">
+    <div class="video-frame">
+      <iframe id="video-frame" title="{{s7_frame_title}}" data-src="{{BASE}}prerender/{{video_page}}" loading="lazy" allow="autoplay; fullscreen"></iframe>
+      <noscript><iframe title="{{s7_frame_title}}" src="{{BASE}}prerender/{{video_page}}"></iframe></noscript>
+    </div>
+    <ol class="features">
+      <li><span class="num mono">1</span><div><b>{{v1_t}}</b><p>{{v1_d}}</p></div></li>
+      <li><span class="num mono">2</span><div><b>{{v2_t}}</b><p>{{v2_d}}</p></div></li>
+      <li><span class="num mono">3</span><div><b>{{v3_t}}</b><p>{{v3_d}}</p></div></li>
+      <li><span class="num mono">4</span><div><b>{{v4_t}}</b><p>{{v4_d}}</p></div></li>
+    </ol>
+  </div>
+  <div class="video-draft">
+    <div class="big-stat">
+      <span class="big-num mono">{{v_size}}</span>
+      <p>{{v_size_d}}</p>
+      <p class="fine">{{v_cmd}}</p>
+    </div>
+    <div class="codebox">
+      <div class="codebox-head mono"><span>{{v_draft_file}}</span><span>{{v_draft_meta}}</span></div>
+      <pre class="code"><code>{{v_draft_html}}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SHEET 08 · BENCHMARK ═══ -->
+<section class="sheet" id="benchmark" aria-labelledby="s8-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">G</span>
+    <h2 id="s8-title">{{s8_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 08 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s8_lede}}</p>
+
+  <div class="bench">
+    <div class="bench-legend mono" aria-hidden="true">
+      <span><i class="sw sw-base"></i>{{b_direct}}</span>
+      <span><i class="sw sw-skill"></i>Answer me with HTML</span>
+    </div>
+
+    <h3 class="minor">{{b_pages}}</h3>
+    <div class="metrics">
+      <div class="metric" role="group" aria-label="{{b_tokens}}: 5,341 → 870">
+        <div class="metric-name">{{b_tokens}}</div>
+        <div class="bars">
+          <div class="bar base" style="--w:100%"><i></i><span class="mono" data-count="5341">5,341</span></div>
+          <div class="bar skill" style="--w:16.3%"><i></i><span class="mono" data-count="870">870</span></div>
+        </div>
+        <div class="metric-gain"><b class="mono">6.1×</b><span>{{b_fewer}}</span></div>
+      </div>
+      <div class="metric" role="group" aria-label="{{b_time}}: 33 s → 12 s">
+        <div class="metric-name">{{b_time}}</div>
+        <div class="bars">
+          <div class="bar base" style="--w:100%"><i></i><span class="mono"><span data-count="33">33</span> s</span></div>
+          <div class="bar skill" style="--w:36.4%"><i></i><span class="mono"><span data-count="12">12</span> s</span></div>
+        </div>
+        <div class="metric-gain"><b class="mono">2.8×</b><span>{{b_faster}}</span></div>
+      </div>
+      <div class="metric" role="group" aria-label="{{b_cost}}: $0.092 → $0.067">
+        <div class="metric-name">{{b_cost}}</div>
+        <div class="bars">
+          <div class="bar base" style="--w:100%"><i></i><span class="mono">$<span data-count="0.092" data-dec="3">0.092</span></span></div>
+          <div class="bar skill" style="--w:72.8%"><i></i><span class="mono">$<span data-count="0.067" data-dec="3">0.067</span></span></div>
+        </div>
+        <div class="metric-gain"><b class="mono">27%</b><span>{{b_cheaper}}</span></div>
+      </div>
+    </div>
+
+    <h3 class="minor">{{b_videos}}</h3>
+    <div class="metrics">
+      <div class="metric" role="group" aria-label="{{b_tokens}}: 27,839 → 1,566">
+        <div class="metric-name">{{b_tokens}}</div>
+        <div class="bars">
+          <div class="bar base" style="--w:100%"><i></i><span class="mono" data-count="27839">27,839</span></div>
+          <div class="bar skill" style="--w:5.6%"><i></i><span class="mono" data-count="1566">1,566</span></div>
+        </div>
+        <div class="metric-gain"><b class="mono">17.8×</b><span>{{b_fewer}}</span></div>
+      </div>
+      <div class="metric" role="group" aria-label="{{b_time}}: 202 s → 17 s">
+        <div class="metric-name">{{b_time}}</div>
+        <div class="bars">
+          <div class="bar base" style="--w:100%"><i></i><span class="mono"><span data-count="202">202</span> s</span></div>
+          <div class="bar skill" style="--w:8.4%"><i></i><span class="mono"><span data-count="17">17</span> s</span></div>
+        </div>
+        <div class="metric-gain"><b class="mono">11.8×</b><span>{{b_faster}}</span></div>
+      </div>
+    </div>
+
+    <div class="bench-notes">
+      <dl class="kvgrid">
+        <div><dt>{{b_setup_k}}</dt><dd>{{b_setup_v}}</dd></div>
+        <div><dt>{{b_model_k}}</dt><dd>Claude Sonnet 5.5</dd></div>
+        <div><dt>{{b_runs_k}}</dt><dd>{{b_runs_v}}</dd></div>
+        <div><dt>{{b_video_k}}</dt><dd>{{b_video_v}}</dd></div>
+      </dl>
+      <aside class="callout callout-warn" aria-labelledby="caveat-t">
+        <b id="caveat-t">{{b_caveat_t}}</b>
+        <p>{{b_caveat}}</p>
+        <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/bench/README.md">{{b_link}} →</a>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SHEET 09 · STE ═══ -->
+<section class="sheet" id="ste" aria-labelledby="s9-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">H</span>
+    <h2 id="s9-title">{{s9_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 09 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s9_lede}}</p>
+  <div class="ste" id="ste-box">
+    <div class="ste-in">
+      <div class="pane-head mono"><label for="ste-input">{{ste_input}}</label><button type="button" class="link-btn" id="ste-reset">{{ste_reset}}</button></div>
+      <textarea id="ste-input" rows="6" spellcheck="false">{{ste_sample}}</textarea>
+      <div class="ste-btns">
+        <button type="button" class="btn btn-sm" id="ste-fix">{{ste_fix}}</button>
+        <span class="fine" id="ste-count" aria-live="polite"></span>
+      </div>
+      <ul class="ste-rules mono">
+        <li><b>{{ste_r1}}</b>{{ste_r1_d}}</li>
+        <li><b>{{ste_r2}}</b>{{ste_r2_d}}</li>
+        <li><b>{{ste_r3}}</b>{{ste_r3_d}}</li>
+      </ul>
+    </div>
+    <div class="ste-out">
+      <div class="pane-head mono"><span>{{ste_output}}</span><span id="ste-ms"></span></div>
+      <div class="ste-text" id="ste-text"></div>
+      <ol class="ste-list" id="ste-list"></ol>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SHEET 10 · INSTALL ═══ -->
+<section class="sheet" id="install" aria-labelledby="s10-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">I</span>
+    <h2 id="s10-title">{{s10_title}}</h2>
+    <span class="sheet-no mono" aria-hidden="true">SHEET 10 / 10</span>
+  </header>
+  <p class="sheet-lede">{{s10_lede}}</p>
+  <div class="install">
+    <div class="tabs">
+      <div class="seg-tabs" role="tablist" aria-label="{{i_tabs}}">
+        <button role="tab" type="button" id="it-agent" aria-controls="ip-agent" aria-selected="true">{{i_agent}} <span class="rec mono">{{i_rec}}</span></button>
+        <button role="tab" type="button" id="it-plugin" aria-controls="ip-plugin" aria-selected="false" tabindex="-1">{{i_plugin}}</button>
+        <button role="tab" type="button" id="it-npx" aria-controls="ip-npx" aria-selected="false" tabindex="-1">npx skills</button>
+        <button role="tab" type="button" id="it-manual" aria-controls="ip-manual" aria-selected="false" tabindex="-1">{{i_manual}}</button>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="ip-agent" aria-labelledby="it-agent">
+        <p>{{i_agent_d}}</p>
+        <div class="copybox prompt"><pre>{{i_agent_prompt}}</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+        <p class="fine">{{i_agent_note}}</p>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="ip-plugin" aria-labelledby="it-plugin" hidden>
+        <p>{{i_plugin_d}}</p>
+        <div class="copybox"><pre>/plugin marketplace add QingYunA/answer-me-with-html
+/plugin install answer-me-with-html@answer-me-with-html</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="ip-npx" aria-labelledby="it-npx" hidden>
+        <p>{{i_npx_d}}</p>
+        <div class="copybox"><pre>npx skills add QingYunA/answer-me-with-html</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="ip-manual" aria-labelledby="it-manual" hidden>
+        <p>{{i_manual_d}}</p>
+        <div class="copybox"><pre>git clone --depth 1 https://github.com/QingYunA/answer-me-with-html.git /tmp/answer-me-with-html
+cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answer-me-with-html</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+        <p class="fine">{{i_manual_note}}</p>
+      </div>
+    </div>
+    <aside class="always">
+      <div class="col-head"><span class="mono">{{i_always_k}}</span><h3>{{i_always_t}}</h3></div>
+      <p>{{i_always_d}}</p>
+      <div class="copybox prompt small"><pre>{{i_always_prompt}}</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+      <p class="fine">{{i_always_note}}</p>
+    </aside>
+  </div>
+  <dl class="reqs mono">
+    <div><dt>{{i_req_k}}</dt><dd>Node.js 20+</dd></div>
+    <div><dt>npm install</dt><dd>{{i_req_npm}}</dd></div>
+    <div><dt>{{i_req_net}}</dt><dd>{{i_req_net_v}}</dd></div>
+    <div><dt>{{i_req_cfg}}</dt><dd>{{i_req_cfg_v}}</dd></div>
+  </dl>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-in">
+    <div class="footer-story">
+      <span class="mono footer-k">{{f_why_k}}</span>
+      <p>{{f_why}}</p>
+    </div>
+    <dl class="footer-block mono">
+      <div class="tb-wide"><dt>{{tb_project}}</dt><dd>Answer me with HTML</dd></div>
+      <div><dt>{{tb_rev}}</dt><dd>{{VERSION}}</dd></div>
+      <div><dt>{{tb_license}}</dt><dd><a href="https://github.com/QingYunA/answer-me-with-html/blob/main/LICENSE">MIT</a></dd></div>
+      <div><dt>{{f_source}}</dt><dd><a href="https://github.com/QingYunA/answer-me-with-html">GitHub</a></dd></div>
+      <div><dt>{{f_community}}</dt><dd><a href="https://linux.do">LINUX DO</a></dd></div>
+      <div class="tb-wide"><dt>{{f_drawn}}</dt><dd>{{f_drawn_v}}</dd></div>
+    </dl>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="{{zoom_dialog}}">
+  <button type="button" class="lightbox-close" aria-label="{{close}}">✕</button>
+  <div class="lightbox-stage"><img alt=""></div>
+</div>
+<div class="toast mono" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="site-ui">{{ui_json}}</script>
+</body>
+</html>
