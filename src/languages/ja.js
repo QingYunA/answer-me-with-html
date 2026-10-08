@@ -21,7 +21,7 @@ export default {
       confirmed: '推奨を確認', untouched: '未回答（推奨のまま）', was: '変更前',
       typed: '「>」で始まる行は読者が入力した文字です。',
     },
-    toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', colon: '：', sep: '、',
+    toc: '目次', flow: 'フローチャート', sequence: 'シーケンス図', er: 'ER 図', colon: '：', sep: '、',
     expand: '拡大表示', close: '閉じる', diagram: 'ダイアグラム',
     delta: { added: '追加', removed: '削除', changed: '変更', view: '表示', before: '変更前', changes: '差分', after: '変更後' },
   },

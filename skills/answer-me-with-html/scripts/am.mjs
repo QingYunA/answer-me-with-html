@@ -286,6 +286,7 @@ var zh_default = {
     toc: "\u76EE\u5F55",
     flow: "\u6D41\u7A0B\u56FE",
     sequence: "\u65F6\u5E8F\u56FE",
+    er: "\u5B9E\u4F53\u5173\u7CFB\u56FE",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u5C55\u5F00\u67E5\u770B\u56FE\u8868",
@@ -333,6 +334,7 @@ var zh_Hant_default = {
     toc: "\u76EE\u9304",
     flow: "\u6D41\u7A0B\u5716",
     sequence: "\u6642\u5E8F\u5716",
+    er: "\u5BE6\u9AD4\u95DC\u806F\u5716",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u5C55\u958B\u67E5\u770B\u5716\u8868",
@@ -374,6 +376,7 @@ var en_default = {
     toc: "Contents",
     flow: "Flowchart",
     sequence: "Sequence diagram",
+    er: "Entity relationship diagram",
     colon: ": ",
     sep: ", ",
     expand: "Expand diagram",
@@ -420,6 +423,7 @@ var ja_default = {
     toc: "\u76EE\u6B21",
     flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
     sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
+    er: "ER \u56F3",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u62E1\u5927\u8868\u793A",
@@ -3186,7 +3190,7 @@ function textLines(lines, cx, cy, lineHeight, attrs = "") {
   const top = cy - (lines.length - 1) * lineHeight / 2;
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(line)}</text>`).join("");
 }
-var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", colon: ": ", sep: ", " };
+var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", er: "Entity relationship diagram", colon: ": ", sep: ", " };
 function diagramLabel(ui, kind2, names) {
   const u = { ...EN_LABELS, ...ui };
   return `${u[kind2]}${u.colon}${names.join(u.sep)}`;
@@ -5497,6 +5501,194 @@ function diamondPoint(node, toward) {
   return { x: node.x + dx / k2, y: node.y + dy / k2 };
 }
 
+// src/components/er.js
+var FS3 = 13;
+var FIELD_FS = 12;
+var HEAD_LH = 20;
+var FIELD_LH = 17;
+var PAD = 11;
+var KEY_GAP = 12;
+var MIN_WIDTH = 92;
+var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
+var CARDS = ["1\\.\\.\\*", "0\\.\\.1", "\\*", "1"];
+var MARKERS = /* @__PURE__ */ new Set(["PK", "FK", "UK"]);
+var RELATIONSHIP = new RegExp(`^(\\S+)\\s+(${CARDS.join("|")})\\s*--\\s*(${CARDS.join("|")})\\s+(\\S+)\\s*(?::\\s*(.*))?$`);
+var er_default = {
+  name: "er",
+  summary: "Entity relationship diagram (automatic layout, crow's-foot ends)",
+  syntax: `\`\`\`er [TB|LR|BT|RL]
+*User                         \u2190 a line at column 0 is an entity; * highlights it
+  id PK                       \u2190 an indented line is a field: name [type] [PK|FK|UK]
+  email string UK
+Order
+  id PK
+  user_id FK -> User          \u2190 FK -> Entity draws the many-to-one relationship (*--1)
+User 1--* Order: places       \u2190 A <cardinality>--<cardinality> B: label (optional)
+\`\`\`
+- Cardinalities are 1, 0..1, * and 1..*. The left end is drawn at the entity on the left, the right end at the entity on the right.
+- A field's FK -> Entity already draws its relationship, so a relationship line is optional. A relationship line that names the same two entities replaces the implied one and sets the cardinality and the label.
+- The type is optional: \`email UK\` is a field with a key but no type.
+- A Mermaid line such as USER ||--o{ ORDER is an error: write USER 1--* ORDER.
+- The default direction is TB (top to bottom).`,
+  example: "```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```",
+  render(text, { args, uid, ui }) {
+    const model = parseEr(text);
+    const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
+    const html = `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", uid(), ui)}</figure>`;
+    return html;
+  }
+};
+function parseEr(text) {
+  const entities = /* @__PURE__ */ new Map();
+  const written = [];
+  let current = null;
+  for (const { raw, text: line, line: n } of contentLines(text)) {
+    if (/^\s/.test(raw)) {
+      if (!current) throw new ComponentError(`"${line}": a field line must follow an entity; write the entity name at the start of its own line first`, n);
+      current.fields.push(parseField(line, n));
+      continue;
+    }
+    const rel = line.match(RELATIONSHIP);
+    if (rel) {
+      written.push({ from: rel[1], fromCard: rel[2], to: rel[4], toCard: rel[3], label: rel[5]?.trim() ?? "", line: n });
+      current = null;
+      continue;
+    }
+    if (line.includes("--")) throw new ComponentError(`"${line}" is not a relationship; write A 1--* B (cardinalities 1, 0..1, * and 1..*)`, n);
+    const hi = line.startsWith("*");
+    const name = (hi ? line.slice(1) : line).trim();
+    if (!name) throw new ComponentError("an entity needs a name", n);
+    if (entities.has(name)) throw new ComponentError(`entity "${name}" is written twice`, n);
+    current = { name, hi, fields: [], line: n, step: 0, x: 0, y: 0, width: 0, height: 0 };
+    entities.set(name, current);
+  }
+  if (!entities.size) throw new ComponentError("an entity relationship diagram needs at least one entity (a line at column 0)", 1);
+  return { entities, written };
+}
+function parseField(line, n) {
+  const tokens = line.split(/\s+/);
+  const name = tokens.shift();
+  const arrow = tokens.indexOf("->");
+  const head = arrow === -1 ? tokens : tokens.slice(0, arrow);
+  const ref = arrow === -1 ? null : tokens[arrow + 1];
+  if (arrow !== -1 && (ref === void 0 || arrow + 2 !== tokens.length)) {
+    throw new ComponentError(`"${line}": write the entity a field points at as "-> Entity", after the key marker`, n);
+  }
+  if (ref !== null && head.at(-1) !== "FK") {
+    throw new ComponentError(`"${line}": only a FK field points at another entity; mark the field FK`, n);
+  }
+  const at3 = head.findIndex((t) => MARKERS.has(t));
+  if (at3 !== -1 && at3 !== head.length - 1) throw new ComponentError(`"${line}": "${head[at3]}" must be the last word before "->"`, n);
+  const marker = at3 === -1 ? null : head[at3];
+  const type = head.slice(0, at3 === -1 ? head.length : at3).join(" ");
+  return { name, type, marker, ref, line: n };
+}
+function relationships({ entities, written }) {
+  const byPair = /* @__PURE__ */ new Map();
+  for (const e of entities.values()) {
+    for (const field of e.fields) {
+      if (!field.ref) continue;
+      byPair.set(pairKey(e.name, field.ref), { from: e.name, fromCard: "*", to: field.ref, toCard: "1", label: "", line: field.line });
+    }
+  }
+  for (const rel of written) byPair.set(pairKey(rel.from, rel.to), rel);
+  return [...byPair.values()];
+}
+var pairKey = (a, b) => [a, b].sort().join("\0");
+var fieldText = (field) => field.type ? `${field.name} ${field.type}` : field.name;
+function nodeSize2(entity) {
+  const keyWidth = (field) => field.marker ? measure(field.marker, FIELD_FS, { mono: true }) + KEY_GAP : 0;
+  const width = Math.max(
+    MIN_WIDTH,
+    measure(entity.name, FS3) + 2 * PAD,
+    ...entity.fields.map((field) => measure(fieldText(field), FIELD_FS) + keyWidth(field) + 2 * PAD)
+  );
+  return { width: Math.ceil(width), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
+}
+function layout3(model, rankdir, id, ui) {
+  const { entities } = model;
+  const rels = relationships(model);
+  const g = new $o.graphlib.Graph({ multigraph: true });
+  g.setGraph({ rankdir, nodesep: 44, ranksep: 62, marginx: 14, marginy: 14 });
+  g.setDefaultEdgeLabel(() => ({}));
+  const key = new Map([...entities.keys()].map((name, i) => [name, `n${i}`]));
+  const sizes = /* @__PURE__ */ new Map();
+  for (const entity of entities.values()) {
+    const size = nodeSize2(entity);
+    sizes.set(entity.name, size);
+    g.setNode(key.get(entity.name), { width: size.width, height: size.height });
+  }
+  rels.forEach((rel, i) => {
+    const label2 = rel.label ? { label: rel.label, width: measure(rel.label, FIELD_FS) + 12, height: 18, labelpos: "c" } : {};
+    g.setEdge(key.get(rel.from), key.get(rel.to), label2, `e${i}`);
+  });
+  $o.layout(g);
+  const steps = [.../* @__PURE__ */ new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
+  const stepOf = new Map(steps.map((line, i) => [line, i]));
+  const edgeSvg = rels.map((rel, i) => {
+    const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
+    const points = data.points.map((p) => ({ ...p }));
+    const path = `<path class="am-edge" d="${smoothPath(points)}"/>`;
+    const ends = endsSvg(points, rel);
+    const label2 = rel.label ? `<g class="am-edge-label"><rect x="${f(data.x - (measure(rel.label, FIELD_FS) + 10) / 2)}" y="${f(data.y - 9)}" width="${f(measure(rel.label, FIELD_FS) + 10)}" height="18" rx="3"/>${textAt(rel.label, data.x, data.y)}</g>` : "";
+    return `<g data-step="${stepOf.get(rel.line)}">${path}${ends}${label2}</g>`;
+  });
+  const nodeSvg = [...entities.values()].map((entity) => {
+    const { x: x2, y: y2 } = g.node(key.get(entity.name));
+    const { width: width2, height: height2 } = sizes.get(entity.name);
+    const left = x2 - width2 / 2;
+    const top = y2 - height2 / 2;
+    const head = `<text class="am-er-head" font-weight="600" x="${f(left + PAD)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(entity.name)}</text>`;
+    const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + width2)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
+    const fields2 = entity.fields.map((field, i) => {
+      const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
+      const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(left + width2 - PAD)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(field.marker)}</text>` : "";
+      return `<text class="am-er-field" font-size="12" x="${f(left + PAD)}" y="${f(cy)}" dominant-baseline="central">${esc(fieldText(field))}</text>${marker}`;
+    }).join("");
+    return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${stepOf.get(entity.line)}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(width2)}" height="${f(height2)}" rx="3"/>${head}${rule}${fields2}</g>`;
+  });
+  const { width, height } = g.graph();
+  const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
+  return `${svgOpen(width, height, label)}<g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
+}
+function endsSvg(points, rel) {
+  const [first, last] = [points[0], points.at(-1)];
+  const out = [];
+  if (points.length > 1) out.push(endMark(last, points.at(-2), rel.toCard), endMark(first, points[1], rel.fromCard));
+  return out.join("");
+}
+var R3 = { back: 12, side: 5, gap: 5 };
+function endMark(point, toward, card) {
+  const dx = point.x - toward.x;
+  const dy = point.y - toward.y;
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  const px = -uy;
+  const py = ux;
+  const at3 = (back, side) => ({ x: point.x - ux * back + px * side, y: point.y - uy * back + py * side });
+  const line = (a, b) => `<line x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(b.x)}" y2="${f(b.y)}"/>`;
+  const bar = (back) => line(at3(back, -R3.side), at3(back, R3.side));
+  const foot = (apexBack) => {
+    const apex = at3(apexBack, 0);
+    return [line(at3(0, -R3.side), apex), line(at3(0, 0), apex), line(at3(0, R3.side), apex)].join("");
+  };
+  const circle = (back) => {
+    const c = at3(back, 0);
+    return `<circle cx="${f(c.x)}" cy="${f(c.y)}" r="3.4"/>`;
+  };
+  const marks = {
+    "1": () => bar(R3.back),
+    "0..1": () => bar(R3.back) + circle(R3.back + R3.gap),
+    "*": () => foot(R3.back),
+    "1..*": () => foot(R3.back) + bar(R3.back + R3.gap)
+  }[card]();
+  return `<g class="am-er-end am-edge">${marks}</g>`;
+}
+function textAt(text, x2, y2) {
+  return `<text x="${f(x2)}" y="${f(y2)}" text-anchor="middle" dominant-baseline="central">${esc(text)}</text>`;
+}
+
 // src/components/ask.js
 var OPTION = /^([*-])\s+(.+)$/;
 var ask_default = {
@@ -5547,7 +5739,7 @@ The question, one sentence
 };
 
 // src/components/index.js
-var ALL2 = [callout_default, kv_default, timeline_default, annot_default, tree_default, limits_default, sequence_default, flow_default, ask_default];
+var ALL2 = [callout_default, kv_default, timeline_default, annot_default, tree_default, limits_default, sequence_default, flow_default, er_default, ask_default];
 var COMPONENTS = new Map(ALL2.map((c) => [c.name, c]));
 var RAW_LANGS = /* @__PURE__ */ new Set(["html", "svg"]);
 
@@ -5556,11 +5748,11 @@ function panelHtml(panel, { cols = 3, grid = true, hints = {} } = {}) {
   const { attrs } = panel;
   const span = Math.min(Number(attrs.span) || 1, cols);
   const rows = Number(attrs.rows) || 1;
-  const layout3 = [
+  const layout4 = [
     grid && span > 1 ? `grid-column: span ${span}` : "",
     grid && rows > 1 ? `grid-row: span ${rows}` : ""
   ].filter(Boolean).join("; ");
-  const style = layout3 ? ` style="${layout3}"` : "";
+  const style = layout4 ? ` style="${layout4}"` : "";
   const hinted = Math.floor(Number(hints.span));
   const data = grid && hinted >= 1 ? ` data-span="${Math.min(hinted, cols)}"` : "";
   const cls = `${span > 1 ? " am-span-wide" : ""}${attrs.bare ? " am-panel--bare" : ""}`;
@@ -7386,7 +7578,7 @@ var CLEAN = Object.freeze({
   hintEveryDays: 7
   // the same notice at most once every 7 days
 });
-var DIRS2 = ["pages", "videos", "cache"];
+var DIRS3 = ["pages", "videos", "cache"];
 function walk(dir) {
   let entries;
   try {
@@ -7408,11 +7600,11 @@ function walk(dir) {
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 function usage(home) {
-  const parts = Object.fromEntries(DIRS2.map((d) => {
+  const parts = Object.fromEntries(DIRS3.map((d) => {
     const files = walk(join5(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
-  return { ...parts, total: DIRS2.reduce((n, d) => n + parts[d].bytes, 0) };
+  return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;

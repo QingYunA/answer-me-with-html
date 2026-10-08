@@ -15,7 +15,7 @@ export default {
       confirmed: '确认了建议', untouched: '未作答，保留建议', was: '原为',
       typed: '以 ">" 开头的行是读者输入的文字。',
     },
-    toc: '目录', flow: '流程图', sequence: '时序图', colon: '：', sep: '、',
+    toc: '目录', flow: '流程图', sequence: '时序图', er: '实体关系图', colon: '：', sep: '、',
     expand: '展开查看图表', close: '关闭', diagram: '图表查看',
     delta: { added: '新增', removed: '删除', changed: '修改', view: '视图', before: '改前', changes: '变更', after: '改后' },
   },
