@@ -209,11 +209,12 @@ export function espeakVoices() {
 }
 
 // Parse the output of `say -v '?'`: name, locale, then a sample after `#`. macOS writes the Chinese name of some voices in
-// brackets after the name, so a long name may be separated from the locale by a single space.
+// brackets after the name, so a long name may be separated from the locale by a single space. A region is usually two
+// letters (`zh_TW`) but may be digits (`ar_001`, `es_419`).
 export function parseMacVoices(out) {
   return out
     .split('\n')
-    .map((l) => l.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z]{2,4})\s+#/))
+    .map((l) => l.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9]{2,4})\s+#/))
     .filter(Boolean)
     .map((m) => ({ name: m[1].trim(), locale: m[2] }));
 }
@@ -235,13 +236,21 @@ const PREFERRED_VOICES = {
   ja: ['Kyoko', 'Otoya'],
 };
 
-// The voice to read a language with: the locale of the tag itself, then the locale its language file names (a Taiwan voice
-// for Traditional Chinese, which has no region in its tag), then any installed voice of the same language. null when the
-// machine has none of them.
+// Voices macOS shares between many languages. They read the language, but a voice of the language itself is nicer, so
+// they are used only when the language has no voice of its own (Korean would otherwise be read by Eddy, not Yuna).
+const SHARED_VOICES = new Set(['Eddy', 'Flo', 'Grandma', 'Grandpa', 'Reed', 'Rocko', 'Sandy', 'Shelley']);
+
+// The voice to read a language with: the locale of the tag itself, then the region the tag leaves out (`fr` -> fr_FR,
+// which macOS has and fr_CA does not), then the locale its language file names (a Taiwan voice for Traditional Chinese,
+// which has no region in its tag), then any installed voice of the same language. null when the machine has none of
+// them: the line keeps its caption. A machine that listed no voice at all reads with its own default voice.
 export function macVoiceFor(voices, language) {
+  if (!voices.length) return '';
   const base = baseLanguage(language);
-  const wanted = [language, voiceHints(language)?.say].filter(Boolean).map(localeKey);
-  for (const locale of wanted) {
+  const implied = new Intl.Locale(language).maximize();
+  const named = voiceHints(language)?.say;
+  const wanted = [language, implied.region && `${implied.language}-${implied.region}`, named].filter(Boolean).map(localeKey);
+  for (const locale of new Set(wanted)) {
     const voice = bestVoice(voices.filter((v) => localeKey(v.locale) === locale), base);
     if (voice) return voice;
   }
@@ -268,7 +277,8 @@ function bestVoice(candidates, base) {
     const hit = candidates.find((v) => stripName(v.name) === name);
     if (hit) return hit.name;
   }
-  return candidates[0].name;
+  const own = candidates.filter((v) => !SHARED_VOICES.has(stripName(v.name)));
+  return (own[0] ?? candidates[0]).name;
 }
 
 // A voice name may carry the Chinese translation of its name in brackets, after the name itself.
@@ -351,9 +361,10 @@ export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
       const i = next++;
       const language = provider.usesLanguage ? languageOf?.(texts[i]) : undefined;
       // A voice picked by language (a system voice) answers null for a language it has no voice for: the line stays silent
-      // rather than being read by a voice for another language. Without a language to match, the voice's own default is used.
+      // rather than being read by a voice for another language. '' means the voice's own default (a machine that listed no
+      // voice at all), and no language at all leaves the default too.
       const voice = language && provider.voiceFor ? provider.voiceFor(language) : undefined;
-      if (language && provider.voiceFor && !voice) {
+      if (language && provider.voiceFor && voice === null) {
         results[i] = null;
         continue;
       }

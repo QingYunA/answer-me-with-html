@@ -6778,7 +6778,7 @@ function espeakVoices() {
   return parseEspeakVoices(spawnSync2("espeak-ng", ["--voices"], { encoding: "utf8" }).stdout || "");
 }
 function parseMacVoices(out) {
-  return out.split("\n").map((l3) => l3.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z]{2,4})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
+  return out.split("\n").map((l3) => l3.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9]{2,4})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
 }
 function parseEspeakVoices(out) {
   return out.split("\n").map((l3) => l3.match(/^\s*\d+\s+(\S+)\s/)).filter(Boolean).map((m) => m[1]);
@@ -6788,10 +6788,14 @@ var PREFERRED_VOICES = {
   en: ["Samantha", "Alex", "Daniel", "Ava"],
   ja: ["Kyoko", "Otoya"]
 };
+var SHARED_VOICES = /* @__PURE__ */ new Set(["Eddy", "Flo", "Grandma", "Grandpa", "Reed", "Rocko", "Sandy", "Shelley"]);
 function macVoiceFor(voices, language) {
+  if (!voices.length) return "";
   const base = baseLanguage(language);
-  const wanted = [language, voiceHints(language)?.say].filter(Boolean).map(localeKey);
-  for (const locale of wanted) {
+  const implied = new Intl.Locale(language).maximize();
+  const named = voiceHints(language)?.say;
+  const wanted = [language, implied.region && `${implied.language}-${implied.region}`, named].filter(Boolean).map(localeKey);
+  for (const locale of new Set(wanted)) {
     const voice = bestVoice(voices.filter((v) => localeKey(v.locale) === locale), base);
     if (voice) return voice;
   }
@@ -6811,7 +6815,8 @@ function bestVoice(candidates, base) {
     const hit = candidates.find((v) => stripName(v.name) === name);
     if (hit) return hit.name;
   }
-  return candidates[0].name;
+  const own = candidates.filter((v) => !SHARED_VOICES.has(stripName(v.name)));
+  return (own[0] ?? candidates[0]).name;
 }
 var stripName = (name) => name.replace(/\s*[(（].*$/, "");
 function run(cmd, args) {
@@ -6879,7 +6884,7 @@ async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
       const i = next++;
       const language = provider.usesLanguage ? languageOf?.(texts[i]) : void 0;
       const voice = language && provider.voiceFor ? provider.voiceFor(language) : void 0;
-      if (language && provider.voiceFor && !voice) {
+      if (language && provider.voiceFor && voice === null) {
         results[i] = null;
         continue;
       }

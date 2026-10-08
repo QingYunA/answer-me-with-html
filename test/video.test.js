@@ -331,10 +331,13 @@ test('local voice: keeps the HTTP status code when reading fails after the respo
   });
 });
 
-// The voices a machine may have installed, as `say -v '?'` lists them: name, locale, then a sample.
+// The voices a machine may have installed, as `say -v '?'` lists them: name, locale, then a sample. Eddy carries every
+// locale of the shared voices; Majed shows a region of digits.
 const MAC_VOICES = parseMacVoices([
   'Albert              en_US    # Hello! My name is Albert.',
   'Amelie              fr_CA    # Bonjour! Je m’appelle Amélie.',
+  'Eddy (韩语（韩国）)      ko_KR    # 안녕하세요! 제 이름은 Eddy입니다.',
+  'Majed               ar_001   # مرحبًا! اسمي ماجد.',
   'Meijia              zh_TW    # 你好！我叫美佳。',
   'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',
   'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
@@ -345,27 +348,30 @@ const MAC_VOICES = parseMacVoices([
 ].join('\n'));
 
 test('parseMacVoices: reads each voice with its locale, including long names separated by one space', () => {
-  assert.equal(MAC_VOICES.length, 9);
+  assert.equal(MAC_VOICES.length, 11);
   assert.deepEqual(MAC_VOICES[0], { name: 'Albert', locale: 'en_US' });
   assert.deepEqual(MAC_VOICES.at(-1), { name: 'Yuna', locale: 'ko_KR' });
   assert.equal(MAC_VOICES.find((v) => v.locale === 'zh_CN').name, 'Reed (中文（中国大陆）)');
+  assert.equal(MAC_VOICES.find((v) => v.locale === 'ar_001').name, 'Majed', 'a region of digits is a locale too');
 });
 
-test('macVoiceFor: the voice of the line language, the language hint, or none at all', () => {
+test('macVoiceFor: the voice of the line language, the region it implies, the language hint, or none at all', () => {
   // A language with a hint: Chinese and Traditional Chinese use the locale the language file names.
   assert.equal(macVoiceFor(MAC_VOICES, 'zh'), 'Tingting (中文（中国大陆）)');
   assert.equal(macVoiceFor(MAC_VOICES, 'zh-Hant'), 'Meijia', 'Traditional Chinese takes the Taiwan voice');
   assert.equal(macVoiceFor(MAC_VOICES, 'zh-HK'), 'Sinji', 'the locale of the tag itself wins over the hint');
-  // A language without a hint: any installed voice of the language, exact locale first.
-  assert.equal(macVoiceFor(MAC_VOICES, 'ko'), 'Yuna');
+  // A language without a hint: the region the tag leaves out first, then any installed voice of the language.
+  assert.equal(macVoiceFor(MAC_VOICES, 'fr'), 'Thomas', 'fr implies fr_FR, not the fr_CA voice');
   assert.equal(macVoiceFor(MAC_VOICES, 'fr-FR'), 'Thomas', 'the exact locale wins, Amelie is fr_CA');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ar'), 'Majed');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ko'), 'Yuna', 'a shared voice (Eddy) is not preferred over the native one');
   // The everyday voice beats a novelty voice that also carries en_US and sorts first.
   assert.equal(macVoiceFor(MAC_VOICES, 'en'), 'Samantha (英语（美国）)');
   // A language the machine has no voice for stays silent, rather than being read by another language.
   assert.equal(macVoiceFor(MAC_VOICES, 'de'), null);
   assert.equal(macVoiceFor(MAC_VOICES, 'th'), null);
-  assert.equal(macVoiceFor(MAC_VOICES, 'zh-Hant'), 'Meijia');
   assert.equal(macVoiceFor([{ name: 'Eddy (中文（中国大陆）)', locale: 'zh_CN' }], 'zh'), 'Eddy (中文（中国大陆）)', 'with no preferred voice installed, the first of the locale is used');
+  assert.equal(macVoiceFor([], 'de'), '', 'a machine that listed no voice at all keeps its default voice');
 });
 
 // The espeak-ng voices, as `espeak-ng --voices` lists them: a priority, the voice name, then the language. English and
