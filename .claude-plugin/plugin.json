@@ -1,7 +1,7 @@
 {
   "name": "answer-me-with-html",
   "description": "Answer hard questions with a one-page HTML: the model writes a short Markdown draft; the bundled CLI handles templates, SVG auto-layout and an STE controlled-writing check.",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "author": {
     "name": "QingYunA"
   },
