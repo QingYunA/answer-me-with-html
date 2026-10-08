@@ -2,6 +2,7 @@
 // replyText and planLayout are plain ES modules for tests; the page gets them with their `export` keyword dropped.
 // src/assets.js (development) and scripts/build.mjs (bundle) both call this with their own file reader, so the two cannot drift apart.
 const unexport = (code) => code.replace(/^export /gm, '');
+export { unexport };
 
 export function composeRuntime(read) {
   return `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('layout-plan.js'))}\n${read('layout-dom.js')}})();\n`;

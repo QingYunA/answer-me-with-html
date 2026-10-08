@@ -17,5 +17,5 @@ export default {
     expand: 'Expand diagram', close: 'Close', diagram: 'Diagram viewer',
     delta: { added: 'added', removed: 'removed', changed: 'changed', view: 'View', before: 'Before', changes: 'Changes', after: 'After' },
   },
-  videoUi: { play: 'Play', pause: 'Pause', chapters: 'Chapters' },
+  videoUi: { play: 'Play', pause: 'Pause', chapters: 'Chapters', speed: 'Speed', export: 'Export' },
 };

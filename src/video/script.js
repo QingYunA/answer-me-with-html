@@ -89,7 +89,7 @@ export function buildTimeline(video, durations) {
     t += TIMING.transition;
     const beats = lay(s.beats);
     t += TIMING.tail - TIMING.gap;
-    return { title: s.title, start: round(start), end: round(t), beats };
+    return { id: s.id, title: s.title, start: round(start), end: round(t), beats };
   });
   t += TIMING.outro;
   return { duration: round(t), title, scenes };

@@ -1,7 +1,7 @@
 // Static assets needed at run time, in one place. In development they are read from disk; when bundling (scripts/build.mjs) the whole module is replaced by inline strings,
 // so the bundle skills/answer-me-with-html/scripts/am.mjs depends on no external files.
 import { readFileSync } from 'node:fs';
-import { composeRuntime } from './runtime/compose.js';
+import { composeRuntime, unexport } from './runtime/compose.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -13,3 +13,7 @@ export const DELTA_CSS = read('./themes/delta.css');
 export const DELTA_JS = read('./runtime/delta.js');
 export const VIDEO_CSS = read('./themes/video.css');
 export const VIDEO_JS = read('./runtime/video.js');
+export const VIDEO_EXPORT_JS = read('./runtime/video-export.js');
+// The WebM writer is shared with the page: the same source runs in Node (the CLI writes the file) and inside the
+// player (the export button). scripts/inline-assets.mjs builds the identical string for the bundle.
+export const VIDEO_MUX_JS = `${unexport(read('./video/webm.js'))}\nwindow.__amvWebm = { WebmWriter };\n`;
