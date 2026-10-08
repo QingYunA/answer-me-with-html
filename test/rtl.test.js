@@ -5,8 +5,10 @@ import assert from 'node:assert/strict';
 import { renderDoc } from '../src/render.js';
 import { COMPONENTS } from '../src/components/index.js';
 import { replyText } from '../src/runtime/reply-text.js';
-import { RTL_CSS } from '../src/assets.js';
+import { readFileSync } from 'node:fs';
+import { RTL_CSS, RTL_JS } from '../src/assets.js';
 import { isolateLtrRuns, svgLine } from '../src/bidi.js';
+import { RTL_LETTER } from '../src/runtime/rtl-letter.js';
 
 const draft = (lang, body) => `---\nlang: ${lang}\n---\n${body}`;
 const FLOW = '## A זרימה\n```flow LR\nטיוטה -> הכלי am: קורא\nהכלי am -> דף HTML\n```\n';
@@ -328,4 +330,32 @@ test('rtl: only a right-to-left page carries the reply view, and the copied repl
   // The view is drawn from the textarea, which still holds replyText's Markdown: Copy copies the textarea.
   assert.match(he, /navigator\.clipboard\.writeText\(text\.value\)/);
   assert.match(RTL_CSS, /\.am-reply--view textarea/);
+});
+
+// A `>` or `<` inside a quoted attribute value belongs to the tag: no isolate is ever written inside an attribute.
+test('rtl: isolateLtrRuns reads quoted attribute values as part of the tag', () => {
+  assert.equal(isolateLtrRuns('<span title="a > b">src/app.js</span>'), '<span title="a > b"><bdi dir="ltr">src/app.js</bdi></span>');
+  assert.equal(isolateLtrRuns("<span title='a > b'>src/app.js</span>"), `<span title='a > b'><bdi dir="ltr">src/app.js</bdi></span>`);
+  assert.equal(isolateLtrRuns('<span title="a < b">src/app.js</span>'), '<span title="a < b"><bdi dir="ltr">src/app.js</bdi></span>');
+  // A quote of the other kind inside a value, and values on tags around Hebrew text: the html stays as it was.
+  const hebrew = `<p data-x="it's > 1"><span title='say "a > b"'>שלום</span></p>`;
+  assert.equal(isolateLtrRuns(hebrew), hebrew);
+});
+
+// The reply view (src/runtime/reply-view.js) and the page builder (src/bidi.js) share one RTL_LETTER (src/runtime/rtl-letter.js).
+test('rtl: the reply view and bidi.js use the one RTL_LETTER definition, and the page script carries it without an import', () => {
+  const src = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+  for (const file of ['bidi.js', 'runtime/reply-view.js']) {
+    assert.doesNotMatch(src(file), /RTL_LETTER\s*=/, `${file} defines its own RTL_LETTER`);
+    assert.match(src(file), /import \{ RTL_LETTER \} from '\.\/(runtime\/)?rtl-letter\.js';/);
+  }
+  // The definition is written with property escapes only: no literal right-to-left or invisible characters.
+  assert.doesNotMatch(src('runtime/rtl-letter.js'), /[^\x00-\x7F]/);
+  // The page script holds the definition once, has no import, and compiles.
+  assert.equal(RTL_JS.split(RTL_LETTER.source).length, 2);
+  assert.doesNotMatch(RTL_JS, /^\s*(import|export)\b/m);
+  assert.doesNotThrow(() => new Function(RTL_JS));
+  // Hebrew and Arabic letters count; a byte order mark, Latin letters and digits do not.
+  assert.ok(RTL_LETTER.test('א') && RTL_LETTER.test('ا'));
+  assert.ok(!RTL_LETTER.test('﻿') && !RTL_LETTER.test('a1'));
 });

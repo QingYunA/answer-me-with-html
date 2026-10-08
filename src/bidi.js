@@ -3,7 +3,8 @@
 // `abcd.example.com-1234`. Such a run is isolated as left to right. A run that holds any Hebrew or
 // Arabic letter keeps the page direction: there the neutrals belong to the right-to-left sentence.
 
-const RTL_LETTER = /[\p{Script=Hebrew}\p{Script=Arabic}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Samaritan}\p{Script=Mandaic}]/u;
+import { RTL_LETTER } from './runtime/rtl-letter.js';
+
 const LETTER = /\p{L}/u;
 
 // True for text with a letter of a left-to-right script and no right-to-left letter. Digits and punctuation alone are not a run:
@@ -43,7 +44,8 @@ export function svgLine(line, dir) {
 const INLINE = new Set(['a', 'abbr', 'b', 'cite', 'code', 'del', 'dfn', 'em', 'i', 'ins', 'kbd', 'mark', 'q', 's', 'samp', 'strong', 'sub', 'sup', 'u', 'var']);
 // Elements whose content is not page text: skipped whole.
 const SKIP = new Set(['svg', 'pre', 'script', 'style', 'textarea', 'select', 'option', 'title']);
-const TOKEN = /<!--[\s\S]*?-->|<\/?([a-zA-Z][\w-]*)\b[^>]*>|[^<]+|</g;
+// A tag ends at the first `>` outside a quoted attribute value, so `<span title="a > b">` is one tag, not a tag followed by the text ` b">`.
+const TOKEN = /<!--[\s\S]*?-->|<\/?([a-zA-Z][\w-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|[^<]+|</g;
 
 // Every run of text in a right-to-left page's html that has no right-to-left letter and holds punctuation gets <bdi dir="ltr">…</bdi>
 // (a bdi, so no style written for a span applies to it). A run is the text

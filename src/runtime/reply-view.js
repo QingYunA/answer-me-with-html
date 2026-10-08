@@ -3,8 +3,10 @@
 // with markup or Latin letters ("# Re: ...", "1. [E] ...", "- **A · ...**") then come out reordered for a Hebrew reader.
 // This script shows the reply drawn instead: headings, bold answers and quoted comments, each line in its own direction.
 // The textarea stays in the sheet as what Copy copies, so the copied text does not change.
-// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).
-const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the
+// import (src/runtime/compose.js).
+import { RTL_LETTER } from './rtl-letter.js';
+
 const escHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 // A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.
 const dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');
