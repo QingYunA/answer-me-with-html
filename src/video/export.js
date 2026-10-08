@@ -1,16 +1,15 @@
 // Writing a video file next to the player page. Two ways:
 //   MP4    local Chrome (headless, via the Chrome DevTools Protocol) calls the player page's render(t) frame by frame and
 //          screenshots it, then ffmpeg encodes H.264 and muxes the narration track. No Playwright / Puppeteer dependency.
-//   WebM   the same frame loop, but the page itself encodes the frames with WebCodecs and this module writes the
-//          container (src/video/webm.js). Needs Chrome only, no ffmpeg. VP9 video and Opus audio.
+//   WebM   the page encodes its own frames with WebCodecs and muxes the container with src/video/webm.js, which every
+//          player page carries (it drives the export button too). This module only starts it, watches it and writes the
+//          bytes it hands back. Needs Chrome only, no ffmpeg. VP9 video and Opus audio.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { hasCommand } from '../sys.js';
-import { VIDEO_EXPORT_JS } from '../assets.js';
-import { WebmWriter } from './webm.js';
 
 export class ExportError extends Error {}
 
@@ -19,9 +18,9 @@ const CHROME_START_TIMEOUT_MS = 20000;
 const WIDTH = 1920;
 const HEIGHT = 1080;
 const QUALITY = 92;               // the JPEG quality of every captured frame
-const FRAME_RECORD = 14;          // bytes of header in a record the page returns: kind, flags, timestamp, length
-const PULL_BYTES = 1 << 20;       // how much encoded data one pull takes out of the page
 const WEBM_BITRATE = 3_500_000;   // VP9 at 1080p30: flat slides stay clean at this rate
+const WEBM_SLICE = 1_048_572;     // 1 MiB rounded to a multiple of 3, so every base64 slice stands on its own
+const WEBM_POLL_MS = 250;         // how often the CLI looks at the page's progress
 
 const CHROME_PATHS = {
   darwin: [
@@ -149,88 +148,42 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
   }
 }
 
-// The export without ffmpeg: the page encodes the picture and the narration with WebCodecs, the CLI writes the WebM
-// container. `am video` picks this path when ffmpeg is missing, so `--mp4` still results in a video file.
+// The export without ffmpeg: the page encodes the picture and the narration with WebCodecs and muxes the container
+// itself (src/runtime/video-export.js), so this only starts it, reports progress and writes the bytes it hands back.
+// `am video` picks this path when ffmpeg is missing, so `--mp4` still results in a video file.
 export async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = () => {}, startTimeoutMs = CHROME_START_TIMEOUT_MS, bitrate = WEBM_BITRATE } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('The built-in encoder needs Node.js 22 or later (built-in WebSocket)');
 
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
-    const { info, evaluate, screenshot } = player;
-    await evaluate(VIDEO_EXPORT_JS);
+    const { info, evaluate } = player;
     if (!(await evaluate('window.__amvEnc.supported()'))) {
       throw new ExportError('This browser cannot encode video (WebCodecs is missing). Install ffmpeg to export an MP4');
     }
-    const { codec } = await evaluate(`window.__amvEnc.init(${JSON.stringify({ width: WIDTH, height: HEIGHT, fps: info.fps, bitrate })})`);
-    const writer = new WebmWriter({
-      width: WIDTH, height: HEIGHT, durationMs: info.duration * 1000,
-      videoCodec: codec.startsWith('vp8') ? 'V_VP8' : 'V_VP9',
-    });
+    const started = await evaluate(`window.__amvEnc.start(${JSON.stringify({ bitrate })})`);
+    if (started.error) throw new ExportError(`The browser could not encode the video: ${started.error}`);
 
-    const sound = await evaluate('window.__amvEnc.audio()');
-    if (sound) writer.audio = { channels: sound.channels, codecPrivate: opusHead(sound), preSkipSamples: opusPreSkip(sound) };
-
-    // Records arrive in whole pieces; the page does not split one.
-    const take = (buf) => {
-      let at = 0;
-      while (at + FRAME_RECORD <= buf.length) {
-        const length = buf.readUInt32LE(at + 10);
-        if (at + FRAME_RECORD + length > buf.length) break;
-        writer.block({
-          track: buf[at], key: (buf[at + 1] & 1) === 1,
-          tsUs: buf.readDoubleLE(at + 2), data: buf.subarray(at + FRAME_RECORD, at + FRAME_RECORD + length),
-        });
-        at += FRAME_RECORD + length;
-      }
-      if (at !== buf.length) throw new ExportError('The encoder returned a broken frame record');
-    };
-    const collect = async () => {
-      for (;;) {
-        const slice = await evaluate(`window.__amvEnc.pull(${PULL_BYTES})`);
-        if (slice.error) throw new ExportError(`The encoder stopped: ${slice.error}`);
-        if (!slice.data) return;
-        take(Buffer.from(slice.data, 'base64'));
-      }
-    };
-
-    const frames = Math.ceil(info.duration * info.fps);
-    const keyEvery = Math.max(1, Math.round(info.fps * 5));   // a key frame every 5 seconds, so seeking stays cheap
-    for (let i = 0; i < frames; i++) {
-      await evaluate(`render(${i / info.fps})`);
-      const data = await screenshot();
-      await evaluate(`window.__amvEnc.frame(${JSON.stringify(data)}, ${Math.round((i / info.fps) * 1e6)}, ${i % keyEvery === 0})`);
-      if (i % 15 === 0 || i === frames - 1) {
-        await collect();
-        onProgress(i + 1, frames);
-      }
+    let state = null;
+    for (;;) {
+      state = await evaluate('window.__amvEnc.progress()');
+      if (state.error) throw new ExportError(`The browser stopped encoding: ${state.error}`);
+      onProgress(state.done, state.total);
+      if (!state.running) break;
+      await new Promise((r) => setTimeout(r, WEBM_POLL_MS));
     }
-    await evaluate('window.__amvEnc.finish()');
-    await collect();
-    writeFileSync(webmFile, writer.build());
-    return { frames, duration: info.duration, codec, audio: Boolean(sound) };
+
+    const size = await evaluate('window.__amvEnc.size()');
+    const file = Buffer.alloc(size);
+    for (let at = 0; at < size; at += WEBM_SLICE) {
+      const slice = await evaluate(`window.__amvEnc.bytes(${at}, ${Math.min(WEBM_SLICE, size - at)})`);
+      Buffer.from(slice, 'base64').copy(file, at);
+    }
+    writeFileSync(webmFile, file);
+    return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
   } finally {
     await player.close();
   }
 }
-
-// The setup bytes the Opus decoder needs (OpusHead). The browser reports them with the first chunk; if it does not,
-// build one: 312 samples are the pre-skip libopus uses by default.
-function opusHead(sound) {
-  const head = sound.head ? Buffer.from(sound.head, 'base64') : null;
-  if (head?.length >= 19) return head;
-  const out = Buffer.alloc(19);
-  out.write('OpusHead', 0, 'ascii');
-  out[8] = 1;
-  out[9] = sound.channels;
-  out.writeUInt16LE(312, 10);
-  out.writeUInt32LE(sound.sampleRate, 12);
-  return out;
-}
-
-const opusPreSkip = (sound) => {
-  const head = sound.head ? Buffer.from(sound.head, 'base64') : null;
-  return head?.length >= 19 ? head.readUInt16LE(10) : 312;
-};
 
 // Waits for Chrome to print its DevTools URL. A failure message carries the end of Chrome's stderr,
 // so a crash at start can be told apart from a slow start.

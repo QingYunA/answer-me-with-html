@@ -24,5 +24,5 @@ export default {
     expand: '展開查看圖表', close: '關閉', diagram: '圖表檢視',
     delta: { added: '新增', removed: '刪除', changed: '修改', view: '檢視', before: '改前', changes: '變更', after: '改後' },
   },
-  videoUi: { play: '播放', pause: '暫停', chapters: '章節', speed: '速度' },
+  videoUi: { play: '播放', pause: '暫停', chapters: '章節', speed: '速度', export: '匯出' },
 };

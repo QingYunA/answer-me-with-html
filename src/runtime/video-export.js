@@ -1,104 +1,102 @@
-// The built-in encoder for the export path that has no ffmpeg: the CLI drives window.render(t), screenshots every
-// frame and sends the JPEG here; WebCodecs encodes the picture, the narration in the page is encoded too, and the CLI
-// collects the chunks and writes the WebM file (src/video/webm.js). The script is injected into the player page at
-// export time only, so a page that is merely watched does not carry it.
+// The export engine for the path that has no ffmpeg: the player page drives its own render(t), rasterizes the stage
+// into a canvas, encodes the picture and the narration with WebCodecs and muxes the WebM container with the writer
+// from src/video/webm.js (injected ahead of this script as window.__amvWebm). Every video page carries it: the export
+// button in the controls drives it, and `am video --mp4` drives the same code through the DevTools protocol.
 //
-// Every chunk leaves as one record: kind (1 video, 2 audio), flags (bit 0: key frame), timestamp in microseconds as a
-// float64, payload length as a uint32, then the payload. The CLI parses the same layout.
+// The page hands out the finished file in slices (window.__amvEnc.bytes(at, len), base64) so no bytes travel twice.
 (() => {
-  const HEADER = 14;
-  const AUDIO_FRAME_SECONDS = 0.02;   // Opus encodes 20 ms frames
-  const CODECS = ['vp09.00.31.08', 'vp09.00.10.08', 'vp8'];
+  const W = 1920;
+  const H = 1080;
+  const CODECS = ['vp09.00.31.08', 'vp09.00.10.08', 'vp8'];   // the first one the browser really encodes
+  const AUDIO_FRAME_SECONDS = 0.02;    // Opus encodes 20 ms frames
+  const KEY_SECONDS = 5;               // a key frame every 5 s, so seeking stays cheap
+  const BITRATE = 3_500_000;           // VP9 at 1080p30: flat slides stay clean at this rate
+  const QUEUE_LIMIT = 8;               // frames in flight; a software encoder runs slower than the page renders
 
-  const queue = [];
-  let video = null;
-  let audio = null;
-  let fps = 30;
-  let error = null;
-  let frames = 0;
-  let audioChunks = 0;
+  const state = { running: false, done: 0, total: 0, error: null, bytes: null, codec: '', audio: false, cancel: false };
 
-  const fail = (e) => {
-    if (!error) error = String((e && e.message) || e);
-  };
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const yieldToPage = () => new Promise((r) => {
+    // A timer is clamped in a hidden tab; a message port keeps the export running at full speed in the background.
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => r();
+    ch.port2.postMessage(0);
+  });
 
-  const fromBase64 = (s) => {
-    const bin = atob(s);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    return out;
-  };
-  // btoa needs a string, and one built with fromCharCode cannot be too long for the argument list.
-  const toBase64 = (bytes) => {
-    let s = '';
-    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-    return btoa(s);
-  };
   const asBytes = (x) => (x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x.buffer, x.byteOffset, x.byteLength));
 
-  function push(kind, key, tsUs, data) {
-    const rec = new Uint8Array(HEADER + data.byteLength);
-    const view = new DataView(rec.buffer);
-    view.setUint8(0, kind);
-    view.setUint8(1, key ? 1 : 0);
-    view.setFloat64(2, tsUs, true);
-    view.setUint32(10, data.byteLength, true);
-    rec.set(data, HEADER);
-    queue.push(rec);
+  // ── Rasterizing: the stage, with every node's computed style copied into the SVG ──
+  // The clone needs the styles inline: an <img> of an SVG that embeds the page's own stylesheets does not lay out the
+  // page the same way (the fixed-position chain and the html/body height rules break). Computed styles are exact and
+  // cost about 300 ms for the whole stage, so unchanged nodes keep their string from the previous frame: the player
+  // changes only a handful of nodes per frame (14 of 261 measured on a five-scene video).
+  const styles = new Map();
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const image = new Image();
+  let stageEl = null;
+
+  // The picture is always 1920x1080: the stage is pinned at the top left of the SVG and the fit transform the player
+  // applies to the live stage (translate + scale) is dropped, so the frame does not depend on the window size.
+  const PIN = `;position:absolute;left:0;top:0;width:${W}px;height:${H}px;transform:none;`;
+
+  function styleOf(el) {
+    const cs = getComputedStyle(el);
+    let out = '';
+    for (let i = 0; i < cs.length; i++) out += `${cs[i]}:${cs.getPropertyValue(cs[i])};`;
+    return out;
   }
 
-  // The codec names differ in the level they claim; take the first the browser really encodes.
-  async function pickCodec(config) {
-    for (const codec of CODECS) {
-      try {
-        if ((await VideoEncoder.isConfigSupported({ ...config, codec })).supported) return codec;
-      } catch {
-        // an unknown codec string is not an error, try the next one
-      }
+  function stageSvg(stage) {
+    const animated = new Set();
+    for (const anim of document.getAnimations()) {
+      const target = anim.effect && anim.effect.target;
+      if (target) animated.add(target);
     }
-    throw new Error('This browser encodes neither VP9 nor VP8');
+    const clone = stage.cloneNode(true);
+    const stamp = `${window.innerWidth}x${window.innerHeight}`;
+    let recomputed = 0;
+    const walk = (src, dst, parentSign) => {
+      const sign = `${parentSign}\u0001${src.getAttribute('class') || ''}\u0001${src.getAttribute('style') || ''}${animated.has(src) ? '\u0001a' : ''}`;
+      let entry = styles.get(src);
+      if (!entry || entry.sign !== sign) {
+        entry = { sign, text: styleOf(src) + (src === stage ? PIN : '') };
+        styles.set(src, entry);
+        recomputed++;
+      }
+      dst.setAttribute('style', entry.text);
+      const a = src.children;
+      const b = dst.children;
+      for (let i = 0; i < a.length; i++) walk(a[i], b[i], sign);
+    };
+    walk(stage, clone, stamp);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${new XMLSerializer().serializeToString(clone)}</foreignObject></svg>`;
+    return { svg, recomputed };
   }
 
-  async function init(cfg) {
-    fps = cfg.fps;
-    const config = { width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, latencyMode: 'quality' };
-    const codec = await pickCodec(config);
-    video = new VideoEncoder({
-      output: (chunk) => {
-        const data = new Uint8Array(chunk.byteLength);
-        chunk.copyTo(data);
-        push(1, chunk.type === 'key', chunk.timestamp, data);
-        frames++;
-      },
-      error: fail,
-    });
-    video.configure({ ...config, codec });
-    return { codec };
+  async function paint(stage) {
+    const { svg } = stageSvg(stage);
+    // A data URL keeps the canvas origin clean; a blob URL taints it and the encoder then refuses the frame.
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    await image.decode();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(image, 0, 0, W, H);
   }
 
-  async function frame(base64, tsUs, key) {
-    const bitmap = await createImageBitmap(new Blob([fromBase64(base64)], { type: 'image/jpeg' }));
-    const picture = new VideoFrame(bitmap, { timestamp: tsUs, duration: Math.round(1e6 / fps) });
-    video.encode(picture, { keyFrame: Boolean(key) });
-    picture.close();
-    bitmap.close();
-    // A software encoder runs slower than the frames arrive; keep the queue short instead of piling frames up.
-    while (video.encodeQueueSize > 8 && !error) await wait(2);
-    if (error) throw new Error(error);
-    return { frames, queued: video.encodeQueueSize };
-  }
-
-  // The narration the page already carries, encoded from the WAV in the <audio> element: no bytes travel twice.
-  async function addAudio() {
+  // ── The narration the page already carries: encoded from the WAV the player holds as a data URL ──
+  function readWav() {
     const el = document.getElementById('amv-audio');
-    const src = el?.getAttribute('src') ?? '';
+    const src = (el && el.getAttribute('src')) || '';
     const comma = src.indexOf(',');
     if (!src.startsWith('data:') || comma < 0) return null;
-    const wav = fromBase64(src.slice(comma + 1));
+    const bin = atob(src.slice(comma + 1));
+    const wav = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) wav[i] = bin.charCodeAt(i);
     const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
     const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);
-    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') throw new Error('The narration track is not a WAV file');
+    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') throw new Error('the narration track is not a WAV file');
     let format = null;
     let pcm = null;
     for (let o = 12; o + 8 <= wav.byteLength;) {
@@ -108,74 +106,141 @@
       else if (id === 'data') pcm = { at: o + 8, len };
       o += 8 + len + (len % 2);
     }
-    if (!format || !pcm || format.bits !== 16) throw new Error('The narration track must be 16-bit PCM WAV');
-    const { channels, sampleRate } = format;
+    if (!format || !pcm || format.bits !== 16) throw new Error('the narration track must be 16-bit PCM WAV');
+    return { wav, pcm, ...format };
+  }
 
+  async function encodeAudio(writer) {
+    const sound = readWav();
+    if (!sound) return false;
+    const { wav, pcm, channels, sampleRate } = sound;
     let head = null;
-    audio = new AudioEncoder({
-      output: (chunk, meta) => {
-        if (!head && meta?.decoderConfig?.description) head = asBytes(meta.decoderConfig.description).slice();
+    const audio = new AudioEncoder({
+      output(chunk, meta) {
+        if (!head && meta && meta.decoderConfig && meta.decoderConfig.description) head = asBytes(meta.decoderConfig.description).slice();
         const data = new Uint8Array(chunk.byteLength);
         chunk.copyTo(data);
-        push(2, false, chunk.timestamp, data);
-        audioChunks++;
+        writer.block({ track: 2, key: false, tsUs: chunk.timestamp, data });
       },
-      error: fail,
+      error(e) { state.error = String((e && e.message) || e); },
     });
     audio.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: 64000 * channels });
     const perBlock = Math.round(sampleRate * AUDIO_FRAME_SECONDS);
     const total = Math.floor(pcm.len / (2 * channels));
     for (let i = 0; i < total; i += perBlock) {
       const samples = perBlock * channels;
-      const bytes = new Uint8Array(samples * 2);   // zero filled: a short last block becomes a full Opus frame
+      const data = new Uint8Array(samples * 2);   // zero filled: a short last block becomes a full Opus frame
       const from = pcm.at + i * channels * 2;
-      bytes.set(wav.subarray(from, from + Math.min(samples, (total - i) * channels) * 2));
-      const data = new AudioData({
+      data.set(wav.subarray(from, from + Math.min(samples, (total - i) * channels) * 2));
+      const block = new AudioData({
         format: 's16', sampleRate, numberOfFrames: perBlock, numberOfChannels: channels,
-        timestamp: Math.round((i / sampleRate) * 1e6), data: bytes,
+        timestamp: Math.round((i / sampleRate) * 1e6), data,
       });
-      audio.encode(data);
-      data.close();
-      while (audio.encodeQueueSize > 16 && !error) await wait(2);
+      audio.encode(block);
+      block.close();
+      while (audio.encodeQueueSize > 16 && !state.error) await yieldToPage();
+      if (state.cancel) break;
     }
-    if (error) throw new Error(error);
-    return { head: head ? toBase64(head) : '', channels, sampleRate, chunks: audioChunks };
+    await audio.flush();
+    audio.close();
+    if (state.error) throw new Error(state.error);
+    // The encoder adds pre-skip samples of silence; CodecDelay makes the player drop them again.
+    const preSkip = head && head.length >= 19 ? new DataView(head.buffer, head.byteOffset, head.byteLength).getUint16(10, true) : 312;
+    if (!head || head.length < 19) {
+      head = new Uint8Array(19);
+      head.set(new TextEncoder().encode('OpusHead'), 0);
+      head[8] = 1;
+      head[9] = channels;
+      new DataView(head.buffer).setUint16(10, 312, true);
+      new DataView(head.buffer).setUint32(12, sampleRate, true);
+    }
+    writer.audio = { channels, codecPrivate: head, preSkipSamples: preSkip };
+    return true;
   }
 
-  async function finish() {
-    if (video) { await video.flush(); video.close(); video = null; }
-    if (audio) { await audio.flush(); audio.close(); audio = null; }
-    if (error) throw new Error(error);
-    return { frames, audioChunks };
+  // ── The whole export, run inside this page ──
+  // start() only validates and kicks the work off: the caller polls progress() and then asks for the bytes, so the
+  // DevTools protocol never has to wait minutes for one call to come back.
+  function start(options = {}) {
+    if (state.running) return { error: 'an export is already running' };
+    const api = window.__amv;
+    const Mux = window.__amvWebm && window.__amvWebm.WebmWriter;
+    if (!Mux) return { error: 'the WebM writer is missing from this page' };
+    if (typeof VideoEncoder !== 'function' || typeof AudioEncoder !== 'function') {
+      return { error: 'this browser cannot encode video (WebCodecs is missing)' };
+    }
+    Object.assign(state, { running: true, done: 0, total: Math.ceil(api.duration * api.fps), error: null, bytes: null, cancel: false });
+    run(Mux, options).catch((e) => { state.error = String((e && e.message) || e); }).finally(() => { state.running = false; styles.clear(); });
+    return { total: state.total, fps: api.fps, duration: api.duration };
   }
 
-  // Hand the CLI the next slice of encoded data; it writes the container while the encoder keeps working.
-  function pull(maxBytes) {
-    if (error) return { error };
-    const parts = [];
-    let bytes = 0;
-    while (queue.length && bytes < maxBytes) {
-      const rec = queue.shift();
-      parts.push(rec);
-      bytes += rec.byteLength;
+  async function run(Mux, options) {
+    const api = window.__amv;
+    const fps = api.fps;
+    const total = state.total;
+    const config = { width: W, height: H, bitrate: options.bitrate || BITRATE, framerate: fps, latencyMode: 'quality' };
+    let codec = null;
+    for (const candidate of CODECS) {
+      try {
+        if ((await VideoEncoder.isConfigSupported({ ...config, codec: candidate })).supported) { codec = candidate; break; }
+      } catch {
+        // an unknown codec string is not an error, try the next one
+      }
     }
-    if (!parts.length) return { data: '', bytes: 0 };
-    const all = new Uint8Array(bytes);
-    let at = 0;
-    for (const part of parts) {
-      all.set(part, at);
-      at += part.byteLength;
+    if (!codec) throw new Error('this browser encodes neither VP9 nor VP8');
+    state.codec = codec;
+
+    const writer = new Mux({ width: W, height: H, durationMs: api.duration * 1000, videoCodec: codec.startsWith('vp8') ? 'V_VP8' : 'V_VP9' });
+    state.audio = await encodeAudio(writer);
+    if (state.cancel) throw new Error('cancelled');
+
+    // The player keeps its own clock; the export poses every frame itself, so playback is paused first.
+    api.pauseForExport();
+    stageEl = stageEl || document.querySelector('.amv-stage');
+    const video = new VideoEncoder({
+      output(chunk) {
+        const data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        writer.block({ track: 1, key: chunk.type === 'key', tsUs: chunk.timestamp, data });
+      },
+      error(e) { state.error = String((e && e.message) || e); },
+    });
+    video.configure({ ...config, codec });
+    const keyEvery = Math.max(1, Math.round(fps * KEY_SECONDS));
+    for (let i = 0; i < total; i++) {
+      if (state.cancel) { video.close(); throw new Error('cancelled'); }
+      if (state.error) throw new Error(state.error);
+      window.render(i / fps);
+      await paint(stageEl);
+      const frame = new VideoFrame(canvas, { timestamp: Math.round((i / fps) * 1e6), duration: Math.round(1e6 / fps) });
+      video.encode(frame, { keyFrame: i % keyEvery === 0 });
+      frame.close();
+      state.done = i + 1;
+      if (video.encodeQueueSize > QUEUE_LIMIT || i % 5 === 0) await yieldToPage();
     }
-    return { data: toBase64(all), bytes };
+    await video.flush();
+    video.close();
+    if (state.error) throw new Error(state.error);
+    state.bytes = writer.build();
   }
+
+  const base64 = (from, to) => {
+    let out = '';
+    for (let i = from; i < to; i += 0x8000) out += String.fromCharCode.apply(null, state.bytes.subarray(i, Math.min(to, i + 0x8000)));
+    return btoa(out);
+  };
 
   window.__amvEnc = {
-    supported: () => typeof VideoEncoder === 'function' && typeof AudioEncoder === 'function',
-    init,
-    frame,
-    audio: addAudio,
-    finish,
-    pull,
-    stats: () => ({ error, frames, audioChunks, queued: queue.length }),
+    supported() {
+      return typeof VideoEncoder === 'function' && typeof AudioEncoder === 'function' && Boolean(window.__amvWebm && window.__amvWebm.WebmWriter);
+    },
+    start,
+    progress() {
+      return { running: state.running, done: state.done, total: state.total, error: state.error, audio: state.audio, codec: state.codec };
+    },
+    // The caller asks for the file in slices: one big string would travel badly over a debugger protocol.
+    size() { return state.bytes ? state.bytes.length : 0; },
+    bytes(from, len) { return state.bytes ? base64(from, Math.min(from + len, state.bytes.length)) : ''; },
+    cancel() { state.cancel = true; },
   };
 })();

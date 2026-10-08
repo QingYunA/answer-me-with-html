@@ -77,7 +77,7 @@ test('WebmWriter: header, Info, both tracks and time-ordered blocks', () => {
   writer.block({ track: 1, key: false, tsUs: 66667, data: Buffer.from('V2') });
   writer.block({ track: 2, key: false, tsUs: 20000, data: Buffer.from('A1') });
   writer.block({ track: 2, key: false, tsUs: 0, data: Buffer.from('A0') });
-  const file = writer.build();
+  const file = Buffer.from(writer.build());   // the writer returns plain bytes; this test reads them with Buffer
 
   const top = readList(file, 0, file.length);
   assert.equal(top[0].id, '1a45dfa3', 'the file starts with the EBML header');
@@ -132,7 +132,7 @@ test('WebmWriter: header, Info, both tracks and time-ordered blocks', () => {
 test('WebmWriter: clusters are cut every second, so seeking stays cheap', () => {
   const writer = new WebmWriter({ width: 640, height: 360, durationMs: 3000 });
   for (const tsUs of [0, 1_200_000, 2_500_000]) writer.block({ track: 1, key: true, tsUs, data: Buffer.from('V') });
-  const file = writer.build();
+  const file = Buffer.from(writer.build());   // the writer returns plain bytes; this test reads them with Buffer
 
   assert.equal(writer.count(1), 3);
   const segment = readList(file, 0, file.length)[1];
@@ -145,7 +145,7 @@ test('WebmWriter: clusters are cut every second, so seeking stays cheap', () => 
 test('WebmWriter: a video without narration has one track', () => {
   const writer = new WebmWriter({ width: 1920, height: 1080, durationMs: 1000 });
   writer.block({ track: 1, key: true, tsUs: 0, data: Buffer.from('V') });
-  const file = writer.build();
+  const file = Buffer.from(writer.build());   // the writer returns plain bytes; this test reads them with Buffer
 
   const segment = readList(file, 0, file.length)[1];
   const inside = readList(file, segment.body, file.length);

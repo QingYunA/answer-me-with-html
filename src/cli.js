@@ -177,10 +177,12 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
-- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene) and a
-  speed button (0.5x to 2x).
-- --mp4 also saves a 1080p video file next to the page: an .mp4 through ffmpeg when it is installed, otherwise a .webm
-  the page encodes itself (VP9 + Opus). Export needs Chrome and Node 22+ and takes about 1.3 times the video length.`;
+- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
+  speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
+- --mp4 also saves a 1080p video file next to the page: an .mp4 through ffmpeg when it is installed (about 1.3 times the
+  video length), otherwise a .webm the page encodes itself (VP9 + Opus; the time follows how much of the page moves).
+  Export needs Chrome and Node 22+. The export button needs a secure context (a local file or localhost): WebCodecs is
+  not available to a page served over plain HTTP.`;
 
 export async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;

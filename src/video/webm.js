@@ -1,8 +1,10 @@
 // Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,
-// see src/runtime/video-export.js) and this module writes the container. One VP8/VP9 video track and an optional Opus
-// audio track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the
+// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio
+// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the
 // picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which
 // is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.
+// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs
+// turns it into a script for the player page).
 const APP = 'answer-me-with-html';   // MuxingApp / WritingApp
 const CLUSTER_MS = 1000;              // how much time one cluster holds
 const SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for
@@ -19,13 +21,24 @@ const ID = {
   CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],
   Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],
 };
-const UNKNOWN_SIZE = Buffer.from([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+const UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+const concat = (parts) => {
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
+};
+const bytes = (id) => new Uint8Array(id);
+const text = (s) => new TextEncoder().encode(s);
 
 // Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.
 function size(n) {
   for (let len = 1; len <= 8; len++) {
     if (len === 8 || n < 2 ** (7 * len) - 1) {
-      const out = Buffer.alloc(len);
+      const out = new Uint8Array(len);
       let v = n;
       for (let i = len - 1; i >= 0; i--) {
         out[i] = v & 0xff;
@@ -45,16 +58,16 @@ function uint(n) {
     out.unshift(v & 0xff);
     v = Math.floor(v / 256);
   } while (v > 0);
-  return Buffer.from(out);
+  return new Uint8Array(out);
 }
 
 function f64(x) {
-  const out = Buffer.alloc(8);
-  out.writeDoubleBE(x);
+  const out = new Uint8Array(8);
+  new DataView(out.buffer).setFloat64(0, x);
   return out;
 }
 
-const elem = (id, payload) => Buffer.concat([Buffer.from(id), size(payload.length), payload]);
+const elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);
 
 // WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or
 // { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.
@@ -79,34 +92,34 @@ export class WebmWriter {
 
   build() {
     const parts = [
-      elem(ID.EBML, Buffer.concat([
+      elem(ID.EBML, concat([
         elem(ID.EBMLVersion, uint(1)),
         elem(ID.EBMLReadVersion, uint(1)),
         elem(ID.EBMLMaxIDLength, uint(4)),
         elem(ID.EBMLMaxSizeLength, uint(8)),
-        elem(ID.DocType, Buffer.from('webm')),
+        elem(ID.DocType, text('webm')),
         elem(ID.DocTypeVersion, uint(4)),
         elem(ID.DocTypeReadVersion, uint(2)),
       ])),
-      Buffer.concat([Buffer.from(ID.Segment), UNKNOWN_SIZE]),
-      elem(ID.Info, Buffer.concat([
+      concat([bytes(ID.Segment), UNKNOWN_SIZE]),
+      elem(ID.Info, concat([
         elem(ID.TimecodeScale, uint(1_000_000)),
-        elem(ID.MuxingApp, Buffer.from(APP)),
-        elem(ID.WritingApp, Buffer.from(APP)),
+        elem(ID.MuxingApp, text(APP)),
+        elem(ID.WritingApp, text(APP)),
         elem(ID.Duration, f64(this.durationMs)),
       ])),
-      elem(ID.Tracks, Buffer.concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),
+      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),
     ];
     for (const cluster of this.#clusters()) parts.push(cluster);
-    return Buffer.concat(parts);
+    return concat(parts);
   }
 
   #track(num, type, codecId, extra) {
-    return elem(ID.TrackEntry, Buffer.concat([
+    return elem(ID.TrackEntry, concat([
       elem(ID.TrackNumber, uint(num)),
       elem(ID.TrackUID, uint(num)),
       elem(ID.FlagLacing, uint(0)),
-      elem(ID.CodecID, Buffer.from(codecId)),
+      elem(ID.CodecID, text(codecId)),
       elem(ID.TrackType, uint(type)),
       ...extra,
     ]));
@@ -114,13 +127,13 @@ export class WebmWriter {
 
   #videoTrack() {
     return this.#track(1, 1, this.videoCodec, [
-      elem(ID.Video, Buffer.concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),
+      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),
     ]);
   }
 
   #audioTrack() {
     const { channels, codecPrivate, preSkipSamples } = this.audio;
-    const extra = [elem(ID.Audio, Buffer.concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];
+    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];
     if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));
     // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.
     extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));
@@ -137,16 +150,16 @@ export class WebmWriter {
         body.push(this.#block(blocks[i], start));
         i++;
       }
-      out.push(Buffer.concat([Buffer.from(ID.Cluster), UNKNOWN_SIZE, ...body]));
+      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));
     }
     return out;
   }
 
   #block(b, clusterStart) {
-    const head = Buffer.alloc(4);
+    const head = new Uint8Array(4);
     head[0] = 0x80 | b.track;                 // the track number as a variable-size integer
-    head.writeInt16BE(b.ms - clusterStart, 1);
+    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);
     head[3] = b.key ? 0x80 : 0x00;
-    return elem(ID.SimpleBlock, Buffer.concat([head, b.data]));
+    return elem(ID.SimpleBlock, concat([head, b.data]));
   }
 }

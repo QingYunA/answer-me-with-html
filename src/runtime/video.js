@@ -401,6 +401,72 @@
   stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });
   seek.addEventListener('input', () => seekTo(Number(seek.value)));
   rateBtn.addEventListener('click', () => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length]));
+
+  // ── Export: the page encodes itself (src/runtime/video-export.js) and offers the file as a download ──
+  // The engine needs no help from the page behind it: the stage is pinned into the frame while it copies styles, so
+  // the picture is 1920x1080 whatever the window shows. The overlay covers the scrubbing stage and the button keeps
+  // its place in the controls, so a second click stops the export.
+  const exportBtn = document.querySelector('[data-amv="export"]');
+  const SLICE = 1_048_572;   // 1 MiB rounded to a multiple of 3, so every base64 slice stands on its own
+  let exporting = false;
+
+  const decode = (b64) => {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+
+  async function runExport() {
+    if (exporting) { window.__amvEnc.cancel(); return; }
+    exporting = true;
+    const label = exportBtn.dataset.label || 'Export';
+    const overlay = document.createElement('div');
+    overlay.className = 'amv-exporting';
+    overlay.innerHTML = '<span><i></i></span><b></b>';
+    overlay.title = label;
+    overlay.addEventListener('click', () => window.__amvEnc.cancel());
+    // After the viewport and before the controls: the cover hides the picture, the controls stay clickable.
+    document.querySelector('.amv-viewport').after(overlay);
+    window.__amv.pauseForExport();
+    try {
+      const started = await window.__amvEnc.start({});
+      if (started.error) throw new Error(started.error);
+      for (;;) {
+        const p = window.__amvEnc.progress();
+        const pct = Math.round((p.done / Math.max(1, p.total)) * 100);
+        exportBtn.textContent = `${pct}%`;
+        overlay.querySelector('b').textContent = `${label} ${pct}%`;
+        overlay.querySelector('i').style.width = `${pct}%`;
+        if (p.error) throw new Error(p.error);
+        if (!p.running) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      const size = window.__amvEnc.size();
+      const parts = [];
+      for (let at = 0; at < size; at += SLICE) parts.push(decode(window.__amvEnc.bytes(at, Math.min(SLICE, size - at))));
+      const url = URL.createObjectURL(new Blob(parts, { type: 'video/webm' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${(document.title || 'video').replace(/[\\/:*?"<>|]+/g, '-')}.webm`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      exportBtn.textContent = '✕';
+      overlay.querySelector('b').textContent = String((e && e.message) || e);
+      await new Promise((r) => setTimeout(r, 2500));
+    } finally {
+      overlay.remove();
+      exportBtn.textContent = exportBtn.dataset.icon || '⤓';
+      exporting = false;
+      window.__amv.resumeAfterExport();
+    }
+  }
+
+  if (window.__amvEnc && window.__amvEnc.supported()) exportBtn.addEventListener('click', runExport);
+  else exportBtn.remove();
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     if (e.key === 'ArrowRight') seekTo(now() + 5);
@@ -416,12 +482,24 @@
   }
   window.addEventListener('resize', fitStage);
 
-  // Export: place the stage 1:1 at the top left and call render(t) frame by frame.
+  // Export: place the stage 1:1 at the top left and call render(t) frame by frame. exportMode is for the CLI, which
+  // hides the controls and either screenshots the frames (ffmpeg) or drives the built-in encoder (see video-export.js).
   window.render = render;
+  let resumeAt;   // undefined: no export ran; null: playback was paused already; a number: carry on there
   window.__amv = {
     duration: D.duration,
     fps: D.fps,
     exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },
+    // The encoder poses every frame itself, so playback stops for the length of an export and carries on afterwards.
+    // The button and the engine both call this; only the first call decides where playback resumes.
+    pauseForExport() { if (resumeAt === undefined) resumeAt = playing ? now() : null; pause(); return resumeAt; },
+    resumeAfterExport() {
+      if (resumeAt === undefined || resumeAt === null) { resumeAt = undefined; return; }
+      const at = resumeAt;
+      resumeAt = undefined;
+      seekTo(at);
+      if (at < D.duration - 0.05) play();
+    },
   };
   fitStage();
   setRate(rate);   // the button carries the speed on load

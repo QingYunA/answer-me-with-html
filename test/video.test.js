@@ -379,6 +379,18 @@ test('player: a chapter strip, a tick per scene and a playback speed button, in 
   assert.match(en.html, /data-speed="Speed"/);
 });
 
+test('player: the export button carries the page language, and the page carries the encoder and the writer', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /data-amv="export" data-label="导出" data-icon="&#8681;" aria-label="导出"/);
+  // The button needs both halves of the export in the page: the WebM writer, then the engine that drives it.
+  assert.match(zh.html, /\nwindow\.__amvWebm = \{ WebmWriter \};\n/);
+  assert.match(zh.html, /window\.__amvEnc = \{/);
+  assert.ok(zh.html.indexOf('window.__amvWebm') < zh.html.indexOf('window.__amvEnc'), 'the writer comes first');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n- point\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /data-amv="export" data-label="Export" data-icon="&#8681;" aria-label="Export"/);
+});
+
 test('video fonts: Japanese 3b1b titles use a Japanese serif; titles in other themes are not overridden', async () => {
   const JA = '## 概要\n> 接続は3回のやりとりで行う。\n';
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${JA}`);

@@ -206,7 +206,20 @@ html[data-video] .am-diagram .amv-hl text, html[data-video] .am-diagram text.amv
 /* The mark stays 2 px wide; the pseudo element widens what can be clicked. */
 .amv-marks i::before { content: ''; position: absolute; left: -5px; right: -5px; top: -6px; bottom: -4px; }
 .amv-rate { width: auto; min-width: 46px; padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
+.amv-export { width: auto; min-width: 46px; padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
+.amv-export:hover, .amv-export[aria-busy="true"] { border-color: var(--v-ctl-accent); color: var(--v-ctl-accent); }
 .amv-brand { color: var(--v-ctl-muted); font-size: 12px; white-space: nowrap; }
+
+/* \u2500\u2500 Export cover: the engine poses every frame behind it, so the picture is out of the way but the controls stay usable \u2500\u2500 */
+.amv-exporting {
+  position: fixed; inset: 0; display: grid; place-content: center; gap: 16px; text-align: center; cursor: pointer;
+  background: color-mix(in srgb, var(--v-ctl-bg) 92%, transparent); color: var(--v-ctl-fg);
+  font: 14px -apple-system, "Segoe UI", sans-serif;
+}
+.amv-exporting > span { width: 320px; height: 4px; border-radius: 2px; background: var(--v-ctl-btn); overflow: hidden; }
+.amv-exporting > span > i { display: block; width: 0; height: 100%; background: var(--v-ctl-accent); }
+.amv-exporting > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-export] .amv-exporting { display: none; }
 
 /* \u2500\u2500 Chapter strip (one chip per scene; scrolls when the titles are long) \u2500\u2500 */
 .amv-chapters {
@@ -233,8 +246,9 @@ html[data-export] .amv-controls, html[data-export] .amv-bigplay, html[data-expor
 html[data-export] .amv-viewport { inset: 0; }
 html[data-export] .amv-stage { left: 0; top: 0; transform: none !important; }
 `;
-var VIDEO_JS = "(() => {\n  const D = JSON.parse(document.getElementById('amv-data').textContent);\n  const W = 1920;\n  const H = 1080;\n  const T = 0.9;     // scene transition, matches TIMING.transition\n  const R = 0.6;     // one step appearing\n  const CAM = 0.8;   // camera move\n  const root = document.documentElement;\n  const stage = document.querySelector('.amv-stage');\n  const camera = document.querySelector('.amv-camera');\n  const overlay = document.querySelector('.amv-overlay');\n  const caption = document.querySelector('.amv-caption span');\n  const scenes = [...document.querySelectorAll('.amv-scene')];\n  const segs = D.segments;\n  // One chapter per scene (the title card is not a chapter). The strip needs its space before anything measures the viewport,\n  // so the attribute goes on before section 1.\n  const chapterList = segs.slice(1);\n  if (chapterList.length > 1) root.setAttribute('data-chapters', '');\n  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));\n  const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };\n  const lerp = (a, b, p) => a + (b - a) * p;\n  const STEP_SEL = '.am-tl-item, .am-lim, .am-seg, tbody tr, .am-kv-cell, .am-md > ul > li, .am-md > ol > li, .am-md > p, .am-md > blockquote, .am-callout';\n\n  // \u2500\u2500 1. Fit each scene's content to the frame \u2500\u2500\n  for (const sc of scenes) {\n    const fit = sc.querySelector('.amv-fit');\n    if (!fit || !fit.children.length) continue;\n    const s = Math.min(1600 / fit.offsetWidth, 740 / fit.offsetHeight, 3.4);\n    fit.style.transform = `scale(${s})`;\n  }\n\n  // Scene titles sit outside the camera, so they stay put when it zooms.\n  const heads = scenes.map((sc) => {\n    const h = sc.querySelector('.amv-scene-head');\n    if (h) stage.insertBefore(h, camera.nextSibling);\n    return h;\n  });\n\n  // Measure elements in stage coordinates (the camera is the identity transform here).\n  const sr = stage.getBoundingClientRect();\n  const k = sr.width / W;\n  const rectOf = (el) => {\n    const r = el.getBoundingClientRect();\n    return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k, w: r.width / k, h: r.height / k };\n  };\n\n  // \u2500\u2500 2. Steps: group by data-step when a component sets it, else one step per row / item \u2500\u2500\n  const items = [];   // { el, at, paths: [{ el, len }] }\n  scenes.forEach((sc, i) => {\n    if (i === 0) return;\n    const groups = [];\n    for (const block of sc.querySelectorAll('.amv-fit > *')) {\n      const marked = [...block.querySelectorAll('[data-step]')];\n      if (marked.length) {\n        const by = new Map();\n        for (const el of marked) {\n          const n = Number(el.dataset.step);\n          if (!by.has(n)) by.set(n, []);\n          by.get(n).push(el);\n        }\n        [...by.keys()].sort((a, b) => a - b).forEach((n) => groups.push(by.get(n)));\n      } else {\n        const found = [...block.querySelectorAll(STEP_SEL)].filter((el) => !el.parentElement.closest(STEP_SEL));\n        if (found.length) found.forEach((el) => groups.push([el]));\n        else groups.push([block]);\n      }\n    }\n    const beats = segs[i].beats;\n    const S = groups.length;\n    const B = beats.length;\n    const perBeat = new Map();\n    groups.forEach((g, gi) => {\n      // With more beats than steps, the extra beats open the scene: steps align to the last beats.\n      const b = S <= B ? gi + (B - S) : Math.floor((gi * B) / S);\n      const rank = perBeat.get(b) ?? 0;\n      perBeat.set(b, rank + 1);\n      const beat = beats[b];\n      const count = S <= B ? 1 : Math.ceil(S / B) || 1;\n      const slot = Math.min(0.45, (beat.end - beat.start) / count);\n      for (const el of g) {\n        const paths = (el.matches('path.am-edge') ? [el] : [...el.querySelectorAll('path.am-edge')])\n          .filter((p) => !p.classList.contains('am-edge--dashed'))\n          .map((p) => ({ el: p, len: p.getTotalLength() }));\n        items.push({ el, scene: i, at: beat.start + rank * slot, paths });\n      }\n    });\n  });\n\n  // \u2500\u2500 3. Morphs: elements with the same data-key in consecutive scenes \u2500\u2500\n  const morphs = [];  // { scene, from, to, ghost, a, b }\n  const keyed = (sc) => {\n    const m = new Map();\n    for (const el of sc.querySelectorAll('[data-key]')) if (!m.has(el.dataset.key)) m.set(el.dataset.key, el);\n    return m;\n  };\n  for (let i = 2; i < scenes.length; i++) {\n    const prev = keyed(scenes[i - 1]);\n    for (const [key, to] of keyed(scenes[i])) {\n      const from = prev.get(key);\n      // Morph only like with like (SVG to SVG, HTML to HTML); otherwise the shapes do not match.\n      if (!from || (from instanceof SVGElement) !== (to instanceof SVGElement)) continue;\n      try {\n        const ghost = makeGhost(from);\n        overlay.append(ghost.node);\n        morphs.push({ scene: i, from, to, ghost: ghost.node, a: ghost.place(rectOf(from)), b: ghost.place(rectOf(to)) });\n      } catch {\n        // Morphs are a nicety: skip an element whose measurement fails; playback is unaffected.\n      }\n    }\n  }\n  const carried = new Set(morphs.map((m) => m.to));\n\n  function makeGhost(el) {\n    const wrap = document.createElement('div');\n    const host = el.closest('.am-diagram, .am-tree, .am-timeline, .am-kv, .am-limits');\n    wrap.className = `amv-ghost ${host ? host.className : ''}`;\n    if (el instanceof SVGGraphicsElement) {\n      const bb = el.getBBox();\n      const pad = 4;\n      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');\n      svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`);\n      svg.setAttribute('width', bb.width + pad * 2);\n      svg.setAttribute('height', bb.height + pad * 2);\n      const clone = el.cloneNode(true);\n      clone.removeAttribute('style');\n      svg.append(clone);\n      wrap.append(svg);\n      return {\n        node: wrap,\n        place: (r) => {\n          const s = r.w / (bb.width || 1);\n          return { x: r.x - pad * s, y: r.y - pad * s, s };\n        },\n      };\n    }\n    const clone = el.cloneNode(true);\n    clone.removeAttribute('style');\n    clone.querySelectorAll('[data-key], ul').forEach((n) => n.remove());\n    const box = document.createElement(el.tagName === 'LI' ? 'ul' : 'div');\n    box.className = el.tagName === 'LI' ? 'am-tree-list' : '';\n    box.style.margin = '0';\n    box.append(clone);\n    wrap.append(box);\n    wrap.style.width = `${el.offsetWidth}px`;\n    const w0 = el.offsetWidth || 1;\n    return { node: wrap, place: (r) => ({ x: r.x, y: r.y, s: r.w / w0 }) };\n  }\n\n  // \u2500\u2500 4. Camera: the element named by [name] in the narration \u2500\u2500\n  const findKey = (sc, key) => {\n    const all = [...sc.querySelectorAll('[data-key]')];\n    const norm = (s) => s.replace(/[`*]/g, '').trim().toLowerCase();\n    return all.find((el) => norm(el.dataset.key) === norm(key))\n      ?? all.find((el) => norm(el.dataset.key).includes(norm(key)))\n      ?? [...sc.querySelectorAll(`${STEP_SEL}, text`)].find((el) => norm(el.textContent).includes(norm(key)));\n  };\n  const IDENT = { s: 1, x: 0, y: 0 };\n  // Zoom without cropping: the whole diagram must stay in the safe area between title and captions.\n  const SAFE = { left: 60, right: W - 60, top: 150, bottom: H - 200 }; // leave room for captions at the bottom\n  function focusCam(r, sc) {\n    const fit = sc.querySelector('.amv-fit');\n    const c = fit ? rectOf(fit) : { x: 0, y: 0, w: W, h: H };\n    const room = Math.min((SAFE.right - SAFE.left) / c.w, (SAFE.bottom - SAFE.top) / c.h);\n    const s = clamp(Math.min(0.5 * W / r.w, 0.42 * H / r.h, room, 1.4), 1, 1.4);\n    const fitAxis = (want, lo, hi, a, b) => (s * (b - a) <= hi - lo ? clamp(want, lo - s * a, hi - s * b) : want);\n    return {\n      s,\n      x: fitAxis(W / 2 - s * (r.x + r.w / 2), SAFE.left, SAFE.right, c.x, c.x + c.w),\n      y: fitAxis(H * 0.5 - s * (r.y + r.h / 2), SAFE.top, SAFE.bottom, c.y, c.y + c.h),\n    };\n  }\n  const camEvents = [];   // { t, cam, hl }\n  segs.forEach((seg, i) => {\n    camEvents.push({ t: seg.start, cam: IDENT, hl: null });\n    seg.beats.forEach((b) => {\n      const el = b.focus ? findKey(scenes[i], b.focus) : null;\n      let cam = IDENT;\n      if (el) cam = focusCam(rectOf(el), scenes[i]);\n      camEvents.push({ t: b.start, cam, hl: el });\n    });\n  });\n  const hlTargets = new Set(camEvents.map((e) => e.hl).filter(Boolean));\n\n  // Scene and title fades. Titles never overlap: the old one fades out in the first half of the transition, the new one fades in in the second half.\n  const show = (el, op) => {\n    el.style.opacity = op;\n    el.style.visibility = op > 0 ? 'visible' : 'hidden';\n  };\n  function drawScenes(t) {\n    scenes.forEach((sc, i) => {\n      const seg = segs[i];\n      const next = segs[i + 1];\n      const before = t < seg.start;\n      const fadeIn = i === 0 ? ease(t / 0.8) : ease((t - seg.start) / T);\n      const fadeOut = next ? 1 - ease((t - next.start) / T) : 1;\n      show(sc, before ? 0 : Math.min(fadeIn, fadeOut));\n      if (!heads[i]) return;\n      const hin = ease((t - seg.start - T / 2) / (T / 2));\n      const hout = next ? 1 - ease((t - next.start) / (T / 2)) : 1;\n      show(heads[i], before ? 0 : Math.min(hin, hout));\n    });\n  }\n\n  // Steps appear: edges draw in one stroke, other elements fade in and rise slightly.\n  function drawSteps(t) {\n    for (const it of items) {\n      if (carried.has(it.el)) continue;\n      const p = ease((t - it.at) / R);\n      it.el.style.opacity = clamp((t - it.at) / 0.25);\n      if (!it.paths.length) {\n        it.el.style.transform = p < 1 ? `translateY(${(1 - p) * 14}px)` : '';\n        continue;\n      }\n      for (const { el, len } of it.paths) {\n        el.style.strokeDasharray = `${len}`;\n        el.style.strokeDashoffset = `${len * (1 - p)}`;\n        el.style.markerEnd = p < 0.97 ? 'none' : '';\n      }\n    }\n  }\n\n  // Morphs: during the transition a stand-in moves from the old to the new position while the real elements are hidden.\n  // An element can end one morph and start the next; collect the elements to hide first, then apply, so the two do not overwrite each other.\n  const morphed = [...new Set(morphs.flatMap((m) => [m.from, m.to]))];\n  function drawMorphs(t) {\n    const hidden = new Set();\n    for (const m of morphs) {\n      const s0 = segs[m.scene].start;\n      const during = t >= s0 && t < s0 + T;\n      m.ghost.style.display = during ? '' : 'none';\n      if (during) {\n        const p = ease((t - s0) / T);\n        m.ghost.style.transform = `translate(${lerp(m.a.x, m.b.x, p)}px, ${lerp(m.a.y, m.b.y, p)}px) scale(${lerp(m.a.s, m.b.s, p)})`;\n        hidden.add(m.from);\n      }\n      if (t < s0 + T) hidden.add(m.to);\n      m.to.style.opacity = 1;\n    }\n    for (const el of morphed) el.style.visibility = hidden.has(el) ? 'hidden' : '';\n  }\n\n  // Camera and highlight: interpolate between the previous camera position and the current target.\n  function drawCamera(t) {\n    const ev = camEvents.findLastIndex((e) => t >= e.t);\n    const e = ev >= 0 ? camEvents[ev] : null;\n    const prev = ev > 0 ? camEvents[ev - 1].cam : IDENT;\n    const p = e ? ease((t - e.t) / CAM) : 0;\n    const to = e ? e.cam : IDENT;\n    camera.style.transform = `translate(${lerp(prev.x, to.x, p)}px, ${lerp(prev.y, to.y, p)}px) scale(${lerp(prev.s, to.s, p)})`;\n    for (const el of hlTargets) el.classList.toggle('amv-hl', el === e?.hl);\n  }\n\n  function drawCaption(t) {\n    const cur = segs.findLastIndex((s) => t >= s.start);\n    const beats = cur >= 0 ? segs[cur].beats : [];\n    const b = beats.find((x) => t >= x.start && t < x.end + 0.3);\n    const html = b ? b.html : '';\n    if (caption.dataset.html !== html) {\n      caption.innerHTML = html;\n      caption.dataset.html = html;\n    }\n    caption.style.opacity = b ? clamp((t - b.start) / 0.2) : 0;\n  }\n\n  // \u2500\u2500 5. Deterministic rendering: the same time always draws the same frame \u2500\u2500\n  function render(time) {\n    const t = clamp(time, 0, D.duration);\n    drawScenes(t);\n    drawSteps(t);\n    drawMorphs(t);\n    drawCamera(t);\n    drawCaption(t);\n    updateUi(t);\n  }\n\n  // \u2500\u2500 6. Player \u2500\u2500\n  const audio = document.getElementById('amv-audio');\n  const seek = document.querySelector('.amv-seek');\n  const timeEl = document.querySelector('.amv-time');\n  const toggleBtn = document.querySelector('[data-amv=\"toggle\"]');\n  const bigPlay = document.querySelector('.amv-bigplay');\n  const marks = document.querySelector('.amv-marks');\n  const bar = document.querySelector('.amv-chapters');\n  const rateBtn = document.querySelector('[data-amv=\"rate\"]');\n  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];\n  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;\n  seek.max = D.duration;\n\n  // A tick on the track and a chip in the strip per scene; both jump to the start of the scene and keep playing.\n  const chips = chapterList.map((s, i) => {\n    const mark = document.createElement('i');\n    mark.style.left = `${(s.start / D.duration) * 100}%`;\n    mark.title = `${s.id} ${s.title} \xB7 ${fmt(s.start)}`;\n    mark.addEventListener('click', () => jump(s.start));\n    marks.append(mark);\n\n    const chip = document.createElement('button');\n    chip.type = 'button';\n    chip.className = 'amv-chap';\n    chip.title = `${s.title} \xB7 ${fmt(s.start)}`;\n    const letter = document.createElement('b');\n    letter.textContent = s.id || String.fromCharCode(65 + i);\n    const label = document.createElement('span');\n    label.textContent = s.title;\n    chip.append(letter, label);\n    chip.addEventListener('click', () => jump(s.start));\n    bar.append(chip);\n    return chip;\n  });\n\n  let playing = false;\n  let base = 0;\n  let t0 = 0;\n  let rate = 1;\n  // The clock: the audio element when there is one, otherwise wall-clock time scaled by the playback rate.\n  const now = () => (!playing ? base : audio ? audio.currentTime : base + ((performance.now() - t0) / 1000) * rate);\n\n  function jump(t) {\n    seekTo(t);\n    if (!playing) play();\n  }\n\n  // The chip of the scene the picture is in, kept in view while the strip scrolls.\n  let activeChip = -1;\n  function markChapter(t) {\n    const i = chapterList.findLastIndex((s) => t >= s.start);\n    if (i === activeChip) return;\n    activeChip = i;\n    chips.forEach((c, k) => (k === i ? c.setAttribute('aria-current', 'true') : c.removeAttribute('aria-current')));\n    const chip = chips[i];\n    if (chip && bar.scrollWidth > bar.clientWidth) {\n      bar.scrollTo({ left: Math.max(0, chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' });\n    }\n  }\n\n  // Changing the rate must not move the clock: anchor it again at the time it shows now.\n  function setRate(r) {\n    const at = now();\n    rate = r;\n    if (audio) audio.playbackRate = r;\n    rateBtn.textContent = `${r}\xD7`;\n    rateBtn.setAttribute('aria-label', `${rateBtn.dataset.speed ?? 'Speed'} ${r}\xD7`);\n    if (playing) {\n      base = at;\n      t0 = performance.now();\n    }\n  }\n\n  function updateUi(t) {\n    if (document.activeElement !== seek) seek.value = t;\n    timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;\n    markChapter(t);\n  }\n\n  function play() {\n    if (base >= D.duration - 0.05) base = 0;\n    playing = true;\n    bigPlay.hidden = true;\n    toggleBtn.textContent = '\u275A\u275A';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.pause);\n    if (audio) {\n      audio.currentTime = base;\n      audio.play().catch(() => {});\n    } else {\n      t0 = performance.now();\n    }\n    requestAnimationFrame(tick);\n  }\n\n  function pause() {\n    base = now();\n    playing = false;\n    audio?.pause();\n    toggleBtn.textContent = '\u25B6';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.play);\n  }\n\n  function seekTo(x) {\n    base = clamp(x, 0, D.duration);\n    if (audio) audio.currentTime = base;\n    t0 = performance.now();\n    render(base);\n  }\n\n  function tick() {\n    if (!playing) return;\n    const t = now();\n    if (t >= D.duration) {\n      pause();\n      base = D.duration;\n      render(D.duration);\n      return;\n    }\n    render(t);\n    requestAnimationFrame(tick);\n  }\n\n  const toggle = () => (playing ? pause() : play());\n  toggleBtn.addEventListener('click', toggle);\n  bigPlay.addEventListener('click', play);\n  stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });\n  seek.addEventListener('input', () => seekTo(Number(seek.value)));\n  rateBtn.addEventListener('click', () => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length]));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === ' ') { e.preventDefault(); toggle(); }\n    if (e.key === 'ArrowRight') seekTo(now() + 5);\n    if (e.key === 'ArrowLeft') seekTo(now() - 5);\n  });\n  audio?.addEventListener('ended', () => { pause(); base = D.duration; });\n\n  function fitStage() {\n    if (root.hasAttribute('data-export')) return;\n    const vp = stage.parentElement;\n    const s = Math.min(vp.clientWidth / W, vp.clientHeight / H);\n    stage.style.transform = `translate(-50%, -50%) scale(${s})`;\n  }\n  window.addEventListener('resize', fitStage);\n\n  // Export: place the stage 1:1 at the top left and call render(t) frame by frame.\n  window.render = render;\n  window.__amv = {\n    duration: D.duration,\n    fps: D.fps,\n    exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },\n  };\n  fitStage();\n  setRate(rate);   // the button carries the speed on load\n  // Poster: show the fully faded-in title card, but playback still starts at 0.\n  render(Math.min(1, segs[0].end));\n  updateUi(0);\n})();\n";
-var VIDEO_EXPORT_JS = "// The built-in encoder for the export path that has no ffmpeg: the CLI drives window.render(t), screenshots every\n// frame and sends the JPEG here; WebCodecs encodes the picture, the narration in the page is encoded too, and the CLI\n// collects the chunks and writes the WebM file (src/video/webm.js). The script is injected into the player page at\n// export time only, so a page that is merely watched does not carry it.\n//\n// Every chunk leaves as one record: kind (1 video, 2 audio), flags (bit 0: key frame), timestamp in microseconds as a\n// float64, payload length as a uint32, then the payload. The CLI parses the same layout.\n(() => {\n  const HEADER = 14;\n  const AUDIO_FRAME_SECONDS = 0.02;   // Opus encodes 20 ms frames\n  const CODECS = ['vp09.00.31.08', 'vp09.00.10.08', 'vp8'];\n\n  const queue = [];\n  let video = null;\n  let audio = null;\n  let fps = 30;\n  let error = null;\n  let frames = 0;\n  let audioChunks = 0;\n\n  const fail = (e) => {\n    if (!error) error = String((e && e.message) || e);\n  };\n  const wait = (ms) => new Promise((r) => setTimeout(r, ms));\n\n  const fromBase64 = (s) => {\n    const bin = atob(s);\n    const out = new Uint8Array(bin.length);\n    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);\n    return out;\n  };\n  // btoa needs a string, and one built with fromCharCode cannot be too long for the argument list.\n  const toBase64 = (bytes) => {\n    let s = '';\n    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));\n    return btoa(s);\n  };\n  const asBytes = (x) => (x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x.buffer, x.byteOffset, x.byteLength));\n\n  function push(kind, key, tsUs, data) {\n    const rec = new Uint8Array(HEADER + data.byteLength);\n    const view = new DataView(rec.buffer);\n    view.setUint8(0, kind);\n    view.setUint8(1, key ? 1 : 0);\n    view.setFloat64(2, tsUs, true);\n    view.setUint32(10, data.byteLength, true);\n    rec.set(data, HEADER);\n    queue.push(rec);\n  }\n\n  // The codec names differ in the level they claim; take the first the browser really encodes.\n  async function pickCodec(config) {\n    for (const codec of CODECS) {\n      try {\n        if ((await VideoEncoder.isConfigSupported({ ...config, codec })).supported) return codec;\n      } catch {\n        // an unknown codec string is not an error, try the next one\n      }\n    }\n    throw new Error('This browser encodes neither VP9 nor VP8');\n  }\n\n  async function init(cfg) {\n    fps = cfg.fps;\n    const config = { width: cfg.width, height: cfg.height, bitrate: cfg.bitrate, framerate: cfg.fps, latencyMode: 'quality' };\n    const codec = await pickCodec(config);\n    video = new VideoEncoder({\n      output: (chunk) => {\n        const data = new Uint8Array(chunk.byteLength);\n        chunk.copyTo(data);\n        push(1, chunk.type === 'key', chunk.timestamp, data);\n        frames++;\n      },\n      error: fail,\n    });\n    video.configure({ ...config, codec });\n    return { codec };\n  }\n\n  async function frame(base64, tsUs, key) {\n    const bitmap = await createImageBitmap(new Blob([fromBase64(base64)], { type: 'image/jpeg' }));\n    const picture = new VideoFrame(bitmap, { timestamp: tsUs, duration: Math.round(1e6 / fps) });\n    video.encode(picture, { keyFrame: Boolean(key) });\n    picture.close();\n    bitmap.close();\n    // A software encoder runs slower than the frames arrive; keep the queue short instead of piling frames up.\n    while (video.encodeQueueSize > 8 && !error) await wait(2);\n    if (error) throw new Error(error);\n    return { frames, queued: video.encodeQueueSize };\n  }\n\n  // The narration the page already carries, encoded from the WAV in the <audio> element: no bytes travel twice.\n  async function addAudio() {\n    const el = document.getElementById('amv-audio');\n    const src = el?.getAttribute('src') ?? '';\n    const comma = src.indexOf(',');\n    if (!src.startsWith('data:') || comma < 0) return null;\n    const wav = fromBase64(src.slice(comma + 1));\n    const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);\n    const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);\n    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') throw new Error('The narration track is not a WAV file');\n    let format = null;\n    let pcm = null;\n    for (let o = 12; o + 8 <= wav.byteLength;) {\n      const id = tag(o);\n      const len = view.getUint32(o + 4, true);\n      if (id === 'fmt ') format = { channels: view.getUint16(o + 10, true), sampleRate: view.getUint32(o + 12, true), bits: view.getUint16(o + 22, true) };\n      else if (id === 'data') pcm = { at: o + 8, len };\n      o += 8 + len + (len % 2);\n    }\n    if (!format || !pcm || format.bits !== 16) throw new Error('The narration track must be 16-bit PCM WAV');\n    const { channels, sampleRate } = format;\n\n    let head = null;\n    audio = new AudioEncoder({\n      output: (chunk, meta) => {\n        if (!head && meta?.decoderConfig?.description) head = asBytes(meta.decoderConfig.description).slice();\n        const data = new Uint8Array(chunk.byteLength);\n        chunk.copyTo(data);\n        push(2, false, chunk.timestamp, data);\n        audioChunks++;\n      },\n      error: fail,\n    });\n    audio.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: 64000 * channels });\n    const perBlock = Math.round(sampleRate * AUDIO_FRAME_SECONDS);\n    const total = Math.floor(pcm.len / (2 * channels));\n    for (let i = 0; i < total; i += perBlock) {\n      const samples = perBlock * channels;\n      const bytes = new Uint8Array(samples * 2);   // zero filled: a short last block becomes a full Opus frame\n      const from = pcm.at + i * channels * 2;\n      bytes.set(wav.subarray(from, from + Math.min(samples, (total - i) * channels) * 2));\n      const data = new AudioData({\n        format: 's16', sampleRate, numberOfFrames: perBlock, numberOfChannels: channels,\n        timestamp: Math.round((i / sampleRate) * 1e6), data: bytes,\n      });\n      audio.encode(data);\n      data.close();\n      while (audio.encodeQueueSize > 16 && !error) await wait(2);\n    }\n    if (error) throw new Error(error);\n    return { head: head ? toBase64(head) : '', channels, sampleRate, chunks: audioChunks };\n  }\n\n  async function finish() {\n    if (video) { await video.flush(); video.close(); video = null; }\n    if (audio) { await audio.flush(); audio.close(); audio = null; }\n    if (error) throw new Error(error);\n    return { frames, audioChunks };\n  }\n\n  // Hand the CLI the next slice of encoded data; it writes the container while the encoder keeps working.\n  function pull(maxBytes) {\n    if (error) return { error };\n    const parts = [];\n    let bytes = 0;\n    while (queue.length && bytes < maxBytes) {\n      const rec = queue.shift();\n      parts.push(rec);\n      bytes += rec.byteLength;\n    }\n    if (!parts.length) return { data: '', bytes: 0 };\n    const all = new Uint8Array(bytes);\n    let at = 0;\n    for (const part of parts) {\n      all.set(part, at);\n      at += part.byteLength;\n    }\n    return { data: toBase64(all), bytes };\n  }\n\n  window.__amvEnc = {\n    supported: () => typeof VideoEncoder === 'function' && typeof AudioEncoder === 'function',\n    init,\n    frame,\n    audio: addAudio,\n    finish,\n    pull,\n    stats: () => ({ error, frames, audioChunks, queued: queue.length }),\n  };\n})();\n";
+var VIDEO_JS = "(() => {\n  const D = JSON.parse(document.getElementById('amv-data').textContent);\n  const W = 1920;\n  const H = 1080;\n  const T = 0.9;     // scene transition, matches TIMING.transition\n  const R = 0.6;     // one step appearing\n  const CAM = 0.8;   // camera move\n  const root = document.documentElement;\n  const stage = document.querySelector('.amv-stage');\n  const camera = document.querySelector('.amv-camera');\n  const overlay = document.querySelector('.amv-overlay');\n  const caption = document.querySelector('.amv-caption span');\n  const scenes = [...document.querySelectorAll('.amv-scene')];\n  const segs = D.segments;\n  // One chapter per scene (the title card is not a chapter). The strip needs its space before anything measures the viewport,\n  // so the attribute goes on before section 1.\n  const chapterList = segs.slice(1);\n  if (chapterList.length > 1) root.setAttribute('data-chapters', '');\n  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));\n  const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };\n  const lerp = (a, b, p) => a + (b - a) * p;\n  const STEP_SEL = '.am-tl-item, .am-lim, .am-seg, tbody tr, .am-kv-cell, .am-md > ul > li, .am-md > ol > li, .am-md > p, .am-md > blockquote, .am-callout';\n\n  // \u2500\u2500 1. Fit each scene's content to the frame \u2500\u2500\n  for (const sc of scenes) {\n    const fit = sc.querySelector('.amv-fit');\n    if (!fit || !fit.children.length) continue;\n    const s = Math.min(1600 / fit.offsetWidth, 740 / fit.offsetHeight, 3.4);\n    fit.style.transform = `scale(${s})`;\n  }\n\n  // Scene titles sit outside the camera, so they stay put when it zooms.\n  const heads = scenes.map((sc) => {\n    const h = sc.querySelector('.amv-scene-head');\n    if (h) stage.insertBefore(h, camera.nextSibling);\n    return h;\n  });\n\n  // Measure elements in stage coordinates (the camera is the identity transform here).\n  const sr = stage.getBoundingClientRect();\n  const k = sr.width / W;\n  const rectOf = (el) => {\n    const r = el.getBoundingClientRect();\n    return { x: (r.left - sr.left) / k, y: (r.top - sr.top) / k, w: r.width / k, h: r.height / k };\n  };\n\n  // \u2500\u2500 2. Steps: group by data-step when a component sets it, else one step per row / item \u2500\u2500\n  const items = [];   // { el, at, paths: [{ el, len }] }\n  scenes.forEach((sc, i) => {\n    if (i === 0) return;\n    const groups = [];\n    for (const block of sc.querySelectorAll('.amv-fit > *')) {\n      const marked = [...block.querySelectorAll('[data-step]')];\n      if (marked.length) {\n        const by = new Map();\n        for (const el of marked) {\n          const n = Number(el.dataset.step);\n          if (!by.has(n)) by.set(n, []);\n          by.get(n).push(el);\n        }\n        [...by.keys()].sort((a, b) => a - b).forEach((n) => groups.push(by.get(n)));\n      } else {\n        const found = [...block.querySelectorAll(STEP_SEL)].filter((el) => !el.parentElement.closest(STEP_SEL));\n        if (found.length) found.forEach((el) => groups.push([el]));\n        else groups.push([block]);\n      }\n    }\n    const beats = segs[i].beats;\n    const S = groups.length;\n    const B = beats.length;\n    const perBeat = new Map();\n    groups.forEach((g, gi) => {\n      // With more beats than steps, the extra beats open the scene: steps align to the last beats.\n      const b = S <= B ? gi + (B - S) : Math.floor((gi * B) / S);\n      const rank = perBeat.get(b) ?? 0;\n      perBeat.set(b, rank + 1);\n      const beat = beats[b];\n      const count = S <= B ? 1 : Math.ceil(S / B) || 1;\n      const slot = Math.min(0.45, (beat.end - beat.start) / count);\n      for (const el of g) {\n        const paths = (el.matches('path.am-edge') ? [el] : [...el.querySelectorAll('path.am-edge')])\n          .filter((p) => !p.classList.contains('am-edge--dashed'))\n          .map((p) => ({ el: p, len: p.getTotalLength() }));\n        items.push({ el, scene: i, at: beat.start + rank * slot, paths });\n      }\n    });\n  });\n\n  // \u2500\u2500 3. Morphs: elements with the same data-key in consecutive scenes \u2500\u2500\n  const morphs = [];  // { scene, from, to, ghost, a, b }\n  const keyed = (sc) => {\n    const m = new Map();\n    for (const el of sc.querySelectorAll('[data-key]')) if (!m.has(el.dataset.key)) m.set(el.dataset.key, el);\n    return m;\n  };\n  for (let i = 2; i < scenes.length; i++) {\n    const prev = keyed(scenes[i - 1]);\n    for (const [key, to] of keyed(scenes[i])) {\n      const from = prev.get(key);\n      // Morph only like with like (SVG to SVG, HTML to HTML); otherwise the shapes do not match.\n      if (!from || (from instanceof SVGElement) !== (to instanceof SVGElement)) continue;\n      try {\n        const ghost = makeGhost(from);\n        overlay.append(ghost.node);\n        morphs.push({ scene: i, from, to, ghost: ghost.node, a: ghost.place(rectOf(from)), b: ghost.place(rectOf(to)) });\n      } catch {\n        // Morphs are a nicety: skip an element whose measurement fails; playback is unaffected.\n      }\n    }\n  }\n  const carried = new Set(morphs.map((m) => m.to));\n\n  function makeGhost(el) {\n    const wrap = document.createElement('div');\n    const host = el.closest('.am-diagram, .am-tree, .am-timeline, .am-kv, .am-limits');\n    wrap.className = `amv-ghost ${host ? host.className : ''}`;\n    if (el instanceof SVGGraphicsElement) {\n      const bb = el.getBBox();\n      const pad = 4;\n      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');\n      svg.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.width + pad * 2} ${bb.height + pad * 2}`);\n      svg.setAttribute('width', bb.width + pad * 2);\n      svg.setAttribute('height', bb.height + pad * 2);\n      const clone = el.cloneNode(true);\n      clone.removeAttribute('style');\n      svg.append(clone);\n      wrap.append(svg);\n      return {\n        node: wrap,\n        place: (r) => {\n          const s = r.w / (bb.width || 1);\n          return { x: r.x - pad * s, y: r.y - pad * s, s };\n        },\n      };\n    }\n    const clone = el.cloneNode(true);\n    clone.removeAttribute('style');\n    clone.querySelectorAll('[data-key], ul').forEach((n) => n.remove());\n    const box = document.createElement(el.tagName === 'LI' ? 'ul' : 'div');\n    box.className = el.tagName === 'LI' ? 'am-tree-list' : '';\n    box.style.margin = '0';\n    box.append(clone);\n    wrap.append(box);\n    wrap.style.width = `${el.offsetWidth}px`;\n    const w0 = el.offsetWidth || 1;\n    return { node: wrap, place: (r) => ({ x: r.x, y: r.y, s: r.w / w0 }) };\n  }\n\n  // \u2500\u2500 4. Camera: the element named by [name] in the narration \u2500\u2500\n  const findKey = (sc, key) => {\n    const all = [...sc.querySelectorAll('[data-key]')];\n    const norm = (s) => s.replace(/[`*]/g, '').trim().toLowerCase();\n    return all.find((el) => norm(el.dataset.key) === norm(key))\n      ?? all.find((el) => norm(el.dataset.key).includes(norm(key)))\n      ?? [...sc.querySelectorAll(`${STEP_SEL}, text`)].find((el) => norm(el.textContent).includes(norm(key)));\n  };\n  const IDENT = { s: 1, x: 0, y: 0 };\n  // Zoom without cropping: the whole diagram must stay in the safe area between title and captions.\n  const SAFE = { left: 60, right: W - 60, top: 150, bottom: H - 200 }; // leave room for captions at the bottom\n  function focusCam(r, sc) {\n    const fit = sc.querySelector('.amv-fit');\n    const c = fit ? rectOf(fit) : { x: 0, y: 0, w: W, h: H };\n    const room = Math.min((SAFE.right - SAFE.left) / c.w, (SAFE.bottom - SAFE.top) / c.h);\n    const s = clamp(Math.min(0.5 * W / r.w, 0.42 * H / r.h, room, 1.4), 1, 1.4);\n    const fitAxis = (want, lo, hi, a, b) => (s * (b - a) <= hi - lo ? clamp(want, lo - s * a, hi - s * b) : want);\n    return {\n      s,\n      x: fitAxis(W / 2 - s * (r.x + r.w / 2), SAFE.left, SAFE.right, c.x, c.x + c.w),\n      y: fitAxis(H * 0.5 - s * (r.y + r.h / 2), SAFE.top, SAFE.bottom, c.y, c.y + c.h),\n    };\n  }\n  const camEvents = [];   // { t, cam, hl }\n  segs.forEach((seg, i) => {\n    camEvents.push({ t: seg.start, cam: IDENT, hl: null });\n    seg.beats.forEach((b) => {\n      const el = b.focus ? findKey(scenes[i], b.focus) : null;\n      let cam = IDENT;\n      if (el) cam = focusCam(rectOf(el), scenes[i]);\n      camEvents.push({ t: b.start, cam, hl: el });\n    });\n  });\n  const hlTargets = new Set(camEvents.map((e) => e.hl).filter(Boolean));\n\n  // Scene and title fades. Titles never overlap: the old one fades out in the first half of the transition, the new one fades in in the second half.\n  const show = (el, op) => {\n    el.style.opacity = op;\n    el.style.visibility = op > 0 ? 'visible' : 'hidden';\n  };\n  function drawScenes(t) {\n    scenes.forEach((sc, i) => {\n      const seg = segs[i];\n      const next = segs[i + 1];\n      const before = t < seg.start;\n      const fadeIn = i === 0 ? ease(t / 0.8) : ease((t - seg.start) / T);\n      const fadeOut = next ? 1 - ease((t - next.start) / T) : 1;\n      show(sc, before ? 0 : Math.min(fadeIn, fadeOut));\n      if (!heads[i]) return;\n      const hin = ease((t - seg.start - T / 2) / (T / 2));\n      const hout = next ? 1 - ease((t - next.start) / (T / 2)) : 1;\n      show(heads[i], before ? 0 : Math.min(hin, hout));\n    });\n  }\n\n  // Steps appear: edges draw in one stroke, other elements fade in and rise slightly.\n  function drawSteps(t) {\n    for (const it of items) {\n      if (carried.has(it.el)) continue;\n      const p = ease((t - it.at) / R);\n      it.el.style.opacity = clamp((t - it.at) / 0.25);\n      if (!it.paths.length) {\n        it.el.style.transform = p < 1 ? `translateY(${(1 - p) * 14}px)` : '';\n        continue;\n      }\n      for (const { el, len } of it.paths) {\n        el.style.strokeDasharray = `${len}`;\n        el.style.strokeDashoffset = `${len * (1 - p)}`;\n        el.style.markerEnd = p < 0.97 ? 'none' : '';\n      }\n    }\n  }\n\n  // Morphs: during the transition a stand-in moves from the old to the new position while the real elements are hidden.\n  // An element can end one morph and start the next; collect the elements to hide first, then apply, so the two do not overwrite each other.\n  const morphed = [...new Set(morphs.flatMap((m) => [m.from, m.to]))];\n  function drawMorphs(t) {\n    const hidden = new Set();\n    for (const m of morphs) {\n      const s0 = segs[m.scene].start;\n      const during = t >= s0 && t < s0 + T;\n      m.ghost.style.display = during ? '' : 'none';\n      if (during) {\n        const p = ease((t - s0) / T);\n        m.ghost.style.transform = `translate(${lerp(m.a.x, m.b.x, p)}px, ${lerp(m.a.y, m.b.y, p)}px) scale(${lerp(m.a.s, m.b.s, p)})`;\n        hidden.add(m.from);\n      }\n      if (t < s0 + T) hidden.add(m.to);\n      m.to.style.opacity = 1;\n    }\n    for (const el of morphed) el.style.visibility = hidden.has(el) ? 'hidden' : '';\n  }\n\n  // Camera and highlight: interpolate between the previous camera position and the current target.\n  function drawCamera(t) {\n    const ev = camEvents.findLastIndex((e) => t >= e.t);\n    const e = ev >= 0 ? camEvents[ev] : null;\n    const prev = ev > 0 ? camEvents[ev - 1].cam : IDENT;\n    const p = e ? ease((t - e.t) / CAM) : 0;\n    const to = e ? e.cam : IDENT;\n    camera.style.transform = `translate(${lerp(prev.x, to.x, p)}px, ${lerp(prev.y, to.y, p)}px) scale(${lerp(prev.s, to.s, p)})`;\n    for (const el of hlTargets) el.classList.toggle('amv-hl', el === e?.hl);\n  }\n\n  function drawCaption(t) {\n    const cur = segs.findLastIndex((s) => t >= s.start);\n    const beats = cur >= 0 ? segs[cur].beats : [];\n    const b = beats.find((x) => t >= x.start && t < x.end + 0.3);\n    const html = b ? b.html : '';\n    if (caption.dataset.html !== html) {\n      caption.innerHTML = html;\n      caption.dataset.html = html;\n    }\n    caption.style.opacity = b ? clamp((t - b.start) / 0.2) : 0;\n  }\n\n  // \u2500\u2500 5. Deterministic rendering: the same time always draws the same frame \u2500\u2500\n  function render(time) {\n    const t = clamp(time, 0, D.duration);\n    drawScenes(t);\n    drawSteps(t);\n    drawMorphs(t);\n    drawCamera(t);\n    drawCaption(t);\n    updateUi(t);\n  }\n\n  // \u2500\u2500 6. Player \u2500\u2500\n  const audio = document.getElementById('amv-audio');\n  const seek = document.querySelector('.amv-seek');\n  const timeEl = document.querySelector('.amv-time');\n  const toggleBtn = document.querySelector('[data-amv=\"toggle\"]');\n  const bigPlay = document.querySelector('.amv-bigplay');\n  const marks = document.querySelector('.amv-marks');\n  const bar = document.querySelector('.amv-chapters');\n  const rateBtn = document.querySelector('[data-amv=\"rate\"]');\n  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];\n  const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;\n  seek.max = D.duration;\n\n  // A tick on the track and a chip in the strip per scene; both jump to the start of the scene and keep playing.\n  const chips = chapterList.map((s, i) => {\n    const mark = document.createElement('i');\n    mark.style.left = `${(s.start / D.duration) * 100}%`;\n    mark.title = `${s.id} ${s.title} \xB7 ${fmt(s.start)}`;\n    mark.addEventListener('click', () => jump(s.start));\n    marks.append(mark);\n\n    const chip = document.createElement('button');\n    chip.type = 'button';\n    chip.className = 'amv-chap';\n    chip.title = `${s.title} \xB7 ${fmt(s.start)}`;\n    const letter = document.createElement('b');\n    letter.textContent = s.id || String.fromCharCode(65 + i);\n    const label = document.createElement('span');\n    label.textContent = s.title;\n    chip.append(letter, label);\n    chip.addEventListener('click', () => jump(s.start));\n    bar.append(chip);\n    return chip;\n  });\n\n  let playing = false;\n  let base = 0;\n  let t0 = 0;\n  let rate = 1;\n  // The clock: the audio element when there is one, otherwise wall-clock time scaled by the playback rate.\n  const now = () => (!playing ? base : audio ? audio.currentTime : base + ((performance.now() - t0) / 1000) * rate);\n\n  function jump(t) {\n    seekTo(t);\n    if (!playing) play();\n  }\n\n  // The chip of the scene the picture is in, kept in view while the strip scrolls.\n  let activeChip = -1;\n  function markChapter(t) {\n    const i = chapterList.findLastIndex((s) => t >= s.start);\n    if (i === activeChip) return;\n    activeChip = i;\n    chips.forEach((c, k) => (k === i ? c.setAttribute('aria-current', 'true') : c.removeAttribute('aria-current')));\n    const chip = chips[i];\n    if (chip && bar.scrollWidth > bar.clientWidth) {\n      bar.scrollTo({ left: Math.max(0, chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' });\n    }\n  }\n\n  // Changing the rate must not move the clock: anchor it again at the time it shows now.\n  function setRate(r) {\n    const at = now();\n    rate = r;\n    if (audio) audio.playbackRate = r;\n    rateBtn.textContent = `${r}\xD7`;\n    rateBtn.setAttribute('aria-label', `${rateBtn.dataset.speed ?? 'Speed'} ${r}\xD7`);\n    if (playing) {\n      base = at;\n      t0 = performance.now();\n    }\n  }\n\n  function updateUi(t) {\n    if (document.activeElement !== seek) seek.value = t;\n    timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;\n    markChapter(t);\n  }\n\n  function play() {\n    if (base >= D.duration - 0.05) base = 0;\n    playing = true;\n    bigPlay.hidden = true;\n    toggleBtn.textContent = '\u275A\u275A';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.pause);\n    if (audio) {\n      audio.currentTime = base;\n      audio.play().catch(() => {});\n    } else {\n      t0 = performance.now();\n    }\n    requestAnimationFrame(tick);\n  }\n\n  function pause() {\n    base = now();\n    playing = false;\n    audio?.pause();\n    toggleBtn.textContent = '\u25B6';\n    toggleBtn.setAttribute('aria-label', toggleBtn.dataset.play);\n  }\n\n  function seekTo(x) {\n    base = clamp(x, 0, D.duration);\n    if (audio) audio.currentTime = base;\n    t0 = performance.now();\n    render(base);\n  }\n\n  function tick() {\n    if (!playing) return;\n    const t = now();\n    if (t >= D.duration) {\n      pause();\n      base = D.duration;\n      render(D.duration);\n      return;\n    }\n    render(t);\n    requestAnimationFrame(tick);\n  }\n\n  const toggle = () => (playing ? pause() : play());\n  toggleBtn.addEventListener('click', toggle);\n  bigPlay.addEventListener('click', play);\n  stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });\n  seek.addEventListener('input', () => seekTo(Number(seek.value)));\n  rateBtn.addEventListener('click', () => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length]));\n\n  // \u2500\u2500 Export: the page encodes itself (src/runtime/video-export.js) and offers the file as a download \u2500\u2500\n  // The engine needs no help from the page behind it: the stage is pinned into the frame while it copies styles, so\n  // the picture is 1920x1080 whatever the window shows. The overlay covers the scrubbing stage and the button keeps\n  // its place in the controls, so a second click stops the export.\n  const exportBtn = document.querySelector('[data-amv=\"export\"]');\n  const SLICE = 1_048_572;   // 1 MiB rounded to a multiple of 3, so every base64 slice stands on its own\n  let exporting = false;\n\n  const decode = (b64) => {\n    const bin = atob(b64);\n    const out = new Uint8Array(bin.length);\n    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);\n    return out;\n  };\n\n  async function runExport() {\n    if (exporting) { window.__amvEnc.cancel(); return; }\n    exporting = true;\n    const label = exportBtn.dataset.label || 'Export';\n    const overlay = document.createElement('div');\n    overlay.className = 'amv-exporting';\n    overlay.innerHTML = '<span><i></i></span><b></b>';\n    overlay.title = label;\n    overlay.addEventListener('click', () => window.__amvEnc.cancel());\n    // After the viewport and before the controls: the cover hides the picture, the controls stay clickable.\n    document.querySelector('.amv-viewport').after(overlay);\n    window.__amv.pauseForExport();\n    try {\n      const started = await window.__amvEnc.start({});\n      if (started.error) throw new Error(started.error);\n      for (;;) {\n        const p = window.__amvEnc.progress();\n        const pct = Math.round((p.done / Math.max(1, p.total)) * 100);\n        exportBtn.textContent = `${pct}%`;\n        overlay.querySelector('b').textContent = `${label} ${pct}%`;\n        overlay.querySelector('i').style.width = `${pct}%`;\n        if (p.error) throw new Error(p.error);\n        if (!p.running) break;\n        await new Promise((r) => setTimeout(r, 200));\n      }\n      const size = window.__amvEnc.size();\n      const parts = [];\n      for (let at = 0; at < size; at += SLICE) parts.push(decode(window.__amvEnc.bytes(at, Math.min(SLICE, size - at))));\n      const url = URL.createObjectURL(new Blob(parts, { type: 'video/webm' }));\n      const link = document.createElement('a');\n      link.href = url;\n      link.download = `${(document.title || 'video').replace(/[\\\\/:*?\"<>|]+/g, '-')}.webm`;\n      document.body.appendChild(link);\n      link.click();\n      link.remove();\n      setTimeout(() => URL.revokeObjectURL(url), 60_000);\n    } catch (e) {\n      exportBtn.textContent = '\u2715';\n      overlay.querySelector('b').textContent = String((e && e.message) || e);\n      await new Promise((r) => setTimeout(r, 2500));\n    } finally {\n      overlay.remove();\n      exportBtn.textContent = exportBtn.dataset.icon || '\u2913';\n      exporting = false;\n      window.__amv.resumeAfterExport();\n    }\n  }\n\n  if (window.__amvEnc && window.__amvEnc.supported()) exportBtn.addEventListener('click', runExport);\n  else exportBtn.remove();\n  document.addEventListener('keydown', (e) => {\n    if (e.key === ' ') { e.preventDefault(); toggle(); }\n    if (e.key === 'ArrowRight') seekTo(now() + 5);\n    if (e.key === 'ArrowLeft') seekTo(now() - 5);\n  });\n  audio?.addEventListener('ended', () => { pause(); base = D.duration; });\n\n  function fitStage() {\n    if (root.hasAttribute('data-export')) return;\n    const vp = stage.parentElement;\n    const s = Math.min(vp.clientWidth / W, vp.clientHeight / H);\n    stage.style.transform = `translate(-50%, -50%) scale(${s})`;\n  }\n  window.addEventListener('resize', fitStage);\n\n  // Export: place the stage 1:1 at the top left and call render(t) frame by frame. exportMode is for the CLI, which\n  // hides the controls and either screenshots the frames (ffmpeg) or drives the built-in encoder (see video-export.js).\n  window.render = render;\n  let resumeAt;   // undefined: no export ran; null: playback was paused already; a number: carry on there\n  window.__amv = {\n    duration: D.duration,\n    fps: D.fps,\n    exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },\n    // The encoder poses every frame itself, so playback stops for the length of an export and carries on afterwards.\n    // The button and the engine both call this; only the first call decides where playback resumes.\n    pauseForExport() { if (resumeAt === undefined) resumeAt = playing ? now() : null; pause(); return resumeAt; },\n    resumeAfterExport() {\n      if (resumeAt === undefined || resumeAt === null) { resumeAt = undefined; return; }\n      const at = resumeAt;\n      resumeAt = undefined;\n      seekTo(at);\n      if (at < D.duration - 0.05) play();\n    },\n  };\n  fitStage();\n  setRate(rate);   // the button carries the speed on load\n  // Poster: show the fully faded-in title card, but playback still starts at 0.\n  render(Math.min(1, segs[0].end));\n  updateUi(0);\n})();\n";
+var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the player page drives its own render(t), rasterizes the stage\n// into a canvas, encodes the picture and the narration with WebCodecs and muxes the WebM container with the writer\n// from src/video/webm.js (injected ahead of this script as window.__amvWebm). Every video page carries it: the export\n// button in the controls drives it, and `am video --mp4` drives the same code through the DevTools protocol.\n//\n// The page hands out the finished file in slices (window.__amvEnc.bytes(at, len), base64) so no bytes travel twice.\n(() => {\n  const W = 1920;\n  const H = 1080;\n  const CODECS = ['vp09.00.31.08', 'vp09.00.10.08', 'vp8'];   // the first one the browser really encodes\n  const AUDIO_FRAME_SECONDS = 0.02;    // Opus encodes 20 ms frames\n  const KEY_SECONDS = 5;               // a key frame every 5 s, so seeking stays cheap\n  const BITRATE = 3_500_000;           // VP9 at 1080p30: flat slides stay clean at this rate\n  const QUEUE_LIMIT = 8;               // frames in flight; a software encoder runs slower than the page renders\n\n  const state = { running: false, done: 0, total: 0, error: null, bytes: null, codec: '', audio: false, cancel: false };\n\n  const yieldToPage = () => new Promise((r) => {\n    // A timer is clamped in a hidden tab; a message port keeps the export running at full speed in the background.\n    const ch = new MessageChannel();\n    ch.port1.onmessage = () => r();\n    ch.port2.postMessage(0);\n  });\n\n  const asBytes = (x) => (x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x.buffer, x.byteOffset, x.byteLength));\n\n  // \u2500\u2500 Rasterizing: the stage, with every node's computed style copied into the SVG \u2500\u2500\n  // The clone needs the styles inline: an <img> of an SVG that embeds the page's own stylesheets does not lay out the\n  // page the same way (the fixed-position chain and the html/body height rules break). Computed styles are exact and\n  // cost about 300 ms for the whole stage, so unchanged nodes keep their string from the previous frame: the player\n  // changes only a handful of nodes per frame (14 of 261 measured on a five-scene video).\n  const styles = new Map();\n  const canvas = document.createElement('canvas');\n  canvas.width = W;\n  canvas.height = H;\n  const ctx = canvas.getContext('2d', { alpha: false });\n  const image = new Image();\n  let stageEl = null;\n\n  // The picture is always 1920x1080: the stage is pinned at the top left of the SVG and the fit transform the player\n  // applies to the live stage (translate + scale) is dropped, so the frame does not depend on the window size.\n  const PIN = `;position:absolute;left:0;top:0;width:${W}px;height:${H}px;transform:none;`;\n\n  function styleOf(el) {\n    const cs = getComputedStyle(el);\n    let out = '';\n    for (let i = 0; i < cs.length; i++) out += `${cs[i]}:${cs.getPropertyValue(cs[i])};`;\n    return out;\n  }\n\n  function stageSvg(stage) {\n    const animated = new Set();\n    for (const anim of document.getAnimations()) {\n      const target = anim.effect && anim.effect.target;\n      if (target) animated.add(target);\n    }\n    const clone = stage.cloneNode(true);\n    const stamp = `${window.innerWidth}x${window.innerHeight}`;\n    let recomputed = 0;\n    const walk = (src, dst, parentSign) => {\n      const sign = `${parentSign}\\u0001${src.getAttribute('class') || ''}\\u0001${src.getAttribute('style') || ''}${animated.has(src) ? '\\u0001a' : ''}`;\n      let entry = styles.get(src);\n      if (!entry || entry.sign !== sign) {\n        entry = { sign, text: styleOf(src) + (src === stage ? PIN : '') };\n        styles.set(src, entry);\n        recomputed++;\n      }\n      dst.setAttribute('style', entry.text);\n      const a = src.children;\n      const b = dst.children;\n      for (let i = 0; i < a.length; i++) walk(a[i], b[i], sign);\n    };\n    walk(stage, clone, stamp);\n    const svg = `<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${W}\" height=\"${H}\"><foreignObject x=\"0\" y=\"0\" width=\"${W}\" height=\"${H}\">${new XMLSerializer().serializeToString(clone)}</foreignObject></svg>`;\n    return { svg, recomputed };\n  }\n\n  async function paint(stage) {\n    const { svg } = stageSvg(stage);\n    // A data URL keeps the canvas origin clean; a blob URL taints it and the encoder then refuses the frame.\n    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;\n    await image.decode();\n    ctx.fillStyle = '#000';\n    ctx.fillRect(0, 0, W, H);\n    ctx.drawImage(image, 0, 0, W, H);\n  }\n\n  // \u2500\u2500 The narration the page already carries: encoded from the WAV the player holds as a data URL \u2500\u2500\n  function readWav() {\n    const el = document.getElementById('amv-audio');\n    const src = (el && el.getAttribute('src')) || '';\n    const comma = src.indexOf(',');\n    if (!src.startsWith('data:') || comma < 0) return null;\n    const bin = atob(src.slice(comma + 1));\n    const wav = new Uint8Array(bin.length);\n    for (let i = 0; i < bin.length; i++) wav[i] = bin.charCodeAt(i);\n    const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);\n    const tag = (o) => String.fromCharCode(wav[o], wav[o + 1], wav[o + 2], wav[o + 3]);\n    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE') throw new Error('the narration track is not a WAV file');\n    let format = null;\n    let pcm = null;\n    for (let o = 12; o + 8 <= wav.byteLength;) {\n      const id = tag(o);\n      const len = view.getUint32(o + 4, true);\n      if (id === 'fmt ') format = { channels: view.getUint16(o + 10, true), sampleRate: view.getUint32(o + 12, true), bits: view.getUint16(o + 22, true) };\n      else if (id === 'data') pcm = { at: o + 8, len };\n      o += 8 + len + (len % 2);\n    }\n    if (!format || !pcm || format.bits !== 16) throw new Error('the narration track must be 16-bit PCM WAV');\n    return { wav, pcm, ...format };\n  }\n\n  async function encodeAudio(writer) {\n    const sound = readWav();\n    if (!sound) return false;\n    const { wav, pcm, channels, sampleRate } = sound;\n    let head = null;\n    const audio = new AudioEncoder({\n      output(chunk, meta) {\n        if (!head && meta && meta.decoderConfig && meta.decoderConfig.description) head = asBytes(meta.decoderConfig.description).slice();\n        const data = new Uint8Array(chunk.byteLength);\n        chunk.copyTo(data);\n        writer.block({ track: 2, key: false, tsUs: chunk.timestamp, data });\n      },\n      error(e) { state.error = String((e && e.message) || e); },\n    });\n    audio.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: 64000 * channels });\n    const perBlock = Math.round(sampleRate * AUDIO_FRAME_SECONDS);\n    const total = Math.floor(pcm.len / (2 * channels));\n    for (let i = 0; i < total; i += perBlock) {\n      const samples = perBlock * channels;\n      const data = new Uint8Array(samples * 2);   // zero filled: a short last block becomes a full Opus frame\n      const from = pcm.at + i * channels * 2;\n      data.set(wav.subarray(from, from + Math.min(samples, (total - i) * channels) * 2));\n      const block = new AudioData({\n        format: 's16', sampleRate, numberOfFrames: perBlock, numberOfChannels: channels,\n        timestamp: Math.round((i / sampleRate) * 1e6), data,\n      });\n      audio.encode(block);\n      block.close();\n      while (audio.encodeQueueSize > 16 && !state.error) await yieldToPage();\n      if (state.cancel) break;\n    }\n    await audio.flush();\n    audio.close();\n    if (state.error) throw new Error(state.error);\n    // The encoder adds pre-skip samples of silence; CodecDelay makes the player drop them again.\n    const preSkip = head && head.length >= 19 ? new DataView(head.buffer, head.byteOffset, head.byteLength).getUint16(10, true) : 312;\n    if (!head || head.length < 19) {\n      head = new Uint8Array(19);\n      head.set(new TextEncoder().encode('OpusHead'), 0);\n      head[8] = 1;\n      head[9] = channels;\n      new DataView(head.buffer).setUint16(10, 312, true);\n      new DataView(head.buffer).setUint32(12, sampleRate, true);\n    }\n    writer.audio = { channels, codecPrivate: head, preSkipSamples: preSkip };\n    return true;\n  }\n\n  // \u2500\u2500 The whole export, run inside this page \u2500\u2500\n  // start() only validates and kicks the work off: the caller polls progress() and then asks for the bytes, so the\n  // DevTools protocol never has to wait minutes for one call to come back.\n  function start(options = {}) {\n    if (state.running) return { error: 'an export is already running' };\n    const api = window.__amv;\n    const Mux = window.__amvWebm && window.__amvWebm.WebmWriter;\n    if (!Mux) return { error: 'the WebM writer is missing from this page' };\n    if (typeof VideoEncoder !== 'function' || typeof AudioEncoder !== 'function') {\n      return { error: 'this browser cannot encode video (WebCodecs is missing)' };\n    }\n    Object.assign(state, { running: true, done: 0, total: Math.ceil(api.duration * api.fps), error: null, bytes: null, cancel: false });\n    run(Mux, options).catch((e) => { state.error = String((e && e.message) || e); }).finally(() => { state.running = false; styles.clear(); });\n    return { total: state.total, fps: api.fps, duration: api.duration };\n  }\n\n  async function run(Mux, options) {\n    const api = window.__amv;\n    const fps = api.fps;\n    const total = state.total;\n    const config = { width: W, height: H, bitrate: options.bitrate || BITRATE, framerate: fps, latencyMode: 'quality' };\n    let codec = null;\n    for (const candidate of CODECS) {\n      try {\n        if ((await VideoEncoder.isConfigSupported({ ...config, codec: candidate })).supported) { codec = candidate; break; }\n      } catch {\n        // an unknown codec string is not an error, try the next one\n      }\n    }\n    if (!codec) throw new Error('this browser encodes neither VP9 nor VP8');\n    state.codec = codec;\n\n    const writer = new Mux({ width: W, height: H, durationMs: api.duration * 1000, videoCodec: codec.startsWith('vp8') ? 'V_VP8' : 'V_VP9' });\n    state.audio = await encodeAudio(writer);\n    if (state.cancel) throw new Error('cancelled');\n\n    // The player keeps its own clock; the export poses every frame itself, so playback is paused first.\n    api.pauseForExport();\n    stageEl = stageEl || document.querySelector('.amv-stage');\n    const video = new VideoEncoder({\n      output(chunk) {\n        const data = new Uint8Array(chunk.byteLength);\n        chunk.copyTo(data);\n        writer.block({ track: 1, key: chunk.type === 'key', tsUs: chunk.timestamp, data });\n      },\n      error(e) { state.error = String((e && e.message) || e); },\n    });\n    video.configure({ ...config, codec });\n    const keyEvery = Math.max(1, Math.round(fps * KEY_SECONDS));\n    for (let i = 0; i < total; i++) {\n      if (state.cancel) { video.close(); throw new Error('cancelled'); }\n      if (state.error) throw new Error(state.error);\n      window.render(i / fps);\n      await paint(stageEl);\n      const frame = new VideoFrame(canvas, { timestamp: Math.round((i / fps) * 1e6), duration: Math.round(1e6 / fps) });\n      video.encode(frame, { keyFrame: i % keyEvery === 0 });\n      frame.close();\n      state.done = i + 1;\n      if (video.encodeQueueSize > QUEUE_LIMIT || i % 5 === 0) await yieldToPage();\n    }\n    await video.flush();\n    video.close();\n    if (state.error) throw new Error(state.error);\n    state.bytes = writer.build();\n  }\n\n  const base64 = (from, to) => {\n    let out = '';\n    for (let i = from; i < to; i += 0x8000) out += String.fromCharCode.apply(null, state.bytes.subarray(i, Math.min(to, i + 0x8000)));\n    return btoa(out);\n  };\n\n  window.__amvEnc = {\n    supported() {\n      return typeof VideoEncoder === 'function' && typeof AudioEncoder === 'function' && Boolean(window.__amvWebm && window.__amvWebm.WebmWriter);\n    },\n    start,\n    progress() {\n      return { running: state.running, done: state.done, total: state.total, error: state.error, audio: state.audio, codec: state.codec };\n    },\n    // The caller asks for the file in slices: one big string would travel badly over a debugger protocol.\n    size() { return state.bytes ? state.bytes.length : 0; },\n    bytes(from, len) { return state.bytes ? base64(from, Math.min(from + len, state.bytes.length)) : ''; },\n    cancel() { state.cancel = true; },\n  };\n})();\n";
+var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
 import { join as join7, resolve as resolve3, dirname as dirname2, basename as basename3 } from "node:path";
@@ -279,7 +293,7 @@ var zh_default = {
     diagram: "\u56FE\u8868\u67E5\u770B",
     delta: { added: "\u65B0\u589E", removed: "\u5220\u9664", changed: "\u4FEE\u6539", view: "\u89C6\u56FE", before: "\u6539\u524D", changes: "\u53D8\u66F4", after: "\u6539\u540E" }
   },
-  videoUi: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282", speed: "\u901F\u5EA6" }
+  videoUi: { play: "\u64AD\u653E", pause: "\u6682\u505C", chapters: "\u7AE0\u8282", speed: "\u901F\u5EA6", export: "\u5BFC\u51FA" }
 };
 
 // src/languages/zh-Hant.js
@@ -326,7 +340,7 @@ var zh_Hant_default = {
     diagram: "\u5716\u8868\u6AA2\u8996",
     delta: { added: "\u65B0\u589E", removed: "\u522A\u9664", changed: "\u4FEE\u6539", view: "\u6AA2\u8996", before: "\u6539\u524D", changes: "\u8B8A\u66F4", after: "\u6539\u5F8C" }
   },
-  videoUi: { play: "\u64AD\u653E", pause: "\u66AB\u505C", chapters: "\u7AE0\u7BC0", speed: "\u901F\u5EA6" }
+  videoUi: { play: "\u64AD\u653E", pause: "\u66AB\u505C", chapters: "\u7AE0\u7BC0", speed: "\u901F\u5EA6", export: "\u532F\u51FA" }
 };
 
 // src/languages/en.js
@@ -367,7 +381,7 @@ var en_default = {
     diagram: "Diagram viewer",
     delta: { added: "added", removed: "removed", changed: "changed", view: "View", before: "Before", changes: "Changes", after: "After" }
   },
-  videoUi: { play: "Play", pause: "Pause", chapters: "Chapters", speed: "Speed" }
+  videoUi: { play: "Play", pause: "Pause", chapters: "Chapters", speed: "Speed", export: "Export" }
 };
 
 // src/languages/ja.js
@@ -413,7 +427,7 @@ var ja_default = {
     diagram: "\u30C0\u30A4\u30A2\u30B0\u30E9\u30E0",
     delta: { added: "\u8FFD\u52A0", removed: "\u524A\u9664", changed: "\u5909\u66F4", view: "\u8868\u793A", before: "\u5909\u66F4\u524D", changes: "\u5DEE\u5206", after: "\u5909\u66F4\u5F8C" }
   },
-  videoUi: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0", speed: "\u901F\u5EA6" }
+  videoUi: { play: "\u518D\u751F", pause: "\u4E00\u6642\u505C\u6B62", chapters: "\u7AE0", speed: "\u901F\u5EA6", export: "\u66F8\u304D\u51FA\u3057" }
 };
 
 // src/languages/registry.js
@@ -2463,10 +2477,10 @@ function charWidth(ch, mono) {
   if (ch >= "A" && ch <= "Z") return 0.68;
   return 0.56;
 }
-function measure(str, size2 = 13, { mono = false } = {}) {
+function measure(str, size = 13, { mono = false } = {}) {
   let units = 0;
   for (const ch of String(str ?? "")) units += charWidth(ch, mono);
-  return Math.round(units * size2 * 100) / 100;
+  return Math.round(units * size * 100) / 100;
 }
 var HANGUL_SYLLABLE = /[가-힯]/;
 var HAN_KANA = new RegExp(CJK_RE.source.replace(HANGUL_SYLLABLE.source.slice(1, -1), ""));
@@ -2491,15 +2505,15 @@ function words(text, locale) {
   }
   return out;
 }
-function runUnits(run2, maxWidth, size2, opts) {
+function runUnits(run2, maxWidth, size, opts) {
   const unspaced = UNSPACED.find(([, re3]) => re3.test(run2));
   if (unspaced) {
     const [locale] = unspaced;
-    return words(run2, locale).flatMap((w) => measure(w, size2, opts) > maxWidth ? graphemes(w, locale) : [w]);
+    return words(run2, locale).flatMap((w) => measure(w, size, opts) > maxWidth ? graphemes(w, locale) : [w]);
   }
-  return HANGUL_SYLLABLE.test(run2) && measure(run2, size2, opts) > maxWidth ? graphemes(run2, "ko") : [run2];
+  return HANGUL_SYLLABLE.test(run2) && measure(run2, size, opts) > maxWidth ? graphemes(run2, "ko") : [run2];
 }
-function tokenize(str, maxWidth, size2, opts) {
+function tokenize(str, maxWidth, size, opts) {
   const chars = [...String(str)];
   const out = [];
   let i = 0;
@@ -2516,22 +2530,22 @@ function tokenize(str, maxWidth, size2, opts) {
     } else {
       let j2 = i;
       while (j2 < chars.length && !/\s/u.test(chars[j2]) && !HAN_KANA.test(chars[j2])) j2++;
-      out.push(...runUnits(chars.slice(i, j2).join(""), maxWidth, size2, opts));
+      out.push(...runUnits(chars.slice(i, j2).join(""), maxWidth, size, opts));
       i = j2;
     }
   }
   return out;
 }
-function wrap(str, maxWidth, size2 = 13, opts = {}) {
+function wrap(str, maxWidth, size = 13, opts = {}) {
   const lines = [];
   let line = "";
-  for (const tok of tokenize(str, maxWidth, size2, opts)) {
+  for (const tok of tokenize(str, maxWidth, size, opts)) {
     if (/^\s+$/.test(tok)) {
       if (line) line += " ";
       continue;
     }
     const candidate = line + tok;
-    if (line.trim() && measure(candidate, size2, opts) > maxWidth) {
+    if (line.trim() && measure(candidate, size, opts) > maxWidth) {
       lines.push(line.trimEnd());
       line = tok;
     } else {
@@ -5385,13 +5399,13 @@ function nodeSize(node) {
   const th = lines.length * LH2;
   const w = Math.max(tw + 28, 64);
   const h2 = th + 18;
-  const size2 = {
+  const size = {
     rect: [w, h2],
     round: [w + 12, h2],
     diamond: [(tw + 28) * 1.5, h2 * 1.6],
     db: [w, h2 + 14]
   }[node.shape];
-  return { lines, width: size2[0], height: size2[1] };
+  return { lines, width: size[0], height: size[1] };
 }
 function layout2({ nodes, edges, groups }, rankdir, id, ui) {
   const g = new $o.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
@@ -6041,14 +6055,14 @@ function readImage(ref, baseDir) {
   const path = localPath(ref, baseDir);
   const type = TYPES[extname(path).toLowerCase()];
   if (!type) throw new ImageError(`"${ref}" is not an image file; use ${Object.keys(TYPES).join(" ")}`, ref);
-  let size2;
+  let size;
   try {
-    size2 = statSync(path).size;
+    size = statSync(path).size;
   } catch {
     return null;
   }
-  if (size2 > MAX_IMAGE_BYTES) {
-    throw new ImageError(`"${ref}" is ${(size2 / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
+  if (size > MAX_IMAGE_BYTES) {
+    throw new ImageError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
   }
   return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
 }
@@ -6228,16 +6242,16 @@ function readSlice(ref, range, baseDir) {
   if (SECRET_FILE.test(basename2(path)) || relative(baseDir, path).split(sep).some((part) => SECRET_DIR.has(part))) {
     throw new CodeError(`"${ref}" is a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
   }
-  let size2;
+  let size;
   try {
     const stat = statSync2(path);
     if (!stat.isFile()) throw new CodeError(`"${ref}" is not a file`);
-    size2 = stat.size;
+    size = stat.size;
   } catch (err) {
     if (err instanceof CodeError) throw err;
     return null;
   }
-  if (size2 > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size2 / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
+  if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
   const buf = readFileSync3(path);
   if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
   if (SECRET_TEXT.test(buf.toString("utf8"))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
@@ -6782,16 +6796,16 @@ function readWav(buf) {
   let fmt = null;
   while (pos + 8 <= buf.length) {
     const id = buf.toString("ascii", pos, pos + 4);
-    const size2 = buf.readUInt32LE(pos + 4);
+    const size = buf.readUInt32LE(pos + 4);
     if (id === "fmt ") fmt = { channels: buf.readUInt16LE(pos + 10), rate: buf.readUInt32LE(pos + 12), bits: buf.readUInt16LE(pos + 22) };
     if (id === "data") {
       if (!fmt || fmt.bits !== 16) throw new TtsError("Only 16-bit PCM WAV is supported");
-      const n = Math.floor(Math.min(size2, buf.length - pos - 8) / 2 / fmt.channels);
+      const n = Math.floor(Math.min(size, buf.length - pos - 8) / 2 / fmt.channels);
       const samples = new Int16Array(n);
       for (let i = 0; i < n; i++) samples[i] = buf.readInt16LE(pos + 8 + i * 2 * fmt.channels);
       return fmt.rate === SAMPLE_RATE ? samples : resample({ rate: fmt.rate, samples });
     }
-    pos += 8 + size2 + size2 % 2;
+    pos += 8 + size + size % 2;
   }
   throw new TtsError("The WAV has no data chunk");
 }
@@ -6989,12 +7003,17 @@ ${scenesHtml}
 <span class="amv-time">0:00 / 0:00</span>
 <div class="amv-track"><input class="amv-seek" type="range" min="0" step="0.01" value="0" aria-label="seek"><div class="amv-marks"></div></div>
 <button class="amv-btn amv-rate" type="button" data-amv="rate" data-speed="${esc(ui.speed)}" aria-label="${esc(ui.speed)}">1\xD7</button>
+<button class="amv-btn amv-export" type="button" data-amv="export" data-label="${esc(ui.export)}" data-icon="&#8681;" aria-label="${esc(ui.export)}">&#8681;</button>
 <span class="amv-brand">Answer me with HTML ${VERSION} \xB7 ${esc(timestamp())}</span>
 </div>
 <nav class="amv-chapters" aria-label="${esc(ui.chapters)}"></nav>
 <script type="application/json" id="amv-data">${json}</script>
 ${wav2 ? audioTag(wav2) : ""}
 ${sourceTag(source)}
+<script>
+${VIDEO_MUX_JS}</script>
+<script>
+${VIDEO_EXPORT_JS}</script>
 <script>
 ${VIDEO_JS}</script>
 </body>
@@ -7008,161 +7027,6 @@ import { existsSync as existsSync3, mkdtempSync as mkdtempSync2, rmSync as rmSyn
 import { tmpdir as tmpdir2 } from "node:os";
 import { join as join3 } from "node:path";
 import { pathToFileURL } from "node:url";
-
-// src/video/webm.js
-var APP = "answer-me-with-html";
-var CLUSTER_MS = 1e3;
-var SEEK_PRE_ROLL_NS = 8e7;
-var ID = {
-  EBML: [26, 69, 223, 163],
-  EBMLVersion: [66, 134],
-  EBMLReadVersion: [66, 247],
-  EBMLMaxIDLength: [66, 242],
-  EBMLMaxSizeLength: [66, 243],
-  DocType: [66, 130],
-  DocTypeVersion: [66, 135],
-  DocTypeReadVersion: [66, 133],
-  Segment: [24, 83, 128, 103],
-  Info: [21, 73, 169, 102],
-  TimecodeScale: [42, 215, 177],
-  MuxingApp: [77, 128],
-  WritingApp: [87, 65],
-  Duration: [68, 137],
-  Tracks: [22, 84, 174, 107],
-  TrackEntry: [174],
-  TrackNumber: [215],
-  TrackUID: [115, 197],
-  FlagLacing: [156],
-  CodecID: [134],
-  TrackType: [131],
-  Video: [224],
-  PixelWidth: [176],
-  PixelHeight: [186],
-  Audio: [225],
-  SamplingFrequency: [181],
-  Channels: [159],
-  CodecPrivate: [99, 162],
-  CodecDelay: [86, 170],
-  SeekPreRoll: [86, 187],
-  Cluster: [31, 67, 182, 117],
-  Timecode: [231],
-  SimpleBlock: [163]
-};
-var UNKNOWN_SIZE = Buffer.from([1, 255, 255, 255, 255, 255, 255, 255]);
-function size(n) {
-  for (let len = 1; len <= 8; len++) {
-    if (len === 8 || n < 2 ** (7 * len) - 1) {
-      const out = Buffer.alloc(len);
-      let v = n;
-      for (let i = len - 1; i >= 0; i--) {
-        out[i] = v & 255;
-        v = Math.floor(v / 256);
-      }
-      out[0] |= 128 >> len - 1;
-      return out;
-    }
-  }
-}
-function uint(n) {
-  const out = [];
-  let v = Math.round(n);
-  do {
-    out.unshift(v & 255);
-    v = Math.floor(v / 256);
-  } while (v > 0);
-  return Buffer.from(out);
-}
-function f64(x2) {
-  const out = Buffer.alloc(8);
-  out.writeDoubleBE(x2);
-  return out;
-}
-var elem = (id, payload) => Buffer.concat([Buffer.from(id), size(payload.length), payload]);
-var WebmWriter = class {
-  constructor({ width, height, durationMs, videoCodec = "V_VP9", audio = null }) {
-    this.width = width;
-    this.height = height;
-    this.durationMs = durationMs;
-    this.videoCodec = videoCodec;
-    this.audio = audio;
-    this.blocks = [];
-  }
-  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.
-  block({ track, key, tsUs, data }) {
-    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1e3), data });
-  }
-  count(track) {
-    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);
-  }
-  build() {
-    const parts = [
-      elem(ID.EBML, Buffer.concat([
-        elem(ID.EBMLVersion, uint(1)),
-        elem(ID.EBMLReadVersion, uint(1)),
-        elem(ID.EBMLMaxIDLength, uint(4)),
-        elem(ID.EBMLMaxSizeLength, uint(8)),
-        elem(ID.DocType, Buffer.from("webm")),
-        elem(ID.DocTypeVersion, uint(4)),
-        elem(ID.DocTypeReadVersion, uint(2))
-      ])),
-      Buffer.concat([Buffer.from(ID.Segment), UNKNOWN_SIZE]),
-      elem(ID.Info, Buffer.concat([
-        elem(ID.TimecodeScale, uint(1e6)),
-        elem(ID.MuxingApp, Buffer.from(APP)),
-        elem(ID.WritingApp, Buffer.from(APP)),
-        elem(ID.Duration, f64(this.durationMs))
-      ])),
-      elem(ID.Tracks, Buffer.concat([this.#videoTrack(), ...this.audio ? [this.#audioTrack()] : []]))
-    ];
-    for (const cluster of this.#clusters()) parts.push(cluster);
-    return Buffer.concat(parts);
-  }
-  #track(num, type, codecId, extra) {
-    return elem(ID.TrackEntry, Buffer.concat([
-      elem(ID.TrackNumber, uint(num)),
-      elem(ID.TrackUID, uint(num)),
-      elem(ID.FlagLacing, uint(0)),
-      elem(ID.CodecID, Buffer.from(codecId)),
-      elem(ID.TrackType, uint(type)),
-      ...extra
-    ]));
-  }
-  #videoTrack() {
-    return this.#track(1, 1, this.videoCodec, [
-      elem(ID.Video, Buffer.concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))]))
-    ]);
-  }
-  #audioTrack() {
-    const { channels, codecPrivate, preSkipSamples } = this.audio;
-    const extra = [elem(ID.Audio, Buffer.concat([elem(ID.SamplingFrequency, f64(48e3)), elem(ID.Channels, uint(channels))]))];
-    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));
-    extra.push(elem(ID.CodecDelay, uint(preSkipSamples / 48e3 * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));
-    return this.#track(2, 2, "A_OPUS", extra);
-  }
-  #clusters() {
-    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);
-    const out = [];
-    for (let i = 0; i < blocks.length; ) {
-      const start = blocks[i].ms;
-      const body = [elem(ID.Timecode, uint(start))];
-      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {
-        body.push(this.#block(blocks[i], start));
-        i++;
-      }
-      out.push(Buffer.concat([Buffer.from(ID.Cluster), UNKNOWN_SIZE, ...body]));
-    }
-    return out;
-  }
-  #block(b, clusterStart) {
-    const head = Buffer.alloc(4);
-    head[0] = 128 | b.track;
-    head.writeInt16BE(b.ms - clusterStart, 1);
-    head[3] = b.key ? 128 : 0;
-    return elem(ID.SimpleBlock, Buffer.concat([head, b.data]));
-  }
-};
-
-// src/video/export.js
 var ExportError = class extends Error {
 };
 var CDP_TIMEOUT_MS = 3e4;
@@ -7170,9 +7034,9 @@ var CHROME_START_TIMEOUT_MS = 2e4;
 var WIDTH = 1920;
 var HEIGHT = 1080;
 var QUALITY = 92;
-var FRAME_RECORD = 14;
-var PULL_BYTES = 1 << 20;
 var WEBM_BITRATE = 35e5;
+var WEBM_SLICE = 1048572;
+var WEBM_POLL_MS = 250;
 var CHROME_PATHS = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -7329,77 +7193,32 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
   if (typeof WebSocket === "undefined") throw new ExportError("The built-in encoder needs Node.js 22 or later (built-in WebSocket)");
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
-    const { info, evaluate, screenshot } = player;
-    await evaluate(VIDEO_EXPORT_JS);
+    const { info, evaluate } = player;
     if (!await evaluate("window.__amvEnc.supported()")) {
       throw new ExportError("This browser cannot encode video (WebCodecs is missing). Install ffmpeg to export an MP4");
     }
-    const { codec } = await evaluate(`window.__amvEnc.init(${JSON.stringify({ width: WIDTH, height: HEIGHT, fps: info.fps, bitrate })})`);
-    const writer = new WebmWriter({
-      width: WIDTH,
-      height: HEIGHT,
-      durationMs: info.duration * 1e3,
-      videoCodec: codec.startsWith("vp8") ? "V_VP8" : "V_VP9"
-    });
-    const sound = await evaluate("window.__amvEnc.audio()");
-    if (sound) writer.audio = { channels: sound.channels, codecPrivate: opusHead(sound), preSkipSamples: opusPreSkip(sound) };
-    const take = (buf) => {
-      let at3 = 0;
-      while (at3 + FRAME_RECORD <= buf.length) {
-        const length = buf.readUInt32LE(at3 + 10);
-        if (at3 + FRAME_RECORD + length > buf.length) break;
-        writer.block({
-          track: buf[at3],
-          key: (buf[at3 + 1] & 1) === 1,
-          tsUs: buf.readDoubleLE(at3 + 2),
-          data: buf.subarray(at3 + FRAME_RECORD, at3 + FRAME_RECORD + length)
-        });
-        at3 += FRAME_RECORD + length;
-      }
-      if (at3 !== buf.length) throw new ExportError("The encoder returned a broken frame record");
-    };
-    const collect = async () => {
-      for (; ; ) {
-        const slice = await evaluate(`window.__amvEnc.pull(${PULL_BYTES})`);
-        if (slice.error) throw new ExportError(`The encoder stopped: ${slice.error}`);
-        if (!slice.data) return;
-        take(Buffer.from(slice.data, "base64"));
-      }
-    };
-    const frames = Math.ceil(info.duration * info.fps);
-    const keyEvery = Math.max(1, Math.round(info.fps * 5));
-    for (let i = 0; i < frames; i++) {
-      await evaluate(`render(${i / info.fps})`);
-      const data = await screenshot();
-      await evaluate(`window.__amvEnc.frame(${JSON.stringify(data)}, ${Math.round(i / info.fps * 1e6)}, ${i % keyEvery === 0})`);
-      if (i % 15 === 0 || i === frames - 1) {
-        await collect();
-        onProgress(i + 1, frames);
-      }
+    const started = await evaluate(`window.__amvEnc.start(${JSON.stringify({ bitrate })})`);
+    if (started.error) throw new ExportError(`The browser could not encode the video: ${started.error}`);
+    let state = null;
+    for (; ; ) {
+      state = await evaluate("window.__amvEnc.progress()");
+      if (state.error) throw new ExportError(`The browser stopped encoding: ${state.error}`);
+      onProgress(state.done, state.total);
+      if (!state.running) break;
+      await new Promise((r) => setTimeout(r, WEBM_POLL_MS));
     }
-    await evaluate("window.__amvEnc.finish()");
-    await collect();
-    writeFileSync2(webmFile, writer.build());
-    return { frames, duration: info.duration, codec, audio: Boolean(sound) };
+    const size = await evaluate("window.__amvEnc.size()");
+    const file = Buffer.alloc(size);
+    for (let at3 = 0; at3 < size; at3 += WEBM_SLICE) {
+      const slice = await evaluate(`window.__amvEnc.bytes(${at3}, ${Math.min(WEBM_SLICE, size - at3)})`);
+      Buffer.from(slice, "base64").copy(file, at3);
+    }
+    writeFileSync2(webmFile, file);
+    return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
   } finally {
     await player.close();
   }
 }
-function opusHead(sound) {
-  const head = sound.head ? Buffer.from(sound.head, "base64") : null;
-  if (head?.length >= 19) return head;
-  const out = Buffer.alloc(19);
-  out.write("OpusHead", 0, "ascii");
-  out[8] = 1;
-  out[9] = sound.channels;
-  out.writeUInt16LE(312, 10);
-  out.writeUInt32LE(sound.sampleRate, 12);
-  return out;
-}
-var opusPreSkip = (sound) => {
-  const head = sound.head ? Buffer.from(sound.head, "base64") : null;
-  return head?.length >= 19 ? head.readUInt16LE(10) : 312;
-};
 function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
   return new Promise((resolve4, reject) => {
     let buf = "";
@@ -7928,10 +7747,12 @@ Client -> Server: ACK
   and am always sets input, response_format and stream. A line whose duration is clearly wrong is synthesized again,
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit       AM_TTS_VOICE=vivian am video draft.md --voice local
-- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene) and a
-  speed button (0.5x to 2x).
-- --mp4 also saves a 1080p video file next to the page: an .mp4 through ffmpeg when it is installed, otherwise a .webm
-  the page encodes itself (VP9 + Opus). Export needs Chrome and Node 22+ and takes about 1.3 times the video length.`;
+- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
+  speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
+- --mp4 also saves a 1080p video file next to the page: an .mp4 through ffmpeg when it is installed (about 1.3 times the
+  video length), otherwise a .webm the page encodes itself (VP9 + Opus; the time follows how much of the page moves).
+  Export needs Chrome and Node 22+. The export button needs a secure context (a local file or localhost): WebCodecs is
+  not available to a page served over plain HTTP.`;
 async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;
   const err = io.stderr ?? process.stderr;

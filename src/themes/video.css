@@ -118,7 +118,20 @@ html[data-video] .am-diagram .amv-hl text, html[data-video] .am-diagram text.amv
 /* The mark stays 2 px wide; the pseudo element widens what can be clicked. */
 .amv-marks i::before { content: ''; position: absolute; left: -5px; right: -5px; top: -6px; bottom: -4px; }
 .amv-rate { width: auto; min-width: 46px; padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
+.amv-export { width: auto; min-width: 46px; padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
+.amv-export:hover, .amv-export[aria-busy="true"] { border-color: var(--v-ctl-accent); color: var(--v-ctl-accent); }
 .amv-brand { color: var(--v-ctl-muted); font-size: 12px; white-space: nowrap; }
+
+/* ── Export cover: the engine poses every frame behind it, so the picture is out of the way but the controls stay usable ── */
+.amv-exporting {
+  position: fixed; inset: 0; display: grid; place-content: center; gap: 16px; text-align: center; cursor: pointer;
+  background: color-mix(in srgb, var(--v-ctl-bg) 92%, transparent); color: var(--v-ctl-fg);
+  font: 14px -apple-system, "Segoe UI", sans-serif;
+}
+.amv-exporting > span { width: 320px; height: 4px; border-radius: 2px; background: var(--v-ctl-btn); overflow: hidden; }
+.amv-exporting > span > i { display: block; width: 0; height: 100%; background: var(--v-ctl-accent); }
+.amv-exporting > b { font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-export] .amv-exporting { display: none; }
 
 /* ── Chapter strip (one chip per scene; scrolls when the titles are long) ── */
 .amv-chapters {

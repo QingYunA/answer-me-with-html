@@ -6,7 +6,7 @@ import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
-import { VERSION, VIDEO_JS } from '../assets.js';
+import { VERSION, VIDEO_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
@@ -143,12 +143,17 @@ ${scenesHtml}
 <span class="amv-time">0:00 / 0:00</span>
 <div class="amv-track"><input class="amv-seek" type="range" min="0" step="0.01" value="0" aria-label="seek"><div class="amv-marks"></div></div>
 <button class="amv-btn amv-rate" type="button" data-amv="rate" data-speed="${esc(ui.speed)}" aria-label="${esc(ui.speed)}">1×</button>
+<button class="amv-btn amv-export" type="button" data-amv="export" data-label="${esc(ui.export)}" data-icon="&#8681;" aria-label="${esc(ui.export)}">&#8681;</button>
 <span class="amv-brand">Answer me with HTML ${VERSION} · ${esc(timestamp())}</span>
 </div>
 <nav class="amv-chapters" aria-label="${esc(ui.chapters)}"></nav>
 <script type="application/json" id="amv-data">${json}</script>
 ${wav ? audioTag(wav) : ''}
 ${sourceTag(source)}
+<script>
+${VIDEO_MUX_JS}</script>
+<script>
+${VIDEO_EXPORT_JS}</script>
 <script>
 ${VIDEO_JS}</script>
 </body>
