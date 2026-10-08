@@ -152,7 +152,7 @@ Server -> Client: SYN-ACK
 > The [Server] answers with a SYN-ACK.
 ````
 
-`am video` turns it into a player page. The diagram builds step by step with the narration, and the camera follows the node named in brackets. The voice is inside the page, so it plays offline. The player has a chapter strip to jump between scenes, a speed button, and an export button that encodes the video in the browser and downloads it (a local file or `localhost`, no ffmpeg). Add `--mp4` for a video file: an MP4 when ffmpeg is installed, otherwise a WebM the page encodes itself. The agent only makes videos when you ask. Details: [video guide](docs/video.md).
+`am video` turns it into a player page. The diagram builds step by step with the narration, and the camera follows the node named in brackets. The voice is inside the page, so it plays offline. The player has a chapter strip to jump between scenes, a speed button, and an export button that encodes the video in the browser and downloads it (a local file or `localhost`, no ffmpeg). Add `--mp4` for an MP4 file (needs ffmpeg), or `--webm` for a WebM file the page encodes itself (no ffmpeg). The agent only makes videos when you ask. Details: [video guide](docs/video.md).
 
 ## Settings
 

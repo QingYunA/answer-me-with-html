@@ -150,7 +150,7 @@ export async function exportMp4(htmlFile, mp4File, { wav, env = process.env, onP
 
 // The export without ffmpeg: the page encodes the picture and the narration with WebCodecs and muxes the container
 // itself (src/runtime/video-export.js), so this only starts it, reports progress and writes the bytes it hands back.
-// `am video` picks this path when ffmpeg is missing, so `--mp4` still results in a video file.
+// `am video --webm` takes this path; `--mp4` always goes through ffmpeg.
 export async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = () => {}, startTimeoutMs = CHROME_START_TIMEOUT_MS, bitrate = WEBM_BITRATE } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('The built-in encoder needs Node.js 22 or later (built-in WebSocket)');
 

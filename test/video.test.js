@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
@@ -556,6 +556,31 @@ test('e2e: --mp4 exports a 1080p30 video with an audio track', { skip: !E2E, tim
   const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'csv=p=0', join(dir, 'e2e.mp4')], { encoding: 'utf8' });
   assert.match(probe, /video,1920,1080/);
   assert.match(probe, /audio/);
+});
+
+test('cli video: --mp4 without ffmpeg fails and points to --webm, instead of writing a WebM', async () => {
+  const path = process.env.PATH;
+  process.env.PATH = mkdtempSync(join(tmpdir(), 'am-no-ffmpeg-'));
+  try {
+    const r = await run(['video', '-', '-o', 'no-ffmpeg.html', '--mp4'], { stdin: SRC });
+    assert.equal(r.code, 1);
+    assert.match(r.err, /MP4 export needs ffmpeg/);
+    assert.match(r.err, /--webm/);
+    assert.ok(existsSync(join(dir, 'no-ffmpeg.html')), 'the player page is still written');
+    assert.ok(!existsSync(join(dir, 'no-ffmpeg.webm')), 'no WebM in place of the MP4');
+  } finally {
+    process.env.PATH = path;
+  }
+});
+
+test('e2e: --webm exports a 1080p WebM without ffmpeg', { skip: !E2E, timeout: 120000 }, async () => {
+  const short = '---\ntitle: WebM\n---\n## 场景\n```flow\nA -> B\n```\n> A 连到 B。\n';
+  const r = await run(['video', '-', '-o', 'e2e-webm.html', '--webm'], { stdin: short, ttsProvider: fakeProvider() });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /e2e-webm\.webm/);
+  assert.ok(!existsSync(join(dir, 'e2e-webm.mp4')));
+  const head = readFileSync(join(dir, 'e2e-webm.webm')).subarray(0, 64).toString('latin1');
+  assert.match(head, /webm/);
 });
 
 // ── Fixes after review ──
