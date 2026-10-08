@@ -35,5 +35,5 @@ export default {
   deltaCounts: { added: 'נוספו', removed: 'הוסרו', changed: 'שונו' },
   // The render time under the page reads day.month.year, the Israeli way.
   dateOrder: 'dmy',
-  videoUi: { play: 'הפעלה', pause: 'השהיה', chapters: 'פרקים' },
+  videoUi: { play: 'הפעלה', pause: 'השהיה', chapters: 'פרקים', speed: 'מהירות', export: 'ייצוא' },
 };
