@@ -24,6 +24,7 @@ import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
 import { readEmbeddedCode, MAX_CODE_LINES, LONG_CODE_LINES } from './code.js';
 import { languageIds } from './languages/registry.js';
+import { runServe, serveLink, DEFAULT_PORT } from './serve.js';
 
 const MAX_LISTED_WARNINGS = 20;
 
@@ -39,6 +40,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
+  am serve  [--port 8765]                         serve pages on 127.0.0.1 so a remote host can open them over http (am render then prints a link:)
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
@@ -203,6 +205,7 @@ export async function main(argv, io = {}) {
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
+        port: { type: 'string' },
         all: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
@@ -229,6 +232,7 @@ export async function main(argv, io = {}) {
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
     case 'clean': return cmdClean(opts, { print, fail, env });
+    case 'serve': return cmdServe(opts, { print, fail, env });
     case '__update-check': return (await runUpdateCheck(amHome(env))) ? 0 : 1;
     case 'list': return cmdList(ctx), 0;
     case 'help': return cmdHelp(arg, { print, fail });
@@ -484,10 +488,13 @@ function outputPath(dir, title, opts, { env, io }) {
 }
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
-function emit(result, file, { print }, note = '') {
+function emit(result, file, { print, env }, note = '') {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, result.html);
   print(`✓ ${file}`);
+  // With am serve running, a page inside the data directory also gets an http link.
+  const link = serveLink(amHome(env), file);
+  if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note}`);
   // The code the page now holds, so the user can check it before sharing the page.
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(', ')}`);
@@ -566,6 +573,15 @@ function cmdClean(opts, { print, fail, env }) {
     ? `Would delete ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.`
     : `✓ Deleted ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
   return 0;
+}
+
+function cmdServe(opts, { print, fail, env }) {
+  if (opts.port !== undefined && !(/^\d+$/.test(opts.port.trim()) && Number(opts.port) <= 65535)) {
+    fail('✗ --port needs a number from 0 to 65535 (0 picks a free port)');
+    return 2;
+  }
+  const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
+  return runServe({ home: amHome(env), port, print, fail });
 }
 
 function cmdLint(src, opts, { print, fail }) {

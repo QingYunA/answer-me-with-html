@@ -179,6 +179,20 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 - Each page carries the built-in themes plus its own theme, so it still opens on any machine.
 - `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, and renders two specimen pages with every component.
 
+## Opening pages from a remote machine
+
+If your agent runs on a remote or headless machine, `am serve` lets you open its pages in your own browser over `http://`. Run it in a terminal on that machine and leave it running:
+
+````bash
+am serve              # http://127.0.0.1:8765, Ctrl-C to stop; --port N changes the port (0 picks a free one)
+ssh -L 8765:127.0.0.1:8765 user@host   # on your own computer, then open the links in your browser
+````
+
+- While it runs, `am render`, `am patch` and `am video` print a `link:` line for each page they write into `~/.answer-me-with-html/pages/` or `videos/`, and the agent gives you that link instead of a `file://` one.
+- The server listens on `127.0.0.1` only. Use the SSH tunnel to reach it; do not expose the port to the internet or a shared network. There is no password and no TLS.
+- Links are per page: each one carries a token for that one page, and it does not open any other page. They stop working when the server restarts. The server shows no folder listing and serves only `.html` files.
+- A page you opened from `file://` keeps its reply drafts in the browser's storage for that address, so drafts do not carry over to an `http://` link.
+
 ## Updating and cleaning up
 
 **Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` from GitHub to read the latest version number. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Turn this off with `/answer-me-with-html:config update_check off`.
