@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
@@ -73,6 +73,32 @@ test('estimateSeconds: estimates Chinese by character and English by word, with 
   assert.ok(Math.abs(estimateSeconds('一二三四五六七八九十一二三四五六七八九十一') - (21 / 4.2 + 0.3)) < 1e-9);
   assert.ok(estimateSeconds('one two three four five six seven eight nine ten') > 3.5);
   assert.equal(estimateSeconds('好'), 1.6);
+});
+
+test('estimateSeconds: counts words in every script, so a line is not held at the floor', () => {
+  // Seven words take the same time in English and in Cyrillic.
+  const seven = estimateSeconds('one two three four five six seven');
+  assert.equal(seven, estimateSeconds('один два три четыре пять шесть семь'));
+  // A combining mark (an Indic vowel sign or virama, Arabic or Hebrew vowel points) stays inside its word.
+  assert.equal(seven, estimateSeconds('नमस्ते दुनिया, यह एक परीक्षण वाक्य है'));
+  assert.equal(seven, estimateSeconds('كَتَبَ الوَلَدُ الدَّرْسَ فِي البَيْتِ كُلَّ يَوْمٍ'));
+  const lines = {
+    ru: 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.',
+    ar: 'يرسل العميل رسالة قصيرة إلى الخادم لطلب الاتصال، ويرد الخادم بتأكيده الخاص.',
+    el: 'Ο πελάτης στέλνει ένα σύντομο μήνυμα στον διακομιστή για να ζητήσει σύνδεση.',
+    he: 'הלקוח שולח הודעה קצרה לשרת כדי לבקש חיבור, והשרת עונה באישור שלו.',
+    th: 'ฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าว',
+  };
+  for (const [lang, line] of Object.entries(lines)) assert.ok(estimateSeconds(line) > 4, `${lang}: ${estimateSeconds(line)} s`);
+  assert.equal(estimateSeconds('Привет'), 1.6, 'a single word still takes the floor');
+});
+
+test('renderVideo: a Cyrillic narration line is measured, not held for the 1.6 s floor', async () => {
+  const src = '---\nlang: ru\ntitle: T\n---\n## Scene\n- step\n> Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.\n';
+  const r = await renderVideo(src);
+  const data = JSON.parse(r.html.match(/id="amv-data">(.*?)<\/script>/)[1]);
+  const beat = data.segments[1].beats[0];
+  assert.ok(beat.end - beat.start > 4, `held ${beat.end - beat.start} s`);
 });
 
 test('buildTimeline: title, scene changes and narration follow in order with increasing times', () => {
@@ -189,6 +215,19 @@ test('local voice: retries a runaway or truncated duration up to three times and
     const out = await p.synth(text);
     assert.equal(calls.length, 3);
     assert.equal(out.length, Math.round(e * 3 * SAMPLE_RATE), 'when none is normal, picks the ratio closest to 1');
+  });
+});
+
+test('local voice: a clip that fits a line outside Latin and CJK is accepted on the first attempt', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const text = 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.';
+  const e = estimateSeconds(text);
+  assert.ok(e > 4, `the line is not held at the floor: ${e} s`);
+  // A 5 s clip is a normal reading of this line (ratio 0.78, accepted), where the old 1.6 s estimate made it a runaway (3.1).
+  await withFakeFetch([5], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 1);
+    assert.equal(out.length, Math.round(5 * SAMPLE_RATE));
   });
 });
 
@@ -367,6 +406,30 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
   assert.throws(() => renderDoc('---\ntheme: 3b1b\n---\n## A\n文字\n'), ParseError, 'pages do not support 3b1b');
 });
 
+test('player: a chapter strip, a tick per scene and a playback speed button, in the draft language', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /<nav class="amv-chapters" aria-label="章节"><\/nav>/, 'the strip is empty until the player script fills it');
+  assert.match(zh.html, /data-amv="rate" data-speed="速度"/);
+  assert.match(zh.html, /"id":"A"/, 'a chapter carries the letter the scene head shows');
+  assert.match(zh.html, /"segments":\[\{[^}]*"id":""/, 'the title card is not a chapter');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n\`\`\`flow\nA -> B\n\`\`\`\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /aria-label="Chapters"/);
+  assert.match(en.html, /data-speed="Speed"/);
+});
+
+test('player: the export button carries the page language, and the page carries the encoder and the writer', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /data-amv="export" data-label="导出" data-icon="&#8681;" aria-label="导出"/);
+  // The button needs both halves of the export in the page: the WebM writer, then the engine that drives it.
+  assert.match(zh.html, /\nwindow\.__amvWebm = \{ WebmWriter \};\n/);
+  assert.match(zh.html, /window\.__amvEnc = \{/);
+  assert.ok(zh.html.indexOf('window.__amvWebm') < zh.html.indexOf('window.__amvEnc'), 'the writer comes first');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n- point\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /data-amv="export" data-label="Export" data-icon="&#8681;" aria-label="Export"/);
+});
+
 test('video fonts: Japanese 3b1b titles use a Japanese serif; titles in other themes are not overridden', async () => {
   const JA = '## 概要\n> 接続は3回のやりとりで行う。\n';
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${JA}`);
@@ -493,6 +556,32 @@ test('e2e: --mp4 exports a 1080p30 video with an audio track', { skip: !E2E, tim
   const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'csv=p=0', join(dir, 'e2e.mp4')], { encoding: 'utf8' });
   assert.match(probe, /video,1920,1080/);
   assert.match(probe, /audio/);
+});
+
+// Node 20 has no built-in WebSocket, so the export stops at its Node check before it looks for ffmpeg.
+test('cli video: --mp4 without ffmpeg fails and points to --webm, instead of writing a WebM', { skip: typeof WebSocket === 'undefined' && 'needs Node 22+' }, async () => {
+  const path = process.env.PATH;
+  process.env.PATH = mkdtempSync(join(tmpdir(), 'am-no-ffmpeg-'));
+  try {
+    const r = await run(['video', '-', '-o', 'no-ffmpeg.html', '--mp4'], { stdin: SRC });
+    assert.equal(r.code, 1);
+    assert.match(r.err, /MP4 export needs ffmpeg/);
+    assert.match(r.err, /--webm/);
+    assert.ok(existsSync(join(dir, 'no-ffmpeg.html')), 'the player page is still written');
+    assert.ok(!existsSync(join(dir, 'no-ffmpeg.webm')), 'no WebM in place of the MP4');
+  } finally {
+    process.env.PATH = path;
+  }
+});
+
+test('e2e: --webm exports a 1080p WebM without ffmpeg', { skip: !E2E, timeout: 120000 }, async () => {
+  const short = '---\ntitle: WebM\n---\n## 场景\n```flow\nA -> B\n```\n> A 连到 B。\n';
+  const r = await run(['video', '-', '-o', 'e2e-webm.html', '--webm'], { stdin: short, ttsProvider: fakeProvider() });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /e2e-webm\.webm/);
+  assert.ok(!existsSync(join(dir, 'e2e-webm.mp4')));
+  const head = readFileSync(join(dir, 'e2e-webm.webm')).subarray(0, 64).toString('latin1');
+  assert.match(head, /webm/);
 });
 
 // ── Fixes after review ──

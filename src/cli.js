@@ -15,10 +15,11 @@ import { readThemeFile } from './themes/user.js';
 import { checkColors, COLOR_TOKENS } from './themes/check.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
-import { exportMp4, ExportError } from './video/export.js';
+import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { hasCommand } from './sys.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
@@ -34,9 +35,9 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
+  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
-                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
+                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
@@ -176,7 +177,12 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
-- Output goes to ~/.answer-me-with-html/videos/; --mp4 also saves an .mp4 with the same name (needs Chrome and ffmpeg, Node 22+).`;
+- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
+  speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
+- --mp4 also saves a 1080p .mp4 next to the page (H.264 + AAC; needs ffmpeg; about 1.3 times the video length).
+  --webm saves a 1080p .webm that the page encodes itself (VP9 + Opus; no ffmpeg; the time follows how much of the page moves).
+  Both need Chrome and Node 22+; give both to save both. The export button needs a secure context (a local file or
+  localhost): WebCodecs is not available to a page served over plain HTTP.`;
 
 export async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;
@@ -200,6 +206,7 @@ export async function main(argv, io = {}) {
         mode: { type: 'string' },
         voice: { type: 'string' },
         mp4: { type: 'boolean' },
+        webm: { type: 'boolean' },
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
@@ -408,7 +415,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  emit(result, file, ctx, video ? ' (an MP4 with the same name is not updated; run am video --mp4 again if you need it)' : '');
+  emit(result, file, ctx, video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '');
   return finish(file, opts, config, ctx);
 }
 
@@ -427,7 +434,9 @@ async function cmdVideo(src, opts, ctx) {
   }
   const file = outputPath('videos', result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  if (opts.mp4 && !(await exportVideoMp4(file, result.wav, ctx))) return 1;
+  for (const format of ['mp4', 'webm']) {
+    if (opts[format] && !(await exportVideo(file, result.wav, format, ctx))) return 1;
+  }
   return finish(file, opts, config, ctx);
 }
 
@@ -451,17 +460,21 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   return { ...result, voiceName: provider ? provider.name : 'none (captions only)' };
 }
 
-async function exportVideoMp4(file, wav, { print, fail, env }) {
-  const mp4 = `${file.replace(/\.html?$/i, '')}.mp4`;
+// A video file next to the page: an MP4 through ffmpeg, or a WebM from the browser's own encoder. Both drive the page's
+// render(t) frame by frame, so the picture is the same either way. Each flag writes its own format and nothing else.
+async function exportVideo(file, wav, format, { print, fail, env }) {
+  const out = `${file.replace(/\.html?$/i, '')}.${format}`;
   const started = Date.now();
   try {
-    await exportMp4(file, mp4, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    if (format === 'mp4') await exportMp4(file, out, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    else await exportWebm(file, out, { env, onProgress: (i, n) => fail(`  Exporting WebM: frame ${i}/${n}`) });
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;
-    fail(`✗ MP4 export failed: ${e.message}. The player page was written and plays in a browser`);
+    const hint = format === 'mp4' && !hasCommand('ffmpeg') ? '. Or add --webm for a video file without ffmpeg' : '';
+    fail(`✗ Video export failed: ${e.message}${hint}. The player page was written and plays in a browser`);
     return false;
   }
-  print(`✓ ${mp4} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
+  print(`✓ ${out} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
   return true;
 }
 

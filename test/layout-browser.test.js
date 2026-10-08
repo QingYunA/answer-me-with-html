@@ -636,6 +636,41 @@ test('e2e: the expand button does not cover a node at the right edge of the draw
   assert.equal(await evaluate(clear), true, 'expand button sits above the drawing, not on it');
 });
 
+// A horizontal timeline is a row of centered columns joined by a line. On a phone it reads like timeline v instead:
+// one item per row, the dots and the line on the left, the text on the right.
+test('e2e: a horizontal timeline turns vertical on a phone and stays horizontal on a desktop', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\ntitle: Timeline\nlang: en\n---\n## A Plan\n```timeline\n2026-09 | Private beta | Ten design partners try the agent on real work\n2026-10 | Public beta\n*2026-11 | Paid plans | Pro and Team plans open with higher limits\n2027-Q1 | Mobile app\n```\n');
+  const file = join(tmp, 'timeline.html');
+  writeFileSync(file, html);
+  const shape = `(() => {
+    const items = [...document.querySelector('.am-timeline--h').children].map((li) => ({
+      top: li.getBoundingClientRect().top,
+      dotLeftOfTitle: li.querySelector('.am-tl-dot').getBoundingClientRect().right <= li.querySelector('.am-tl-title').getBoundingClientRect().left,
+      lineAcross: getComputedStyle(li, '::before').borderTopWidth !== '0px',
+    }));
+    return {
+      stacked: items.every((it, i) => i === 0 || it.top > items[i - 1].top),
+      oneRow: items.every((it) => it.top === items[0].top),
+      dotsLeft: items.every((it) => it.dotLeftOfTitle),
+      linesAcross: items.filter((it) => it.lineAcross).length,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  })()`;
+
+  await open(file, PHONE);
+  const phone = await evaluate(shape);
+  assert.equal(phone.stacked, true, `one item per row at ${PHONE}px`);
+  assert.equal(phone.dotsLeft, true, `every dot is left of its title at ${PHONE}px`);
+  assert.equal(phone.linesAcross, 0, `no horizontal line at ${PHONE}px`);
+  assert.ok(phone.pageOverflow <= 0, `the page does not scroll sideways at ${PHONE}px`);
+
+  await open(file, DESKTOP);
+  const desktop = await evaluate(shape);
+  assert.equal(desktop.oneRow, true, `all items in one row at ${DESKTOP}px`);
+  assert.equal(desktop.linesAcross, 4, `every item has its part of the horizontal line at ${DESKTOP}px`);
+});
+
 // A host that serves the page inside its own document drops the page's <html> tag, so the real root has none of the page's settings.
 const inHost = (html, rootAttrs = '') => `<!doctype html><html${rootAttrs}><body>${html.replace(/<!doctype[^>]*>\s*/i, '').replace(/<html[^>]*>/i, '').replace(/<\/html>/i, '')}`;
 const ROOT_ATTRS = "[...['lang','data-theme','data-mode','data-style']].map((a) => document.documentElement.getAttribute(a))";

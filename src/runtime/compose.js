@@ -2,6 +2,7 @@
 // replyText and planLayout are plain ES modules for tests; the page gets them with their `export` keyword dropped.
 // src/assets.js (development) and scripts/build.mjs (bundle) both call this with their own file reader, so the two cannot drift apart.
 const unexport = (code) => code.replace(/^export /gm, '');
+export { unexport };
 
 // Right-to-left pages also get the drawn view of the reply (reply-view.js), after the page script.
 export function composeRtlRuntime(read) {
