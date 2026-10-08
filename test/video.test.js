@@ -558,7 +558,8 @@ test('e2e: --mp4 exports a 1080p30 video with an audio track', { skip: !E2E, tim
   assert.match(probe, /audio/);
 });
 
-test('cli video: --mp4 without ffmpeg fails and points to --webm, instead of writing a WebM', async () => {
+// Node 20 has no built-in WebSocket, so the export stops at its Node check before it looks for ffmpeg.
+test('cli video: --mp4 without ffmpeg fails and points to --webm, instead of writing a WebM', { skip: typeof WebSocket === 'undefined' && 'needs Node 22+' }, async () => {
   const path = process.env.PATH;
   process.env.PATH = mkdtempSync(join(tmpdir(), 'am-no-ffmpeg-'));
   try {
