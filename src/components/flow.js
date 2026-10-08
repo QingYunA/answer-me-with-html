@@ -10,8 +10,6 @@ const FS = 13;
 const LH = 17;
 const TEXT_MAX = 150;
 const EDGE_FS = 11.5;
-const CLUSTER_FS = 11;
-const CLUSTER_LABEL_H = 15;
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
 
 // Shape brackets: match longer opening brackets first.
@@ -199,45 +197,22 @@ function nodeSize(node) {
   return { lines, width: size[0], height: size[1] };
 }
 
-const nodeKey = (i) => `n${i}`;
-const gkey = (i) => `g${i}`;
-const reserveKey = (i) => `r${i}`;
-
-// Run dagre. reserve maps each group whose name found no free place in the first layout to the side it gets room on:
-// in TB and BT a label-sized node above the group's first members, which dagre keeps clear of every edge passing by;
-// in LR and RL a strip inserted under the box's top edge, or above its bottom edge when an edge crosses the top one
-// (edges there mostly run sideways, so a strip stays empty).
-function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
+function layout({ nodes, edges, groups }, rankdir, id, ui, pageDir = 'ltr') {
   const g = new dagre.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
   // dagre reserves ids such as "\x00" internally; nodes and groups always get internal numbers, so no user-written name can collide.
-  const key = new Map([...nodes.keys()].map((name, i) => [name, nodeKey(i)]));
+  const key = new Map([...nodes.keys()].map((name, i) => [name, `n${i}`]));
+  const gkey = (i) => `g${i}`;
   const sizes = new Map();
   for (const n of nodes.values()) {
     const s = nodeSize(n);
     sizes.set(n.id, s);
     g.setNode(key.get(n.id), { width: s.width, height: s.height });
   }
-  const vertical = rankdir === 'TB' || rankdir === 'BT';
   groups.forEach((grp, i) => {
     g.setNode(gkey(i), { label: grp.name });
     grp.members.forEach((m) => g.setParent(key.get(m), gkey(i)));
-    if (!reserve.has(i) || !vertical) return;
-    g.setNode(reserveKey(i), { width: widths[i] + 4, height: CLUSTER_LABEL_H });
-    g.setParent(reserveKey(i), gkey(i));
-    // Seen from the top of the drawing (BT reverses every edge): the room goes above the group's first members, those no other
-    // member points to, and below every node outside the group that points to one of them, so their edges pass beside it.
-    const down = edges.map((e) => (rankdir === 'TB' ? [e.from, e.to] : [e.to, e.from]));
-    const link = (a, b, name) => (rankdir === 'TB' ? g.setEdge(a, b, {}, name) : g.setEdge(b, a, {}, name));
-    const inside = new Set(grp.members);
-    const first = grp.members.filter((m) => !down.some(([a, b]) => b === m && a !== m && inside.has(a)));
-    (first.length ? first : grp.members.slice(0, 1)).forEach((m, k) => {
-      link(reserveKey(i), key.get(m), `r${i}-${k}`);
-      down.forEach(([a, b], j) => {
-        if (b === m && !inside.has(a)) link(key.get(a), reserveKey(i), `r${i}-${k}-${j}`);
-      });
-    });
   });
   edges.forEach((e, i) => {
     const label = e.label ? { label: e.label, width: measure(e.label, EDGE_FS) + 12, height: 18, labelpos: 'c' } : {};
@@ -245,141 +220,17 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   });
   dagre.layout(g);
   // A right-to-left page mirrors the finished layout: every direction then reads from the right, and LR runs right to left.
-  if (rtl) mirrorLayout(g);
-  if (!vertical) {
-    for (const [i, side] of reserve) {
-      const c = g.node(gkey(i));
-      insertStrip(g, side === 'top' ? top(c) + 2 : top(c) + c.height - 2, CLUSTER_LABEL_H + 3);
-    }
-  }
-  return { g, key, sizes };
-}
-
-// Push everything below the line y down by d: nodes, edge points, edge labels, and the boxes that start below it; a box the line
-// cuts through grows by d. The drawing gets d taller.
-function insertStrip(g, y, d) {
-  for (const v of g.nodes()) {
-    const n = g.node(v);
-    if (v.startsWith('g') && top(n) < y && top(n) + n.height > y) {
-      n.height += d;
-      n.y += d / 2;
-    } else if (n.y > y) n.y += d;
-  }
-  for (const e of g.edges()) {
-    const edge = g.edge(e);
-    edge.points = edge.points.map((p) => (p.y > y ? { ...p, y: p.y + d } : p));
-    if (edge.y !== undefined && edge.y > y) edge.y += d;
-  }
-  g.graph().height += d;
-}
-
-const top = (n) => n.y - n.height / 2;
-
-// Where each group name goes: [x, baseline] of its text, or null when no place along the top of the box is free of nodes, edges,
-// edge labels and other group names. The name starts in the corner where reading starts (top left, or top right on a right-to-left
-// page) and slides toward the other corner past whatever is in the way.
-function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, reserve) {
-  const boxes = [];
-  for (const n of nodes.values()) {
-    const { x, y } = g.node(key.get(n.id));
-    const { width: w, height: h } = sizes.get(n.id);
-    boxes.push([x - w / 2, y - h / 2, x + w / 2, y + h / 2]);
-  }
-  const segments = [];
-  edges.forEach((e, i) => {
-    const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
-    const pts = data.points;
-    for (let k = 1; k < pts.length; k++) segments.push([pts[k - 1], pts[k]]);
-    if (e.label) {
-      const w = measure(e.label, EDGE_FS) + 10;
-      boxes.push([data.x - w / 2, data.y - 9, data.x + w / 2, data.y + 9]);
-    }
-  });
-  return groups.map((grp, i) => {
-    const c = g.node(gkey(i));
-    const left = c.x - c.width / 2;
-    const right = left + c.width;
-    const w = widths[i];
-    const own = grp.state ? [[rtl ? left - 8 : right - 8, top(c) - 8, rtl ? left + 8 : right + 8, top(c) + 8]] : [];
-    // A name needs air around it: an edge label right beside it would read as one phrase with it.
-    const free = (x0, y0, y1) => {
-      const box = [x0 - 5, y0 - 2, x0 + w + 5, y1 + 2];
-      const wide = [x0 - 10, y0 - 2, x0 + w + 10, y1 + 2];
-      return ![...boxes, ...own].some((b) => overlaps(wide, b)) && !segments.some(([p, q]) => segmentHits(p, q, box));
-    };
-    // First just under the top edge, then on the room reserved for it: a node, or a strip along the bottom edge.
-    const room = g.hasNode(reserveKey(i)) ? g.node(reserveKey(i)) : null;
-    const baselines = reserve.get(i) === 'bottom' ? [top(c) + c.height - 6] : room ? [top(c) + 14, room.y + 4] : [top(c) + 14];
-    for (const baseline of baselines) {
-      const [y0, y1] = [baseline - 11, baseline + 4];
-      for (let s = 0; s <= Math.max(0, c.width - 16 - w); s += 4) {
-        const x0 = rtl ? right - 8 - w - s : left + 8 + s;
-        if (free(x0, y0, y1)) {
-          boxes.push([x0, y0, x0 + w, y1]);
-          return [rtl ? x0 + w : x0, baseline];
-        }
-      }
-    }
-    if (!room) return null;
-    // The reserved node is clear by construction (dagre spaces it from every edge), so the name goes there.
-    const baseline = baselines.at(-1);
-    const x0 = room.x - w / 2;
-    boxes.push([x0, baseline - 11, x0 + w, baseline + 4]);
-    return [rtl ? x0 + w : x0, baseline];
-  });
-}
-
-const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-
-// Does the segment p-q cross the box [x0, y0, x1, y1]? Liang-Barsky clipping.
-function segmentHits(p, q, [x0, y0, x1, y1]) {
-  const dx = q.x - p.x;
-  const dy = q.y - p.y;
-  let t0 = 0;
-  let t1 = 1;
-  for (const [a, b] of [[-dx, p.x - x0], [dx, x1 - p.x], [-dy, p.y - y0], [dy, y1 - p.y]]) {
-    if (a === 0) {
-      if (b < 0) return false;
-    } else {
-      const t = b / a;
-      if (a < 0) t0 = Math.max(t0, t);
-      else t1 = Math.min(t1, t);
-      if (t0 > t1) return false;
-    }
-  }
-  return true;
-}
-
-// The width of a group name: monospace on a left-to-right page, the sans font on a right-to-left one (src/themes/rtl.css).
-const labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== 'rtl' }) + 2;
-
-function layout(model, rankdir, id, ui, pageDir = 'ltr') {
-  const { nodes, edges, groups } = model;
   const rtl = pageDir === 'rtl';
-  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
-  let run = runLayout(model, rankdir, rtl, widths, new Set());
-  let spots = placeLabels(run, model, widths, rtl, new Map());
-  // A group name that would sit on an edge or a node gets room of its own in another layout: first along the top of its box,
-  // and in LR and RL, when an edge crosses that room too, along the bottom.
-  const reserve = new Map();
-  for (const side of ['top', 'bottom']) {
-    const crowded = spots.flatMap((s, i) => (s ? [] : [i]));
-    if (!crowded.length) break;
-    for (const i of crowded) reserve.set(i, side);
-    run = runLayout(model, rankdir, rtl, widths, reserve);
-    spots = placeLabels(run, model, widths, rtl, reserve);
-  }
-  const { g, key, sizes } = run;
+  if (rtl) mirrorLayout(g);
 
   const clusters = groups.map((grp, i) => {
     const c = g.node(gkey(i));
     const x = c.x - c.width / 2;
     const y = c.y - c.height / 2;
     const mark = deltaAttr(grp.state);
-    // The badge sits in the corner opposite the one where reading starts.
-    const badgeX = rtl ? x : x + c.width;
-    const [labelX, labelY] = spots[i] ?? [rtl ? x + c.width - 8 : x + 8, y + 14];
-    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y)}`;
+    // The group name sits in the corner where reading starts (top left, or top right on a right-to-left page); the badge in the other one.
+    const [labelX, badgeX] = rtl ? [x + c.width - 8, x] : [x + 8, x + c.width];
+    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(y + 14)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y)}`;
   });
 
   // In video mode, items appear step by step by source line: edges written on one line and nodes first seen there form one step.
