@@ -77,7 +77,11 @@ test('estimateSeconds: estimates Chinese by character and English by word, with 
 
 test('estimateSeconds: counts words in every script, so a line is not held at the floor', () => {
   // Seven words take the same time in English and in Cyrillic.
-  assert.equal(estimateSeconds('one two three four five six seven'), estimateSeconds('один два три четыре пять шесть семь'));
+  const seven = estimateSeconds('one two three four five six seven');
+  assert.equal(seven, estimateSeconds('один два три четыре пять шесть семь'));
+  // A combining mark (an Indic vowel sign or virama, Arabic or Hebrew vowel points) stays inside its word.
+  assert.equal(seven, estimateSeconds('नमस्ते दुनिया, यह एक परीक्षण वाक्य है'));
+  assert.equal(seven, estimateSeconds('كَتَبَ الوَلَدُ الدَّرْسَ فِي البَيْتِ كُلَّ يَوْمٍ'));
   const lines = {
     ru: 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.',
     ar: 'يرسل العميل رسالة قصيرة إلى الخادم لطلب الاتصال، ويرد الخادم بتأكيده الخاص.',

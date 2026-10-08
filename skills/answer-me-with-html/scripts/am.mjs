@@ -2459,7 +2459,7 @@ function segmenter(locale, granularity) {
 var graphemes = (text, locale) => [...segmenter(locale, "grapheme").segment(text)].map((g) => g.segment);
 function countWords(text) {
   const unspaced = UNSPACED.find(([, re3]) => re3.test(text));
-  return unspaced ? [...segmenter(unspaced[0], "word").segment(text)].filter((s) => s.isWordLike).length : text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  return unspaced ? [...segmenter(unspaced[0], "word").segment(text)].filter((s) => s.isWordLike).length : text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}'’-]*/gu)?.length ?? 0;
 }
 function words(text, locale) {
   const out = [];
