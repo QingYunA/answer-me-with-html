@@ -115,7 +115,12 @@ async function inspectInChrome(file) {
       instance.once('exit', () => { clearTimeout(timer); r(); });
       instance.kill();
     });
-    rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    try {
+      rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    } catch {
+      // Chrome's child processes can still write to the profile after the main process exits (ENOTEMPTY on CI);
+      // a leftover temp directory does not change what the test checked.
+    }
   }
 }
 
