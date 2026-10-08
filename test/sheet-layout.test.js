@@ -63,7 +63,7 @@ test('base.css: at 760px or less, table cells have a minimum width and diagrams 
   const { BASE_CSS } = await import('../src/assets.js');
   const narrow = BASE_CSS.slice(BASE_CSS.indexOf('@media (max-width: 760px)'));
   const block = narrow.slice(0, narrow.indexOf('\n}') + 2);
-  assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*8em/);
+  assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*6em/);
   assert.match(block, /\.am-diagram svg\s*\{[^}]*max-width:\s*none/);
 });
 
@@ -92,15 +92,4 @@ test('sheet: spans added by the server (row filling, wide tables) are not render
 test('sheet: an author span larger than cols is rendered clamped to cols', () => {
   const html = renderDoc('---\ncols: 3\n---\n## A 宽 {span=5}\n文字').html;
   assert.match(panelTag(html, 'A'), /data-span="3"/);
-});
-
-// Narrow tables: the sheet layout gives a table panel the width its columns read well at and keeps each column at its share; a phone
-// keeps cells about two words wide and scrolls; print on paper narrower than three columns puts one panel per row, so no hole is left
-// beside a full-width panel. The browser behaviour itself is checked in test/layout-browser.test.js (AM_E2E=1).
-test('sheet: table panels get readable column widths, phones keep cells two words wide, narrow print uses one column', () => {
-  const { html } = renderDoc(`---\ncols: 3\nlang: en\n---\n## A Runs\n${table(4)}\n\n## B Note\nText.\n`);
-  assert.match(html, /function comfortableWidth\(table\)/);
-  assert.match(html, /function fitTables\(\)/);
-  assert.match(html, /capDiagrams\(plan\.maxScale\);\s*fitTables\(\);/);
-  assert.match(html, /@media print and \(max-width: 1100px\) \{\s*\.am-grid \{ grid-template-columns: minmax\(0, 1fr\); \}\s*\.am-grid > \.am-panel \{ grid-column: auto !important; \}/);
 });

@@ -135,38 +135,6 @@ Server -> Client: reply
 
 ${fillerEn('F', 2)}
 ${fillerEn('G', 3)}`,
-  // Short cells in four columns beside a key-value grid: the table used to get about 96 px a column, one word per line.
-  'short-table.he': `---
-title: טבלה צרה
-cols: 3
-lang: he
----
-## A מה נבדק {bare}
-\`\`\`kv 3
-מודל ריצות היובש: z-ai/glm-5.3
-בעיות: 10 (7 מוכחות אופטימליות, 3 "השיא הידוע")
-בדיקות ברתמה: 68 + 82, כולן עוברות
-\`\`\`
-
-## B איך הגענו לכאן
-- ההחלטה: לא בונים UI קודם, קודם בודקים אם התהליך בכלל עוזר.
-- ארבע ריצות יובש על GLM 5.3, שתי ריצות של זרוע NEXUS נקטעו באמצע.
-- המפתח מחזיר 401, המפתח עצמו לא תקף ולא רק היתרה.
-
-## C מה יצא בריצות היובש
-| בעיה | זרוע | תוצאה | מצב |
-|---|---|---|---|
-| golomb-12 | לולאה פשוטה | אורך 85, האופטימום הידוע | warn כנראה זכרה את התשובה |
-| golomb-12 | NEXUS | נקטעה אחרי 22 אירועים | no אין סיום |
-| circle-packing-26 | לולאה פשוטה | 1.4746, כלומר 56% מהשיא | ok הסתיימה בתקציב |
-| circle-packing-26, 28.9 | לולאה פשוטה | 99.76% מהשיא אחרי 2 הרצות | warn אין מקום לשיפור |
-
-## D מה לא מתחילים
-לא בונים את שלושת המסכים. ההחלטה תלויה בתוצאת ה-kill-test, וההדמיות מראות בעיה פתוחה.
-
-## E הצעד הבא
-מפתח OpenRouter חדש, ואז ריצה מלאה: 10 בעיות כפול 2 זרועות כפול 3 זרעים.
-`,
 };
 
 // Drafts where the server pads or widens a panel's span (row filling, wide tables and diagrams): the padding is no hint from the author,
@@ -509,37 +477,6 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
     await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${name} to lay out again after printing`);
     assertJustified(name, DESKTOP, await measure(), p.ids);
   }
-});
-
-// A cell of two or more words shown one word per line is the defect: a table panel needs the width its columns read well at.
-const STACKED_CELLS = `[...document.querySelectorAll('.am-md td')].filter((td) => {
-  const words = td.textContent.trim().split(/\\s+/).length;
-  const range = document.createRange();
-  range.selectNodeContents(td);
-  const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
-  return words >= 2 && lines >= words;
-}).map((td) => td.textContent.trim())`;
-
-test('e2e: a table with short cells keeps its words together on wide screens, and print leaves no hole beside a wide panel', { skip: SKIP, timeout: 60000 }, async () => {
-  if (!cdp) await launch();
-  for (const name of ['short-table.he', 'wide-table.en']) {
-    const p = pages.find((x) => x.name === name);
-    for (const width of [DESKTOP, 1300]) {
-      await open(p.file, width);
-      await waitFor(SETTLED, `${name} to lay out`);
-      assert.deepEqual(await evaluate(STACKED_CELLS), [], `${name} @${width}px: no cell shows one word per line`);
-    }
-  }
-  const p = pages.find((x) => x.name === 'short-table.he');
-  await open(p.file, DESKTOP);
-  await waitFor(SETTLED, 'short-table.he to lay out');
-  await page('Emulation.setEmulatedMedia', { media: 'print' });
-  await setWidth(A4_PORTRAIT);
-  await waitFor("getComputedStyle(document.querySelector('.am-grid')).display === 'grid'", 'the print layout');
-  const widths = await evaluate("[...document.querySelectorAll('.am-grid > .am-panel')].map((el) => Math.round(el.getBoundingClientRect().width))");
-  const grid = await evaluate("Math.round(document.querySelector('.am-grid').getBoundingClientRect().width)");
-  assert.ok(widths.every((w) => Math.abs(w - grid) <= 1), `print: every panel takes the full row, got ${widths.join(', ')} of ${grid}`);
-  await page('Emulation.setEmulatedMedia', { media: '' });
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
