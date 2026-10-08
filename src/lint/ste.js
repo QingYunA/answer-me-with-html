@@ -7,7 +7,7 @@
 
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES, ZH_WORDS } from './wordlist.zh.js';
-import { isCJK, isJapanese, segmenter, UNSPACED } from '../svg/text.js';
+import { isCJK, isJapanese, countWords } from '../svg/text.js';
 import { COMPONENTS } from '../components/index.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
@@ -31,16 +31,12 @@ export function sentenceLength(sentence) {
 }
 
 // Sentence length in a language without rules of its own: characters for CJK text (as sentenceLength does), words for everything else.
-// Words are counted by whitespace, except in the scripts that write none: there the word segmenter finds them, with the
-// same script list the diagram layout wraps with (src/svg/text.js).
+// The words come from countWords() in src/svg/text.js, which the video duration estimate uses too.
 const CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
 function neutralLength(sentence) {
   const han = sentence.match(CJK_TEXT)?.length ?? 0;
   const rest = sentence.replace(CJK_TEXT, ' ');
-  const unspaced = UNSPACED.find(([, re]) => re.test(rest));
-  const words = unspaced
-    ? [...segmenter(unspaced[0], 'word').segment(rest)].filter((s) => s.isWordLike).length
-    : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  const words = countWords(rest);
   return han >= 4 || han > words ? { lang: 'zh', count: han + words } : { lang: 'en', count: words };
 }
 
