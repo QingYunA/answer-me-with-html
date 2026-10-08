@@ -11,6 +11,12 @@ export default {
     serif: '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC"',
   },
   ui: {
+    remark: {
+      on: '注記中', off: '注記',
+      hint: 'メモ（任意）', save: '保存', remove: '削除',
+      section: '注記',
+      kinds: { suggestion: '提案', keep: '維持', question: '質問', concern: '懸念' },
+    },
     theme: 'テーマ', modeLabel: '表示',
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓', copyCode: 'コピー',

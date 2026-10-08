@@ -10,6 +10,12 @@ export default {
     serif: '"Songti TC", "PMingLiU", "MingLiU", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "Songti SC"',
   },
   ui: {
+    remark: {
+      on: '標註中', off: '標註',
+      hint: '批註（可選）', save: '儲存', remove: '刪除',
+      section: '標註',
+      kinds: { suggestion: '建議', keep: '保留', question: '疑問', concern: '關注' },
+    },
     theme: '主題', modeLabel: '明暗',
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
     copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',

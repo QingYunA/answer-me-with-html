@@ -439,3 +439,26 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-panel--bare { border: 0; background: transparent; box-shadow: none; }
 .am-panel--bare > .am-panel-body { padding: 0; }
 .am-panel--bare .am-kv { background: var(--paper); }
+
+/* Remark mode: block highlights with a note, collected into the Reply copy. */
+.am-btn--remark.is-on { border-color: var(--ink); color: var(--ink); }
+[data-remark="on"] .am-panel-body :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure):hover,
+[data-remark="on"] .am-doc :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure):hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }
+.am-mark { border-left: 3px solid var(--ink-3); padding-left: 10px; border-radius: 1px; }
+.am-mark[data-kind="suggestion"] { border-left-color: #b98206; background: rgba(185, 130, 6, .08); }
+.am-mark[data-kind="keep"] { border-left-color: #12805c; background: rgba(18, 128, 92, .08); }
+.am-mark[data-kind="question"] { border-left-color: #2b5fd9; background: rgba(43, 95, 217, .08); }
+.am-mark[data-kind="concern"] { border-left-color: #c23a5c; background: rgba(194, 58, 92, .08); }
+.am-mark-note { display: block; margin: 2px 0 10px 13px; padding: 1px 8px; font: 12px/1.5 var(--font-sans); color: var(--ink-2); }
+.am-mark-note[data-kind="suggestion"] { border-left: 3px solid #b98206; }
+.am-mark-note[data-kind="keep"] { border-left: 3px solid #12805c; }
+.am-mark-note[data-kind="question"] { border-left: 3px solid #2b5fd9; }
+.am-mark-note[data-kind="concern"] { border-left: 3px solid #c23a5c; }
+.am-remark-pop { position: absolute; z-index: 40; width: 264px; padding: 8px; display: grid; gap: 6px; color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14); }
+.am-remark-kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+.am-remark-kind { font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.am-remark-kind:hover { border-color: var(--ink-3); }
+.am-remark-kind.is-on { color: var(--ink); border-color: var(--ink); }
+.am-remark-pop textarea { font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }
+.am-remark-actions { display: flex; gap: 6px; }
+@media print { .am-remark-pop { display: none !important; } }

@@ -3,6 +3,12 @@ export default {
   id: 'en',
   language: 'en',
   ui: {
+    remark: {
+      on: 'Remark on', off: 'Remark',
+      hint: 'Optional note', save: 'Save', remove: 'Remove',
+      section: 'Remarks',
+      kinds: { suggestion: 'suggestion', keep: 'keep', question: 'question', concern: 'concern' },
+    },
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     copy: 'Copy source', done: 'Copied ✓', copyCode: 'Copy',

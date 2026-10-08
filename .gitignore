@@ -20,3 +20,4 @@ docs/demo/*.gif
 
 # Website build output (npm run site); GitHub Pages builds it in CI.
 site/dist/
+arc-*.html

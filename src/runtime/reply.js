@@ -105,9 +105,10 @@ if (replyBtn) {
       touched: touched.has(ask),
     }));
     const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));
-    const empty = !decisions.length && !comments.some((c) => c.text.trim());
+    const remarks = window.__amRemarkData?.() ?? [];
+    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;
     const title = document.querySelector('.am-head h1')?.textContent.trim() ?? document.title;
-    return empty ? '' : replyText({ title, decisions, comments, ui });
+    return empty ? '' : replyText({ title, decisions, comments, ui }) + (window.__amRemarkText?.() ?? '');
   };
 
   replyBtn.addEventListener('click', () => {
