@@ -37,14 +37,29 @@ test('video narration: each line of an undeclared draft gets the language of its
   assert.deepEqual(await languages(['这是一句中文旁白。', 'This line is English narration.', 'これは日本語のナレーションです。', '이것은 한국어 나레이션입니다.']), ['zh', 'en', 'ja', 'ko']); // lang-ok: narration under test
 });
 
-test('video narration: Traditional Chinese lines use the Chinese voice language, not a Traditional-only one', async () => {
-  assert.deepEqual(await languages(['這是一句繁體中文的旁白。']), ['zh']); // lang-ok: narration under test
+test('video narration: Traditional Chinese lines ask for a Traditional Chinese voice, not the Simplified one', async () => {
+  assert.deepEqual(await languages(['這是一句繁體中文的旁白。']), ['zh-Hant']); // lang-ok: narration under test
 });
 
 test('video narration: a declared language applies to every line', async () => {
   assert.deepEqual(await languages(['这是一句中文旁白。', 'This line is English narration.'], 'en'), ['en', 'en']); // lang-ok: narration under test
-  assert.deepEqual(await languages(['This line is English narration.'], 'zh-TW'), ['zh']);
+  assert.deepEqual(await languages(['This line is English narration.'], 'zh-TW'), ['zh-TW']);
   assert.deepEqual(await languages(['Cette ligne est en français.'], 'fr'), ['fr']);
+});
+
+test('video narration: a line the voice has no voice for keeps its caption and its estimated duration', async () => {
+  const voice = fakeVoice({ usesLanguage: true });
+  // A machine that has a Chinese voice and no Korean one, as `say -v '?'` would report it.
+  voice.voiceFor = (language) => (language.startsWith('zh') ? 'Tingting' : null);
+  const progress = [];
+  const both = await renderVideo(video(['这是一句中文旁白。', '이것은 한국어 나레이션입니다.']), { provider: voice, onProgress: (m) => progress.push(m) }); // lang-ok: narration under test
+  assert.deepEqual(voice.calls.map((c) => c.language), ['zh'], 'the Korean line is not read by the Chinese voice');
+  assert.deepEqual(both.captionsOnly, [{ language: 'ko', lines: 1 }]);
+  assert.ok(both.wav, 'the Chinese line still gives the video a voice track');
+  assert.match(progress.join('\n'), /No ko voice on this machine: captions only for 1 line/);
+  const lone = await renderVideo(video(['이것은 한국어 나레이션입니다.']), { provider: voice }); // lang-ok: narration under test
+  assert.equal(lone.wav, null, 'a video whose every line has no voice has captions only, like --voice off');
+  assert.deepEqual(lone.captionsOnly, [{ language: 'ko', lines: 1 }]);
 });
 
 test('video narration: a voice that does not use the language is called without one', async () => {

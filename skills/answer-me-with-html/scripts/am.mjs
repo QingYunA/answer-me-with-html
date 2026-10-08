@@ -259,6 +259,7 @@ var zh_default = {
   id: "zh",
   language: "zh",
   script: "Hans",
+  voice: { say: "zh_CN", espeak: "cmn" },
   ui: {
     theme: "\u4E3B\u9898",
     modeLabel: "\u660E\u6697",
@@ -301,6 +302,7 @@ var zh_Hant_default = {
   id: "zh-Hant",
   language: "zh",
   script: "Hant",
+  voice: { say: "zh_TW", espeak: "cmn" },
   langs: ["zh-Hant", "zh-TW", "zh-HK", "zh-MO"],
   fonts: {
     sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Heiti TC", "Microsoft JhengHei", "Noto Sans CJK TC", "Noto Sans TC", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -347,6 +349,7 @@ var zh_Hant_default = {
 var en_default = {
   id: "en",
   language: "en",
+  voice: { say: "en_US", espeak: "en-us" },
   ui: {
     theme: "Theme",
     modeLabel: "Mode",
@@ -388,6 +391,7 @@ var en_default = {
 var ja_default = {
   id: "ja",
   language: "ja",
+  voice: { say: "ja_JP", espeak: "ja" },
   langs: ["ja"],
   fonts: {
     sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',
@@ -5991,6 +5995,10 @@ function canonicalTag(value) {
   }
 }
 var baseLanguage = (tag) => new Intl.Locale(tag).language;
+function voiceHints(tag) {
+  const locale = new Intl.Locale(tag).maximize();
+  return findLanguage(locale.language, locale.script)?.voice ?? null;
+}
 function directionOf(locale) {
   const info = typeof locale.getTextInfo === "function" ? locale.getTextInfo() : locale.textInfo;
   return info?.direction === "rtl" ? "rtl" : "ltr";
@@ -6637,6 +6645,8 @@ function elevenLabs(env) {
       try {
         res = await fetch(url, {
           method: "POST",
+          // No language_code: the API ignores it for the models that do not support it (multilingual_v2 is documented as
+          // not supporting it) and every model reads the language from the text, so one voice reads every line.
           headers: { "xi-api-key": env.ELEVENLABS_API_KEY, "content-type": "application/json" },
           body: JSON.stringify({ text, model_id: model }),
           signal: AbortSignal.timeout(ELEVEN_TIMEOUT_MS)
@@ -6730,25 +6740,31 @@ function systemVoice(platform, which) {
     return {
       name: "say",
       voice: "system",
-      id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
+      id: "say",
       concurrency: 4,
       usesLanguage: true,
-      synth: (text, { language } = {}) => withTemp(async (file) => {
-        const v = voices[language];
-        await run("say", [...v ? ["-v", v] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
+      // The voice this machine has for a line's language, or null: the line then keeps its caption instead of being read
+      // by a voice for another language.
+      voiceFor: (language) => macVoiceFor(voices, language),
+      // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
+      synth: (text, { voice } = {}) => withTemp(async (file) => {
+        await run("say", [...voice ? ["-v", voice] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
         return readWav(readFileSync4(file));
       })
     };
   }
   if (which("espeak-ng")) {
+    const voices = espeakVoices();
     return {
       name: "espeak-ng",
       voice: "system",
       id: "espeak-ng",
       concurrency: 4,
       usesLanguage: true,
-      synth: (text, { language } = {}) => withTemp(async (file) => {
-        await run("espeak-ng", ["-v", { zh: "cmn", ja: "ja" }[language] ?? "en-us", "-w", file, "-f", textFile(file, text)]);
+      voiceFor: (language) => espeakVoiceFor(voices, language),
+      // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
+      synth: (text, { voice } = {}) => withTemp(async (file) => {
+        await run("espeak-ng", ["-v", voice ?? "en-us", "-w", file, "-f", textFile(file, text)]);
         return readWav(readFileSync4(file));
       })
     };
@@ -6756,18 +6772,48 @@ function systemVoice(platform, which) {
   return null;
 }
 function macVoices() {
-  return pickMacVoices(spawnSync2("say", ["-v", "?"], { encoding: "utf8" }).stdout || "");
+  return parseMacVoices(spawnSync2("say", ["-v", "?"], { encoding: "utf8" }).stdout || "");
 }
-function pickMacVoices(out) {
-  const list = out.split("\n").map((l3) => l3.match(/^(.+?)\s+([a-z]{2}_[A-Z]{2})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
-  const base = (name) => name.replace(/\s*[(（].*$/, "");
-  const pick = (prefer, locale) => prefer.map((p) => list.find((v) => v.locale === locale && base(v.name) === p)).find(Boolean)?.name;
-  return {
-    zh: pick(["Tingting", "Ting-Ting", "Lilian", "Reed", "Flo", "Eddy"], "zh_CN"),
-    en: pick(["Samantha", "Alex", "Ava", "Allison", "Reed", "Flo", "Eddy"], "en_US"),
-    ja: pick(["Kyoko", "Otoya", "Eddy", "Flo"], "ja_JP")
-  };
+function espeakVoices() {
+  return parseEspeakVoices(spawnSync2("espeak-ng", ["--voices"], { encoding: "utf8" }).stdout || "");
 }
+function parseMacVoices(out) {
+  return out.split("\n").map((l3) => l3.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z]{2,4})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
+}
+function parseEspeakVoices(out) {
+  return out.split("\n").map((l3) => l3.match(/^\s*\d+\s+(\S+)\s/)).filter(Boolean).map((m) => m[1]);
+}
+var PREFERRED_VOICES = {
+  zh: ["Tingting", "Ting-Ting", "Meijia", "Sinji"],
+  en: ["Samantha", "Alex", "Daniel", "Ava"],
+  ja: ["Kyoko", "Otoya"]
+};
+function macVoiceFor(voices, language) {
+  const base = baseLanguage(language);
+  const wanted = [language, voiceHints(language)?.say].filter(Boolean).map(localeKey);
+  for (const locale of wanted) {
+    const voice = bestVoice(voices.filter((v) => localeKey(v.locale) === locale), base);
+    if (voice) return voice;
+  }
+  return bestVoice(voices.filter((v) => localeKey(v.locale).split("_")[0] === base), base);
+}
+function espeakVoiceFor(voices, language) {
+  const base = baseLanguage(language);
+  const name = voiceHints(language)?.espeak ?? base;
+  if (!voices.length) return name;
+  const installed = voices.includes(name) || voices.includes(base) || voices.some((v) => v.startsWith(`${base}-`));
+  return installed ? name : null;
+}
+var localeKey = (locale) => String(locale).toLowerCase().replace(/-/g, "_");
+function bestVoice(candidates, base) {
+  if (!candidates.length) return null;
+  for (const name of PREFERRED_VOICES[base] ?? []) {
+    const hit = candidates.find((v) => stripName(v.name) === name);
+    if (hit) return hit.name;
+  }
+  return candidates[0].name;
+}
+var stripName = (name) => name.replace(/\s*[(（].*$/, "");
 function run(cmd, args) {
   return new Promise((resolve4, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -6832,15 +6878,21 @@ async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
     while (next < texts.length) {
       const i = next++;
       const language = provider.usesLanguage ? languageOf?.(texts[i]) : void 0;
-      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(`${provider.id}${language ? `
+      const voice = language && provider.voiceFor ? provider.voiceFor(language) : void 0;
+      if (language && provider.voiceFor && !voice) {
+        results[i] = null;
+        continue;
+      }
+      const key = `${provider.id}${voice ? `:${voice}` : ""}${language ? `
 ${language}` : ""}
-${texts[i]}`).digest("hex")}.pcm`);
+${texts[i]}`;
+      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(key).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
         continue;
       }
-      results[i] = trimSilence(await provider.synth(texts[i], { language }));
+      results[i] = trimSilence(await provider.synth(texts[i], { language, voice }));
       if (file) writeCache(file, results[i]);
     }
   };
@@ -6870,6 +6922,7 @@ function mixTrack(clips, starts, duration) {
   const total = Math.ceil(duration * SAMPLE_RATE);
   const track = new Int16Array(total);
   clips.forEach((clip, i) => {
+    if (!clip) return;
     const s0 = Math.round(starts[i] * SAMPLE_RATE);
     for (let j2 = 0; j2 < clip.length && s0 + j2 < total; j2++) track[s0 + j2] = clip[j2];
   });
@@ -6906,21 +6959,32 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const warnings = meta.style === "off" ? [] : lintDoc(video.doc, language).filter((w) => w.rule !== "paragraph-length");
   if (meta.style === "strict" && warnings.length) throw new LintError(warnings);
   const beats = allBeats(video);
-  const languageOf = (text) => baseLanguage(language.declared ? language.tag : detectLang(text));
-  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
+  const languageOf = (text) => language.declared ? language.tag : detectLang(text);
+  const { clips, durations, captionsOnly } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
   const timeline = buildTimeline(video, durations);
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
-  const wav2 = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
+  const wav2 = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
   const html = shell2({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
-  return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
+  return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }
 async function voiceBeats(beats, provider, cacheDir, onProgress, languageOf) {
-  if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
+  if (!provider) return { clips: null, captionsOnly: [], durations: beats.map((b) => estimateSeconds(b.text)) };
   onProgress?.(`Voice-over: ${provider.name}, ${beats.length} line${beats.length === 1 ? "" : "s"}`);
   const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir, languageOf });
-  return { clips, durations: clips.map((c) => c.length / SAMPLE_RATE) };
+  const silent = /* @__PURE__ */ new Map();
+  clips.forEach((clip, i) => {
+    if (clip) return;
+    const tag = languageOf(beats[i].text);
+    silent.set(tag, (silent.get(tag) ?? 0) + 1);
+  });
+  const captionsOnly = [...silent].map(([language, lines]) => ({ language, lines }));
+  for (const { language, lines } of captionsOnly) {
+    const n = `${lines} line${lines === 1 ? "" : "s"}`;
+    onProgress?.(`No ${language} voice on this machine: captions only for ${n}`);
+  }
+  return { clips, captionsOnly, durations: clips.map((c, i) => c ? c.length / SAMPLE_RATE : estimateSeconds(beats[i].text)) };
 }
 function playerData(video, meta, timeline) {
   return {
@@ -7742,6 +7806,9 @@ Client -> Server: ACK
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
 - Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+  The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
+  the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
+  A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
   Set the ElevenLabs voice with ELEVENLABS_VOICE_ID and the model with ELEVENLABS_MODEL_ID (default eleven_v4_turbo).
   local calls a local OpenAI-compatible speech service (POST /v1/audio/speech, returns 16-bit PCM WAV):
   AM_TTS_URL (required, service base URL), AM_TTS_MODEL, AM_TTS_VOICE (required when the service has no default),
@@ -8022,7 +8089,12 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
     onProgress: (msg) => fail(`  ${msg}`),
     themes: themes2
   });
-  return { ...result, voiceName: provider ? provider.name : "none (captions only)" };
+  return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
+}
+function voiceSummary(provider, captionsOnly = []) {
+  if (!provider) return "none (captions only)";
+  if (!captionsOnly.length) return provider.name;
+  return `${provider.name} (no ${captionsOnly.map((c) => c.language).join(", ")} voice installed: captions only for those lines)`;
 }
 async function exportVideo(file, wav2, format, { print, fail, env }) {
   const out = `${file.replace(/\.html?$/i, "")}.${format}`;

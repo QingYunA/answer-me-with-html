@@ -2,6 +2,7 @@
 export default {
   id: 'en',
   language: 'en',
+  voice: { say: 'en_US', espeak: 'en-us' },
   ui: {
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },

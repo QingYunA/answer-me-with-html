@@ -4,6 +4,7 @@ export default {
   id: 'zh',
   language: 'zh',
   script: 'Hans',
+  voice: { say: 'zh_CN', espeak: 'cmn' },
   ui: {
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },

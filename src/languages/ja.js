@@ -5,6 +5,7 @@
 export default {
   id: 'ja',
   language: 'ja',
+  voice: { say: 'ja_JP', espeak: 'ja' },
   langs: ['ja'],
   fonts: {
     sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',

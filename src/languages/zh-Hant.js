@@ -4,6 +4,7 @@ export default {
   id: 'zh-Hant',
   language: 'zh',
   script: 'Hant',
+  voice: { say: 'zh_TW', espeak: 'cmn' },
   langs: ['zh-Hant', 'zh-TW', 'zh-HK', 'zh-MO'],
   fonts: {
     sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Heiti TC", "Microsoft JhengHei", "Noto Sans CJK TC", "Noto Sans TC", "PingFang SC", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif',

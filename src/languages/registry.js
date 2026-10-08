@@ -3,6 +3,9 @@
 // (Simplified Chinese covers Hans, Traditional Chinese covers Hant). The label sets in the file are the ones the
 // page and the video player show. A language that needs its own fonts also lists the :lang() ranges they apply to (`langs`) and the
 // fonts (`fonts.sans`; `fonts.serif` is the CJK part of a serif stack).
+// `voice` names the narration voices of the language, for the system voices whose names do not follow from the tag:
+// `say` is the macOS locale to look for (`zh_TW`, so Traditional Chinese is read by a Taiwan voice), `espeak` the
+// espeak-ng voice (`cmn` for Chinese, which espeak-ng lists instead of `zh`). A language without a file has no hint.
 import zh from './zh.js';
 import zhHant from './zh-Hant.js';
 import en from './en.js';

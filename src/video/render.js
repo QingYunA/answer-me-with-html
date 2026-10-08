@@ -1,7 +1,7 @@
 // Video draft → single-file player page. Visuals reuse page components; the timeline comes from each narration line's audio duration (or estimated duration);
 // render(t) in the player page is deterministic: the same moment always draws the same frame, and MP4 export calls it frame by frame.
 import { renderBlocks, LintError, timestamp, hasDelta } from '../render.js';
-import { resolveLanguage, detectLang, baseLanguage } from '../language.js';
+import { resolveLanguage, detectLang } from '../language.js';
 import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
@@ -12,7 +12,8 @@ import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.j
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 
-// When provider is null, only captions are produced and durations are estimated from word count.
+// When provider is null, only captions are produced and durations are estimated from word count. A line whose language the
+// voice has no voice for keeps its caption the same way (captionsOnly says which languages those were).
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 // previousLanguage: the language the page had before (a patched video keeps it unless the draft declares one).
 export async function renderVideo(source, { provider = null, cacheDir, defaults = {}, overrides = {}, onProgress, themes = BUILTIN, previousLanguage } = {}) {
@@ -29,25 +30,38 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   if (meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
   const beats = allBeats(video);
-  // A declared language applies to every line; otherwise each line is read in the language of its own text.
-  const languageOf = (text) => baseLanguage(language.declared ? language.tag : detectLang(text));
-  const { clips, durations } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
+  // A declared language applies to every line; otherwise each line is read in the language of its own text. The tag keeps the
+  // script it resolved to, so a Traditional Chinese line asks for a Traditional Chinese voice and not the Simplified one.
+  const languageOf = (text) => (language.declared ? language.tag : detectLang(text));
+  const { clips, durations, captionsOnly } = await voiceBeats(beats, provider, cacheDir, onProgress, languageOf);
   const timeline = buildTimeline(video, durations);
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
-  const wav = clips ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
+  const wav = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
   const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
-  return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length };
+  return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }
 
-// With a voice-over each beat lasts as long as its audio; otherwise it is estimated from word count.
+// With a voice-over each beat lasts as long as its audio; a beat the voice could not read lasts as long as its text suggests,
+// and its language is reported so the caller can say why.
 async function voiceBeats(beats, provider, cacheDir, onProgress, languageOf) {
-  if (!provider) return { clips: null, durations: beats.map((b) => estimateSeconds(b.text)) };
+  if (!provider) return { clips: null, captionsOnly: [], durations: beats.map((b) => estimateSeconds(b.text)) };
   onProgress?.(`Voice-over: ${provider.name}, ${beats.length} line${beats.length === 1 ? '' : 's'}`);
   const clips = await synthAll(beats.map((b) => b.text), provider, { cacheDir, languageOf });
-  return { clips, durations: clips.map((c) => c.length / SAMPLE_RATE) };
+  const silent = new Map();
+  clips.forEach((clip, i) => {
+    if (clip) return;
+    const tag = languageOf(beats[i].text);
+    silent.set(tag, (silent.get(tag) ?? 0) + 1);
+  });
+  const captionsOnly = [...silent].map(([language, lines]) => ({ language, lines }));
+  for (const { language, lines } of captionsOnly) {
+    const n = `${lines} line${lines === 1 ? '' : 's'}`;
+    onProgress?.(`No ${language} voice on this machine: captions only for ${n}`);
+  }
+  return { clips, captionsOnly, durations: clips.map((c, i) => (c ? c.length / SAMPLE_RATE : estimateSeconds(beats[i].text))) };
 }
 
 function playerData(video, meta, timeline) {
