@@ -75,6 +75,32 @@ test('estimateSeconds: estimates Chinese by character and English by word, with 
   assert.equal(estimateSeconds('好'), 1.6);
 });
 
+test('estimateSeconds: counts words in every script, so a line is not held at the floor', () => {
+  // Seven words take the same time in English and in Cyrillic.
+  const seven = estimateSeconds('one two three four five six seven');
+  assert.equal(seven, estimateSeconds('один два три четыре пять шесть семь'));
+  // A combining mark (an Indic vowel sign or virama, Arabic or Hebrew vowel points) stays inside its word.
+  assert.equal(seven, estimateSeconds('नमस्ते दुनिया, यह एक परीक्षण वाक्य है'));
+  assert.equal(seven, estimateSeconds('كَتَبَ الوَلَدُ الدَّرْسَ فِي البَيْتِ كُلَّ يَوْمٍ'));
+  const lines = {
+    ru: 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.',
+    ar: 'يرسل العميل رسالة قصيرة إلى الخادم لطلب الاتصال، ويرد الخادم بتأكيده الخاص.',
+    el: 'Ο πελάτης στέλνει ένα σύντομο μήνυμα στον διακομιστή για να ζητήσει σύνδεση.',
+    he: 'הלקוח שולח הודעה קצרה לשרת כדי לבקש חיבור, והשרת עונה באישור שלו.',
+    th: 'ฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าว',
+  };
+  for (const [lang, line] of Object.entries(lines)) assert.ok(estimateSeconds(line) > 4, `${lang}: ${estimateSeconds(line)} s`);
+  assert.equal(estimateSeconds('Привет'), 1.6, 'a single word still takes the floor');
+});
+
+test('renderVideo: a Cyrillic narration line is measured, not held for the 1.6 s floor', async () => {
+  const src = '---\nlang: ru\ntitle: T\n---\n## Scene\n- step\n> Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.\n';
+  const r = await renderVideo(src);
+  const data = JSON.parse(r.html.match(/id="amv-data">(.*?)<\/script>/)[1]);
+  const beat = data.segments[1].beats[0];
+  assert.ok(beat.end - beat.start > 4, `held ${beat.end - beat.start} s`);
+});
+
 test('buildTimeline: title, scene changes and narration follow in order with increasing times', () => {
   const v = parseVideo(SRC);
   const tl = buildTimeline(v, [2, 1, 1, 1]);
@@ -189,6 +215,19 @@ test('local voice: retries a runaway or truncated duration up to three times and
     const out = await p.synth(text);
     assert.equal(calls.length, 3);
     assert.equal(out.length, Math.round(e * 3 * SAMPLE_RATE), 'when none is normal, picks the ratio closest to 1');
+  });
+});
+
+test('local voice: a clip that fits a line outside Latin and CJK is accepted on the first attempt', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const text = 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.';
+  const e = estimateSeconds(text);
+  assert.ok(e > 4, `the line is not held at the floor: ${e} s`);
+  // A 5 s clip is a normal reading of this line (ratio 0.78, accepted), where the old 1.6 s estimate made it a runaway (3.1).
+  await withFakeFetch([5], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 1);
+    assert.equal(out.length, Math.round(5 * SAMPLE_RATE));
   });
 });
 

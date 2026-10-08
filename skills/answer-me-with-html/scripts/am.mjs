@@ -2497,6 +2497,10 @@ function segmenter(locale, granularity) {
   return SEGMENTERS.get(key);
 }
 var graphemes = (text, locale) => [...segmenter(locale, "grapheme").segment(text)].map((g) => g.segment);
+function countWords(text) {
+  const unspaced = UNSPACED.find(([, re3]) => re3.test(text));
+  return unspaced ? [...segmenter(unspaced[0], "word").segment(text)].filter((s) => s.isWordLike).length : text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}'’-]*/gu)?.length ?? 0;
+}
 function words(text, locale) {
   const out = [];
   for (const s of segmenter(locale, "word").segment(text)) {
@@ -5783,8 +5787,7 @@ var CJK_TEXT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu;
 function neutralLength(sentence) {
   const han = sentence.match(CJK_TEXT)?.length ?? 0;
   const rest = sentence.replace(CJK_TEXT, " ");
-  const unspaced = UNSPACED.find(([, re3]) => re3.test(rest));
-  const words3 = unspaced ? [...segmenter(unspaced[0], "word").segment(rest)].filter((s) => s.isWordLike).length : rest.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu)?.length ?? 0;
+  const words3 = countWords(rest);
   return han >= 4 || han > words3 ? { lang: "zh", count: han + words3 } : { lang: "en", count: words3 };
 }
 var RULE_LANGUAGES = /* @__PURE__ */ new Set(["zh", "en", "ja"]);
@@ -6531,13 +6534,12 @@ function beat(raw, line) {
 }
 function estimateSeconds(text) {
   let cjk = 0;
-  let latin = "";
+  let rest = "";
   for (const ch of text) {
     if (isCJK(ch)) cjk++;
-    latin += isCJK(ch) ? " " : ch;
+    rest += isCJK(ch) ? " " : ch;
   }
-  const words3 = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return Math.max(1.6, cjk / 4.2 + words3 / 2.6 + 0.3);
+  return Math.max(1.6, cjk / 4.2 + countWords(rest) / 2.6 + 0.3);
 }
 var TIMING = Object.freeze({
   title: 2.4,

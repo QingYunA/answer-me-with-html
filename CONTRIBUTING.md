@@ -15,17 +15,19 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 ## Pull requests
 
+- **Open an issue first, and wait for a maintainer to accept it.** Describe the problem and the change you plan; for new syntax, show the syntax. An issue is accepted when a maintainer agrees in a comment or labels it `ready-for-human`. Then open the PR and link the issue (`Fixes #123`). Only typo and broken-link fixes may skip the issue. We close a PR without an accepted issue, and you can reopen it once the issue is accepted.
 - One topic per PR. Commit messages follow Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`, `chore:`).
 - Write the PR description in English: what changed, why, and how you verified it.
 - `npm test` must pass and the bundle must be rebuilt.
 
 ### Reviewing a contributor PR (maintainers)
 
-1. Check out the PR head in a separate worktree: `git fetch origin pull/<n>/head:pr-<n> && git worktree add /tmp/pr-<n> pr-<n>`.
-2. Review the diff against the PR base (`git diff origin/main...pr-<n>`), never against your current branch.
-3. In the worktree: `npm ci`, `npm run build` (the bundle must not change), `npm test`, and `npm run snapshot` when `src/` changed.
-4. To finish a PR on the contributor's branch, push to their fork. GitHub rejects the push if the PR touches `.github/workflows/` and your token lacks the `workflow` scope; open a carrier PR from a branch in this repository instead.
-5. Comment in English, then remove the worktree.
+1. Check that the PR links an accepted issue. If it does not, close it with a link to "Pull requests" above.
+2. Check out the PR head in a separate worktree: `git fetch origin pull/<n>/head:pr-<n> && git worktree add /tmp/pr-<n> pr-<n>`.
+3. Review the diff against the PR base (`git diff origin/main...pr-<n>`), never against your current branch.
+4. In the worktree: `npm ci`, `npm run build` (the bundle must not change), `npm test`, and `npm run snapshot` when `src/` changed.
+5. To finish a PR on the contributor's branch, push to their fork. GitHub rejects the push if the PR touches `.github/workflows/` and your token lacks the `workflow` scope; open a carrier PR from a branch in this repository instead.
+6. Comment in English, then remove the worktree.
 
 ## Refreshing the demo video
 
