@@ -2481,10 +2481,11 @@ function charWidth(ch, mono) {
   if (ch >= "A" && ch <= "Z") return 0.68;
   return 0.56;
 }
-function measure(str, size = 13, { mono = false } = {}) {
+var BOLD = 1.06;
+function measure(str, size = 13, { mono = false, bold = false } = {}) {
   let units = 0;
   for (const ch of String(str ?? "")) units += charWidth(ch, mono);
-  return Math.round(units * size * 100) / 100;
+  return Math.round(units * size * (bold ? BOLD : 1) * 100) / 100;
 }
 var HANGUL_SYLLABLE = /[가-힯]/;
 var HAN_KANA = new RegExp(CJK_RE.source.replace(HANGUL_SYLLABLE.source.slice(1, -1), ""));
@@ -5504,15 +5505,23 @@ function diamondPoint(node, toward) {
 // src/components/er.js
 var FS3 = 13;
 var FIELD_FS = 12;
+var KEY_FS = 11;
+var EDGE_FS2 = 11.5;
+var LH3 = 17;
 var HEAD_LH = 20;
 var FIELD_LH = 17;
 var PAD = 11;
 var KEY_GAP = 12;
 var MIN_WIDTH = 92;
+var LOOP_OUT = 34;
+var LOOP_STEP = 20;
+var LOOP_END = 18;
 var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
 var CARDS = ["1\\.\\.\\*", "0\\.\\.1", "\\*", "1"];
 var MARKERS = /* @__PURE__ */ new Set(["PK", "FK", "UK"]);
 var RELATIONSHIP = new RegExp(`^(\\S+)\\s+(${CARDS.join("|")})\\s*--\\s*(${CARDS.join("|")})\\s+(\\S+)\\s*(?::\\s*(.*))?$`);
+var MERMAID = /^(\S+)\s+([|o{}]{2})(?:--|\.\.)([|o{}]{2})\s+(\S+)\s*(?::\s*(.*))?$/;
+var MERMAID_CARDS = { "||": "1", "o|": "0..1", "|o": "0..1", "|{": "1..*", "}|": "1..*", "o{": "*", "}o": "*" };
 var er_default = {
   name: "er",
   summary: "Entity relationship diagram (automatic layout, crow's-foot ends)",
@@ -5526,16 +5535,17 @@ Order
 User 1--* Order: places       \u2190 A <cardinality>--<cardinality> B: label (optional)
 \`\`\`
 - Cardinalities are 1, 0..1, * and 1..*. The left end is drawn at the entity on the left, the right end at the entity on the right.
-- A field's FK -> Entity already draws its relationship, so a relationship line is optional. A relationship line that names the same two entities replaces the implied one and sets the cardinality and the label.
+- A field's FK -> Entity already draws its relationship, so a relationship line is optional. A relationship line that names the same two entities replaces the implied one and sets the cardinality and the label. Two FK fields that point at the same entity draw two relationships.
 - The type is optional: \`email UK\` is a field with a key but no type.
-- A Mermaid line such as USER ||--o{ ORDER is an error: write USER 1--* ORDER.
+- A Mermaid line such as USER ||--o{ ORDER is an error that shows the line written for this component.
+- An entity a field or a relationship names must be written at column 0.
+- A field that points at its own entity draws a loop.
 - The default direction is TB (top to bottom).`,
   example: "```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```",
-  render(text, { args, uid, ui }) {
+  render(text, { args, ui }) {
     const model = parseEr(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    const html = `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", uid(), ui)}</figure>`;
-    return html;
+    return `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui)}</figure>`;
   }
 };
 function parseEr(text) {
@@ -5554,15 +5564,31 @@ function parseEr(text) {
       current = null;
       continue;
     }
-    if (line.includes("--")) throw new ComponentError(`"${line}" is not a relationship; write A 1--* B (cardinalities 1, 0..1, * and 1..*)`, n);
+    const mermaid = line.match(MERMAID);
+    if (mermaid && MERMAID_CARDS[mermaid[2]] && MERMAID_CARDS[mermaid[3]]) {
+      throw new ComponentError(`"${line}" is Mermaid syntax; write ${erLineOf(mermaid)}`, n);
+    }
+    if (line.includes("--") || line.includes("{") || line.includes("}")) {
+      throw new ComponentError(`"${line}" is not an entity of this component; write A 1--* B for a relationship, or the entity name at column 0 on its own line`, n);
+    }
     const hi = line.startsWith("*");
     const name = (hi ? line.slice(1) : line).trim();
     if (!name) throw new ComponentError("an entity needs a name", n);
     if (entities.has(name)) throw new ComponentError(`entity "${name}" is written twice`, n);
-    current = { name, hi, fields: [], line: n, step: 0, x: 0, y: 0, width: 0, height: 0 };
+    current = { name, hi, fields: [], line: n };
     entities.set(name, current);
   }
   if (!entities.size) throw new ComponentError("an entity relationship diagram needs at least one entity (a line at column 0)", 1);
+  for (const entity of entities.values()) {
+    for (const field of entity.fields) {
+      if (field.ref && !entities.has(field.ref)) throw new ComponentError(`no entity "${field.ref}"; write it at column 0`, field.line);
+    }
+  }
+  for (const rel of written) {
+    for (const name of [rel.from, rel.to]) {
+      if (!entities.has(name)) throw new ComponentError(`no entity "${name}"; write it at column 0`, rel.line);
+    }
+  }
   return { entities, written };
 }
 function parseField(line, n) {
@@ -5583,31 +5609,34 @@ function parseField(line, n) {
   const type = head.slice(0, at3 === -1 ? head.length : at3).join(" ");
   return { name, type, marker, ref, line: n };
 }
+function erLineOf(mermaid) {
+  const [, from, left, right, to, label] = mermaid;
+  const text = label?.trim();
+  return `${from} ${MERMAID_CARDS[left]}--${MERMAID_CARDS[right]} ${to}${text ? `: ${text}` : ""}`;
+}
 function relationships({ entities, written }) {
-  const byPair = /* @__PURE__ */ new Map();
-  for (const e of entities.values()) {
-    for (const field of e.fields) {
-      if (!field.ref) continue;
-      byPair.set(pairKey(e.name, field.ref), { from: e.name, fromCard: "*", to: field.ref, toCard: "1", label: "", line: field.line });
+  const implied = [];
+  for (const entity of entities.values()) {
+    for (const field of entity.fields) {
+      if (field.ref) implied.push({ from: entity.name, fromCard: "*", to: field.ref, toCard: "1", label: "", line: field.line });
     }
   }
-  for (const rel of written) byPair.set(pairKey(rel.from, rel.to), rel);
-  return [...byPair.values()];
+  const replaced = new Set(written.map((rel) => pairKey(rel.from, rel.to)));
+  return [...implied.filter((rel) => !replaced.has(pairKey(rel.from, rel.to))), ...written];
 }
 var pairKey = (a, b) => [a, b].sort().join("\0");
 var fieldText = (field) => field.type ? `${field.name} ${field.type}` : field.name;
+var nameWidth = (entity) => measure(entity.name, FS3, { bold: true });
+var rowWidth = (entity, field) => measure(fieldText(field), FIELD_FS, { bold: entity.hi }) + keyWidth(entity, field) + 2 * PAD;
+var keyWidth = (entity, field) => field.marker ? measure(field.marker, KEY_FS, { mono: true, bold: entity.hi }) + KEY_GAP : 0;
 function nodeSize2(entity) {
-  const keyWidth = (field) => field.marker ? measure(field.marker, FIELD_FS, { mono: true }) + KEY_GAP : 0;
-  const width = Math.max(
-    MIN_WIDTH,
-    measure(entity.name, FS3) + 2 * PAD,
-    ...entity.fields.map((field) => measure(fieldText(field), FIELD_FS) + keyWidth(field) + 2 * PAD)
-  );
-  return { width: Math.ceil(width), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
+  const rows = entity.fields.map((field) => rowWidth(entity, field));
+  return { width: Math.ceil(Math.max(MIN_WIDTH, nameWidth(entity) + 2 * PAD, ...rows)), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
 }
-function layout3(model, rankdir, id, ui) {
+function layout3(model, rankdir, ui) {
   const { entities } = model;
   const rels = relationships(model);
+  const loops = rels.filter((rel) => rel.from === rel.to);
   const g = new $o.graphlib.Graph({ multigraph: true });
   g.setGraph({ rankdir, nodesep: 44, ranksep: 62, marginx: 14, marginy: 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -5618,44 +5647,98 @@ function layout3(model, rankdir, id, ui) {
     sizes.set(entity.name, size);
     g.setNode(key.get(entity.name), { width: size.width, height: size.height });
   }
-  rels.forEach((rel, i) => {
-    const label2 = rel.label ? { label: rel.label, width: measure(rel.label, FIELD_FS) + 12, height: 18, labelpos: "c" } : {};
+  rels.filter((rel) => rel.from !== rel.to).forEach((rel, i) => {
+    const label2 = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS2) + 10, height: 18, labelpos: "c" } : {};
     g.setEdge(key.get(rel.from), key.get(rel.to), label2, `e${i}`);
   });
   $o.layout(g);
   const steps = [.../* @__PURE__ */ new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
   const stepOf = new Map(steps.map((line, i) => [line, i]));
-  const edgeSvg = rels.map((rel, i) => {
+  const edgeSvg = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
     const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
     const points = data.points.map((p) => ({ ...p }));
-    const path = `<path class="am-edge" d="${smoothPath(points)}"/>`;
-    const ends = endsSvg(points, rel);
-    const label2 = rel.label ? `<g class="am-edge-label"><rect x="${f(data.x - (measure(rel.label, FIELD_FS) + 10) / 2)}" y="${f(data.y - 9)}" width="${f(measure(rel.label, FIELD_FS) + 10)}" height="18" rx="3"/>${textAt(rel.label, data.x, data.y)}</g>` : "";
-    return `<g data-step="${stepOf.get(rel.line)}">${path}${ends}${label2}</g>`;
+    const label2 = rel.label ? labelSvg(rel.label, data.x, data.y) : "";
+    return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
   });
   const nodeSvg = [...entities.values()].map((entity) => {
     const { x: x2, y: y2 } = g.node(key.get(entity.name));
-    const { width: width2, height: height2 } = sizes.get(entity.name);
-    const left = x2 - width2 / 2;
-    const top = y2 - height2 / 2;
-    const head = `<text class="am-er-head" font-weight="600" x="${f(left + PAD)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(entity.name)}</text>`;
-    const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + width2)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
-    const fields2 = entity.fields.map((field, i) => {
-      const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
-      const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(left + width2 - PAD)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(field.marker)}</text>` : "";
-      return `<text class="am-er-field" font-size="12" x="${f(left + PAD)}" y="${f(cy)}" dominant-baseline="central">${esc(fieldText(field))}</text>${marker}`;
-    }).join("");
-    return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${stepOf.get(entity.line)}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(width2)}" height="${f(height2)}" rx="3"/>${head}${rule}${fields2}</g>`;
+    const size = sizes.get(entity.name);
+    return nodeSvgOf(entity, x2, y2, size, stepOf.get(entity.line));
   });
-  const { width, height } = g.graph();
+  const seen = /* @__PURE__ */ new Map();
+  const loopSpecs = loops.map((rel) => {
+    const nth = seen.get(rel.from) ?? 0;
+    seen.set(rel.from, nth + 1);
+    const { x: x2, y: y2 } = g.node(key.get(rel.from));
+    const size = sizes.get(rel.from);
+    return { rel, x: x2, y: y2, size, out: x2 + size.width / 2 + LOOP_OUT + nth * LOOP_STEP };
+  });
+  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line)));
+  const xs = [];
+  const ys = [];
+  const at3 = (x2, y2) => {
+    xs.push(x2);
+    ys.push(y2);
+  };
+  for (const entity of entities.values()) {
+    const { x: x2, y: y2 } = g.node(key.get(entity.name));
+    const size = sizes.get(entity.name);
+    at3(x2 - size.width / 2, y2 - size.height / 2);
+    at3(x2 + size.width / 2, y2 + size.height / 2);
+  }
+  const straight = rels.filter((rel) => rel.from !== rel.to);
+  straight.forEach((rel, i) => {
+    const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
+    for (const p of data.points) at3(p.x, p.y);
+    if (rel.label) {
+      const w = labelWidth(rel.label);
+      at3(data.x - w / 2, data.y - 9);
+      at3(data.x + w / 2, data.y + 9);
+    }
+  });
+  for (const { rel, y: y2, out } of loopSpecs) {
+    at3(out + 6 + (rel.label ? labelWidth(rel.label) : 0), y2 + LOOP_END / 2);
+    at3(out, y2 - LOOP_END / 2);
+  }
+  const margin = 14;
+  const shiftX = margin - Math.min(...xs);
+  const shiftY = margin - Math.min(...ys);
+  const shift = shiftX || shiftY ? ` transform="translate(${f(shiftX)},${f(shiftY)})"` : "";
+  const width = Math.ceil(Math.max(...xs) - Math.min(...xs)) + 2 * margin;
+  const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
-  return `${svgOpen(width, height, label)}<g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
+  return `${svgOpen(width, height, label)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
+}
+function nodeSvgOf(entity, x2, y2, size, step) {
+  const left = x2 - size.width / 2;
+  const top = y2 - size.height / 2;
+  const head = `<text class="am-er-head" font-weight="600" x="${f(left + PAD)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(entity.name)}</text>`;
+  const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
+  const fields2 = entity.fields.map((field, i) => {
+    const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
+    const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(left + size.width - PAD)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(field.marker)}</text>` : "";
+    return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(left + PAD)}" y="${f(cy)}" dominant-baseline="central">${esc(fieldText(field))}</text>${marker}`;
+  }).join("");
+  return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
+}
+function loopSvg({ rel, x: x2, y: y2, size, out }, step) {
+  const right = x2 + size.width / 2;
+  const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
+  const path = `<path class="am-edge" d="M${f(right)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(right)},${f(by)}"/>`;
+  const ends = `${endMark({ x: right, y: ay }, { x: right + 1, y: ay }, rel.fromCard)}${endMark({ x: right, y: by }, { x: right + 1, y: by }, rel.toCard)}`;
+  const label = rel.label ? labelSvg(rel.label, out + 6 + labelWidth(rel.label) / 2, y2) : "";
+  return `<g data-step="${step}">${path}${ends}${label}</g>`;
+}
+function labelWidth(text) {
+  return measure(text, EDGE_FS2) + 10;
+}
+function labelSvg(text, x2, y2) {
+  const w = labelWidth(text);
+  return `<g class="am-edge-label"><rect x="${f(x2 - w / 2)}" y="${f(y2 - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x2, y2, LH3)}</g>`;
 }
 function endsSvg(points, rel) {
-  const [first, last] = [points[0], points.at(-1)];
-  const out = [];
-  if (points.length > 1) out.push(endMark(last, points.at(-2), rel.toCard), endMark(first, points[1], rel.fromCard));
-  return out.join("");
+  if (points.length < 2) return "";
+  return endMark(points.at(-1), points.at(-2), rel.toCard) + endMark(points[0], points[1], rel.fromCard);
 }
 var R3 = { back: 12, side: 5, gap: 5 };
 function endMark(point, toward, card) {
@@ -5675,7 +5758,7 @@ function endMark(point, toward, card) {
   };
   const circle = (back) => {
     const c = at3(back, 0);
-    return `<circle cx="${f(c.x)}" cy="${f(c.y)}" r="3.4"/>`;
+    return `<circle cx="${f(c.x)}" cy="${f(c.y)}" r="3.4" style="fill: var(--paper, #ffffff)"/>`;
   };
   const marks = {
     "1": () => bar(R3.back),
@@ -5684,9 +5767,6 @@ function endMark(point, toward, card) {
     "1..*": () => foot(R3.back) + bar(R3.back + R3.gap)
   }[card]();
   return `<g class="am-er-end am-edge">${marks}</g>`;
-}
-function textAt(text, x2, y2) {
-  return `<text x="${f(x2)}" y="${f(y2)}" text-anchor="middle" dominant-baseline="central">${esc(text)}</text>`;
 }
 
 // src/components/ask.js
@@ -7928,7 +8008,7 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
   timeline, limits, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.

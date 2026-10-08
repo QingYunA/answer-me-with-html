@@ -163,9 +163,9 @@ test('parseEr: entities, fields with an optional type and key, both relationship
 });
 
 test('er: a FK field implies the many-to-one relationship, and a written line replaces it', () => {
-  const implied = relationships(parseEr('Order\n  id PK\n  user_id FK -> User'));
+  const implied = relationships(parseEr('Order\n  id PK\n  user_id FK -> User\nUser\n  id PK'));
   assert.deepEqual(implied.map((r) => [r.from, r.fromCard, r.to, r.toCard]), [['Order', '*', 'User', '1']]);
-  const replaced = relationships(parseEr('Order\n  user_id FK -> User\nUser 1--* Order: places'));
+  const replaced = relationships(parseEr('Order\n  user_id FK -> User\nUser\n  id PK\nUser 1--* Order: places'));
   assert.equal(replaced.length, 1);
   assert.deepEqual([replaced[0].from, replaced[0].to, replaced[0].label], ['User', 'Order', 'places']);
 });
@@ -190,7 +190,6 @@ test('er: each cardinality draws its own end', () => {
 });
 
 test('er: a Mermaid relationship, a field before any entity and a bad FK are errors', () => {
-  assert.match(erThrows('USER ||--o{ ORDER').message, /is not a relationship; write A 1--\* B/);
   assert.match(erThrows('  id PK').message, /must follow an entity/);
   assert.match(erThrows('User\n  id PK -> Order').message, /only a FK field/);
   assert.match(erThrows('User\n  x -> Order').message, /only a FK field/);
@@ -198,6 +197,94 @@ test('er: a Mermaid relationship, a field before any entity and a bad FK are err
   assert.match(erThrows('User\n  id PK int').message, /must be the last word before/);
   assert.match(erThrows('User\nUser').message, /written twice/);
   assert.equal(erThrows('   ').message, 'an entity relationship diagram needs at least one entity (a line at column 0)');
+});
+
+test('er: a name a field or a relationship does not name is an error, not a broken drawing', () => {
+  const fk = erThrows('Order\n  user_id FK -> Usr');
+  assert.match(fk.message, /no entity "Usr"; write it at column 0/);
+  assert.equal(fk.line, 2);
+  assert.match(erThrows('User\nOrder\nUser 1--* Ordr').message, /no entity "Ordr"; write it at column 0/);
+  assert.equal(erThrows('Order\n  user_id FK -> User\nUser\n  id PK\nUser 1--* Order'), null, 'a name that exists parses');
+});
+
+test('er: a Mermaid line is an error that shows the line to write instead', () => {
+  assert.match(erThrows('USER ||--o{ ORDER : places').message, /is Mermaid syntax; write USER 1--\* ORDER: places/);
+  assert.match(erThrows('USER }|..|{ ORDER').message, /write USER 1\.\.\*--1\.\.\* ORDER/);
+  assert.match(erThrows('USER |o--|| ORDER').message, /write USER 0\.\.1--1 ORDER/);
+  assert.match(erThrows('USER {').message, /is not an entity of this component/);
+  assert.match(erThrows('}').message, /is not an entity of this component/);
+});
+
+test('er: two FK fields to one entity draw two relationships, and a written line replaces both', () => {
+  const body = 'Order\n  billing_id FK -> Address\n  shipping_id FK -> Address\nAddress\n  id PK';
+  assert.deepEqual(relationships(parseEr(body)).map((rel) => [rel.from, rel.to, rel.line]), [['Order', 'Address', 2], ['Order', 'Address', 3]]);
+  assert.equal((render('er', body).match(/<path class="am-edge"/g) || []).length, 2);
+  const written = relationships(parseEr(`${body}\nOrder *--1 Address: billed`));
+  assert.equal(written.length, 1);
+  assert.equal(written[0].label, 'billed');
+});
+
+test('er: a field that points at its own entity draws a loop that stays inside the drawing', () => {
+  const svg = render('er', 'Employee\n  id PK\n  manager_id FK -> Employee');
+  assert.doesNotMatch(svg, /NaN/);
+  const [, left, width] = svg.match(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/).map(Number);
+  const right = left + width;
+  const loop = svg.match(/<path class="am-edge" d="M([\d.]+),([\d.]+) C([\d.]+),[\d.]+ ([\d.]+),[\d.]+ ([\d.]+),([\d.]+)"/).map(Number);
+  const view = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number);
+  assert.ok(Math.abs(loop[1] - right) < 0.2, 'the loop starts on the right edge of the box');
+  assert.ok(loop[3] > right, 'and bulges outside it');
+  assert.ok(loop[3] === loop[4], 'out and back with the same control point');
+  assert.ok(view[1] >= loop[3] + 6, 'the drawing is wide enough to hold the loop');
+  assert.equal((svg.match(/class="am-er-end/g) || []).length, 2, 'both ends of the self-reference are drawn');
+  // Two self-references of one entity take their own distance, so both stay visible.
+  const both = render('er', 'Employee\n  manager_id FK -> Employee\n  mentor_id FK -> Employee');
+  const outs = [...both.matchAll(/<path class="am-edge" d="M[\d.]+,[\d.]+ C([\d.]+),/g)].map((m) => Number(m[1]));
+  assert.equal(outs.length, 2);
+  assert.ok(outs[1] > outs[0], 'the second loop goes farther out');
+});
+
+test('er: a box fits its widest field at the size the field renders, and a highlighted one is measured bold', () => {
+  const field = 'shipping_address_reference bigint';
+  const svg = render('er', `*Address\n  ${field} UK\nPlain\n  ${field} UK`);
+  const boxes = [...svg.matchAll(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/g)].map((m) => Number(m[2]));
+  assert.equal(boxes.length, 2);
+  // 11px of padding on each side, then the 12px gap the FK/UK marker leaves; the fields render at 12px because the size
+  // is set in the style attribute, which the stylesheet cannot override.
+  const fits = (width, bold) => 11 + measure('shipping_address_reference', 12, { bold }) + 12 + measure('UK', 11, { mono: true, bold }) <= width - 11;
+  assert.match(svg, /class="am-er-field" style="font-size:12px"/);
+  assert.ok(fits(boxes[0], true), 'the highlighted entity is measured with bold text');
+  assert.ok(fits(boxes[1], false));
+  assert.ok(boxes[0] > boxes[1], 'bold text needs a wider box');
+});
+
+test('er: the canvas is finite and holds what is drawn, parallel edges and their labels included', () => {
+  const bodies = [
+    'Order\n  billing_id FK -> Address\n  shipping_id FK -> Address\nAddress\n  id PK',
+    'A\nB\nA 0..1--* B: many',
+    'Employee\n  manager_id FK -> Employee\n  mentor_id FK -> Employee',
+    'A\n  id PK\n  self_id FK -> A\nA 1--1..* A: again',
+  ];
+  for (const body of bodies) {
+    const svg = render('er', body);
+    assert.doesNotMatch(svg, /NaN/, body);
+    const [, w, h] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number);
+    assert.ok(Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0, `a finite canvas: ${w}x${h}`);
+    // The drawing may carry a shift that keeps the origin at 0; every point still has to land inside the canvas.
+    const shift = svg.match(/transform="translate\(([\d.-]+),([\d.-]+)\)"/);
+    const [dx, dy] = shift ? [Number(shift[1]), Number(shift[2])] : [0, 0];
+    for (const m of svg.matchAll(/<path class="am-edge" d="M([\d.]+),([\d.]+)/g)) {
+      const [x, y] = [Number(m[1]) + dx, Number(m[2]) + dy];
+      assert.ok(x >= 0 && x <= w && y >= 0 && y <= h, `a path starts inside the canvas: ${x},${y} of ${w}x${h}`);
+    }
+    for (const m of svg.matchAll(/<rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)) {
+      const [, x, y, bw, bh] = m.map(Number);
+      assert.ok(x + dx >= 0 && y + dy >= 0 && x + bw + dx <= w && y + bh + dy <= h, 'a box is inside the canvas');
+    }
+    for (const m of svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="18"/g)) {
+      const [, x, y, bw] = m.map(Number);
+      assert.ok(x + dx >= 0 && x + bw + dx <= w, 'an edge label is inside the canvas');
+    }
+  }
 });
 
 test('er: video mode gives every entity and relationship its own step', () => {
