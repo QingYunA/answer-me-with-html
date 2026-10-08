@@ -57,6 +57,7 @@ function playerData(video, meta, timeline) {
     segments: [timeline.title, ...timeline.scenes].map((s, i) => ({
       start: s.start,
       end: s.end,
+      id: i === 0 ? '' : s.id,
       title: i === 0 ? meta.title : s.title,
       beats: s.beats.map((b, k) => ({ ...b, html: captionHtml(beatsOf(video, i)[k].raw) })),
     })),
@@ -141,8 +142,10 @@ ${scenesHtml}
 <button class="amv-btn" type="button" data-amv="toggle" data-play="${esc(ui.play)}" data-pause="${esc(ui.pause)}" aria-label="${esc(ui.play)}">▶</button>
 <span class="amv-time">0:00 / 0:00</span>
 <div class="amv-track"><input class="amv-seek" type="range" min="0" step="0.01" value="0" aria-label="seek"><div class="amv-marks"></div></div>
+<button class="amv-btn amv-rate" type="button" data-amv="rate" data-speed="${esc(ui.speed)}" aria-label="${esc(ui.speed)}">1×</button>
 <span class="amv-brand">Answer me with HTML ${VERSION} · ${esc(timestamp())}</span>
 </div>
+<nav class="amv-chapters" aria-label="${esc(ui.chapters)}"></nav>
 <script type="application/json" id="amv-data">${json}</script>
 ${wav ? audioTag(wav) : ''}
 ${sourceTag(source)}

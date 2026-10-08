@@ -12,6 +12,10 @@
   const caption = document.querySelector('.amv-caption span');
   const scenes = [...document.querySelectorAll('.amv-scene')];
   const segs = D.segments;
+  // One chapter per scene (the title card is not a chapter). The strip needs its space before anything measures the viewport,
+  // so the attribute goes on before section 1.
+  const chapterList = segs.slice(1);
+  if (chapterList.length > 1) root.setAttribute('data-chapters', '');
   const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
   const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };
   const lerp = (a, b, p) => a + (b - a) * p;
@@ -276,23 +280,76 @@
   const toggleBtn = document.querySelector('[data-amv="toggle"]');
   const bigPlay = document.querySelector('.amv-bigplay');
   const marks = document.querySelector('.amv-marks');
+  const bar = document.querySelector('.amv-chapters');
+  const rateBtn = document.querySelector('[data-amv="rate"]');
+  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
   const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
   seek.max = D.duration;
-  segs.slice(1).forEach((s) => {
-    const m = document.createElement('i');
-    m.style.left = `${(s.start / D.duration) * 100}%`;
-    m.title = s.title;
-    marks.append(m);
+
+  // A tick on the track and a chip in the strip per scene; both jump to the start of the scene and keep playing.
+  const chips = chapterList.map((s, i) => {
+    const mark = document.createElement('i');
+    mark.style.left = `${(s.start / D.duration) * 100}%`;
+    mark.title = `${s.id} ${s.title} · ${fmt(s.start)}`;
+    mark.addEventListener('click', () => jump(s.start));
+    marks.append(mark);
+
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'amv-chap';
+    chip.title = `${s.title} · ${fmt(s.start)}`;
+    const letter = document.createElement('b');
+    letter.textContent = s.id || String.fromCharCode(65 + i);
+    const label = document.createElement('span');
+    label.textContent = s.title;
+    chip.append(letter, label);
+    chip.addEventListener('click', () => jump(s.start));
+    bar.append(chip);
+    return chip;
   });
 
   let playing = false;
   let base = 0;
   let t0 = 0;
-  const now = () => (!playing ? base : audio ? audio.currentTime : base + (performance.now() - t0) / 1000);
+  let rate = 1;
+  // The clock: the audio element when there is one, otherwise wall-clock time scaled by the playback rate.
+  const now = () => (!playing ? base : audio ? audio.currentTime : base + ((performance.now() - t0) / 1000) * rate);
+
+  function jump(t) {
+    seekTo(t);
+    if (!playing) play();
+  }
+
+  // The chip of the scene the picture is in, kept in view while the strip scrolls.
+  let activeChip = -1;
+  function markChapter(t) {
+    const i = chapterList.findLastIndex((s) => t >= s.start);
+    if (i === activeChip) return;
+    activeChip = i;
+    chips.forEach((c, k) => (k === i ? c.setAttribute('aria-current', 'true') : c.removeAttribute('aria-current')));
+    const chip = chips[i];
+    if (chip && bar.scrollWidth > bar.clientWidth) {
+      bar.scrollTo({ left: Math.max(0, chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' });
+    }
+  }
+
+  // Changing the rate must not move the clock: anchor it again at the time it shows now.
+  function setRate(r) {
+    const at = now();
+    rate = r;
+    if (audio) audio.playbackRate = r;
+    rateBtn.textContent = `${r}×`;
+    rateBtn.setAttribute('aria-label', `${rateBtn.dataset.speed ?? 'Speed'} ${r}×`);
+    if (playing) {
+      base = at;
+      t0 = performance.now();
+    }
+  }
 
   function updateUi(t) {
     if (document.activeElement !== seek) seek.value = t;
     timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;
+    markChapter(t);
   }
 
   function play() {
@@ -343,6 +400,7 @@
   bigPlay.addEventListener('click', play);
   stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });
   seek.addEventListener('input', () => seekTo(Number(seek.value)));
+  rateBtn.addEventListener('click', () => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length]));
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     if (e.key === 'ArrowRight') seekTo(now() + 5);
@@ -366,6 +424,7 @@
     exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },
   };
   fitStage();
+  setRate(rate);   // the button carries the speed on load
   // Poster: show the fully faded-in title card, but playback still starts at 0.
   render(Math.min(1, segs[0].end));
   updateUi(0);

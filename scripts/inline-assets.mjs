@@ -20,6 +20,7 @@ export const inlineAssets = {
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
         `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,
         `export const VIDEO_JS = ${JSON.stringify(read('../src/runtime/video.js'))};`,
+        `export const VIDEO_EXPORT_JS = ${JSON.stringify(read('../src/runtime/video-export.js'))};`,
       ].join('\n'),
     }));
   },

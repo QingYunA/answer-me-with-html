@@ -14,6 +14,8 @@ html[data-video], html[data-video] body { background: var(--v-letterbox); height
 html[data-video] body { font-size: 22px; }
 
 .amv-viewport { position: fixed; inset: 0 0 56px 0; overflow: hidden; }
+/* A video with more than one scene keeps a chapter strip above the controls (the player sets the attribute before anything measures). */
+html[data-chapters] .amv-viewport { bottom: 96px; }
 .amv-stage {
   position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; overflow: hidden;
   background: var(--v-stage); color: var(--ink); transform-origin: 50% 50%;
@@ -112,10 +114,33 @@ html[data-video] .am-diagram .amv-hl text, html[data-video] .am-diagram text.amv
 .amv-track { position: relative; flex: 1; }
 .amv-seek { width: 100%; accent-color: var(--v-ctl-accent); }
 .amv-marks { position: absolute; left: 0; right: 0; top: -6px; height: 6px; pointer-events: none; }
-.amv-marks i { position: absolute; top: 0; width: 2px; height: 6px; background: var(--v-ctl-accent); }
+.amv-marks i { position: absolute; top: 0; width: 2px; height: 6px; background: var(--v-ctl-accent); pointer-events: auto; cursor: pointer; }
+/* The mark stays 2 px wide; the pseudo element widens what can be clicked. */
+.amv-marks i::before { content: ''; position: absolute; left: -5px; right: -5px; top: -6px; bottom: -4px; }
+.amv-rate { width: auto; min-width: 46px; padding: 0 8px; font: inherit; font-variant-numeric: tabular-nums; }
 .amv-brand { color: var(--v-ctl-muted); font-size: 12px; white-space: nowrap; }
 
+/* ── Chapter strip (one chip per scene; scrolls when the titles are long) ── */
+.amv-chapters {
+  position: fixed; left: 0; right: 0; bottom: 56px; height: 40px; display: flex; align-items: center; gap: 8px;
+  padding: 0 18px; overflow-x: auto; overscroll-behavior-x: contain; background: var(--v-ctl-bg); border-top: 1px solid var(--v-ctl-line);
+  color: var(--v-ctl-fg); font: 13px -apple-system, "Segoe UI", sans-serif; scrollbar-width: thin;
+}
+.amv-chapters:empty { display: none; }
+.amv-chap {
+  display: flex; align-items: center; gap: 7px; flex: 0 0 auto; max-width: 320px; padding: 5px 12px; cursor: pointer;
+  border: 1px solid var(--v-ctl-btn-line); border-radius: 999px; background: var(--v-ctl-btn); color: var(--v-ctl-white);
+  font: inherit; text-align: left;
+}
+.amv-chap b { font-weight: 700; color: var(--v-ctl-accent); }
+.amv-chap span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.amv-chap:hover { border-color: var(--v-ctl-accent); }
+.amv-chap[aria-current="true"] {
+  border-color: var(--v-ctl-accent); color: var(--v-ctl-accent);
+  background: color-mix(in srgb, var(--v-ctl-accent) 18%, var(--v-ctl-btn));
+}
+
 /* Export mode: stage only, 1:1, no scaling */
-html[data-export] .amv-controls, html[data-export] .amv-bigplay { display: none; }
+html[data-export] .amv-controls, html[data-export] .amv-bigplay, html[data-export] .amv-chapters { display: none; }
 html[data-export] .amv-viewport { inset: 0; }
 html[data-export] .amv-stage { left: 0; top: 0; transform: none !important; }

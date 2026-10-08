@@ -367,6 +367,18 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
   assert.throws(() => renderDoc('---\ntheme: 3b1b\n---\n## A\n文字\n'), ParseError, 'pages do not support 3b1b');
 });
 
+test('player: a chapter strip, a tick per scene and a playback speed button, in the draft language', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /<nav class="amv-chapters" aria-label="章节"><\/nav>/, 'the strip is empty until the player script fills it');
+  assert.match(zh.html, /data-amv="rate" data-speed="速度"/);
+  assert.match(zh.html, /"id":"A"/, 'a chapter carries the letter the scene head shows');
+  assert.match(zh.html, /"segments":\[\{[^}]*"id":""/, 'the title card is not a chapter');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n\`\`\`flow\nA -> B\n\`\`\`\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /aria-label="Chapters"/);
+  assert.match(en.html, /data-speed="Speed"/);
+});
+
 test('video fonts: Japanese 3b1b titles use a Japanese serif; titles in other themes are not overridden', async () => {
   const JA = '## 概要\n> 接続は3回のやりとりで行う。\n';
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${JA}`);
