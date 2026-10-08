@@ -420,7 +420,17 @@ code, pre, kbd { font-family: var(--font-mono); }
   .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
   .am-doc-layout { grid-template-columns: minmax(0, 1fr); }
   .am-toc { position: static; }
-  .am-timeline--h { grid-template-columns: minmax(0, 1fr); }
+  /* A horizontal timeline is too narrow to read here: lay it out like timeline v (line and dots on the left, text on the right). */
+  .am-timeline--h { display: block; padding-top: 0; }
+  .am-timeline--h li { text-align: left; padding: 0 0 14px 22px; }
+  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
+    top: 6px; bottom: -6px; left: 5px; right: auto; border-top: 0; border-left: var(--bw) solid var(--line-2);
+  }
+  .am-timeline--h li:last-child::before { display: none; }
+  .am-timeline--h .am-tl-dot { position: absolute; left: 0; top: 4px; margin: 0; }
+  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-right: 8px; }
+  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }
+  .am-timeline--h .am-tl-text { margin-top: 2px; }
   .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
   /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. */
   .am-md th, .am-md td { min-width: 6em; }
