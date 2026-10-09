@@ -57,3 +57,17 @@ export function svgOpen(width, height, label, dir = 'ltr') {
 // A right-to-left page reads a drawing from the right: mirror(width) maps an x of the left-to-right layout to its mirror image
 // (the first node or participant on the right, arrows pointing left). Text is not mirrored, only placed.
 export const mirror = (width, rtl) => (rtl ? (x) => width - x : (x) => x);
+
+// Mirror a finished dagre layout left to right, in place: node and group centres, edge points and edge label positions.
+export function mirrorLayout(g) {
+  const flip = mirror(g.graph().width, true);
+  for (const v of g.nodes()) {
+    const node = g.node(v);
+    node.x = flip(node.x);
+  }
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
+    if (edge.x !== undefined) edge.x = flip(edge.x);
+  }
+}

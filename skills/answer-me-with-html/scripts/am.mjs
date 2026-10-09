@@ -545,6 +545,7 @@ var he_default = {
     toc: "\u05EA\u05D5\u05DB\u05DF \u05D4\u05E2\u05E0\u05D9\u05D9\u05E0\u05D9\u05DD",
     flow: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05D6\u05E8\u05D9\u05DE\u05D4",
     sequence: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05E8\u05E6\u05E3",
+    er: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05D9\u05E9\u05D5\u05D9\u05D5\u05EA \u05D5\u05E7\u05E9\u05E8\u05D9\u05DD",
     colon: ": ",
     sep: ", ",
     expand: "\u05D4\u05D2\u05D3\u05DC\u05EA \u05D4\u05EA\u05E8\u05E9\u05D9\u05DD",
@@ -3438,6 +3439,18 @@ function svgOpen(width, height, label, dir = "ltr") {
   return `<svg viewBox="0 0 ${w} ${h2}" width="${w}" height="${h2}" role="img" aria-label="${esc(label)}"${direction} xmlns="http://www.w3.org/2000/svg">`;
 }
 var mirror = (width, rtl) => rtl ? (x2) => width - x2 : (x2) => x2;
+function mirrorLayout(g) {
+  const flip = mirror(g.graph().width, true);
+  for (const v of g.nodes()) {
+    const node = g.node(v);
+    node.x = flip(node.x);
+  }
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
+    if (edge.x !== void 0) edge.x = flip(edge.x);
+  }
+}
 
 // src/components/sequence.js
 var FS = 13;
@@ -5719,18 +5732,6 @@ function badgePoint(shape, x2, y2, w, h2, rtl = false) {
   if (shape === "round") return [x2 + s * (w / 2 - h2 * 0.15), y2 - h2 / 2 + h2 * 0.15];
   return [x2 + s * (w / 2), y2 - h2 / 2];
 }
-function mirrorLayout(g) {
-  const flip = mirror(g.graph().width, true);
-  for (const v of g.nodes()) {
-    const node = g.node(v);
-    node.x = flip(node.x);
-  }
-  for (const e of g.edges()) {
-    const edge = g.edge(e);
-    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
-    if (edge.x !== void 0) edge.x = flip(edge.x);
-  }
-}
 function shapeSvg(shape, x2, y2, w, h2) {
   const l3 = x2 - w / 2;
   const t = y2 - h2 / 2;
@@ -5798,10 +5799,10 @@ User 1--* Order: places       \u2190 A <cardinality>--<cardinality> B: label (op
 - A field that points at its own entity draws a loop.
 - The default direction is TB (top to bottom).`,
   example: "```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```",
-  render(text, { args, ui }) {
+  render(text, { args, ui, dir: pageDir = "ltr" }) {
     const model = parseEr(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    return `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui)}</figure>`;
+    return `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
   }
 };
 function parseEr(text) {
@@ -5889,7 +5890,7 @@ function nodeSize2(entity) {
   const rows = entity.fields.map((field) => rowWidth(entity, field));
   return { width: Math.ceil(Math.max(MIN_WIDTH, nameWidth(entity) + 2 * PAD, ...rows)), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
 }
-function layout3(model, rankdir, ui) {
+function layout3(model, rankdir, ui, pageDir = "ltr") {
   const { entities } = model;
   const rels = relationships(model);
   const loops = rels.filter((rel) => rel.from === rel.to);
@@ -5908,28 +5909,32 @@ function layout3(model, rankdir, ui) {
     g.setEdge(key.get(rel.from), key.get(rel.to), label2, `e${i}`);
   });
   $o.layout(g);
+  const rtl = pageDir === "rtl";
+  if (rtl) mirrorLayout(g);
   const steps = [.../* @__PURE__ */ new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
   const stepOf = new Map(steps.map((line, i) => [line, i]));
   const edgeSvg = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
     const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
     const points = data.points.map((p) => ({ ...p }));
-    const label2 = rel.label ? labelSvg(rel.label, data.x, data.y) : "";
+    const label2 = rel.label ? labelSvg(rel.label, data.x, data.y, pageDir) : "";
     return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
   });
   const nodeSvg = [...entities.values()].map((entity) => {
     const { x: x2, y: y2 } = g.node(key.get(entity.name));
     const size = sizes.get(entity.name);
-    return nodeSvgOf(entity, x2, y2, size, stepOf.get(entity.line));
+    return nodeSvgOf(entity, x2, y2, size, stepOf.get(entity.line), pageDir);
   });
+  const s = rtl ? -1 : 1;
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((rel) => {
     const nth = seen.get(rel.from) ?? 0;
     seen.set(rel.from, nth + 1);
     const { x: x2, y: y2 } = g.node(key.get(rel.from));
     const size = sizes.get(rel.from);
-    return { rel, x: x2, y: y2, size, out: x2 + size.width / 2 + LOOP_OUT + nth * LOOP_STEP };
+    const edge = x2 + s * size.width / 2;
+    return { rel, y: y2, edge, out: edge + s * LOOP_OUT + s * nth * LOOP_STEP };
   });
-  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line)));
+  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, s, stepOf.get(spec.rel.line), pageDir));
   const xs = [];
   const ys = [];
   const at3 = (x2, y2) => {
@@ -5953,7 +5958,7 @@ function layout3(model, rankdir, ui) {
     }
   });
   for (const { rel, y: y2, out } of loopSpecs) {
-    at3(out + 6 + (rel.label ? labelWidth(rel.label) : 0), y2 + LOOP_END / 2);
+    at3(out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), y2 + LOOP_END / 2);
     at3(out, y2 - LOOP_END / 2);
   }
   const margin = 14;
@@ -5963,34 +5968,34 @@ function layout3(model, rankdir, ui) {
   const width = Math.ceil(Math.max(...xs) - Math.min(...xs)) + 2 * margin;
   const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
-  return `${svgOpen(width, height, label)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
+  return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
 }
-function nodeSvgOf(entity, x2, y2, size, step) {
+function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const left = x2 - size.width / 2;
   const top = y2 - size.height / 2;
-  const head = `<text class="am-er-head" font-weight="600" x="${f(left + PAD)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(entity.name)}</text>`;
+  const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
+  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
   const fields2 = entity.fields.map((field, i) => {
     const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
-    const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(left + size.width - PAD)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(field.marker)}</text>` : "";
-    return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(left + PAD)}" y="${f(cy)}" dominant-baseline="central">${esc(fieldText(field))}</text>${marker}`;
+    const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
+    return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
   }).join("");
   return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
 }
-function loopSvg({ rel, x: x2, y: y2, size, out }, step) {
-  const right = x2 + size.width / 2;
+function loopSvg({ rel, y: y2, edge, out }, s, step, pageDir) {
   const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
-  const path = `<path class="am-edge" d="M${f(right)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(right)},${f(by)}"/>`;
-  const ends = `${endMark({ x: right, y: ay }, { x: right + 1, y: ay }, rel.fromCard)}${endMark({ x: right, y: by }, { x: right + 1, y: by }, rel.toCard)}`;
-  const label = rel.label ? labelSvg(rel.label, out + 6 + labelWidth(rel.label) / 2, y2) : "";
+  const path = `<path class="am-edge" d="M${f(edge)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(edge)},${f(by)}"/>`;
+  const ends = `${endMark({ x: edge, y: ay }, { x: edge + s, y: ay }, rel.fromCard)}${endMark({ x: edge, y: by }, { x: edge + s, y: by }, rel.toCard)}`;
+  const label = rel.label ? labelSvg(rel.label, out + s * 6 + s * labelWidth(rel.label) / 2, y2, pageDir) : "";
   return `<g data-step="${step}">${path}${ends}${label}</g>`;
 }
 function labelWidth(text) {
   return measure(text, EDGE_FS2) + 10;
 }
-function labelSvg(text, x2, y2) {
+function labelSvg(text, x2, y2, pageDir) {
   const w = labelWidth(text);
-  return `<g class="am-edge-label"><rect x="${f(x2 - w / 2)}" y="${f(y2 - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x2, y2, LH3)}</g>`;
+  return `<g class="am-edge-label"><rect x="${f(x2 - w / 2)}" y="${f(y2 - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x2, y2, LH3, "", pageDir)}</g>`;
 }
 function endsSvg(points, rel) {
   if (points.length < 2) return "";

@@ -1,7 +1,7 @@
 // Flow / architecture diagram: the model writes only relations (A -> B: label), dagre computes coordinates, this file draws the layout as SVG.
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
+import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirrorLayout } from '../svg/shapes.js';
 import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
@@ -271,20 +271,6 @@ function badgePoint(shape, x, y, w, h, rtl = false) {
   if (shape === 'diamond') return [x + s * (w / 4), y - h / 4];
   if (shape === 'round') return [x + s * (w / 2 - h * 0.15), y - h / 2 + h * 0.15];
   return [x + s * (w / 2), y - h / 2];
-}
-
-// Mirror a finished dagre layout left to right, in place: node and group centres, edge points and edge label positions.
-function mirrorLayout(g) {
-  const flip = mirror(g.graph().width, true);
-  for (const v of g.nodes()) {
-    const node = g.node(v);
-    node.x = flip(node.x);
-  }
-  for (const e of g.edges()) {
-    const edge = g.edge(e);
-    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
-    if (edge.x !== undefined) edge.x = flip(edge.x);
-  }
 }
 
 function shapeSvg(shape, x, y, w, h) {

@@ -20,7 +20,7 @@ export default {
       confirmed: 'ההמלצה אושרה', untouched: 'לא נענה; ההמלצה נשארה', was: 'היה',
       typed: 'שורות שמתחילות ב-">" הן טקסט שהקורא הקליד.',
     },
-    toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', colon: ': ', sep: ', ',
+    toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', er: 'תרשים ישויות וקשרים', colon: ': ', sep: ', ',
     expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים',
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
     generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },

@@ -3,7 +3,8 @@
 // the boxes and the crow's-foot ends as SVG, so themes, dark mode, the lightbox and video steps work as they do for flow.
 import dagre from '@dagrejs/dagre';
 import { esc, measure } from '../svg/text.js';
-import { f, smoothPath, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
+import { f, smoothPath, svgOpen, textLines, diagramLabel, mirrorLayout } from '../svg/shapes.js';
+import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 
 const FS = 13;
@@ -48,10 +49,10 @@ User 1--* Order: places       ← A <cardinality>--<cardinality> B: label (optio
 - A field that points at its own entity draws a loop.
 - The default direction is TB (top to bottom).`,
   example: '```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```',
-  render(text, { args, ui }) {
+  render(text, { args, ui, dir: pageDir = 'ltr' }) {
     const model = parseEr(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    return `<figure class="am-diagram am-er">${layout(model, DIRS.has(dir) ? dir : 'TB', ui)}</figure>`;
+    return `<figure class="am-diagram am-er">${layout(model, DIRS.has(dir) ? dir : 'TB', ui, pageDir)}</figure>`;
   },
 };
 
@@ -154,7 +155,7 @@ function nodeSize(entity) {
   return { width: Math.ceil(Math.max(MIN_WIDTH, nameWidth(entity) + 2 * PAD, ...rows)), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
 }
 
-function layout(model, rankdir, ui) {
+function layout(model, rankdir, ui, pageDir = 'ltr') {
   const { entities } = model;
   const rels = relationships(model);
   const loops = rels.filter((rel) => rel.from === rel.to);
@@ -175,6 +176,9 @@ function layout(model, rankdir, ui) {
     g.setEdge(key.get(rel.from), key.get(rel.to), label, `e${i}`);
   });
   dagre.layout(g);
+  // A right-to-left page mirrors the finished layout, as flow does; the loops, field names and key markers below follow.
+  const rtl = pageDir === 'rtl';
+  if (rtl) mirrorLayout(g);
 
   // In video mode, items appear step by step by source line: an entity line and a relationship line are one step each.
   const steps = [...new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
@@ -183,27 +187,29 @@ function layout(model, rankdir, ui) {
   const edgeSvg = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
     const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
     const points = data.points.map((p) => ({ ...p }));
-    const label = rel.label ? labelSvg(rel.label, data.x, data.y) : '';
+    const label = rel.label ? labelSvg(rel.label, data.x, data.y, pageDir) : '';
     return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label}</g>`;
   });
 
   const nodeSvg = [...entities.values()].map((entity) => {
     const { x, y } = g.node(key.get(entity.name));
     const size = sizes.get(entity.name);
-    return nodeSvgOf(entity, x, y, size, stepOf.get(entity.line));
+    return nodeSvgOf(entity, x, y, size, stepOf.get(entity.line), pageDir);
   });
 
-  // A loop lies outside the box on its right. Two self-references of one entity take their own distance, so both stay
-  // visible, and the drawing has to be wide enough for the farthest one and its label.
+  // A loop lies outside the box on its right (its left on a right-to-left page, where s is -1). Two self-references of one
+  // entity take their own distance, so both stay visible, and the drawing has to be wide enough for the farthest one and its label.
+  const s = rtl ? -1 : 1;
   const seen = new Map();
   const loopSpecs = loops.map((rel) => {
     const nth = seen.get(rel.from) ?? 0;
     seen.set(rel.from, nth + 1);
     const { x, y } = g.node(key.get(rel.from));
     const size = sizes.get(rel.from);
-    return { rel, x, y, size, out: x + size.width / 2 + LOOP_OUT + nth * LOOP_STEP };
+    const edge = x + (s * size.width) / 2;
+    return { rel, y, edge, out: edge + s * LOOP_OUT + s * nth * LOOP_STEP };
   });
-  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line)));
+  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, s, stepOf.get(spec.rel.line), pageDir));
 
   // The drawing is as big as everything drawn on it: dagre sizes the ranks, but a parallel edge bulges past them and a
   // loop sits outside its box, so the extent of every point decides. A shift keeps the origin at 0.
@@ -231,7 +237,7 @@ function layout(model, rankdir, ui) {
     }
   });
   for (const { rel, y, out } of loopSpecs) {
-    at(out + 6 + (rel.label ? labelWidth(rel.label) : 0), y + LOOP_END / 2);
+    at(out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), y + LOOP_END / 2);
     at(out, y - LOOP_END / 2);
   }
   const margin = 14;
@@ -241,33 +247,36 @@ function layout(model, rankdir, ui) {
   const width = Math.ceil(Math.max(...xs) - Math.min(...xs)) + 2 * margin;
   const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, 'er', [...entities.keys()].slice(0, 8));
-  return `${svgOpen(width, height, label)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g></g></svg>`;
+  return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g></g></svg>`;
 }
 
-function nodeSvgOf(entity, x, y, size, step) {
+function nodeSvgOf(entity, x, y, size, step, pageDir) {
   const left = x - size.width / 2;
   const top = y - size.height / 2;
-  const head = `<text class="am-er-head" font-weight="600" x="${f(left + PAD)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(entity.name)}</text>`;
+  // The name starts at the edge where reading starts and the key marker sits at the other one. The anchors keep their names:
+  // the svg's direction="rtl" turns "start" into the right end of the text, so on a right-to-left page the name moves to the right edge.
+  const [nameX, keyX] = pageDir === 'rtl' ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
+  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
   const fields = entity.fields
     .map((field, i) => {
       const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
       // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
-      const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(left + size.width - PAD)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(field.marker)}</text>` : '';
-      return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(left + PAD)}" y="${f(cy)}" dominant-baseline="central">${esc(fieldText(field))}</text>${marker}`;
+      const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : '';
+      return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
     })
     .join('');
   return `<g class="am-node am-node--er${entity.hi ? ' am-node--hi' : ''}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields}</g>`;
 }
 
-// A self-reference: out of the right edge, around, and back into it, with the two ends on that edge. `toward` lies
-// outside the box, as it does for an edge between two boxes, so the end marks are drawn outside the border too.
-function loopSvg({ rel, x, y, size, out }, step) {
-  const right = x + size.width / 2;
+// A self-reference: out of the right edge (the left one on a right-to-left page), around, and back into it, with the two
+// ends on that edge. `toward` lies outside the box, as it does for an edge between two boxes, so the end marks are drawn
+// outside the border too.
+function loopSvg({ rel, y, edge, out }, s, step, pageDir) {
   const [ay, by] = [y - LOOP_END / 2, y + LOOP_END / 2];
-  const path = `<path class="am-edge" d="M${f(right)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(right)},${f(by)}"/>`;
-  const ends = `${endMark({ x: right, y: ay }, { x: right + 1, y: ay }, rel.fromCard)}${endMark({ x: right, y: by }, { x: right + 1, y: by }, rel.toCard)}`;
-  const label = rel.label ? labelSvg(rel.label, out + 6 + labelWidth(rel.label) / 2, y) : '';
+  const path = `<path class="am-edge" d="M${f(edge)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(edge)},${f(by)}"/>`;
+  const ends = `${endMark({ x: edge, y: ay }, { x: edge + s, y: ay }, rel.fromCard)}${endMark({ x: edge, y: by }, { x: edge + s, y: by }, rel.toCard)}`;
+  const label = rel.label ? labelSvg(rel.label, out + s * 6 + (s * labelWidth(rel.label)) / 2, y, pageDir) : '';
   return `<g data-step="${step}">${path}${ends}${label}</g>`;
 }
 
@@ -275,9 +284,9 @@ function labelWidth(text) {
   return measure(text, EDGE_FS) + 10;
 }
 
-function labelSvg(text, x, y) {
+function labelSvg(text, x, y, pageDir) {
   const w = labelWidth(text);
-  return `<g class="am-edge-label"><rect x="${f(x - w / 2)}" y="${f(y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x, y, LH)}</g>`;
+  return `<g class="am-edge-label"><rect x="${f(x - w / 2)}" y="${f(y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x, y, LH, '', pageDir)}</g>`;
 }
 
 // The end marks of one relationship: the written (or implied) cardinality at each end, drawn just outside the boxes.

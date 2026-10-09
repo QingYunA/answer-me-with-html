@@ -293,3 +293,64 @@ test('er: video mode gives every entity and relationship its own step', () => {
   assert.match(svg, /class="am-node am-node--er" data-key="Order" data-step="1"/);
   assert.match(svg, /<g data-step="2">/);
 });
+
+// ── er on a right-to-left page ──
+const erDir = (text, args, dir) => COMPONENTS.get('er').render(text, { args, uid: () => 'u1', ui: {}, dir });
+const boxes = (svg) => [...svg.matchAll(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/g)].map((m) => [Number(m[1]), Number(m[2])]);
+// The x of the text with this content, ignoring the left-to-right isolate marks (U+2066, U+2069) svgLine adds.
+const textX = (svg, content) => Number(svg.match(new RegExp(`<text [^>]*? x="([\\d.-]+)"[^>]*>(?:\\u2066)?${content}(?:\\u2069)?</text>`))[1]);
+
+test('er: a right-to-left page draws the mirror image, with direction="rtl" on the svg', () => {
+  const ltr = erDir(ER, 'LR', 'ltr');
+  const rtl = erDir(ER, 'LR', 'rtl');
+  assert.equal(erDir(ER, 'LR', undefined), ltr, 'no page direction renders as before');
+  assert.doesNotMatch(ltr, /direction=/);
+  assert.match(rtl, /<svg [^>]*direction="rtl"/);
+  const [a, b] = [boxes(ltr), boxes(rtl)];
+  const [w] = viewBox(rtl);
+  assert.equal(b.length, a.length);
+  a.forEach(([x, width], i) => {
+    assert.equal(b[i][1], width, 'the box keeps its width');
+    // The viewBox rounds the drawing width up, so the mirror image is within one pixel.
+    assert.ok(Math.abs(b[i][0] + width - (w - x)) <= 1, `box ${i} is the mirror image`);
+  });
+  assert.ok(a[0][0] < a[1][0] && b[0][0] > b[1][0], 'LR runs right to left');
+});
+
+test('er: on a right-to-left page a field name sits at the right edge of its box and the key marker at the left one', () => {
+  const body = 'משתמש\n  id PK\nהזמנה\n  user_id FK -> משתמש';
+  const ltr = erDir(body, '', 'ltr');
+  const rtl = erDir(body, '', 'rtl');
+  assert.deepEqual(boxes(rtl).map(([, width]) => width), boxes(ltr).map(([, width]) => width), 'the box width does not depend on the direction');
+  const [left, width] = boxes(rtl)[1];
+  // The svg's direction turns text-anchor "start" into the right end of the text: the name runs left from the right edge,
+  // the marker (anchor "end") runs right from the left edge.
+  assert.equal(textX(rtl, 'user_id'), left + width - 11);
+  assert.equal(textX(rtl, 'FK'), left + 11);
+  assert.equal(textX(rtl, 'הזמנה'), left + width - 11);
+  assert.match(rtl, /\u2066user_id\u2069/, 'a Latin field name is isolated left to right so it stays inside the box');
+  const [l, w] = boxes(ltr)[1];
+  assert.equal(textX(ltr, 'user_id'), l + 11);
+  assert.equal(textX(ltr, 'FK'), l + w - 11);
+});
+
+test('er: on a right-to-left page a self-reference loops out of the left side and stays inside the drawing', () => {
+  const body = 'Employee\n  id PK\n  manager_id FK -> Employee\nEmployee 0..1--* Employee: reports to';
+  const rtl = erDir(body, '', 'rtl');
+  assert.doesNotMatch(rtl, /NaN/);
+  const [left] = boxes(rtl)[0];
+  const loop = rtl.match(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),[\d.-]+ ([\d.-]+),[\d.-]+ ([\d.-]+),([\d.-]+)"/).map(Number);
+  assert.ok(Math.abs(loop[1] - left) < 0.2, 'the loop starts on the left edge of the box');
+  assert.ok(loop[3] < left, 'and bulges outside it');
+  assert.equal(loop[3], loop[4], 'out and back with the same control point');
+  const label = rtl.match(/<g class="am-edge-label"><rect x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/).slice(1).map(Number);
+  // The drawing is shifted so that its leftmost point lands on the margin.
+  const shift = Number(rtl.match(/<g transform="translate\(([\d.-]+),/)?.[1] ?? 0);
+  assert.ok(label[0] + shift >= 0, 'the drawing is wide enough to hold the loop and its label');
+  assert.ok(label[0] + label[1] < loop[3], 'the label lies beyond the loop');
+  assert.ok(left + boxes(rtl)[0][1] + shift <= viewBox(rtl)[0], 'and the box fits on the right');
+  // The end marks are drawn outside the left border.
+  const ends = [...rtl.matchAll(/<g class="am-er-end am-edge">(.*?)<\/g>/g)];
+  assert.equal(ends.length, 2);
+  for (const [, marks] of ends) for (const m of marks.matchAll(/(?:x1|x2|cx)="([\d.-]+)"/g)) assert.ok(Number(m[1]) <= left + 0.01);
+});
