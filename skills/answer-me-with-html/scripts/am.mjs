@@ -6091,7 +6091,7 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   straight.forEach(({ rel, data, points }) => {
     for (const p of points) at3(p.x, p.y);
     if (rel.label) {
-      const w = labelWidth(rel.label);
+      const w = labelWidth2(rel.label);
       at3(data.x - w / 2, data.y - 9);
       at3(data.x + w / 2, data.y + 9);
     }
@@ -6119,22 +6119,22 @@ function clipToBox(centre, size, toward) {
 }
 function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const left = x2 - size.width / 2;
-  const top = y2 - size.height / 2;
+  const top2 = y2 - size.height / 2;
   const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
-  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
-  const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
+  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
+  const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top2 + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top2 + PAD + HEAD_LH)}"/>`;
   const fields2 = entity.fields.map((field, i) => {
-    const cy = top + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
+    const cy = top2 + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
     const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
     return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
   }).join("");
-  return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
+  return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
 }
 function loopBeside(rel, x2, y2, size, nth, s) {
   const edge = x2 + s * size.width / 2;
   const out = edge + s * LOOP_OUT + s * nth * LOOP_STEP;
   const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
-  const label = rel.label ? { x: out + s * 6 + s * labelWidth(rel.label) / 2, y: y2 } : null;
+  const label = rel.label ? { x: out + s * 6 + s * labelWidth2(rel.label) / 2, y: y2 } : null;
   return {
     rel,
     a: { x: edge, y: ay },
@@ -6142,14 +6142,14 @@ function loopBeside(rel, x2, y2, size, nth, s) {
     c: [{ x: out, y: ay }, { x: out, y: by }],
     away: { x: s, y: 0 },
     label,
-    corners: [[out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), by], [out, ay]]
+    corners: [[out + s * 6 + s * (rel.label ? labelWidth2(rel.label) : 0), by], [out, ay]]
   };
 }
 function loopBelow(rel, x2, y2, size, depth, s) {
   const bottom = y2 + size.height / 2;
   const out = bottom + LOOP_OUT + depth;
   const [ax, bx] = [x2 - s * LOOP_END / 2, x2 + s * LOOP_END / 2];
-  const half = Math.max(LOOP_END / 2, rel.label ? labelWidth(rel.label) / 2 : 0);
+  const half = Math.max(LOOP_END / 2, rel.label ? labelWidth2(rel.label) / 2 : 0);
   return {
     rel,
     a: { x: ax, y: bottom },
@@ -6166,11 +6166,11 @@ function loopSvg({ rel, a, b, c, away, label }, step, pageDir) {
   const text = label ? labelSvg(rel.label, label.x, label.y, pageDir) : "";
   return `<g data-step="${step}">${path}${ends}${text}</g>`;
 }
-function labelWidth(text) {
+function labelWidth2(text) {
   return measure(text, EDGE_FS2) + 10;
 }
 function labelSvg(text, x2, y2, pageDir) {
-  const w = labelWidth(text);
+  const w = labelWidth2(text);
   return `<g class="am-edge-label"><rect x="${f(x2 - w / 2)}" y="${f(y2 - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([text], x2, y2, LH3, "", pageDir)}</g>`;
 }
 function endsSvg(points, rel) {
