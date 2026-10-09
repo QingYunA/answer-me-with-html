@@ -133,6 +133,7 @@ A table needs a delimiter row under the header, or the whole block shows as plai
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
 | Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |
+| Mermaid source | code block (checked) | a page shows mermaid as a code listing, not a diagram; for a drawn diagram use flow / sequence / tree or an svg fence (am help mermaid) |
 | Values and limits | `limits` | `label \| 13 / 20 \| unit`, limit only: `label \| max 20` |
 | Word-by-word comments on one sentence | `annot` | `# heading \| right note`, `[span]{note}`, `[wrong word]{!red note}`, `> footnote` |
 | Metadata / title block | `kv [cols=2]` | `key: value`, `* wide cell: value` |

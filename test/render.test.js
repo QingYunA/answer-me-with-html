@@ -625,3 +625,33 @@ test('render: one pipe line alone, or a delimiter row alone, is not a table and 
   assert.ok(html.includes('just one line'));
   assert.equal(stats.tables, 0);
 });
+
+// `mermaid` is not a component: the page shows the fence as a code listing. The source is still checked, and the author is pointed at
+// the components that draw a diagram.
+test('render: a mermaid block with an unknown first word is refused with its line and example', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nsqeuenceDiagram\n  A->>B: hi\n```\n'),
+    (err) => err instanceof RenderError && err.component === 'mermaid' && err.line === 6 && /not a diagram type/.test(err.message) && err.example.startsWith('```mermaid'),
+  );
+});
+
+test('render: an empty mermaid block is refused', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n```mermaid\n%% only a comment\n```\n'),
+    (err) => err instanceof RenderError && err.component === 'mermaid' && /block is empty/.test(err.message),
+  );
+});
+
+test('render: a valid mermaid block renders as a listing and warns to use a diagram component', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```\n');
+  assert.match(html, /am-code-lang">mermaid/);
+  const warned = stats.componentWarnings.filter((w) => w.component === 'mermaid');
+  assert.equal(warned.length, 1);
+  assert.equal(warned[0].line, 6);
+  assert.match(warned[0].message, /code listing/);
+});
+
+test('render: an unclosed double quote in a mermaid block warns, and the page is still written', () => {
+  const { stats } = renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nflowchart LR\n  A["oops] --> B\n```\n');
+  assert.ok(stats.componentWarnings.some((w) => w.component === 'mermaid' && /unclosed double quote/.test(w.message)));
+});

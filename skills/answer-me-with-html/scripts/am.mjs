@@ -7176,7 +7176,10 @@ function renderFence(block2, ctx) {
   const { lang, args, text, line } = block2;
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
-  if (!comp) return codeBlock(block2, ctx);
+  if (!comp) {
+    if (lang === "mermaid") checkMermaid(block2, ctx);
+    return codeBlock(block2, ctx);
+  }
   if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
@@ -7190,6 +7193,40 @@ function renderFence(block2, ctx) {
       example: comp.example
     });
   }
+}
+var MERMAID_TYPES = ["graph", "flowchart", "sequenceDiagram", "stateDiagram-v2", "stateDiagram", "classDiagram-v2", "classDiagram", "erDiagram", "journey", "gantt", "pie", "mindmap", "timeline", "gitGraph", "quadrantChart", "xychart-beta", "block-beta", "packet-beta", "sankey-beta", "architecture-beta", "kanban", "requirementDiagram", "radar-beta", "treemap-beta", "C4Context", "C4Container", "C4Component", "C4Dynamic", "C4Deployment", "info"];
+var MERMAID_EXAMPLE = "```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```";
+function mermaidHead(text) {
+  const lines = String(text).split("\n");
+  let i = 0;
+  if ((lines[0] ?? "").trim() === "---") {
+    const end = lines.findIndex((l3, k2) => k2 > 0 && l3.trim() === "---");
+    if (end > 0) i = end + 1;
+  }
+  for (; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t || t.startsWith("%%")) continue;
+    return { text: t, line: i };
+  }
+  return null;
+}
+function mermaidHeadOrThrow(block2) {
+  const head = mermaidHead(block2.text);
+  if (!head) throw new RenderError("mermaid: the block is empty; write a diagram type and its body, or choose another fence language for a plain listing", { line: block2.line + 1, component: "mermaid", example: MERMAID_EXAMPLE });
+  const type = head.text.split(/[\s;{]/)[0];
+  if (!MERMAID_TYPES.includes(type)) throw new RenderError(`mermaid: "${head.text.length > 32 ? head.text.slice(0, 32) + "..." : head.text}" is not a diagram type; start with flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt or pie`, { line: block2.line + 1 + head.line, component: "mermaid", example: MERMAID_EXAMPLE });
+  return head;
+}
+function checkMermaid(block2, ctx) {
+  const warn = (idx, message) => ctx.stats.componentWarnings?.push({ line: block2.line + 1 + idx, component: "mermaid", message });
+  const head = mermaidHeadOrThrow(block2);
+  warn(head.line, "the page shows a mermaid block as a code listing; use the flow / sequence / tree component or an svg fence for a diagram");
+  const lines = block2.text.split("\n");
+  const body = lines.slice(head.line + 1).filter((l3) => l3.trim() && !l3.trim().startsWith("%%"));
+  if (!body.length) warn(head.line, "the diagram type has no body");
+  lines.forEach((l3, k2) => {
+    if ((l3.match(/"/g) ?? []).length % 2) warn(k2, "an unclosed double quote on this line");
+  });
 }
 function codeBlock(block2, ctx) {
   try {
@@ -8454,7 +8491,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|code|image|table|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|table|mermaid|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / mermaid rules / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -8494,6 +8531,7 @@ A -> B
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
 - A placeholder such as <host> is shown as text. Inside a sentence only text-level tags stay (b, i, kbd, sup, a, span, br, img ...), and tags that break the page (script, style, iframe ...) are shown as text too. Put raw markup in an html or svg fence and code in backticks.
 - Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
+- A \`\`\`mermaid fence is checked as mermaid source and shows as a code listing; the page cannot draw mermaid (see am help mermaid).
 - For the component list see am list; for one component's syntax see am help <component>.`;
 var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
 
@@ -8721,6 +8759,16 @@ var TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the body 
 - The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
 - Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a \u2713 / \u2717 / ! badge.
 - A wide table needs no attributes: the page sizes it to the panel.`;
+var MERMAID_HELP = `Mermaid blocks: checked mermaid source, shown as a code listing
+
+\`\`\`mermaid
+flowchart LR
+  A[Start] --> B[Done]
+\`\`\`
+
+- A page cannot draw mermaid: the fence shows as a code listing, and its source is checked (a diagram type on the first line, closed quotes). am lint reports a bad block as well.
+- The first line names the diagram type: flowchart, graph, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, gantt, pie, mindmap, timeline, gitGraph, quadrantChart, xychart-beta, block-beta, packet-beta, sankey-beta, architecture-beta, kanban, requirementDiagram, C4Context ...
+- For a drawn diagram use the flow, sequence, tree, timeline or limits component, or paste a finished diagram as SVG in an \`\`\`svg fence.`;
 var PATCH_HELP = `Replace one panel of a rendered page in place
 
 Usage:
@@ -9131,13 +9179,14 @@ function cmdHelp(name, { print, fail }) {
   if (name === "image") return print(IMAGE_HELP), 0;
   if (name === "code") return print(CODE_HELP), 0;
   if (name === "table") return print(TABLE_HELP), 0;
+  if (name === "mermaid") return print(MERMAID_HELP), 0;
   if (name === "video") return print(VIDEO_FORMAT), 0;
   if (name === "patch") return print(PATCH_HELP), 0;
   if (name === "theme") return print(THEME_HELP), 0;
   if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, table, video, patch, theme`);
+    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, table, mermaid, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}

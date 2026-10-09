@@ -43,7 +43,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|code|image|table|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|table|mermaid|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / mermaid rules / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -84,6 +84,7 @@ A -> B
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
 - A placeholder such as <host> is shown as text. Inside a sentence only text-level tags stay (b, i, kbd, sup, a, span, br, img ...), and tags that break the page (script, style, iframe ...) are shown as text too. Put raw markup in an html or svg fence and code in backticks.
 - Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
+- A \`\`\`mermaid fence is checked as mermaid source and shows as a code listing; the page cannot draw mermaid (see am help mermaid).
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
 const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
@@ -312,6 +313,17 @@ const TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the bod
 - The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
 - Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
 - A wide table needs no attributes: the page sizes it to the panel.`;
+
+const MERMAID_HELP = `Mermaid blocks: checked mermaid source, shown as a code listing
+
+\`\`\`mermaid
+flowchart LR
+  A[Start] --> B[Done]
+\`\`\`
+
+- A page cannot draw mermaid: the fence shows as a code listing, and its source is checked (a diagram type on the first line, closed quotes). am lint reports a bad block as well.
+- The first line names the diagram type: flowchart, graph, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, gantt, pie, mindmap, timeline, gitGraph, quadrantChart, xychart-beta, block-beta, packet-beta, sankey-beta, architecture-beta, kanban, requirementDiagram, C4Context ...
+- For a drawn diagram use the flow, sequence, tree, timeline or limits component, or paste a finished diagram as SVG in an \`\`\`svg fence.`;
 
 const PATCH_HELP = `Replace one panel of a rendered page in place
 
@@ -765,13 +777,14 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'code') return print(CODE_HELP), 0;
   if (name === 'table') return print(TABLE_HELP), 0;
+  if (name === 'mermaid') return print(MERMAID_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, table, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, table, mermaid, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

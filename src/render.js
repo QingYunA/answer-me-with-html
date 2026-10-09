@@ -146,7 +146,10 @@ function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
-  if (!comp) return codeBlock(block, ctx);
+  if (!comp) {
+    if (lang === 'mermaid') checkMermaid(block, ctx);
+    return codeBlock(block, ctx);
+  }
   if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
@@ -160,6 +163,47 @@ function renderFence(block, ctx) {
       example: comp.example,
     });
   }
+}
+
+// `mermaid` is not a component: the page cannot draw it, so the fence shows as a code listing. Its source is still checked, so a
+// wrong diagram type or an unclosed quote is caught, and the author is pointed at the components that draw a diagram.
+const MERMAID_TYPES = ['graph', 'flowchart', 'sequenceDiagram', 'stateDiagram-v2', 'stateDiagram', 'classDiagram-v2', 'classDiagram', 'erDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'timeline', 'gitGraph', 'quadrantChart', 'xychart-beta', 'block-beta', 'packet-beta', 'sankey-beta', 'architecture-beta', 'kanban', 'requirementDiagram', 'radar-beta', 'treemap-beta', 'C4Context', 'C4Container', 'C4Component', 'C4Dynamic', 'C4Deployment', 'info'];
+const MERMAID_EXAMPLE = '```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```';
+
+// The first line that is neither blank nor a %% comment. A mermaid front matter block (--- ... ---) is skipped first.
+function mermaidHead(text) {
+  const lines = String(text).split('\n');
+  let i = 0;
+  if ((lines[0] ?? '').trim() === '---') {
+    const end = lines.findIndex((l, k) => k > 0 && l.trim() === '---');
+    if (end > 0) i = end + 1;
+  }
+  for (; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t || t.startsWith('%%')) continue;
+    return { text: t, line: i };
+  }
+  return null;
+}
+
+function mermaidHeadOrThrow(block) {
+  const head = mermaidHead(block.text);
+  if (!head) throw new RenderError('mermaid: the block is empty; write a diagram type and its body, or choose another fence language for a plain listing', { line: block.line + 1, component: 'mermaid', example: MERMAID_EXAMPLE });
+  const type = head.text.split(/[\s;{]/)[0];
+  if (!MERMAID_TYPES.includes(type)) throw new RenderError(`mermaid: "${head.text.length > 32 ? head.text.slice(0, 32) + '...' : head.text}" is not a diagram type; start with flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt or pie`, { line: block.line + 1 + head.line, component: 'mermaid', example: MERMAID_EXAMPLE });
+  return head;
+}
+
+function checkMermaid(block, ctx) {
+  const warn = (idx, message) => ctx.stats.componentWarnings?.push({ line: block.line + 1 + idx, component: 'mermaid', message });
+  const head = mermaidHeadOrThrow(block);
+  warn(head.line, 'the page shows a mermaid block as a code listing; use the flow / sequence / tree component or an svg fence for a diagram');
+  const lines = block.text.split('\n');
+  const body = lines.slice(head.line + 1).filter((l) => l.trim() && !l.trim().startsWith('%%'));
+  if (!body.length) warn(head.line, 'the diagram type has no body');
+  lines.forEach((l, k) => {
+    if ((l.match(/"/g) ?? []).length % 2) warn(k, 'an unclosed double quote on this line');
+  });
 }
 
 // A fence that is not a component is code. In a video the block has no copy button.
