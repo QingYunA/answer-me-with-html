@@ -36,10 +36,14 @@ function charWidth(ch, mono) {
   return 0.56;
 }
 
-export function measure(str, size = 13, { mono = false } = {}) {
+// Bold text is wider than the same text in regular weight. SVG is laid out here without font metrics, so this is the
+// estimate (`bold`), used for the text a theme draws bold such as a highlighted node.
+const BOLD = 1.06;
+
+export function measure(str, size = 13, { mono = false, bold = false } = {}) {
   let units = 0;
   for (const ch of String(str ?? '')) units += charWidth(ch, mono);
-  return Math.round(units * size * 100) / 100;
+  return Math.round(units * size * (bold ? BOLD : 1) * 100) / 100;
 }
 
 // Split into unbreakable layout units. A unit is one Han, kana or fullwidth character, one word of a script that

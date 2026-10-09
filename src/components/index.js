@@ -7,11 +7,12 @@ import tree from './tree.js';
 import limits from './limits.js';
 import sequence from './sequence.js';
 import flow from './flow.js';
+import er from './er.js';
 import ask from './ask.js';
 
 export { ComponentError } from './error.js';
 
-const ALL = [callout, kv, timeline, annot, tree, limits, sequence, flow, ask];
+const ALL = [callout, kv, timeline, annot, tree, limits, sequence, flow, er, ask];
 
 export const COMPONENTS = new Map(ALL.map((c) => [c.name, c]));
 export const RAW_LANGS = new Set(['html', 'svg']);

@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
+  <a href="https://answer-me-with-html.com/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -248,6 +248,7 @@ The agent picks a component by the shape of the information:
 | Component | Good for |
 | :--- | :--- |
 | `flow` | Architecture, call chains, decision branches. Auto layout, with groups, decisions and databases |
+| `er` | A data model: entities with their columns (PK / FK / UK) and crow's-foot relationships |
 | `sequence` | Messages going back and forth between several parties over time |
 | `tree` | Folders, modules, taxonomies |
 | `timeline` | History, releases, phases |

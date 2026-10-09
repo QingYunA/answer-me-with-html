@@ -165,12 +165,15 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
   timeline, limits, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
 - Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+  The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
+  the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
+  A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
   Set the ElevenLabs voice with ELEVENLABS_VOICE_ID and the model with ELEVENLABS_MODEL_ID (default eleven_v4_turbo).
   local calls a local OpenAI-compatible speech service (POST /v1/audio/speech, returns 16-bit PCM WAV):
   AM_TTS_URL (required, service base URL), AM_TTS_MODEL, AM_TTS_VOICE (required when the service has no default),
@@ -461,7 +464,15 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
     onProgress: (msg) => fail(`  ${msg}`),
     themes,
   });
-  return { ...result, voiceName: provider ? provider.name : 'none (captions only)' };
+  return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
+}
+
+// The voice line of the one-line summary: the provider, and the languages that kept captions only because no voice is
+// installed for them.
+function voiceSummary(provider, captionsOnly = []) {
+  if (!provider) return 'none (captions only)';
+  if (!captionsOnly.length) return provider.name;
+  return `${provider.name} (no ${captionsOnly.map((c) => c.language).join(', ')} voice installed: captions only for those lines)`;
 }
 
 // A video file next to the page: an MP4 through ffmpeg, or a WebM from the browser's own encoder. Both drive the page's
