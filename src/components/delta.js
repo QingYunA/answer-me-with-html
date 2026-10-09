@@ -35,7 +35,9 @@ export function withDelta(html, states, { ui, video = false } = {}) {
   const used = STATES.map((s) => [s, states.filter((x) => x === s).length]).filter(([, n]) => n > 0);
   if (!used.length) return html;
   const t = labelsOf(ui);
-  const counts = used.map(([s, n]) => `<span class="am-delta-count am-delta-count--${s}">${SIGN[s]}${n} ${esc(t[s])}</span>`).join(' ');
+  // counts: the word after a count above one, for a language whose word changes with the number (Hebrew "נוסף" for one, "נוספו" for 4).
+  const word = (s, n) => (n === 1 ? t[s] : (t.counts?.[s] ?? t[s]));
+  const counts = used.map(([s, n]) => `<span class="am-delta-count am-delta-count--${s}">${SIGN[s]}${n} ${esc(word(s, n))}</span>`).join(' ');
   const views = ['before', 'changes', 'after'].map((v) => `<button type="button" data-view="${v}" aria-pressed="${v === 'changes'}">${esc(t[v])}</button>`).join('');
   const switcher = video ? '' : `<span class="am-delta-switch" role="group" aria-label="${esc(t.view)}" hidden>${views}</span>`;
   const open = html.indexOf('>');

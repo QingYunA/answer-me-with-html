@@ -109,7 +109,6 @@ const ui = {
 export default {
   meta_title: 'Answer me with HTML：提一个难题，拿到一页图解',
   meta_desc: '一个 Agent Skill，支持 Claude Code、Codex、Cursor 等。模型只写一份简短的 Markdown 稿件，自带的 CLI 把它排成一页离线可看的 HTML，模型要写的 token 约为手写 HTML 的 1/8。',
-  canonical: 'https://qingyuna.github.io/answer-me-with-html/zh/',
   og_locale: 'zh_CN',
   og_image: 'text-vs-page-zh.png',
   og_image_alt: '同一个 TCP 问题的两种回答：一堵终端文字墙，和一页带图表的页面',

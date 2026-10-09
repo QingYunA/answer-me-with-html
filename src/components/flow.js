@@ -1,7 +1,8 @@
 // Flow / architecture diagram: the model writes only relations (A -> B: label), dagre computes coordinates, this file draws the layout as SVG.
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
+import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
+import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 
@@ -49,11 +50,11 @@ Client -> Gateway
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
-  render(text, { args, uid, ui, warn, video }) {
+  render(text, { args, uid, ui, warn, video, dir: pageDir = 'ltr' }) {
     const model = parseFlow(text);
     model.warnings.forEach((w) => warn?.(w));
-    const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui)}</figure>`;
+    const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
+    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -206,7 +207,7 @@ const reserveKey = (i) => `r${i}`;
 // in TB and BT a label-sized node above the group's first members, which dagre keeps clear of every edge passing by;
 // in LR and RL a strip inserted under the box's top edge, or above its bottom edge when an edge crosses the top one
 // (edges there mostly run sideways, so a strip stays empty).
-function runLayout({ nodes, edges, groups }, rankdir, widths, reserve) {
+function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   const g = new dagre.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -243,6 +244,8 @@ function runLayout({ nodes, edges, groups }, rankdir, widths, reserve) {
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
   dagre.layout(g);
+  // A right-to-left page mirrors the finished layout: every direction then reads from the right, and LR runs right to left.
+  if (rtl) mirrorLayout(g);
   if (!vertical) {
     for (const [i, side] of reserve) {
       const c = g.node(gkey(i));
@@ -273,8 +276,9 @@ function insertStrip(g, y, d) {
 const top = (n) => n.y - n.height / 2;
 
 // Where each group name goes: [x, baseline] of its text, or null when no place along the top of the box is free of nodes, edges,
-// edge labels and other group names. The name starts in the top left corner and slides right past whatever is in the way.
-function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, reserve) {
+// edge labels and other group names. The name starts in the corner where reading starts (top left, or top right on a right-to-left
+// page) and slides toward the other corner past whatever is in the way.
+function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, reserve) {
   const boxes = [];
   for (const n of nodes.values()) {
     const { x, y } = g.node(key.get(n.id));
@@ -296,7 +300,7 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, reserv
     const left = c.x - c.width / 2;
     const right = left + c.width;
     const w = widths[i];
-    const own = grp.state ? [[right - 8, top(c) - 8, right + 8, top(c) + 8]] : [];
+    const own = grp.state ? [[rtl ? left - 8 : right - 8, top(c) - 8, rtl ? left + 8 : right + 8, top(c) + 8]] : [];
     // A name needs air around it: an edge label right beside it would read as one phrase with it.
     const free = (x0, y0, y1) => {
       const box = [x0 - 5, y0 - 2, x0 + w + 5, y1 + 2];
@@ -309,10 +313,10 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, reserv
     for (const baseline of baselines) {
       const [y0, y1] = [baseline - 11, baseline + 4];
       for (let s = 0; s <= Math.max(0, c.width - 16 - w); s += 4) {
-        const x0 = left + 8 + s;
+        const x0 = rtl ? right - 8 - w - s : left + 8 + s;
         if (free(x0, y0, y1)) {
           boxes.push([x0, y0, x0 + w, y1]);
-          return [x0, baseline];
+          return [rtl ? x0 + w : x0, baseline];
         }
       }
     }
@@ -321,7 +325,7 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, reserv
     const baseline = baselines.at(-1);
     const x0 = room.x - w / 2;
     boxes.push([x0, baseline - 11, x0 + w, baseline + 4]);
-    return [x0, baseline];
+    return [rtl ? x0 + w : x0, baseline];
   });
 }
 
@@ -346,14 +350,15 @@ function segmentHits(p, q, [x0, y0, x1, y1]) {
   return true;
 }
 
-// The width of a group name, drawn in the monospace font (src/themes/base.css).
-const labelWidth = (name) => measure(name, CLUSTER_FS, { mono: true }) + 2;
+// The width of a group name: monospace on a left-to-right page, the sans font on a right-to-left one (src/themes/rtl.css).
+const labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== 'rtl' }) + 2;
 
-function layout(model, rankdir, id, ui) {
+function layout(model, rankdir, id, ui, pageDir = 'ltr') {
   const { nodes, edges, groups } = model;
-  const widths = groups.map((grp) => labelWidth(grp.name));
-  let run = runLayout(model, rankdir, widths, new Set());
-  let spots = placeLabels(run, model, widths, new Map());
+  const rtl = pageDir === 'rtl';
+  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+  let run = runLayout(model, rankdir, rtl, widths, new Set());
+  let spots = placeLabels(run, model, widths, rtl, new Map());
   // A group name that would sit on an edge or a node gets room of its own in another layout: first along the top of its box,
   // and in LR and RL, when an edge crosses that room too, along the bottom.
   const reserve = new Map();
@@ -361,8 +366,8 @@ function layout(model, rankdir, id, ui) {
     const crowded = spots.flatMap((s, i) => (s ? [] : [i]));
     if (!crowded.length) break;
     for (const i of crowded) reserve.set(i, side);
-    run = runLayout(model, rankdir, widths, reserve);
-    spots = placeLabels(run, model, widths, reserve);
+    run = runLayout(model, rankdir, rtl, widths, reserve);
+    spots = placeLabels(run, model, widths, rtl, reserve);
   }
   const { g, key, sizes } = run;
 
@@ -371,8 +376,10 @@ function layout(model, rankdir, id, ui) {
     const x = c.x - c.width / 2;
     const y = c.y - c.height / 2;
     const mark = deltaAttr(grp.state);
-    const [labelX, labelY] = spots[i] ?? [x + 8, y + 14];
-    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(grp.name)}</text>${badgeSvg(grp.state, x + c.width, y)}`;
+    // The badge sits in the corner opposite the one where reading starts.
+    const badgeX = rtl ? x : x + c.width;
+    const [labelX, labelY] = spots[i] ?? [rtl ? x + c.width - 8 : x + 8, y + 14];
+    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y)}`;
   });
 
   // In video mode, items appear step by step by source line: edges written on one line and nodes first seen there form one step.
@@ -385,20 +392,20 @@ function layout(model, rankdir, id, ui) {
     const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>`;
     if (!e.label) return `${open}${path}</g>`;
     const w = measure(e.label, EDGE_FS) + 10;
-    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH)}</g></g>`;
+    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH, '', pageDir)}</g></g>`;
   });
 
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x, y } = g.node(key.get(n.id));
     const { width: w, height: h, lines } = sizes.get(n.id);
-    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH)}${badge}</g>`;
+    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h, rtl));
+    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH, '', pageDir)}${badge}</g>`;
   });
 
   const { width, height } = g.graph();
   const label = diagramLabel(ui, 'flow', [...nodes.keys()].slice(0, 8));
   const heads = ['added', 'removed'].filter((state) => edges.some((e) => e.state === state));
-  return `${svgOpen(width, height, label)}${arrowDefs(id, heads)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
+  return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g>${clusters.join('')}</g><g>${edgeSvg.join('')}</g><g>${nodeSvg.join('')}</g></svg>`;
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
@@ -407,11 +414,26 @@ function badgeSvg(state, x, y) {
   return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 
-// Where the badge sits: the top right corner, pulled in where the shape has no corner there.
-function badgePoint(shape, x, y, w, h) {
-  if (shape === 'diamond') return [x + w / 4, y - h / 4];
-  if (shape === 'round') return [x + w / 2 - h * 0.15, y - h / 2 + h * 0.15];
-  return [x + w / 2, y - h / 2];
+// Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.
+function badgePoint(shape, x, y, w, h, rtl = false) {
+  const s = rtl ? -1 : 1;
+  if (shape === 'diamond') return [x + s * (w / 4), y - h / 4];
+  if (shape === 'round') return [x + s * (w / 2 - h * 0.15), y - h / 2 + h * 0.15];
+  return [x + s * (w / 2), y - h / 2];
+}
+
+// Mirror a finished dagre layout left to right, in place: node and group centres, edge points and edge label positions.
+function mirrorLayout(g) {
+  const flip = mirror(g.graph().width, true);
+  for (const v of g.nodes()) {
+    const node = g.node(v);
+    node.x = flip(node.x);
+  }
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: flip(p.x) }));
+    if (edge.x !== undefined) edge.x = flip(edge.x);
+  }
 }
 
 function shapeSvg(shape, x, y, w, h) {
