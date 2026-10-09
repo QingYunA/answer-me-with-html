@@ -8,7 +8,7 @@ Other tools also turn agent output into something visual. Two come up most: [Arc
 | :--- | :--- | :--- | :--- |
 | The model writes | A Markdown draft | A typed JSON spec | JSON in a `dsh-ui` fence |
 | You get | One page that answers the question | One interactive diagram | Components inside the chat reply |
-| What fits on it | Text, tables, real code from your files, 11 components (flow, sequence, tree, timeline …) | Five diagram types: architecture, workflow, sequence, data flow, lifecycle | 30+ components: cards, tables, charts, forms, quizzes, 3D scenes |
+| What fits on it | Text, tables, real code from your files, 12 components (flow, er, sequence, tree, timeline …) | Five diagram types: architecture, workflow, sequence, data flow, lifecycle | 30+ components: cards, tables, charts, forms, quizzes, 3D scenes |
 | Where it works | Any agent that can run a shell command: Claude Code, Codex, Cursor, OpenCode, Pi | Claude Code, Codex, opencode, Cursor; Claude.ai by upload | The DeepSeek Harness web UI |
 | The result | A single `.html` file, no CDN or web fonts, opens offline | A single `.html` file | Shown in the chat; finished blocks export to HTML |
 | Interaction | Comments and decisions on the page; one Reply message to paste back | Focus, route tracing, search, presentation mode, PNG / SVG / WebM export | Buttons, forms and quizzes send events back to the model; renders while the model writes |

@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -479,4 +479,31 @@ test('cli patch: on a video page, --style on this run wins over the style stored
   assert.equal(r.code, 1);
   assert.match(r.err, /STE check failed/);
   assert.equal(readFileSync(join(dir, 'vstyle-cli.html'), 'utf8'), before, 'a strict failure must not change the file');
+});
+
+// am lint runs the same source checks as am render, without writing a page: a draft it passes is one am render accepts.
+test('cli lint: a component error is reported with the line and the example, and no page is written', async () => {
+  const pages = join(dir, 'pages');
+  const before = existsSync(pages) ? readdirSync(pages).length : 0;
+  const bad = '---\ntitle: L\n---\n## A\n```flow LR\nA -> B\n~ B -> C\n```\n';
+  const r = await run(['lint', '-'], { stdin: bad });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /\[flow\]/);
+  assert.match(r.err, /~ marks a node, not a link/);
+  assert.match(r.err, /Correct example:/);
+  assert.equal(existsSync(pages) ? readdirSync(pages).length : 0, before, 'lint writes no page');
+});
+
+test('cli lint: a table without a delimiter row is reported like the render does', async () => {
+  const r = await run(['lint', '-'], { stdin: '---\ntitle: T\n---\n## A\n| Task | Status |\n| Build | ok |\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /\[table\].*delimiter row/);
+});
+
+test('cli lint: a valid draft passes, and its component warnings are printed', async () => {
+  const ok = '---\ntitle: L ok\n---\n## A\n```mermaid\nflowchart LR\n  A --> B\n```\n';
+  const r = await run(['lint', '-'], { stdin: ok });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /diagram 1 warning \(a page would be written/);
+  assert.match(r.out, /STE ✓ 0 warnings/);
 });

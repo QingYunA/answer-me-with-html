@@ -7,6 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { hasCommand } from '../sys.js';
+import { baseLanguage, voiceHints } from '../language.js';
 import { estimateSeconds } from './script.js';
 
 export const SAMPLE_RATE = 22050;
@@ -59,6 +60,8 @@ function elevenLabs(env) {
       try {
         res = await fetch(url, {
           method: 'POST',
+          // No language_code: the API ignores it for the models that do not support it (multilingual_v2 is documented as
+          // not supporting it) and every model reads the language from the text, so one voice reads every line.
           headers: { 'xi-api-key': env.ELEVENLABS_API_KEY, 'content-type': 'application/json' },
           body: JSON.stringify({ text, model_id: model }),
           signal: AbortSignal.timeout(ELEVEN_TIMEOUT_MS),
@@ -162,25 +165,31 @@ function systemVoice(platform, which) {
     return {
       name: 'say',
       voice: 'system',
-      id: `say:${voices.zh}:${voices.en}:${voices.ja}`,
+      id: 'say',
       concurrency: 4,
       usesLanguage: true,
-      synth: (text, { language } = {}) => withTemp(async (file) => {
-        const v = voices[language];
-        await run('say', [...(v ? ['-v', v] : []), '-o', file, '--file-format=WAVE', `--data-format=LEI16@${SAMPLE_RATE}`, '-f', textFile(file, text)]);
+      // The voice this machine has for a line's language, or null: the line then keeps its caption instead of being read
+      // by a voice for another language.
+      voiceFor: (language) => macVoiceFor(voices, language),
+      // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
+      synth: (text, { voice } = {}) => withTemp(async (file) => {
+        await run('say', [...(voice ? ['-v', voice] : []), '-o', file, '--file-format=WAVE', `--data-format=LEI16@${SAMPLE_RATE}`, '-f', textFile(file, text)]);
         return readWav(readFileSync(file));
       }),
     };
   }
   if (which('espeak-ng')) {
+    const voices = espeakVoices();
     return {
       name: 'espeak-ng',
       voice: 'system',
       id: 'espeak-ng',
       concurrency: 4,
       usesLanguage: true,
-      synth: (text, { language } = {}) => withTemp(async (file) => {
-        await run('espeak-ng', ['-v', ({ zh: 'cmn', ja: 'ja' })[language] ?? 'en-us', '-w', file, '-f', textFile(file, text)]);
+      voiceFor: (language) => espeakVoiceFor(voices, language),
+      // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
+      synth: (text, { voice } = {}) => withTemp(async (file) => {
+        await run('espeak-ng', ['-v', voice ?? 'en-us', '-w', file, '-f', textFile(file, text)]);
         return readWav(readFileSync(file));
       }),
     };
@@ -188,22 +197,92 @@ function systemVoice(platform, which) {
   return null;
 }
 
-// Pick a macOS voice by language: prefer common high-quality voices, then any voice for that language.
+// The installed macOS voices, read once when the provider is created; `say -v '?'` writes one line per voice.
 export function macVoices() {
-  return pickMacVoices(spawnSync('say', ['-v', '?'], { encoding: 'utf8' }).stdout || '');
+  return parseMacVoices(spawnSync('say', ['-v', '?'], { encoding: 'utf8' }).stdout || '');
 }
 
-// Parse the output of say -v '?'. With long names, only one space may separate the name and the language code.
-export function pickMacVoices(out) {
-  const list = out.split('\n').map((l) => l.match(/^(.+?)\s+([a-z]{2}_[A-Z]{2})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
-  const base = (name) => name.replace(/\s*[(（].*$/, '');
-  const pick = (prefer, locale) => prefer.map((p) => list.find((v) => v.locale === locale && base(v.name) === p)).find(Boolean)?.name;
-  return {
-    zh: pick(['Tingting', 'Ting-Ting', 'Lilian', 'Reed', 'Flo', 'Eddy'], 'zh_CN'),
-    en: pick(['Samantha', 'Alex', 'Ava', 'Allison', 'Reed', 'Flo', 'Eddy'], 'en_US'),
-    ja: pick(['Kyoko', 'Otoya', 'Eddy', 'Flo'], 'ja_JP'),
-  };
+// The installed espeak-ng voices, read once when the provider is created; `espeak-ng --voices` prints a table whose
+// second column is the voice name.
+export function espeakVoices() {
+  return parseEspeakVoices(spawnSync('espeak-ng', ['--voices'], { encoding: 'utf8' }).stdout || '');
 }
+
+// Parse the output of `say -v '?'`: name, locale, then a sample after `#`. macOS writes the Chinese name of some voices in
+// brackets after the name, so a long name may be separated from the locale by a single space. A region is usually two
+// letters (`zh_TW`) but may be digits (`ar_001`, `es_419`).
+export function parseMacVoices(out) {
+  return out
+    .split('\n')
+    .map((l) => l.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9]{2,4})\s+#/))
+    .filter(Boolean)
+    .map((m) => ({ name: m[1].trim(), locale: m[2] }));
+}
+
+// Parse the output of `espeak-ng --voices`: `Pty Language …`, so the name is the column after the priority.
+export function parseEspeakVoices(out) {
+  return out
+    .split('\n')
+    .map((l) => l.match(/^\s*\d+\s+(\S+)\s/))
+    .filter(Boolean)
+    .map((m) => m[1]);
+}
+
+// Among the voices of one locale, macOS ships an everyday voice for the language, and also novelty voices (Albert,
+// Bells, Zarvox…) that carry en_US and would otherwise win by sorting first.
+const PREFERRED_VOICES = {
+  zh: ['Tingting', 'Ting-Ting', 'Meijia', 'Sinji'],
+  en: ['Samantha', 'Alex', 'Daniel', 'Ava'],
+  ja: ['Kyoko', 'Otoya'],
+};
+
+// Voices macOS shares between many languages. They read the language, but a voice of the language itself is nicer, so
+// they are used only when the language has no voice of its own (Korean would otherwise be read by Eddy, not Yuna).
+const SHARED_VOICES = new Set(['Eddy', 'Flo', 'Grandma', 'Grandpa', 'Reed', 'Rocko', 'Sandy', 'Shelley']);
+
+// The voice to read a language with: the locale of the tag itself, then the region the tag leaves out (`fr` -> fr_FR,
+// which macOS has and fr_CA does not), then the locale its language file names (a Taiwan voice for Traditional Chinese,
+// which has no region in its tag), then any installed voice of the same language. null when the machine has none of
+// them: the line keeps its caption. A machine that listed no voice at all reads with its own default voice.
+export function macVoiceFor(voices, language) {
+  if (!voices.length) return '';
+  const base = baseLanguage(language);
+  const implied = new Intl.Locale(language).maximize();
+  const named = voiceHints(language)?.say;
+  const wanted = [language, implied.region && `${implied.language}-${implied.region}`, named].filter(Boolean).map(localeKey);
+  for (const locale of new Set(wanted)) {
+    const voice = bestVoice(voices.filter((v) => localeKey(v.locale) === locale), base);
+    if (voice) return voice;
+  }
+  return bestVoice(voices.filter((v) => localeKey(v.locale).split('_')[0] === base), base);
+}
+
+// The espeak-ng voice to read a language with: the name its language file gives (espeak-ng lists Mandarin as `cmn`, not
+// `zh`), otherwise the language itself. null when espeak-ng has no voice for the language, so the line keeps its caption.
+export function espeakVoiceFor(voices, language) {
+  const base = baseLanguage(language);
+  const name = voiceHints(language)?.espeak ?? base;
+  // espeak-ng lists English and French as en-us / fr-fr and the like, so a voice is installed when the name, the language
+  // itself or a variant of it is listed. An unreadable list (the command failed) is not taken as "nothing installed".
+  if (!voices.length) return name;
+  const installed = voices.includes(name) || voices.includes(base) || voices.some((v) => v.startsWith(`${base}-`));
+  return installed ? name : null;
+}
+
+const localeKey = (locale) => String(locale).toLowerCase().replace(/-/g, '_');
+
+function bestVoice(candidates, base) {
+  if (!candidates.length) return null;
+  for (const name of PREFERRED_VOICES[base] ?? []) {
+    const hit = candidates.find((v) => stripName(v.name) === name);
+    if (hit) return hit.name;
+  }
+  const own = candidates.filter((v) => !SHARED_VOICES.has(stripName(v.name)));
+  return (own[0] ?? candidates[0]).name;
+}
+
+// A voice name may carry the Chinese translation of its name in brackets, after the name itself.
+const stripName = (name) => name.replace(/\s*[(（].*$/, '');
 
 function run(cmd, args) {
   return new Promise((resolve, reject) => {
@@ -267,9 +346,12 @@ function resample(input) {
   return out;
 }
 
-// Synthesize all narration (with cache and a concurrency limit); returns a list of Int16Array as long as texts.
+// Synthesize all narration (with cache and a concurrency limit); returns a list as long as texts, holding an Int16Array
+// per line, or null for a line whose language the voice has no voice for (the line keeps its caption, and the caller
+// estimates its duration).
 // languageOf(text) is the language to read a line in; only a voice marked usesLanguage (the system voices) gets it, and for it the
-// language is part of the cache key. The cache of the other voices (ElevenLabs, a local server) does not change with the language.
+// language and the chosen voice are part of the cache key. The cache of the other voices (ElevenLabs, a local server) does not
+// change with the language.
 export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
   if (cacheDir) mkdirSync(cacheDir, { recursive: true });
   const results = new Array(texts.length);
@@ -278,13 +360,24 @@ export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
     while (next < texts.length) {
       const i = next++;
       const language = provider.usesLanguage ? languageOf?.(texts[i]) : undefined;
-      const file = cacheDir && join(cacheDir, `${createHash('sha1').update(`${provider.id}${language ? `\n${language}` : ''}\n${texts[i]}`).digest('hex')}.pcm`);
+      // A voice picked by language (a system voice) answers null for a language it has no voice for: the line stays silent
+      // rather than being read by a voice for another language. '' means the voice's own default (a machine that listed no
+      // voice at all), and no language at all leaves the default too.
+      const voice = language && provider.voiceFor ? provider.voiceFor(language) : undefined;
+      if (language && provider.voiceFor && voice === null) {
+        results[i] = null;
+        continue;
+      }
+      // The key holds the voice that was actually chosen, so picking or installing another voice for a language does not
+      // reuse the clips the old one produced.
+      const key = `${provider.id}${voice ? `:${voice}` : ''}${language ? `\n${language}` : ''}\n${texts[i]}`;
+      const file = cacheDir && join(cacheDir, `${createHash('sha1').update(key).digest('hex')}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
         continue;
       }
-      results[i] = trimSilence(await provider.synth(texts[i], { language }));
+      results[i] = trimSilence(await provider.synth(texts[i], { language, voice }));
       if (file) writeCache(file, results[i]);
     }
   };
@@ -322,6 +415,7 @@ export function mixTrack(clips, starts, duration) {
   const total = Math.ceil(duration * SAMPLE_RATE);
   const track = new Int16Array(total);
   clips.forEach((clip, i) => {
+    if (!clip) return;
     const s0 = Math.round(starts[i] * SAMPLE_RATE);
     for (let j = 0; j < clip.length && s0 + j < total; j++) track[s0 + j] = clip[j];
   });

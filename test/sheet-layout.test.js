@@ -63,7 +63,7 @@ test('base.css: at 760px or less, table cells have a minimum width and diagrams 
   const { BASE_CSS } = await import('../src/assets.js');
   const narrow = BASE_CSS.slice(BASE_CSS.indexOf('@media (max-width: 760px)'));
   const block = narrow.slice(0, narrow.indexOf('\n}') + 2);
-  assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*6em/);
+  assert.match(block, /\.am-md th,\s*\.am-md td\s*\{[^}]*min-width:\s*8em/);
   assert.match(block, /\.am-diagram svg\s*\{[^}]*max-width:\s*none/);
 });
 
@@ -92,4 +92,40 @@ test('sheet: spans added by the server (row filling, wide tables) are not render
 test('sheet: an author span larger than cols is rendered clamped to cols', () => {
   const html = renderDoc('---\ncols: 3\n---\n## A 宽 {span=5}\n文字').html;
   assert.match(panelTag(html, 'A'), /data-span="3"/);
+});
+
+// Narrow tables: the sheet layout gives a table panel the width its columns read well at and keeps each column at its share; a phone
+// keeps cells about two words wide and scrolls; print on paper narrower than three columns puts one panel per row, so no hole is left
+// beside a full-width panel. The browser behaviour itself is checked in test/layout-browser.test.js (AM_E2E=1).
+test('sheet: table panels get readable column widths, phones keep cells two words wide, narrow print uses one column', () => {
+  const { html } = renderDoc(`---\ncols: 3\nlang: en\n---\n## A Runs\n${table(4)}\n\n## B Note\nText.\n`);
+  assert.match(html, /function comfortableWidth\(table\)/);
+  assert.match(html, /function fitTables\(\)/);
+  assert.match(html, /capDiagrams\(plan\.maxScale\);\s*fitTables\(\);/);
+  assert.match(html, /@media print and \(max-width: 1100px\) \{\s*\.am-grid \{ grid-template-columns: minmax\(0, 1fr\); \}\s*\.am-grid > \.am-panel \{ grid-column: auto !important; \}/);
+});
+
+// A horizontal timeline lays its items side by side: at one column the labels wrap into each other, so the panel claims about three
+// items per column. A vertical timeline already reads in one column.
+const timeline = (rows) => `\`\`\`timeline\n${rows.join('\n')}\n\`\`\``;
+const H5 = timeline(['17:46 | 触发 | #157', '17:47 | 编排 | clingenv', '17:48 | 初始化 | cling_setup', '17:48 | 报错 | 内核不匹配', '18:04 | 清场 | 锁与容器']);
+
+test('sheet: a horizontal timeline with five items takes 2 columns', () => {
+  assert.equal(spanOf(render('cols: 3', `## A 时间线\n${H5}`), 'A'), 2);
+});
+
+test('sheet: a horizontal timeline with three items keeps 1 column', () => {
+  assert.equal(spanOf(render('cols: 3', `## A 时间线\n${timeline(['1 | 一', '2 | 二', '3 | 三'])}`), 'A'), 1);
+});
+
+test('sheet: a vertical timeline keeps 1 column', () => {
+  const rows = Array.from({ length: 7 }, (_, i) => `${i + 1} | 第${i + 1}步`);
+  assert.equal(spanOf(render('cols: 3', `## A 时间线\n${timeline(rows)}`), 'A'), 1);
+});
+
+// The runtime floor that keeps the items apart when the script runs; the page inlines the layout script, so the rendered page shows it.
+test('sheet: the layout script claims TIMELINE_ITEM_MIN per horizontal timeline item', () => {
+  const { html } = renderDoc(`---\ncols: 3\n---\n## A 时间线\n${H5}\n\n## B 一\n文字\n`);
+  assert.match(html, /const TIMELINE_ITEM_MIN = \d+/);
+  assert.match(html, /querySelectorAll\('\.am-timeline--h'\)/);
 });

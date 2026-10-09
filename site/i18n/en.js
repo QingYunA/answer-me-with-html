@@ -87,7 +87,6 @@ const ui = {
 export default {
   meta_title: 'Answer me with HTML — ask a hard question, get a page',
   meta_desc: 'An agent skill for Claude Code, Codex, Cursor and more. The model writes a short Markdown draft; a bundled CLI turns it into one offline HTML page with diagrams. About 1/8 of the tokens.',
-  canonical: 'https://qingyuna.github.io/answer-me-with-html/',
   og_locale: 'en_US',
   og_image: 'text-vs-page.png',
   og_image_alt: 'The same TCP question answered as a wall of terminal text and as one readable page with diagrams',

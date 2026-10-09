@@ -29,7 +29,13 @@
   // page the same way (the fixed-position chain and the html/body height rules break). Computed styles are exact and
   // cost about 300 ms for the whole stage, so unchanged nodes keep their string from the previous frame: the player
   // changes only a handful of nodes per frame (14 of 261 measured on a five-scene video).
+  // A pseudo-element is not a node, so the clone cannot carry it and the SVG has no stylesheet that could draw it: the
+  // tree and timeline connectors, the annotation brackets and the drawing sheet's inner frame are all ::before / ::after
+  // boxes, and without them the exported picture differs from the player. The computed style of each one is read from
+  // the live element and put on a real span that opens (::before) or closes (::after) the clone's children. The spans
+  // are cached with the element's own entry, so an unchanged frame only re-clones them.
   const styles = new Map();
+  const PSEUDOS = ['::before', '::after'];
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -41,11 +47,43 @@
   // applies to the live stage (translate + scale) is dropped, so the frame does not depend on the window size.
   const PIN = `;position:absolute;left:0;top:0;width:${W}px;height:${H}px;transform:none;`;
 
-  function styleOf(el) {
-    const cs = getComputedStyle(el);
+  function styleOf(cs) {
     let out = '';
-    for (let i = 0; i < cs.length; i++) out += `${cs[i]}:${cs.getPropertyValue(cs[i])};`;
+    for (let i = 0; i < cs.length; i++) {
+      const name = cs[i];
+      if (name === 'content') continue;   // generated content belongs to the stand-in span's text, not to its style
+      out += `${name}:${cs.getPropertyValue(name)};`;
+    }
     return out;
+  }
+
+  // What the cache entry of one node is keyed on: every attribute decides the node's computed style and what its
+  // pseudo-elements print (a code line number reads attr(data-n)), and a change anywhere above a node changes it too.
+  function signature(el) {
+    let out = '';
+    for (const attr of el.attributes) out += `${attr.name}=${attr.value}\u0001`;
+    return out;
+  }
+
+  // The text a pseudo-element prints: a CSS string such as "" or "→ ", or attr(name) as the browser substitutes it.
+  function pseudoText(src, content) {
+    let text = '';
+    for (const part of content.matchAll(/"((?:[^"\\]|\\.)*)"|attr\(\s*([-\w]+)\s*\)/g)) {
+      if (part[2] !== undefined) text += src.getAttribute(part[2]) ?? '';
+      else text += part[1].replace(/\\([0-9a-fA-F]{1,6})\s?|\\(.)/g, (_, hex, ch) => (hex ? String.fromCodePoint(parseInt(hex, 16)) : ch));
+    }
+    return text;
+  }
+
+  // The span that stands in for one pseudo-element, or null when the browser generates no box for it.
+  function pseudoSpan(src, pseudo) {
+    const cs = getComputedStyle(src, pseudo);
+    const content = cs.getPropertyValue('content');
+    if (!content || content === 'none' || content === 'normal' || cs.display === 'none') return null;
+    const span = document.createElement('span');
+    span.setAttribute('style', styleOf(cs));
+    span.textContent = pseudoText(src, content);
+    return span;
   }
 
   function stageSvg(stage) {
@@ -58,17 +96,22 @@
     const stamp = `${window.innerWidth}x${window.innerHeight}`;
     let recomputed = 0;
     const walk = (src, dst, parentSign) => {
-      const sign = `${parentSign}\u0001${src.getAttribute('class') || ''}\u0001${src.getAttribute('style') || ''}${animated.has(src) ? '\u0001a' : ''}`;
+      const sign = `${parentSign}\u0001${signature(src)}${animated.has(src) ? '\u0001a' : ''}`;
       let entry = styles.get(src);
       if (!entry || entry.sign !== sign) {
-        entry = { sign, text: styleOf(src) + (src === stage ? PIN : '') };
+        entry = { sign, text: styleOf(getComputedStyle(src)) + (src === stage ? PIN : ''), pseudo: PSEUDOS.map((pseudo) => pseudoSpan(src, pseudo)) };
         styles.set(src, entry);
         recomputed++;
       }
       dst.setAttribute('style', entry.text);
+      const before = entry.pseudo[0] && entry.pseudo[0].cloneNode(true);
+      const after = entry.pseudo[1] && entry.pseudo[1].cloneNode(true);
+      if (before) dst.insertBefore(before, dst.firstChild);
+      if (after) dst.appendChild(after);
       const a = src.children;
       const b = dst.children;
-      for (let i = 0; i < a.length; i++) walk(a[i], b[i], sign);
+      const shift = before ? 1 : 0;
+      for (let i = 0; i < a.length; i++) walk(a[i], b[i + shift], sign);
     };
     walk(stage, clone, stamp);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><foreignObject x="0" y="0" width="${W}" height="${H}">${new XMLSerializer().serializeToString(clone)}</foreignObject></svg>`;

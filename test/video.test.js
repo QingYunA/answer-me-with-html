@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
 import { renderVideo, captionHtml, formatClock } from '../src/video/render.js';
-import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, pickMacVoices, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
+import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, parseMacVoices, macVoiceFor, parseEspeakVoices, espeakVoiceFor, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
 import { findChrome } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
@@ -331,24 +331,105 @@ test('local voice: keeps the HTTP status code when reading fails after the respo
   });
 });
 
-test('pickMacVoices: recognizes long names separated by one space, prefers Tingting / Samantha', () => {
-  const out = [
-    'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',
-    'Tingting (中文（中国大陆）) zh_CN    # 你好！我叫婷婷。',
-    'Albert              en_US    # Hello! My name is Albert.',
-    'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
-  ].join('\n');
-  assert.deepEqual(pickMacVoices(out), { zh: 'Tingting (中文（中国大陆）)', en: 'Samantha (英语（美国）)', ja: undefined });
-  assert.deepEqual(pickMacVoices('Reed (中文（中国大陆）)  zh_CN  # x'), { zh: 'Reed (中文（中国大陆）)', en: undefined, ja: undefined });
+// The voices a machine may have installed, as `say -v '?'` lists them: name, locale, then a sample. Eddy carries every
+// locale of the shared voices; Majed shows a region of digits.
+const MAC_VOICES = parseMacVoices([
+  'Albert              en_US    # Hello! My name is Albert.',
+  'Amelie              fr_CA    # Bonjour! Je m’appelle Amélie.',
+  'Eddy (韩语（韩国）)      ko_KR    # 안녕하세요! 제 이름은 Eddy입니다.',
+  'Majed               ar_001   # مرحبًا! اسمي ماجد.',
+  'Meijia              zh_TW    # 你好！我叫美佳。',
+  'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',
+  'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
+  'Sinji               zh_HK    # 你好！我叫Sinji。',
+  'Thomas              fr_FR    # Bonjour! Je m’appelle Thomas.',
+  'Tingting (中文（中国大陆）) zh_CN    # 你好！我叫婷婷。',
+  'Yuna                ko_KR    # 안녕하세요! 제 이름은 Yuna입니다.',
+].join('\n'));
+
+test('parseMacVoices: reads each voice with its locale, including long names separated by one space', () => {
+  assert.equal(MAC_VOICES.length, 11);
+  assert.deepEqual(MAC_VOICES[0], { name: 'Albert', locale: 'en_US' });
+  assert.deepEqual(MAC_VOICES.at(-1), { name: 'Yuna', locale: 'ko_KR' });
+  assert.equal(MAC_VOICES.find((v) => v.locale === 'zh_CN').name, 'Reed (中文（中国大陆）)');
+  assert.equal(MAC_VOICES.find((v) => v.locale === 'ar_001').name, 'Majed', 'a region of digits is a locale too');
 });
 
-test('pickMacVoices: prefers Kyoko for Japanese', () => {
-  const out = [
+test('macVoiceFor: the voice of the line language, the region it implies, the language hint, or none at all', () => {
+  // A language with a hint: Chinese and Traditional Chinese use the locale the language file names.
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh'), 'Tingting (中文（中国大陆）)');
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh-Hant'), 'Meijia', 'Traditional Chinese takes the Taiwan voice');
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh-HK'), 'Sinji', 'the locale of the tag itself wins over the hint');
+  // A language without a hint: the region the tag leaves out first, then any installed voice of the language.
+  assert.equal(macVoiceFor(MAC_VOICES, 'fr'), 'Thomas', 'fr implies fr_FR, not the fr_CA voice');
+  assert.equal(macVoiceFor(MAC_VOICES, 'fr-FR'), 'Thomas', 'the exact locale wins, Amelie is fr_CA');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ar'), 'Majed');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ko'), 'Yuna', 'a shared voice (Eddy) is not preferred over the native one');
+  // The everyday voice beats a novelty voice that also carries en_US and sorts first.
+  assert.equal(macVoiceFor(MAC_VOICES, 'en'), 'Samantha (英语（美国）)');
+  // A language the machine has no voice for stays silent, rather than being read by another language.
+  assert.equal(macVoiceFor(MAC_VOICES, 'de'), null);
+  assert.equal(macVoiceFor(MAC_VOICES, 'th'), null);
+  assert.equal(macVoiceFor([{ name: 'Eddy (中文（中国大陆）)', locale: 'zh_CN' }], 'zh'), 'Eddy (中文（中国大陆）)', 'with no preferred voice installed, the first of the locale is used');
+  assert.equal(macVoiceFor([], 'de'), '', 'a machine that listed no voice at all keeps its default voice');
+});
+
+// The espeak-ng voices, as `espeak-ng --voices` lists them: a priority, the voice name, then the language. English and
+// French are listed by variant (en-us, fr-fr), as the real output does.
+const ESPEAK_VOICES = parseEspeakVoices([
+  'Pty Language       Age/Gender VoiceName          File                 Other Languages',
+  ' 5  cmn             --/M      Mandarin_(China)   zh                    ',
+  ' 2  en-us           --/M      English_(America)  gmw/en-US            (en 3)',
+  ' 5  fr-fr           --/M      French_(France)    roa/fr               (fr 5)',
+  ' 5  ja              --/M      Japanese           ja                    ',
+  ' 5  ko              --/M      Korean             ko                    ',
+  ' 5  my              --/M      Myanmar            my                    ',
+].join('\n'));
+
+test('espeak voices: the name from the language file, the language itself otherwise, none when not installed', () => {
+  assert.deepEqual(ESPEAK_VOICES, ['cmn', 'en-us', 'fr-fr', 'ja', 'ko', 'my']);
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'zh'), 'cmn', 'espeak-ng lists Mandarin, not zh');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'zh-Hant'), 'cmn');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'en'), 'en-us');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'ko'), 'ko');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'fr'), 'fr', 'a language listed by variant is installed');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'th'), null, 'a language with no installed voice keeps its caption');
+  assert.equal(espeakVoiceFor([], 'th'), 'th', 'an unreadable voice list is not taken as "nothing installed"');
+});
+
+test('synthAll: a line the voice has no voice for stays silent, and the cache follows the voice chosen', async () => {
+  const cacheDir = join(dir, 'voice-choice');
+  const calls = [];
+  const provider = (voiceFor) => ({
+    name: 'fake',
+    id: 'fake',
+    usesLanguage: true,
+    concurrency: 1,
+    voiceFor,
+    async synth(text, { voice } = {}) {
+      calls.push(`${voice}:${text}`);
+      return Int16Array.from({ length: 100 }, () => 1000);
+    },
+  });
+  const texts = ['这句话用中文念。', 'この行は日本語です。', '이 줄은 한국어입니다.'];
+  const picked = ['zh', 'ja', 'ko'];
+  const first = await synthAll(texts, provider((language) => (language === 'ko' ? null : language)), { cacheDir, languageOf: (t) => picked[texts.indexOf(t)] });
+  assert.deepEqual(first.slice(0, 2).map((c) => c.length), [100, 100]);
+  assert.equal(first[2], null, 'the Korean line has no voice on this machine');
+  assert.deepEqual(calls, ['zh:这句话用中文念。', 'ja:この行は日本語です。']);
+  await synthAll(texts, provider((language) => (language === 'ko' ? null : language)), { cacheDir, languageOf: (t) => picked[texts.indexOf(t)] });
+  assert.equal(calls.length, 2, 'the second run is served from the cache');
+  await synthAll([texts[0]], provider(() => 'other'), { cacheDir, languageOf: () => 'zh' });
+  assert.equal(calls.length, 3, 'another voice for the same language does not reuse the cache');
+});
+
+test('macVoiceFor: prefers Kyoko for Japanese, and any voice of the locale when it is not installed', () => {
+  const voices = parseMacVoices([
     'Eddy (日本語（日本）)      ja_JP    # こんにちは! 私の名前はEddyです。',
     'Kyoko               ja_JP    # こんにちは! 私の名前はKyokoです。',
-  ].join('\n');
-  assert.equal(pickMacVoices(out).ja, 'Kyoko');
-  assert.equal(pickMacVoices(out.split('\n')[0]).ja, 'Eddy (日本語（日本）)');
+  ].join('\n'));
+  assert.equal(macVoiceFor(voices, 'ja'), 'Kyoko');
+  assert.equal(macVoiceFor([voices[0]], 'ja'), 'Eddy (日本語（日本）)');
 });
 
 // ── Render ──
