@@ -38,7 +38,7 @@ Usage:
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
-  am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
+  am lint   <file|->  [--style off|80|strict]     check a draft (structure, components, STE) without writing a page
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
@@ -240,7 +240,7 @@ export async function main(argv, io = {}) {
     case 'render': return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
     case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
-    case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
+    case 'lint': return withSource(arg, io, fail, (src, baseDir) => cmdLint(src, opts, ctx, baseDir));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
     case 'clean': return cmdClean(opts, { print, fail, env });
@@ -552,9 +552,9 @@ function emit(result, file, { print }, note = '') {
 }
 
 // What a component noticed in its own block (a group box that would be empty after a change). The page is still written.
-function printComponentWarnings(notes = [], print) {
+function printComponentWarnings(notes = [], print, wrote = 'the page is written') {
   if (!notes.length) return;
-  print(`  diagram ${count(notes.length, 'warning')} (the page is written; fix the draft if that is not what you meant):`);
+  print(`  diagram ${count(notes.length, 'warning')} (${wrote}; fix the draft if that is not what you meant):`);
   notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
@@ -619,7 +619,10 @@ function cmdClean(opts, { print, fail, env }) {
   return 0;
 }
 
-function cmdLint(src, opts, { print, fail }) {
+function cmdLint(src, opts, ctx, baseDir) {
+  const { print, fail } = ctx;
+  const config = loadConfig(ctx);
+  const { theme, mode } = config.values;
   let doc;
   try {
     doc = parseDoc(src);
@@ -630,6 +633,17 @@ function cmdLint(src, opts, { print, fail }) {
   if (!CHOICES.style.includes(style)) {
     fail(`✗ Invalid style value "${style}". Choose one of: ${CHOICES.style.join(' | ')}`);
     return 2;
+  }
+  // The source checks of every component and of the picture files run only in the render. Check the draft the same way, without writing
+  // a page, so a draft that passes am lint is one am render accepts (style: off here; the STE check below reports the writing rules).
+  if (doc.meta.template !== 'video') {
+    let result;
+    try {
+      result = renderDoc(src, { theme: opts.theme, template: opts.template, style: 'off', mode: opts.mode }, { theme, mode, style: 'off' }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
+    } catch (e) {
+      return reportError(e, fail);
+    }
+    printComponentWarnings(result.stats.componentWarnings, print, 'a page would be written');
   }
   // The language decides the rule family, exactly as it does in render and video: a draft whose language has no rules of
   // its own must be measured with the language-neutral ones, and must not get the Chinese or English rules.

@@ -8486,7 +8486,7 @@ Usage:
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
-  am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
+  am lint   <file|->  [--style off|80|strict]     check a draft (structure, components, STE) without writing a page
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
@@ -8685,7 +8685,7 @@ ${USAGE}`);
     case "video":
       return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case "lint":
-      return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
+      return withSource(arg, io, fail, (src, baseDir) => cmdLint(src, opts, ctx, baseDir));
     case "config":
       return cmdConfig([arg, ...rest].filter((x2) => x2 !== void 0), ctx);
     case "theme":
@@ -8969,9 +8969,9 @@ function emit(result, file, { print }, note2 = "") {
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
 }
-function printComponentWarnings(notes = [], print) {
+function printComponentWarnings(notes = [], print, wrote = "the page is written") {
   if (!notes.length) return;
-  print(`  diagram ${count(notes.length, "warning")} (the page is written; fix the draft if that is not what you meant):`);
+  print(`  diagram ${count(notes.length, "warning")} (${wrote}; fix the draft if that is not what you meant):`);
   notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
@@ -9026,7 +9026,10 @@ function cmdClean(opts, { print, fail, env }) {
   print(dry ? `Would delete ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.` : `\u2713 Deleted ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
   return 0;
 }
-function cmdLint(src, opts, { print, fail }) {
+function cmdLint(src, opts, ctx, baseDir) {
+  const { print, fail } = ctx;
+  const config = loadConfig(ctx);
+  const { theme, mode } = config.values;
   let doc2;
   try {
     doc2 = parseDoc(src);
@@ -9037,6 +9040,15 @@ function cmdLint(src, opts, { print, fail }) {
   if (!CHOICES.style.includes(style)) {
     fail(`\u2717 Invalid style value "${style}". Choose one of: ${CHOICES.style.join(" | ")}`);
     return 2;
+  }
+  if (doc2.meta.template !== "video") {
+    let result;
+    try {
+      result = renderDoc(src, { theme: opts.theme, template: opts.template, style: "off", mode: opts.mode }, { theme, mode, style: "off" }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
+    } catch (e) {
+      return reportError(e, fail);
+    }
+    printComponentWarnings(result.stats.componentWarnings, print, "a page would be written");
   }
   const language = resolveLanguage({ declared: doc2.meta.lang, text: src });
   const warnings = style === "off" ? [] : lintDoc(doc2, language);
