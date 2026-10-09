@@ -5773,6 +5773,7 @@ var MIN_WIDTH = 92;
 var LOOP_OUT = 34;
 var LOOP_STEP = 20;
 var LOOP_END = 18;
+var LOOP_LABEL = 24;
 var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
 var CARDS = ["1\\.\\.\\*", "0\\.\\.1", "\\*", "1"];
 var MARKERS = /* @__PURE__ */ new Set(["PK", "FK", "UK"]);
@@ -5796,7 +5797,7 @@ User 1--* Order: places       \u2190 A <cardinality>--<cardinality> B: label (op
 - The type is optional: \`email UK\` is a field with a key but no type.
 - A Mermaid line such as USER ||--o{ ORDER is an error that shows the line written for this component.
 - An entity a field or a relationship names must be written at column 0.
-- A field that points at its own entity draws a loop.
+- A field that points at its own entity draws a loop: beside the box, or below it in LR and RL.
 - The default direction is TB (top to bottom).`,
   example: "```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```",
   render(text, { args, ui, dir: pageDir = "ltr" }) {
@@ -5925,16 +5926,16 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
     return nodeSvgOf(entity, x2, y2, size, stepOf.get(entity.line), pageDir);
   });
   const s = rtl ? -1 : 1;
+  const below = rankdir === "LR" || rankdir === "RL";
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((rel) => {
-    const nth = seen.get(rel.from) ?? 0;
-    seen.set(rel.from, nth + 1);
+    const { nth, depth } = seen.get(rel.from) ?? { nth: 0, depth: 0 };
+    seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
     const { x: x2, y: y2 } = g.node(key.get(rel.from));
     const size = sizes.get(rel.from);
-    const edge = x2 + s * size.width / 2;
-    return { rel, y: y2, edge, out: edge + s * LOOP_OUT + s * nth * LOOP_STEP };
+    return below ? loopBelow(rel, x2, y2, size, depth, s) : loopBeside(rel, x2, y2, size, nth, s);
   });
-  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, s, stepOf.get(spec.rel.line), pageDir));
+  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line), pageDir));
   const xs = [];
   const ys = [];
   const at3 = (x2, y2) => {
@@ -5957,10 +5958,7 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
       at3(data.x + w / 2, data.y + 9);
     }
   });
-  for (const { rel, y: y2, out } of loopSpecs) {
-    at3(out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), y2 + LOOP_END / 2);
-    at3(out, y2 - LOOP_END / 2);
-  }
+  for (const { corners } of loopSpecs) corners.forEach(([x2, y2]) => at3(x2, y2));
   const margin = 14;
   const shiftX = margin - Math.min(...xs);
   const shiftY = margin - Math.min(...ys);
@@ -5983,12 +5981,41 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   }).join("");
   return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
 }
-function loopSvg({ rel, y: y2, edge, out }, s, step, pageDir) {
+function loopBeside(rel, x2, y2, size, nth, s) {
+  const edge = x2 + s * size.width / 2;
+  const out = edge + s * LOOP_OUT + s * nth * LOOP_STEP;
   const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
-  const path = `<path class="am-edge" d="M${f(edge)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(edge)},${f(by)}"/>`;
-  const ends = `${endMark({ x: edge, y: ay }, { x: edge + s, y: ay }, rel.fromCard)}${endMark({ x: edge, y: by }, { x: edge + s, y: by }, rel.toCard)}`;
-  const label = rel.label ? labelSvg(rel.label, out + s * 6 + s * labelWidth(rel.label) / 2, y2, pageDir) : "";
-  return `<g data-step="${step}">${path}${ends}${label}</g>`;
+  const label = rel.label ? { x: out + s * 6 + s * labelWidth(rel.label) / 2, y: y2 } : null;
+  return {
+    rel,
+    a: { x: edge, y: ay },
+    b: { x: edge, y: by },
+    c: [{ x: out, y: ay }, { x: out, y: by }],
+    away: { x: s, y: 0 },
+    label,
+    corners: [[out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), by], [out, ay]]
+  };
+}
+function loopBelow(rel, x2, y2, size, depth, s) {
+  const bottom = y2 + size.height / 2;
+  const out = bottom + LOOP_OUT + depth;
+  const [ax, bx] = [x2 - s * LOOP_END / 2, x2 + s * LOOP_END / 2];
+  const half = Math.max(LOOP_END / 2, rel.label ? labelWidth(rel.label) / 2 : 0);
+  return {
+    rel,
+    a: { x: ax, y: bottom },
+    b: { x: bx, y: bottom },
+    c: [{ x: ax, y: out }, { x: bx, y: out }],
+    away: { x: 0, y: 1 },
+    label: rel.label ? { x: x2, y: out + 6 + 9 } : null,
+    corners: [[x2 - half, bottom], [x2 + half, out + (rel.label ? 6 + 18 : 0)]]
+  };
+}
+function loopSvg({ rel, a, b, c, away, label }, step, pageDir) {
+  const path = `<path class="am-edge" d="M${f(a.x)},${f(a.y)} C${f(c[0].x)},${f(c[0].y)} ${f(c[1].x)},${f(c[1].y)} ${f(b.x)},${f(b.y)}"/>`;
+  const ends = `${endMark(a, { x: a.x + away.x, y: a.y + away.y }, rel.fromCard)}${endMark(b, { x: b.x + away.x, y: b.y + away.y }, rel.toCard)}`;
+  const text = label ? labelSvg(rel.label, label.x, label.y, pageDir) : "";
+  return `<g data-step="${step}">${path}${ends}${text}</g>`;
 }
 function labelWidth(text) {
   return measure(text, EDGE_FS2) + 10;

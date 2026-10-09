@@ -20,6 +20,7 @@ const MIN_WIDTH = 92;
 const LOOP_OUT = 34; // how far a self-reference loops out of the box
 const LOOP_STEP = 20; // and how much farther each further self-reference of the same entity goes
 const LOOP_END = 18; // how far apart its two ends sit on the edge
+const LOOP_LABEL = 24; // the room a loop's label takes below the loop, which the next loop of the same entity leaves free
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
 // Cardinalities. `*` is many, `0..1` is zero or one, `1..*` is one or more; the end mark is drawn from the word.
 const CARDS = ['1\\.\\.\\*', '0\\.\\.1', '\\*', '1'];
@@ -46,7 +47,7 @@ User 1--* Order: places       ← A <cardinality>--<cardinality> B: label (optio
 - The type is optional: \`email UK\` is a field with a key but no type.
 - A Mermaid line such as USER ||--o{ ORDER is an error that shows the line written for this component.
 - An entity a field or a relationship names must be written at column 0.
-- A field that points at its own entity draws a loop.
+- A field that points at its own entity draws a loop: beside the box, or below it in LR and RL.
 - The default direction is TB (top to bottom).`,
   example: '```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```',
   render(text, { args, ui, dir: pageDir = 'ltr' }) {
@@ -197,19 +198,21 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
     return nodeSvgOf(entity, x, y, size, stepOf.get(entity.line), pageDir);
   });
 
-  // A loop lies outside the box on its right (its left on a right-to-left page, where s is -1). Two self-references of one
-  // entity take their own distance, so both stay visible, and the drawing has to be wide enough for the farthest one and its label.
+  // A loop lies outside the box on its right (its left on a right-to-left page, where s is -1). With the ranks running
+  // sideways (LR, RL) the edges to the neighbouring ranks leave by that side, so the loop lies below the box instead. Two
+  // self-references of one entity take their own distance, so both stay visible, and the drawing has to be wide enough
+  // (or tall enough) for the farthest one and its label.
   const s = rtl ? -1 : 1;
+  const below = rankdir === 'LR' || rankdir === 'RL';
   const seen = new Map();
   const loopSpecs = loops.map((rel) => {
-    const nth = seen.get(rel.from) ?? 0;
-    seen.set(rel.from, nth + 1);
+    const { nth, depth } = seen.get(rel.from) ?? { nth: 0, depth: 0 };
+    seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
     const { x, y } = g.node(key.get(rel.from));
     const size = sizes.get(rel.from);
-    const edge = x + (s * size.width) / 2;
-    return { rel, y, edge, out: edge + s * LOOP_OUT + s * nth * LOOP_STEP };
+    return below ? loopBelow(rel, x, y, size, depth, s) : loopBeside(rel, x, y, size, nth, s);
   });
-  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, s, stepOf.get(spec.rel.line), pageDir));
+  const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line), pageDir));
 
   // The drawing is as big as everything drawn on it: dagre sizes the ranks, but a parallel edge bulges past them and a
   // loop sits outside its box, so the extent of every point decides. A shift keeps the origin at 0.
@@ -236,10 +239,7 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
       at(data.x + w / 2, data.y + 9);
     }
   });
-  for (const { rel, y, out } of loopSpecs) {
-    at(out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), y + LOOP_END / 2);
-    at(out, y - LOOP_END / 2);
-  }
+  for (const { corners } of loopSpecs) corners.forEach(([x, y]) => at(x, y));
   const margin = 14;
   const shiftX = margin - Math.min(...xs);
   const shiftY = margin - Math.min(...ys);
@@ -269,15 +269,49 @@ function nodeSvgOf(entity, x, y, size, step, pageDir) {
   return `<g class="am-node am-node--er${entity.hi ? ' am-node--hi' : ''}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields}</g>`;
 }
 
-// A self-reference: out of the right edge (the left one on a right-to-left page), around, and back into it, with the two
-// ends on that edge. `toward` lies outside the box, as it does for an edge between two boxes, so the end marks are drawn
-// outside the border too.
-function loopSvg({ rel, y, edge, out }, s, step, pageDir) {
+// A self-reference beside its box: out of the right edge (the left one on a right-to-left page), around, and back into it,
+// with the two ends on that edge. Each end mark's `away` point lies outside the box, as it does for an edge between two
+// boxes, so the end marks are drawn outside the border too. The label sits beyond the loop.
+function loopBeside(rel, x, y, size, nth, s) {
+  const edge = x + (s * size.width) / 2;
+  const out = edge + s * LOOP_OUT + s * nth * LOOP_STEP;
   const [ay, by] = [y - LOOP_END / 2, y + LOOP_END / 2];
-  const path = `<path class="am-edge" d="M${f(edge)},${f(ay)} C${f(out)},${f(ay)} ${f(out)},${f(by)} ${f(edge)},${f(by)}"/>`;
-  const ends = `${endMark({ x: edge, y: ay }, { x: edge + s, y: ay }, rel.fromCard)}${endMark({ x: edge, y: by }, { x: edge + s, y: by }, rel.toCard)}`;
-  const label = rel.label ? labelSvg(rel.label, out + s * 6 + (s * labelWidth(rel.label)) / 2, y, pageDir) : '';
-  return `<g data-step="${step}">${path}${ends}${label}</g>`;
+  const label = rel.label ? { x: out + s * 6 + (s * labelWidth(rel.label)) / 2, y } : null;
+  return {
+    rel,
+    a: { x: edge, y: ay },
+    b: { x: edge, y: by },
+    c: [{ x: out, y: ay }, { x: out, y: by }],
+    away: { x: s, y: 0 },
+    label,
+    corners: [[out + s * 6 + s * (rel.label ? labelWidth(rel.label) : 0), by], [out, ay]],
+  };
+}
+
+// A self-reference below its box, for the layouts whose ranks run sideways: out of the bottom edge, down, and back up into
+// it, bulging `depth` farther than the first loop. The first end sits on the side where reading starts, and the label is
+// centred under the loop.
+function loopBelow(rel, x, y, size, depth, s) {
+  const bottom = y + size.height / 2;
+  const out = bottom + LOOP_OUT + depth;
+  const [ax, bx] = [x - (s * LOOP_END) / 2, x + (s * LOOP_END) / 2];
+  const half = Math.max(LOOP_END / 2, rel.label ? labelWidth(rel.label) / 2 : 0);
+  return {
+    rel,
+    a: { x: ax, y: bottom },
+    b: { x: bx, y: bottom },
+    c: [{ x: ax, y: out }, { x: bx, y: out }],
+    away: { x: 0, y: 1 },
+    label: rel.label ? { x, y: out + 6 + 9 } : null,
+    corners: [[x - half, bottom], [x + half, out + (rel.label ? 6 + 18 : 0)]],
+  };
+}
+
+function loopSvg({ rel, a, b, c, away, label }, step, pageDir) {
+  const path = `<path class="am-edge" d="M${f(a.x)},${f(a.y)} C${f(c[0].x)},${f(c[0].y)} ${f(c[1].x)},${f(c[1].y)} ${f(b.x)},${f(b.y)}"/>`;
+  const ends = `${endMark(a, { x: a.x + away.x, y: a.y + away.y }, rel.fromCard)}${endMark(b, { x: b.x + away.x, y: b.y + away.y }, rel.toCard)}`;
+  const text = label ? labelSvg(rel.label, label.x, label.y, pageDir) : '';
+  return `<g data-step="${step}">${path}${ends}${text}</g>`;
 }
 
 function labelWidth(text) {

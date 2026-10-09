@@ -354,3 +354,32 @@ test('er: on a right-to-left page a self-reference loops out of the left side an
   assert.equal(ends.length, 2);
   for (const [, marks] of ends) for (const m of marks.matchAll(/(?:x1|x2|cx)="([\d.-]+)"/g)) assert.ok(Number(m[1]) <= left + 0.01);
 });
+
+test('er: in LR and RL a self-reference loops below its box, clear of the edge to the next entity and its label', () => {
+  const body = '*Employee\n  id PK\n  manager_id FK -> Employee\n  mentor_id FK -> Employee\nOrder\n  id PK\n  employee_id FK -> Employee\nEmployee 1--* Order: places\nEmployee 0..1--* Employee: reports to\nEmployee *--1 Employee: mentored by';
+  const num = (list) => list.map(Number);
+  for (const [args, dir] of [['LR', 'ltr'], ['LR', 'rtl'], ['RL', 'ltr']]) {
+    const svg = erDir(body, args, dir);
+    assert.doesNotMatch(svg, /NaN/);
+    const [, sx, sy] = svg.match(/<g transform="translate\(([\d.-]+),([\d.-]+)\)"/) ?? [0, 0, 0];
+    const [w, h] = viewBox(svg);
+    const box = svg.match(/data-key="Employee"[^>]*><rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/).slice(1).map(Number);
+    const bottom = box[1] + box[3];
+    const loops = [...svg.matchAll(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/g)].map((m) => num(m.slice(1)));
+    assert.equal(loops.length, 2, `${args} ${dir}: both self-references are drawn`);
+    for (const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] of loops) {
+      assert.ok([y1, cy1, cy2, y2].every((y) => y >= bottom - 0.01), `${args} ${dir}: the loop lies below the box`);
+      assert.ok(Math.abs(y1 - bottom) < 0.2 && Math.abs(y2 - bottom) < 0.2, 'with both ends on the bottom edge');
+      assert.ok([x1, cx1, cx2, x2].every((x) => x >= box[0] && x <= box[0] + box[2]), 'under the box');
+      assert.ok(cy1 + Number(sy) <= h && x1 + Number(sx) >= 0 && x2 + Number(sx) <= w, 'and inside the viewBox');
+    }
+    assert.ok(loops[1][3] > loops[0][3] + 18, 'the second loop goes farther down, below the first one\'s label');
+    const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => num(m.slice(1)));
+    assert.equal(labels.length, 3);
+    labels.forEach(([x, y, lw, lh]) => assert.ok(y + Number(sy) >= 0 && y + lh + Number(sy) <= h && x + Number(sx) >= 0 && x + lw + Number(sx) <= w, 'a label lies inside the viewBox'));
+    labels.forEach((a, i) => labels.slice(i + 1).forEach((b, j) => {
+      const apart = a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
+      assert.ok(apart, `${args} ${dir}: labels ${i} and ${i + j + 1} do not overlap`);
+    }));
+  }
+});
