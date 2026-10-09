@@ -11,7 +11,11 @@ import { uptime } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { clean } from '../src/housekeeping.js';
-import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError } from '../src/serve.js';
+import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX } from '../src/serve.js';
+
+// Windows has no POSIX file modes (Node reports 0o666) and cannot deliver SIGINT to a child process.
+const isWin = process.platform === 'win32';
+const assertPrivate = (file) => isWin || assert.equal(statSync(file).mode & 0o777, 0o600);
 
 const AM_BIN = fileURLToPath(new URL('../bin/am.js', import.meta.url));
 
@@ -79,7 +83,8 @@ test('serve: a valid link returns the file with all security headers', async () 
     assert.equal(r.status, 200, file);
     assert.equal(r.body, body);
     assert.equal(r.headers['content-type'], 'text/html; charset=utf-8');
-    assert.equal(r.headers['content-security-policy'], "frame-ancestors 'none'");
+    assert.equal(r.headers['content-security-policy'], `frame-ancestors 'none'; ${SANDBOX}`);
+    assert.doesNotMatch(r.headers['content-security-policy'], /allow-same-origin/);
     assert.equal(r.headers['x-frame-options'], 'DENY');
     assert.equal(r.headers['x-content-type-options'], 'nosniff');
     assert.equal(r.headers['referrer-policy'], 'no-referrer');
@@ -150,7 +155,7 @@ test('serve: methods other than GET and HEAD are 405', async () => {
 
 test('serve.json: mode 0600 while running, a second start is refused, removed after close, am clean keeps it', async () => {
   const file = join(home, 'serve.json');
-  assert.equal(statSync(file).mode & 0o777, 0o600);
+  assertPrivate(file);
   const info = JSON.parse(readFileSync(file, 'utf8'));
   assert.equal(info.pid, process.pid);
   assert.equal(info.port, srv.port);
@@ -218,7 +223,7 @@ test('serve.json of a live pid with nothing listening on its port is overwritten
     const fresh = await startServer({ home: dir, port: 0 });
     const info = JSON.parse(readFileSync(join(dir, 'serve.json'), 'utf8'));
     assert.notEqual(info.secret, 'abc');
-    assert.equal(statSync(join(dir, 'serve.json')).mode & 0o777, 0o600);
+    assertPrivate(join(dir, 'serve.json'));
     await fresh.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -231,7 +236,7 @@ test('serve.json: a leftover temp file with a loose mode does not weaken the new
     const tmp = join(dir, `serve.json.${process.pid}.tmp`);
     writeFileSync(tmp, 'old', { mode: 0o644 });
     const fresh = await startServer({ home: dir, port: 0 });
-    assert.equal(statSync(join(dir, 'serve.json')).mode & 0o777, 0o600);
+    assertPrivate(join(dir, 'serve.json'));
     await fresh.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -301,7 +306,7 @@ test('am serve: rejects a bad --port', async () => {
   }
 });
 
-test('am serve: runs in the foreground, writes serve.json and removes it on SIGINT', async () => {
+test('am serve: runs in the foreground, writes serve.json and removes it on SIGINT', { skip: isWin && 'Windows cannot send SIGINT to a child' }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'am-serve-proc-'));
   const child = spawn(process.execPath, [AM_BIN, 'serve', '--port', '0'], { env: { ...process.env, AM_HOME: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '';

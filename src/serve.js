@@ -18,8 +18,13 @@ const PREFIX = Object.freeze({ p: 'pages', v: 'videos' });
 const PREFIX_OF = Object.freeze({ pages: 'p', videos: 'v' });
 // Only loopback names are accepted: an SSH tunnel may map any local port, but a DNS-rebinding page arrives with its own host name.
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
+// All pages share one origin over HTTP, and a page can hold a script (an ```html block). sandbox without allow-same-origin
+// gives every page an opaque origin of its own, so a script can neither fetch another page nor read the localStorage keys
+// that name other pages' links. The page keeps its scripts, its outbound links (popups that leave the sandbox) and the
+// video export download; Reply answers then last until the page closes, as in a private window.
+export const SANDBOX = 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads';
 const HEADERS = Object.freeze({
-  'Content-Security-Policy': "frame-ancestors 'none'",
+  'Content-Security-Policy': `frame-ancestors 'none'; ${SANDBOX}`,
   'X-Frame-Options': 'DENY',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',

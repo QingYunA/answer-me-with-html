@@ -8408,11 +8408,12 @@ import { join as join7, resolve as resolve3, dirname as dirname2, basename as ba
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var TOKEN_LENGTH = 22;
-var PREFIX = Object.freeze({ p: "pages", v: "videos" });
+var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
+var SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads";
 var HEADERS = Object.freeze({
-  "Content-Security-Policy": "frame-ancestors 'none'",
+  "Content-Security-Policy": `frame-ancestors 'none'; ${SANDBOX}`,
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
@@ -8513,7 +8514,7 @@ function handler(home, secret) {
       const parts = req.url.split(/[?#]/)[0].split("/");
       if (parts.length !== 4 || parts[0] !== "") return notFound(req, res);
       const [, prefix, token, raw] = parts;
-      const dir = Object.hasOwn(PREFIX, prefix) ? PREFIX[prefix] : void 0;
+      const dir = Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
       if (!dir || !token || !raw) return notFound(req, res);
       let file;
       try {
