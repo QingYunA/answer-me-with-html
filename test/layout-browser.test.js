@@ -483,7 +483,8 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
   for (const p of pages) {
     await open(p.file, DESKTOP);
     await waitFor(SETTLED, `${p.name} to lay out`);
-    assertJustified(p.name, DESKTOP, await measure(), p.ids);
+    const wide = await measure();
+    assertJustified(p.name, DESKTOP, wide, p.ids);
 
     await page('Emulation.setEmulatedMedia', { media: 'print' });
     await setWidth(A4_PORTRAIT);
@@ -492,7 +493,9 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
 
     await page('Emulation.setEmulatedMedia', { media: '' });
     await setWidth(DESKTOP);
-    await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${p.name} to lay out again after print`);
+    // Not just display: flex: a re-layout still pending from the print width can run once the media is screen again but before the
+    // viewport is back, and leave flex rows planned for the A4 width until the resize lays the page out again.
+    await waitFor(`document.querySelector('.am-grid').clientWidth === ${wide.width} && ${SETTLED}`, `${p.name} to lay out again after print`);
     assertJustified(p.name, DESKTOP, await measure(), p.ids);
   }
 
