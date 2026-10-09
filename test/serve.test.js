@@ -40,9 +40,9 @@ after(async () => {
   rmSync(outside, { recursive: true, force: true });
 });
 
-function get(path, { method = 'GET', host } = {}) {
+function get(path, { method = 'GET', host, headers = {} } = {}) {
   return new Promise((resolve, reject) => {
-    const req = request({ host: '127.0.0.1', port: srv.port, path, method, headers: host === undefined ? {} : { Host: host }, setHost: host === undefined }, (res) => {
+    const req = request({ host: '127.0.0.1', port: srv.port, path, method, headers: host === undefined ? headers : { ...headers, Host: host }, setHost: host === undefined }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
@@ -111,6 +111,16 @@ test('serve: wrong or foreign tokens, other folders and old secrets give a plain
     assert.equal(r.status, 404, path);
     assert.equal(r.headers['content-type'], 'text/plain; charset=utf-8');
     assert.equal(r.headers['cache-control'], 'no-store');
+    assert.doesNotMatch(r.body, /A<\/h1>/);
+  }
+});
+
+test('serve: a page is opened, not fetched: only a document request or one without Sec-Fetch-Dest gets it', async () => {
+  const good = urlOf('pages', 'a.html');
+  assert.equal((await get(good, { headers: { 'Sec-Fetch-Dest': 'document' } })).status, 200);
+  for (const dest of ['empty', 'script', 'iframe', 'serviceworker', 'worker']) {
+    const r = await get(good, { headers: { 'Sec-Fetch-Dest': dest } });
+    assert.equal(r.status, 404, dest);
     assert.doesNotMatch(r.body, /A<\/h1>/);
   }
 });
@@ -203,6 +213,20 @@ test('serve.json from before the boot (a reused pid) is stale: no link, and serv
   try {
     const beforeBoot = Date.now() - uptime() * 1000 - 60_000;
     writeFileSync(join(dir, 'serve.json'), JSON.stringify({ pid: 1, port: srv.port, secret: 'abc', startedAt: beforeBoot }));
+    assert.doesNotMatch(await render({ AM_HOME: dir }), /link:/);
+    const fresh = await startServer({ home: dir, port: 0 });
+    assert.equal(JSON.parse(readFileSync(join(dir, 'serve.json'), 'utf8')).pid, process.pid);
+    await fresh.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('serve.json of a pid that belongs to another user (a reused pid) is stale: no link, and serve starts', { skip: isWin && 'pid 1 is not another user on Windows' }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-eperm-'));
+  try {
+    // pid 1 is init / launchd: alive, but not ours, so process.kill(1, 0) gives EPERM.
+    writeFileSync(join(dir, 'serve.json'), JSON.stringify({ pid: 1, port: srv.port, secret: 'abc', startedAt: Date.now() }));
     assert.doesNotMatch(await render({ AM_HOME: dir }), /link:/);
     const fresh = await startServer({ home: dir, port: 0 });
     assert.equal(JSON.parse(readFileSync(join(dir, 'serve.json'), 'utf8')).pid, process.pid);
@@ -306,25 +330,27 @@ test('am serve: rejects a bad --port', async () => {
   }
 });
 
-test('am serve: runs in the foreground, writes serve.json and removes it on SIGINT', { skip: isWin && 'Windows cannot send SIGINT to a child' }, async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'am-serve-proc-'));
-  const child = spawn(process.execPath, [AM_BIN, 'serve', '--port', '0'], { env: { ...process.env, AM_HOME: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
-  let out = '';
-  const exited = new Promise((resolve) => child.on('exit', (code, signal) => resolve({ code, signal })));
-  try {
-    await new Promise((resolve, reject) => {
-      child.stdout.on('data', (c) => { out += c; if (out.includes('\n')) resolve(); });
-      child.on('error', reject);
-      exited.then(() => reject(new Error(`exited early: ${out}`)));
-    });
-    const port = Number(out.match(/http:\/\/127\.0\.0\.1:(\d+)/)[1]);
-    assert.match(out, /Ctrl-C/);
-    assert.equal(JSON.parse(readFileSync(join(dir, 'serve.json'), 'utf8')).port, port);
-    child.kill('SIGINT');
-    assert.equal((await exited).code, 0);
-    assert.equal(existsSync(join(dir, 'serve.json')), false);
-  } finally {
-    child.kill('SIGKILL');
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  test(`am serve: runs in the foreground, writes serve.json and removes it on ${signal}`, { skip: isWin && 'Windows cannot send signals to a child' }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'am-serve-proc-'));
+    const child = spawn(process.execPath, [AM_BIN, 'serve', '--port', '0'], { env: { ...process.env, AM_HOME: dir }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    const exited = new Promise((resolve) => child.on('exit', (code, sig) => resolve({ code, signal: sig })));
+    try {
+      await new Promise((resolve, reject) => {
+        child.stdout.on('data', (c) => { out += c; if (out.includes('\n')) resolve(); });
+        child.on('error', reject);
+        exited.then(() => reject(new Error(`exited early: ${out}`)));
+      });
+      const port = Number(out.match(/http:\/\/127\.0\.0\.1:(\d+)/)[1]);
+      assert.match(out, /Ctrl-C/);
+      assert.equal(JSON.parse(readFileSync(join(dir, 'serve.json'), 'utf8')).port, port);
+      child.kill(signal);
+      assert.equal((await exited).code, 0);
+      assert.equal(existsSync(join(dir, 'serve.json')), false);
+    } finally {
+      child.kill('SIGKILL');
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}

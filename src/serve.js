@@ -61,13 +61,15 @@ function tokenMatches(secret, dir, file, token) {
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
+// Whether the pid is a live process of this user. EPERM means the pid belongs to another user: the server always runs as
+// the user who renders (serve.json is 0600), so such a pid was reused, and the link would point at someone else's port.
 function alive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e) {
-    return e.code === 'EPERM';
+  } catch {
+    return false;
   }
 }
 
@@ -105,7 +107,8 @@ function writeInfo(home, info) {
   mkdirSync(home, { recursive: true });
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   rmSync(tmp, { force: true }); // the mode applies only to a file that writeFileSync creates
-  writeFileSync(tmp, `${JSON.stringify(info)}\n`, { mode: 0o600 });
+  // wx: fail rather than write through a file or symlink that appeared after the rmSync.
+  writeFileSync(tmp, `${JSON.stringify(info)}\n`, { mode: 0o600, flag: 'wx' });
   renameSync(tmp, infoPath(home));
 }
 
@@ -159,6 +162,10 @@ function handler(home, secret) {
         return notFound(req, res);
       }
       if (!validFileName(file) || !tokenMatches(secret, dir, file, token)) return notFound(req, res);
+      // A page is only opened, never fetched: a browser marks a script's fetch (or a service worker's) with another
+      // destination, so a leaked token does not let a script read the page. curl sends no Sec-Fetch-Dest.
+      const dest = req.headers['sec-fetch-dest'];
+      if (dest !== undefined && dest !== 'document') return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
       return reply(req, res, 200, 'text/html; charset=utf-8', await readFile(real));
@@ -205,7 +212,7 @@ export async function startServer({ home, port = DEFAULT_PORT }) {
   return { port: actual, secret, close };
 }
 
-// am serve: run in the foreground until Ctrl-C / SIGTERM. Resolves with the exit code.
+// am serve: run in the foreground until Ctrl-C / SIGTERM / SIGHUP. Resolves with the exit code.
 export async function runServe({ home, port, print, fail }) {
   let srv;
   try {
@@ -220,6 +227,7 @@ export async function runServe({ home, port, print, fail }) {
     const stop = () => srv.close().then(() => done(0));
     process.once('SIGINT', stop);
     process.once('SIGTERM', stop);
+    process.once('SIGHUP', stop); // the SSH session or terminal that runs the server closed
     process.once('exit', () => removeInfo(home, srv.secret));
     print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
     print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);

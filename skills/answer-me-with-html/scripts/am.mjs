@@ -8446,8 +8446,8 @@ function alive(pid) {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (e) {
-    return e.code === "EPERM";
+  } catch {
+    return false;
   }
 }
 var BOOT_SLACK_MS = 5e3;
@@ -8478,7 +8478,7 @@ function writeInfo(home, info) {
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   rmSync5(tmp, { force: true });
   writeFileSync5(tmp, `${JSON.stringify(info)}
-`, { mode: 384 });
+`, { mode: 384, flag: "wx" });
   renameSync3(tmp, infoPath(home));
 }
 function removeInfo(home, secret) {
@@ -8523,6 +8523,8 @@ function handler(home, secret) {
         return notFound(req, res);
       }
       if (!validFileName(file) || !tokenMatches(secret, dir, file, token)) return notFound(req, res);
+      const dest = req.headers["sec-fetch-dest"];
+      if (dest !== void 0 && dest !== "document") return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
       return reply(req, res, 200, "text/html; charset=utf-8", await readFile(real));
@@ -8578,6 +8580,7 @@ async function runServe({ home, port, print, fail }) {
     const stop = () => srv.close().then(() => done(0));
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
+    process.once("SIGHUP", stop);
     process.once("exit", () => removeInfo(home, srv.secret));
     print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
     print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
