@@ -9,7 +9,7 @@ const LANGUAGE_SERIF_HEAD = '"Iowan Old Style", Palatino, Georgia';
 export default {
   name: 'paper',
   summary: 'Paper, for long reading',
-  label: { zh: '纸张', 'zh-Hant': '紙張', en: 'Paper', ja: '紙' }, // lang-ok: viewer-facing theme labels
+  label: { zh: '纸张', 'zh-Hant': '紙張', en: 'Paper', ja: '紙', he: 'נייר' }, // lang-ok: viewer-facing theme labels
   scope: ['page'],
   tokens: {
     common: { '--font-sans': SANS, '--font-mono': MONO, '--font-serif': SERIF, '--radius': '2px', '--shadow': 'none', '--bw': '1px', '--head-font': 'var(--font-serif)' },

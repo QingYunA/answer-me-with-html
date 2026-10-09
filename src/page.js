@@ -6,17 +6,20 @@ const SOURCE_OPEN = '<textarea id="am-source"';
 const SOURCE_RE = new RegExp(`^${SOURCE_OPEN}[^>]*>([\\s\\S]*?)<\\/textarea>`);
 const AUDIO_OPEN = '<audio id="amv-audio"';
 
-// lang is already an html lang value when passed in (e.g. zh-CN).
+// lang is already an html lang value when passed in (e.g. zh-CN). dir is written only for a right-to-left language (dir="rtl");
+// a left-to-right page keeps the root tag it always had.
 // voice is written only on voiced video pages (elevenlabs / local / system); patch keeps the same voice.
-export function rootTag({ lang, theme, mode, style, voice, video = false }) {
-  return `<html lang="${lang}" data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
+export function rootTag({ lang, dir, theme, mode, style, voice, video = false }) {
+  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
 }
 
 // Copies of the root settings, written on the toolbar. A host that serves the page inside its own document leaves the real <html>
 // without them; the page runtime sets back whatever the root lacks from these (see the first statement of src/runtime/page.js).
-export function rootCarrierAttrs({ lang, theme, mode, style }) {
-  return ` data-am-root-lang="${lang}" data-am-root-theme="${esc(theme)}" data-am-root-mode="${esc(mode)}" data-am-root-style="${esc(style)}"`;
+export function rootCarrierAttrs({ lang, dir, theme, mode, style }) {
+  return ` data-am-root-lang="${lang}"${dir === 'rtl' ? ' data-am-root-dir="rtl"' : ''} data-am-root-theme="${esc(theme)}" data-am-root-mode="${esc(mode)}" data-am-root-style="${esc(style)}"`;
 }
+
+const dirAttr = (dir) => (dir === 'rtl' ? ' dir="rtl"' : '');
 
 export function audioTag(wav) {
   return `${AUDIO_OPEN} preload="auto" src="data:audio/wav;base64,${wav.toString('base64')}"></audio>`;

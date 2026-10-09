@@ -2,12 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPONENTS, ComponentError } from '../src/components/index.js';
 import { parseFlow } from '../src/components/flow.js';
+import { parseEr, relationships } from '../src/components/er.js';
 import { parseSequence } from '../src/components/sequence.js';
 import { smoothPath } from '../src/svg/shapes.js';
 import { measure } from '../src/svg/text.js';
 
-const ctx = (args = '') => ({ args, uid: () => 'u1' });
-const render = (name, text, args) => COMPONENTS.get(name).render(text, ctx(args));
+const ctx = (args = '', dir) => ({ args, uid: () => 'u1', dir });
+const render = (name, text, args, dir) => COMPONENTS.get(name).render(text, ctx(args, dir));
 const throwsAt = (fn, line) =>
   assert.throws(fn, (e) => e instanceof ComponentError && e.line === line);
 const viewBox = (svg) => svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).slice(1).map(Number);
@@ -117,6 +118,80 @@ test('flow: lays out nodes whose names equal dagre reserved ids or internal grou
   assert.match(render('flow', 'g0 -> n0\ngroup g0: n0'), /am-cluster/);
 });
 
+// A group name never sits on an edge, an edge label or a node, in any direction, on left-to-right and right-to-left pages.
+// On a right-to-left page the text is anchored at its right end and set in the sans font, so its box extends left from x.
+function labelClashes(svg, dir, which = 0) {
+  const label = [...svg.matchAll(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)">([^<]*)<\/text>/g)][which];
+  const [x, y] = [Number(label[1]), Number(label[2])];
+  const w = measure(label[3].replace(/[\u2066-\u2069]/g, ''), 11, { mono: dir !== 'rtl' });
+  const box = dir === 'rtl' ? [x - w, y - 11, x, y + 3] : [x, y - 11, x + w, y + 3];
+  const inside = (p) => p[0] > box[0] && p[0] < box[2] && p[1] > box[1] && p[1] < box[3];
+  const clashes = [];
+  for (const [, d] of svg.matchAll(/class="am-edge[^"]*" d="([^"]+)"/g)) {
+    const pts = [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    for (let k = 1; k < pts.length; k++) {
+      for (let t = 0; t <= 1; t += 0.02) {
+        const p = [pts[k - 1][0] + (pts[k][0] - pts[k - 1][0]) * t, pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * t];
+        if (inside(p)) clashes.push(`edge ${d}`);
+      }
+    }
+  }
+  const rects = [
+    ...svg.matchAll(/<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
+    ...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
+  ];
+  for (const m of rects) {
+    const [rx, ry, rw, rh] = m.slice(1).map(Number);
+    if (rx < box[2] && box[0] < rx + rw && ry < box[3] && box[1] < ry + rh) clashes.push(`box at ${rx},${ry}`);
+  }
+  return [...new Set(clashes)];
+}
+
+const CROWDED = {
+  TB: 'Source PDF -> pdf_to_text.py: text in reading order\npdf_to_text.py -> Index: build\nIndex -> Search\ngroup Preparation (one time): pdf_to_text.py, Index',
+  BT: 'Source file -> Convert: text in reading order\nConvert -> Index: build\nIndex -> Search\ngroup Preparation (one time only): Convert, Index',
+  LR: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+  RL: 'Top -> Worker\nClient -> Gateway: HTTPS\nGateway -> Worker\nWorker -> DB\ngroup A very long backend group name here: Gateway, Worker',
+};
+// The right-to-left TB case is written in Hebrew, so the name is measured and anchored as on a real page.
+const CROWDED_HE_TB = 'קובץ PDF -> pdf_to_text.py: טקסט בסדר קריאה\npdf_to_text.py -> אינדקס: brainrag index\nאינדקס -> חיפוש\ngroup הכנה (פעם אחת): pdf_to_text.py, אינדקס';
+
+for (const [rankdir, text] of Object.entries(CROWDED)) {
+  for (const dir of ['ltr', 'rtl']) {
+    test(`flow: a group name stays clear of edges and nodes (${rankdir}, ${dir})`, () => {
+      const svg = render('flow', dir === 'rtl' && rankdir === 'TB' ? CROWDED_HE_TB : text, rankdir, dir);
+      assert.deepEqual(labelClashes(svg, dir), []);
+      // The name stays inside its box.
+      const [bx, , bw] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/).slice(1).map(Number);
+      const x = Number(svg.match(/<text class="am-cluster-label" x="([\d.]+)"/)[1]);
+      assert.ok(x >= bx && x <= bx + bw);
+    });
+  }
+}
+
+for (const dir of ['ltr', 'rtl']) {
+  test(`flow: two crowded groups side by side both find a clear place (${dir})`, () => {
+    const svg = render('flow', 'A -> B\nA -> C\nB -> D\nC -> D\ngroup Left side group label: B\ngroup Right side group label: C', 'TB', dir);
+    const labels = [...svg.matchAll(/<text class="am-cluster-label"[^>]*>/g)];
+    assert.equal(labels.length, 2);
+    for (const which of [0, 1]) assert.deepEqual(labelClashes(svg, dir, which), []);
+  });
+}
+
+test('flow: a group name that is already clear stays in the top left corner', () => {
+  const svg = render('flow', 'A -> B\nB -> C\ngroup G: B, C');
+  const [bx, by] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)"/).slice(1).map(Number);
+  const [lx, ly] = svg.match(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)"/).slice(1).map(Number);
+  assert.deepEqual([Math.round(lx - bx), Math.round(ly - by)], [8, 14]);
+});
+
+test('flow: on a right-to-left page a group name that is already clear stays in the top right corner', () => {
+  const svg = render('flow', 'A -> B\nB -> C\ngroup G: B, C', 'TB', 'rtl');
+  const [bx, by, bw] = svg.match(/<rect class="am-cluster" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/).slice(1).map(Number);
+  const [lx, ly] = svg.match(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)"/).slice(1).map(Number);
+  assert.deepEqual([Math.round(bx + bw - lx), Math.round(ly - by)], [8, 14]);
+});
+
 // Wrapping by script (issue #85): a Korean label breaks at its spaces, and a Thai one inside the node budget, which is 150 for flow.
 const textLines = (svg) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
 
@@ -134,4 +209,279 @@ test('sequence: Korean and Thai messages wrap the same way', () => {
   assert.deepEqual(textLines(render('sequence', 'A -> B: 데이터베이스 연결을 확인하고 재시도합니다')), ['A', 'B', '데이터베이스 연결을 확인하고', '재시도합니다']);
   const thai = textLines(render('sequence', 'A -> B: ตรวจสอบการเชื่อมต่อฐานข้อมูลแล้วลองอีกครั้ง'));
   for (const l of thai) assert.ok(measure(l, 13) <= 240, `line too wide: ${l}`);
+});
+
+// ── er ──
+const ER = '*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places';
+const erThrows = (text) => {
+  try {
+    parseEr(text);
+    return null;
+  } catch (e) {
+    return e;
+  }
+};
+const endGroups = (svg) => [...svg.matchAll(/<g class="am-er-end[^"]*">([\s\S]*?)<\/g>/g)].map((m) => m[1]);
+
+test('parseEr: entities, fields with an optional type and key, both relationship forms', () => {
+  const m = parseEr(ER);
+  assert.deepEqual([...m.entities.keys()], ['User', 'Order']);
+  assert.equal(m.entities.get('User').hi, true);
+  assert.equal(m.entities.get('Order').hi, false);
+  assert.deepEqual(m.entities.get('User').fields, [
+    { name: 'id', type: '', marker: 'PK', ref: null, line: 2 },
+    { name: 'email', type: 'string', marker: 'UK', ref: null, line: 3 },
+  ]);
+  assert.deepEqual(m.entities.get('Order').fields[1], { name: 'user_id', type: '', marker: 'FK', ref: 'User', line: 6 });
+  assert.deepEqual(m.written, [{ from: 'User', fromCard: '1', to: 'Order', toCard: '*', label: 'places', line: 7 }]);
+});
+
+test('er: a FK field implies the many-to-one relationship, and a written line replaces it', () => {
+  const implied = relationships(parseEr('Order\n  id PK\n  user_id FK -> User\nUser\n  id PK'));
+  assert.deepEqual(implied.map((r) => [r.from, r.fromCard, r.to, r.toCard]), [['Order', '*', 'User', '1']]);
+  const replaced = relationships(parseEr('Order\n  user_id FK -> User\nUser\n  id PK\nUser 1--* Order: places'));
+  assert.equal(replaced.length, 1);
+  assert.deepEqual([replaced[0].from, replaced[0].to, replaced[0].label], ['User', 'Order', 'places']);
+});
+
+test('er: draws a box per entity with its fields, and an end per cardinality', () => {
+  const svg = render('er', ER);
+  assert.match(svg, /^<figure class="am-diagram am-er">/);
+  assert.equal((svg.match(/class="am-node am-node--er/g) || []).length, 2);
+  assert.match(svg, /class="am-node am-node--er am-node--hi" data-key="User"/);
+  assert.match(svg, />email string</);
+  assert.equal((svg.match(/class="am-er-key[^"]*"/g) || []).length, 4);
+  assert.equal((endGroups(svg).length), 2);
+  assert.match(svg, /class="am-edge-label"[\s\S]*>places</);
+});
+
+test('er: each cardinality draws its own end', () => {
+  const end = (card) => endGroups(render('er', `A\nB\nA ${card}--1 B`))[1];
+  assert.equal((end('1').match(/<line/g) || []).length, 1);
+  assert.equal((end('0..1').match(/<circle/g) || []).length, 1);
+  assert.equal((end('*').match(/<line/g) || []).length, 3);
+  assert.equal((end('1..*').match(/<line/g) || []).length, 4);
+});
+
+test('er: a Mermaid relationship, a field before any entity and a bad FK are errors', () => {
+  assert.match(erThrows('  id PK').message, /must follow an entity/);
+  assert.match(erThrows('User\n  id PK -> Order').message, /only a FK field/);
+  assert.match(erThrows('User\n  x -> Order').message, /only a FK field/);
+  assert.match(erThrows('User\n  id FK ->').message, /write the entity a field points at/);
+  assert.match(erThrows('User\n  id PK int').message, /must be the last word before/);
+  assert.match(erThrows('User\nUser').message, /written twice/);
+  assert.equal(erThrows('   ').message, 'an entity relationship diagram needs at least one entity (a line at column 0)');
+});
+
+test('er: a name a field or a relationship does not name is an error, not a broken drawing', () => {
+  const fk = erThrows('Order\n  user_id FK -> Usr');
+  assert.match(fk.message, /no entity "Usr"; write it at column 0/);
+  assert.equal(fk.line, 2);
+  assert.match(erThrows('User\nOrder\nUser 1--* Ordr').message, /no entity "Ordr"; write it at column 0/);
+  assert.equal(erThrows('Order\n  user_id FK -> User\nUser\n  id PK\nUser 1--* Order'), null, 'a name that exists parses');
+});
+
+test('er: a Mermaid line is an error that shows the line to write instead', () => {
+  assert.match(erThrows('USER ||--o{ ORDER : places').message, /is Mermaid syntax; write USER 1--\* ORDER: places/);
+  assert.match(erThrows('USER }|..|{ ORDER').message, /write USER 1\.\.\*--1\.\.\* ORDER/);
+  assert.match(erThrows('USER |o--|| ORDER').message, /write USER 0\.\.1--1 ORDER/);
+  assert.match(erThrows('USER {').message, /is not an entity of this component/);
+  assert.match(erThrows('}').message, /is not an entity of this component/);
+});
+
+test('er: two FK fields to one entity draw two relationships, and a written line replaces both', () => {
+  const body = 'Order\n  billing_id FK -> Address\n  shipping_id FK -> Address\nAddress\n  id PK';
+  assert.deepEqual(relationships(parseEr(body)).map((rel) => [rel.from, rel.to, rel.line]), [['Order', 'Address', 2], ['Order', 'Address', 3]]);
+  assert.equal((render('er', body).match(/<path class="am-edge"/g) || []).length, 2);
+  const written = relationships(parseEr(`${body}\nOrder *--1 Address: billed`));
+  assert.equal(written.length, 1);
+  assert.equal(written[0].label, 'billed');
+});
+
+test('er: a field that points at its own entity draws a loop that stays inside the drawing', () => {
+  const svg = render('er', 'Employee\n  id PK\n  manager_id FK -> Employee');
+  assert.doesNotMatch(svg, /NaN/);
+  const [, left, width] = svg.match(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/).map(Number);
+  const right = left + width;
+  const loop = svg.match(/<path class="am-edge" d="M([\d.]+),([\d.]+) C([\d.]+),[\d.]+ ([\d.]+),[\d.]+ ([\d.]+),([\d.]+)"/).map(Number);
+  const view = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number);
+  assert.ok(Math.abs(loop[1] - right) < 0.2, 'the loop starts on the right edge of the box');
+  assert.ok(loop[3] > right, 'and bulges outside it');
+  assert.ok(loop[3] === loop[4], 'out and back with the same control point');
+  assert.ok(view[1] >= loop[3] + 6, 'the drawing is wide enough to hold the loop');
+  assert.equal((svg.match(/class="am-er-end/g) || []).length, 2, 'both ends of the self-reference are drawn');
+  // Two self-references of one entity take their own distance, so both stay visible.
+  const both = render('er', 'Employee\n  manager_id FK -> Employee\n  mentor_id FK -> Employee');
+  const outs = [...both.matchAll(/<path class="am-edge" d="M[\d.]+,[\d.]+ C([\d.]+),/g)].map((m) => Number(m[1]));
+  assert.equal(outs.length, 2);
+  assert.ok(outs[1] > outs[0], 'the second loop goes farther out');
+});
+
+test('er: a box fits its widest field at the size the field renders, and a highlighted one is measured bold', () => {
+  const field = 'shipping_address_reference bigint';
+  const svg = render('er', `*Address\n  ${field} UK\nPlain\n  ${field} UK`);
+  const boxes = [...svg.matchAll(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/g)].map((m) => Number(m[2]));
+  assert.equal(boxes.length, 2);
+  // 11px of padding on each side, then the 12px gap the FK/UK marker leaves; the fields render at 12px because the size
+  // is set in the style attribute, which the stylesheet cannot override.
+  const fits = (width, bold) => 11 + measure('shipping_address_reference', 12, { bold }) + 12 + measure('UK', 11, { mono: true, bold }) <= width - 11;
+  assert.match(svg, /class="am-er-field" style="font-size:12px"/);
+  assert.ok(fits(boxes[0], true), 'the highlighted entity is measured with bold text');
+  assert.ok(fits(boxes[1], false));
+  assert.ok(boxes[0] > boxes[1], 'bold text needs a wider box');
+});
+
+test('er: the canvas is finite and holds what is drawn, parallel edges and their labels included', () => {
+  const bodies = [
+    'Order\n  billing_id FK -> Address\n  shipping_id FK -> Address\nAddress\n  id PK',
+    'A\nB\nA 0..1--* B: many',
+    'Employee\n  manager_id FK -> Employee\n  mentor_id FK -> Employee',
+    'A\n  id PK\n  self_id FK -> A\nA 1--1..* A: again',
+  ];
+  for (const body of bodies) {
+    const svg = render('er', body);
+    assert.doesNotMatch(svg, /NaN/, body);
+    const [, w, h] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number);
+    assert.ok(Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0, `a finite canvas: ${w}x${h}`);
+    // The drawing may carry a shift that keeps the origin at 0; every point still has to land inside the canvas.
+    const shift = svg.match(/transform="translate\(([\d.-]+),([\d.-]+)\)"/);
+    const [dx, dy] = shift ? [Number(shift[1]), Number(shift[2])] : [0, 0];
+    for (const m of svg.matchAll(/<path class="am-edge" d="M([\d.]+),([\d.]+)/g)) {
+      const [x, y] = [Number(m[1]) + dx, Number(m[2]) + dy];
+      assert.ok(x >= 0 && x <= w && y >= 0 && y <= h, `a path starts inside the canvas: ${x},${y} of ${w}x${h}`);
+    }
+    for (const m of svg.matchAll(/<rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)) {
+      const [, x, y, bw, bh] = m.map(Number);
+      assert.ok(x + dx >= 0 && y + dy >= 0 && x + bw + dx <= w && y + bh + dy <= h, 'a box is inside the canvas');
+    }
+    for (const m of svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="18"/g)) {
+      const [, x, y, bw] = m.map(Number);
+      assert.ok(x + dx >= 0 && x + bw + dx <= w, 'an edge label is inside the canvas');
+    }
+  }
+});
+
+test('er: video mode gives every entity and relationship its own step', () => {
+  const svg = COMPONENTS.get('er').render(ER, { args: '', uid: () => 'u1', video: true });
+  assert.match(svg, /class="am-node am-node--er am-node--hi" data-key="User" data-step="0"/);
+  assert.match(svg, /class="am-node am-node--er" data-key="Order" data-step="1"/);
+  assert.match(svg, /<g data-step="2">/);
+});
+
+// ── er on a right-to-left page ──
+const erDir = (text, args, dir) => COMPONENTS.get('er').render(text, { args, uid: () => 'u1', ui: {}, dir });
+const boxes = (svg) => [...svg.matchAll(/class="am-node-shape" x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/g)].map((m) => [Number(m[1]), Number(m[2])]);
+// The x of the text with this content, ignoring the left-to-right isolate marks (U+2066, U+2069) svgLine adds.
+const textX = (svg, content) => Number(svg.match(new RegExp(`<text [^>]*? x="([\\d.-]+)"[^>]*>(?:\\u2066)?${content}(?:\\u2069)?</text>`))[1]);
+
+test('er: a right-to-left page draws the mirror image, with direction="rtl" on the svg', () => {
+  const ltr = erDir(ER, 'LR', 'ltr');
+  const rtl = erDir(ER, 'LR', 'rtl');
+  assert.equal(erDir(ER, 'LR', undefined), ltr, 'no page direction renders as before');
+  assert.doesNotMatch(ltr, /direction=/);
+  assert.match(rtl, /<svg [^>]*direction="rtl"/);
+  const [a, b] = [boxes(ltr), boxes(rtl)];
+  const [w] = viewBox(rtl);
+  assert.equal(b.length, a.length);
+  a.forEach(([x, width], i) => {
+    assert.equal(b[i][1], width, 'the box keeps its width');
+    // The viewBox rounds the drawing width up, so the mirror image is within one pixel.
+    assert.ok(Math.abs(b[i][0] + width - (w - x)) <= 1, `box ${i} is the mirror image`);
+  });
+  assert.ok(a[0][0] < a[1][0] && b[0][0] > b[1][0], 'LR runs right to left');
+});
+
+test('er: on a right-to-left page a field name sits at the right edge of its box and the key marker at the left one', () => {
+  const body = 'משתמש\n  id PK\nהזמנה\n  user_id FK -> משתמש';
+  const ltr = erDir(body, '', 'ltr');
+  const rtl = erDir(body, '', 'rtl');
+  assert.deepEqual(boxes(rtl).map(([, width]) => width), boxes(ltr).map(([, width]) => width), 'the box width does not depend on the direction');
+  const [left, width] = boxes(rtl)[1];
+  // The svg's direction turns text-anchor "start" into the right end of the text: the name runs left from the right edge,
+  // the marker (anchor "end") runs right from the left edge.
+  assert.equal(textX(rtl, 'user_id'), left + width - 11);
+  assert.equal(textX(rtl, 'FK'), left + 11);
+  assert.equal(textX(rtl, 'הזמנה'), left + width - 11);
+  assert.match(rtl, /\u2066user_id\u2069/, 'a Latin field name is isolated left to right so it stays inside the box');
+  const [l, w] = boxes(ltr)[1];
+  assert.equal(textX(ltr, 'user_id'), l + 11);
+  assert.equal(textX(ltr, 'FK'), l + w - 11);
+});
+
+test('er: on a right-to-left page a self-reference loops out of the left side and stays inside the drawing', () => {
+  const body = 'Employee\n  id PK\n  manager_id FK -> Employee\nEmployee 0..1--* Employee: reports to';
+  const rtl = erDir(body, '', 'rtl');
+  assert.doesNotMatch(rtl, /NaN/);
+  const [left] = boxes(rtl)[0];
+  const loop = rtl.match(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),[\d.-]+ ([\d.-]+),[\d.-]+ ([\d.-]+),([\d.-]+)"/).map(Number);
+  assert.ok(Math.abs(loop[1] - left) < 0.2, 'the loop starts on the left edge of the box');
+  assert.ok(loop[3] < left, 'and bulges outside it');
+  assert.equal(loop[3], loop[4], 'out and back with the same control point');
+  const label = rtl.match(/<g class="am-edge-label"><rect x="([\d.-]+)" y="[\d.-]+" width="([\d.-]+)"/).slice(1).map(Number);
+  // The drawing is shifted so that its leftmost point lands on the margin.
+  const shift = Number(rtl.match(/<g transform="translate\(([\d.-]+),/)?.[1] ?? 0);
+  assert.ok(label[0] + shift >= 0, 'the drawing is wide enough to hold the loop and its label');
+  assert.ok(label[0] + label[1] < loop[3], 'the label lies beyond the loop');
+  assert.ok(left + boxes(rtl)[0][1] + shift <= viewBox(rtl)[0], 'and the box fits on the right');
+  // The end marks are drawn outside the left border.
+  const ends = [...rtl.matchAll(/<g class="am-er-end am-edge">(.*?)<\/g>/g)];
+  assert.equal(ends.length, 2);
+  for (const [, marks] of ends) for (const m of marks.matchAll(/(?:x1|x2|cx)="([\d.-]+)"/g)) assert.ok(Number(m[1]) <= left + 0.01);
+});
+
+test('er: in LR and RL a self-reference loops below its box, clear of the edge to the next entity and its label', () => {
+  const body = '*Employee\n  id PK\n  manager_id FK -> Employee\n  mentor_id FK -> Employee\nOrder\n  id PK\n  employee_id FK -> Employee\nEmployee 1--* Order: places\nEmployee 0..1--* Employee: reports to\nEmployee *--1 Employee: mentored by';
+  const num = (list) => list.map(Number);
+  for (const [args, dir] of [['LR', 'ltr'], ['LR', 'rtl'], ['RL', 'ltr']]) {
+    const svg = erDir(body, args, dir);
+    assert.doesNotMatch(svg, /NaN/);
+    const [, sx, sy] = svg.match(/<g transform="translate\(([\d.-]+),([\d.-]+)\)"/) ?? [0, 0, 0];
+    const [w, h] = viewBox(svg);
+    const box = svg.match(/data-key="Employee"[^>]*><rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/).slice(1).map(Number);
+    const bottom = box[1] + box[3];
+    const loops = [...svg.matchAll(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/g)].map((m) => num(m.slice(1)));
+    assert.equal(loops.length, 2, `${args} ${dir}: both self-references are drawn`);
+    for (const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] of loops) {
+      assert.ok([y1, cy1, cy2, y2].every((y) => y >= bottom - 0.01), `${args} ${dir}: the loop lies below the box`);
+      assert.ok(Math.abs(y1 - bottom) < 0.2 && Math.abs(y2 - bottom) < 0.2, 'with both ends on the bottom edge');
+      assert.ok([x1, cx1, cx2, x2].every((x) => x >= box[0] && x <= box[0] + box[2]), 'under the box');
+      assert.ok(cy1 + Number(sy) <= h && x1 + Number(sx) >= 0 && x2 + Number(sx) <= w, 'and inside the viewBox');
+    }
+    assert.ok(loops[1][3] > loops[0][3] + 18, 'the second loop goes farther down, below the first one\'s label');
+    const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => num(m.slice(1)));
+    assert.equal(labels.length, 3);
+    labels.forEach(([x, y, lw, lh]) => assert.ok(y + Number(sy) >= 0 && y + lh + Number(sy) <= h && x + Number(sx) >= 0 && x + lw + Number(sx) <= w, 'a label lies inside the viewBox'));
+    labels.forEach((a, i) => labels.slice(i + 1).forEach((b, j) => {
+      const apart = a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
+      assert.ok(apart, `${args} ${dir}: labels ${i} and ${i + j + 1} do not overlap`);
+    }));
+  }
+});
+
+test('er: in LR the room under a box for its loops keeps them clear of the other entities, and edges still end on the box', () => {
+  const body = 'Customer\n  id PK\nEmployee\n  id PK\n  manager_id FK -> Employee\nInvoice\n  id PK\nOrder\n  id PK\n  customer_id FK -> Customer\n  employee_id FK -> Employee\n  invoice_id FK -> Invoice\nEmployee 0..1--* Employee: reports to';
+  for (const dir of ['ltr', 'rtl']) {
+    const svg = erDir(body, 'LR', dir);
+    assert.doesNotMatch(svg, /NaN/);
+    const all = Object.fromEntries([...svg.matchAll(/data-key="(\w+)"[^>]*><rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => [m[1], m.slice(2).map(Number)]));
+    const [x, y, w, h] = all.Employee;
+    const others = Object.entries(all).filter(([name]) => name !== 'Employee').map(([, box]) => box);
+    const apart = (a, b) => a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
+    // What the loop draws: its path, its two end marks and the label, as one bounding box under the Employee box.
+    const loop = svg.match(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/).slice(1).map(Number);
+    assert.ok(loop[3] > y + h, `${dir}: the loop lies below the Employee box`);
+    const label = svg.match(/<g class="am-edge-label"><rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/).slice(1).map(Number);
+    const hang = [Math.min(label[0], x), y + h, Math.max(label[0] + label[2], x + w) - Math.min(label[0], x), label[1] + label[3] - (y + h)];
+    assert.ok(hang[3] > 0);
+    for (const box of others) assert.ok(apart(hang, box), `${dir}: the loop and its label do not touch another entity`);
+    // Every end of an edge between two entities lies on the border of a drawn box, within 1px.
+    const onBorder = ([px, py]) => Object.values(all).some(([bx, by, bw, bh]) => {
+      const inside = px >= bx - 1 && px <= bx + bw + 1 && py >= by - 1 && py <= by + bh + 1;
+      const inner = px > bx + 1 && px < bx + bw - 1 && py > by + 1 && py < by + bh - 1;
+      return inside && !inner;
+    });
+    const edges = [...svg.matchAll(/<path class="am-edge" d="(M[^"]*L[^"C]*)"/g)].map((m) => m[1].match(/[\d.-]+,[\d.-]+/g).map((p) => p.split(',').map(Number)));
+    assert.equal(edges.length, 3);
+    for (const points of edges) assert.ok(onBorder(points[0]) && onBorder(points.at(-1)), `${dir}: an edge ends on a box border`);
+  }
 });

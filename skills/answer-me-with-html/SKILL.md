@@ -124,6 +124,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 | Shape of the information | Component | Minimal syntax |
 |---|---|---|
 | What connects to what, architecture, decision branches | `flow [LR]` | `A -> B: label`, `A --> C` dashed, `A -> B & C` fan-out, `{decision?}` `(start)` `[(database)]`, `*emphasis`, `group name: A, B` |
+| A data model: entities, their columns and the relations between them | `er [LR]` | entity at column 0, indented `name [type] [PK\|FK\|UK]` fields, `user_id FK -> User`, `User 1--* Order: places` |
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
 | Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |

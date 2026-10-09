@@ -4,7 +4,7 @@ import { SANS, MONO } from './fonts.js';
 export default {
   name: 'shadcn',
   summary: 'shadcn cards',
-  label: { zh: '卡片', 'zh-Hant': '卡片', en: 'Cards', ja: 'カード' }, // lang-ok: viewer-facing theme labels
+  label: { zh: '卡片', 'zh-Hant': '卡片', en: 'Cards', ja: 'カード', he: 'כרטיסים' }, // lang-ok: viewer-facing theme labels
   scope: ['page', 'video'],
   tokens: {
     common: { '--font-sans': SANS, '--font-mono': MONO, '--radius': '8px', '--shadow': '0 1px 2px 0 rgba(0,0,0,0.05)', '--bw': '1px', '--head-font': 'var(--font-sans)' },

@@ -10,9 +10,10 @@ import zh from './zh.js';
 import zhHant from './zh-Hant.js';
 import en from './en.js';
 import ja from './ja.js';
+import he from './he.js';
 
 // The order is the key order of the label objects that theme files carry.
-export const LANGUAGES = Object.freeze([zh, zhHant, en, ja]);
+export const LANGUAGES = Object.freeze([zh, zhHant, en, ja, he]);
 
 // What a language without its own file shows: English labels.
 export const FALLBACK = en;
