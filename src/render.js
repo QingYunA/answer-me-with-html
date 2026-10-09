@@ -34,11 +34,36 @@ export class LintError extends Error {
   }
 }
 
-// A table without a delimiter row under its first row is not a table: Markdown shows the block as plain text with pipes, so the draft
-// would lose the table silently. Refuse it with the example that fixes it.
+// A pipe block whose second line is not a delimiter row is not a table: Markdown shows the block as plain text with pipes, so the draft
+// would lose the table silently. Refuse it with the line the block starts at and the example that fixes it.
 const TABLE_PIPE_ROW = /^ {0,3}\|/;
-const TABLE_DELIMITER = /^ {0,3}\|?(?:[:\- ]*\|)+[:\- ]*$/;
+const TABLE_DELIMITER_CELL = /^:?-+:?$/;
 const TABLE_EXAMPLE = '| Task | Status |\n| --- | --- |\n| Build | ok |';
+
+// The cells of a table row, counted the way Markdown reads them: one cell per pipe, a pipe behind a backslash is text, and the two
+// edge pipes delimit nothing.
+function tableCells(line) {
+  const text = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const cells = [];
+  let cell = '';
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\' && i + 1 < text.length) cell += text[i] + text[++i];
+    else if (text[i] === '|') { cells.push(cell.trim()); cell = ''; }
+    else cell += text[i];
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+// Why the second row is not the delimiter row of the header row, or null when it is one: every cell needs hyphens (---, :---, ---:), and
+// there must be one cell per header column — a short, long or empty delimiter row renders no table at all.
+function tableProblem(header, delimiter) {
+  const cells = tableCells(delimiter);
+  if (cells.some((cell) => !TABLE_DELIMITER_CELL.test(cell))) return 'table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text';
+  const columns = tableCells(header).length;
+  if (cells.length !== columns) return `table: the delimiter row has ${cells.length} column${cells.length === 1 ? '' : 's'}, the header row ${columns}; write one --- per column or the whole block shows as plain text`;
+  return null;
+}
 
 function checkTables(blocks) {
   for (const block of blocks) {
@@ -47,9 +72,8 @@ function checkTables(blocks) {
     let run = [];
     let runStart = 0;
     const flush = () => {
-      if (run.length >= 2 && !TABLE_DELIMITER.test(run[1])) {
-        throw new RenderError('table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text', { line: block.line + runStart, component: 'table', example: TABLE_EXAMPLE });
-      }
+      const problem = run.length >= 2 ? tableProblem(run[0], run[1]) : null;
+      if (problem) throw new RenderError(problem, { line: block.line + runStart, component: 'table', example: TABLE_EXAMPLE });
       run = [];
     };
     for (let i = 0; i < lines.length; i++) {

@@ -111,7 +111,7 @@ Lead: one or two sentences with the core conclusion (optional).
 ## A Panel title {span=2 meta="small text, top right"}
 Plain Markdown: paragraphs, lists, tables, quotes.
 Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗ / ! badges.
-A table needs a delimiter row under the header, or the whole block shows as plain text:
+A table needs a delimiter row under the header, one `---` per column, or the whole block shows as plain text:
 
 | Task | Status |
 | --- | --- |

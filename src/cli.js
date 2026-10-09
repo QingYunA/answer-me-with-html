@@ -310,7 +310,7 @@ const TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the bod
 | --- | --- |
 | Build | ok |
 
-- The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
+- The delimiter row (|---|---|) under the header row is required, with one --- per column of the header row; without it the whole block shows as plain text.
 - Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
 - A wide table needs no attributes: the page sizes it to the panel.`;
 

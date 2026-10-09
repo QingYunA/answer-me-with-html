@@ -620,6 +620,34 @@ test('render: a table with a delimiter row renders, and the summary counts it', 
   assert.equal(stats.tables, 1);
 });
 
+// The delimiter row is only a delimiter row when every cell of it has hyphens and there is one cell per header column: a short, long or
+// empty one renders no table either, so the block would lose the table without a word.
+test('render: a delimiter row that does not match the header row is refused', () => {
+  const draft = (delimiter) => `---\ntitle: t\n---\n## A\n| Task | Status |\n${delimiter}\n| Build | ok |\n`;
+  for (const delimiter of ['| --- |', '| --- | --- | --- |', '| --- ||', '| | |', '| :-: |']) {
+    assert.throws(
+      () => renderDoc(draft(delimiter)),
+      (err) => err instanceof RenderError && err.component === 'table' && err.line === 5 && /the whole block shows as plain text/.test(err.message),
+      `accepted as a delimiter row: ${delimiter}`,
+    );
+  }
+  assert.throws(
+    () => renderDoc(draft('| --- |')),
+    (err) => /delimiter row has 1 column, the header row 2/.test(err.message),
+  );
+});
+
+test('render: a delimiter row with one cell per column renders, with alignment colons and escaped pipes in the header', () => {
+  const aligned = renderDoc('---\ntitle: t\n---\n## A\n| Task | Status | Note |\n| :--- | ---: | :--: |\n| Build | ok | fine |\n');
+  assert.ok(aligned.html.includes('<table>'));
+  assert.equal(aligned.stats.tables, 1);
+
+  // A pipe behind a backslash is text, not a cell: the header has two cells, and the delimiter row two as well.
+  const escaped = renderDoc('---\ntitle: t\n---\n## A\n| A \\| x | B |\n| --- | --- |\n| 1 | 2 |\n');
+  assert.ok(escaped.html.includes('<table>'));
+  assert.equal(escaped.stats.tables, 1);
+});
+
 test('render: one pipe line alone, or a delimiter row alone, is not a table and passes', () => {
   const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n| just one line\nplain text after it\n');
   assert.ok(html.includes('just one line'));

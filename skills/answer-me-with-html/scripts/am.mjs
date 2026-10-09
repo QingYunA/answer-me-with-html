@@ -7088,8 +7088,29 @@ var LintError = class extends Error {
   }
 };
 var TABLE_PIPE_ROW = /^ {0,3}\|/;
-var TABLE_DELIMITER = /^ {0,3}\|?(?:[:\- ]*\|)+[:\- ]*$/;
+var TABLE_DELIMITER_CELL = /^:?-+:?$/;
 var TABLE_EXAMPLE = "| Task | Status |\n| --- | --- |\n| Build | ok |";
+function tableCells(line) {
+  const text = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells = [];
+  let cell = "";
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "\\" && i + 1 < text.length) cell += text[i] + text[++i];
+    else if (text[i] === "|") {
+      cells.push(cell.trim());
+      cell = "";
+    } else cell += text[i];
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+function tableProblem(header, delimiter) {
+  const cells = tableCells(delimiter);
+  if (cells.some((cell) => !TABLE_DELIMITER_CELL.test(cell))) return "table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text";
+  const columns = tableCells(header).length;
+  if (cells.length !== columns) return `table: the delimiter row has ${cells.length} column${cells.length === 1 ? "" : "s"}, the header row ${columns}; write one --- per column or the whole block shows as plain text`;
+  return null;
+}
 function checkTables(blocks) {
   for (const block2 of blocks) {
     if (block2.type !== "md") continue;
@@ -7097,9 +7118,8 @@ function checkTables(blocks) {
     let run2 = [];
     let runStart = 0;
     const flush = () => {
-      if (run2.length >= 2 && !TABLE_DELIMITER.test(run2[1])) {
-        throw new RenderError("table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text", { line: block2.line + runStart, component: "table", example: TABLE_EXAMPLE });
-      }
+      const problem = run2.length >= 2 ? tableProblem(run2[0], run2[1]) : null;
+      if (problem) throw new RenderError(problem, { line: block2.line + runStart, component: "table", example: TABLE_EXAMPLE });
       run2 = [];
     };
     for (let i = 0; i < lines.length; i++) {
@@ -8756,7 +8776,7 @@ var TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the body 
 | --- | --- |
 | Build | ok |
 
-- The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
+- The delimiter row (|---|---|) under the header row is required, with one --- per column of the header row; without it the whole block shows as plain text.
 - Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a \u2713 / \u2717 / ! badge.
 - A wide table needs no attributes: the page sizes it to the panel.`;
 var MERMAID_HELP = `Mermaid blocks: checked mermaid source, shown as a code listing
