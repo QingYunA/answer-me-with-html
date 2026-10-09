@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
+  <a href="https://answer-me-with-html.com/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
 </p>
 
 <p align="center">

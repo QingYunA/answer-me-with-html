@@ -68,7 +68,9 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith('#')) continue;
-    const m = raw.match(/^([\w-]+)\s*:\s*(.*)$/);
+    // A key is letters of any script (a Hebrew or Chinese key such as `עודכן` shows in the meta row as written), digits, _ and -,
+    // and may hold single spaces between words.
+    const m = raw.match(/^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u);
     if (!m) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
     entries[m[1]] = { value: coerce(m[1], unquote(m[2])), line: i + 1 };
   }
