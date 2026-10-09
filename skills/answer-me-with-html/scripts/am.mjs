@@ -8506,18 +8506,45 @@ ${text.replace(/^\n+/, "")}`;
 
 // src/serve.js
 import { createServer } from "node:http";
-import { connect as connect2 } from "node:net";
-import { uptime } from "node:os";
+import { connect as connect2, isIP } from "node:net";
+import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5 } from "node:fs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { join as join8, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
+var LAN_BIND = "0.0.0.0";
 var TOKEN_LENGTH = 22;
 var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
+function lanIPv4Addresses(interfaces = networkInterfaces()) {
+  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("169.254.")).map(({ address }) => address))].sort();
+}
+function publicUrlOrigin(input) {
+  const error = () => new ServeError("--public-url must be an http:// or https:// origin without a path, credentials, query or fragment");
+  if (typeof input !== "string" || !/^https?:\/\/[^\s/?#]+\/?$/i.test(input)) throw error();
+  let url;
+  try {
+    url = new URL(input);
+  } catch {
+    throw error();
+  }
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash || !url.hostname || url.hostname === LAN_BIND) throw error();
+  return url.origin;
+}
+function hostAllowed(host, additional) {
+  if (LOOPBACK_HOST.test(host ?? "")) return true;
+  if (typeof host !== "string") return false;
+  const value = host.toLowerCase();
+  return additional.some((allowed) => {
+    if (value === allowed.toLowerCase()) return true;
+    if (isIP(allowed) !== 4 || !value.startsWith(allowed + ":")) return false;
+    const port = value.slice(allowed.length + 1);
+    return /^[1-9][0-9]{0,4}$/.test(port) && Number(port) <= 65535;
+  });
+}
 var SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads";
 var HEADERS = Object.freeze({
   "Content-Security-Policy": `frame-ancestors 'none'; ${SANDBOX}`,
@@ -8537,8 +8564,9 @@ var infoPath = (home) => join8(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
-function pageLink({ port, secret }, dir, file) {
-  return `http://${HOST}:${port}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
+function pageLink({ port, secret, baseUrl }, dir, file) {
+  const origin = baseUrl ?? "http://" + HOST + ":" + port;
+  return origin + "/" + PREFIX_OF[dir] + "/" + pageToken(secret, dir, file) + "/" + encodeURIComponent(file);
 }
 function validFileName(name) {
   return typeof name === "string" && name.length > 0 && name.endsWith(".html") && !/[/\\\0]/.test(name) && !name.includes("..");
@@ -8562,8 +8590,9 @@ var bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1e3 - BOOT
 function readServeInfo(home) {
   try {
     const info = JSON.parse(readFileSync7(infoPath(home), "utf8"));
-    const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid);
-    return ok ? { pid: info.pid, port: info.port, secret: info.secret } : null;
+    const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
+    const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
+    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
   } catch {
     return null;
   }
@@ -8610,10 +8639,10 @@ async function resolvePage(home, dir, file) {
     return null;
   }
 }
-function handler(home, secret) {
+function handler(home, secret, allowedHosts) {
   return async (req, res) => {
     try {
-      if (!LOOPBACK_HOST.test(req.headers.host ?? "")) return notFound(req, res);
+      if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
       if (req.method !== "GET" && req.method !== "HEAD") {
         res.setHeader("Allow", "GET, HEAD");
         return reply(req, res, 405, "text/plain; charset=utf-8", "Method not allowed\n");
@@ -8652,17 +8681,24 @@ function listening(port, timeout = 500) {
     socket.once("error", () => end(false));
   });
 }
-async function startServer({ home, port = DEFAULT_PORT }) {
+async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses }) {
+  const addresses = lan ? lanAddresses ?? lanIPv4Addresses() : [];
+  if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4 || address === LAN_BIND || address.startsWith("127.")))) {
+    throw new ServeError("--lan needs at least one active non-loopback IPv4 interface");
+  }
+  const publicOrigin = publicUrl === void 0 ? null : publicUrlOrigin(publicUrl);
+  const allowedHosts = [...addresses, ...publicOrigin ? [new URL(publicOrigin).host] : []];
   const running = readServeInfo(home);
   if (running && await listening(running.port)) throw new ServeError(`am serve is already running on http://${HOST}:${running.port} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString("hex");
-  const server = createServer(handler(home, secret));
+  const server = createServer(handler(home, secret, allowedHosts));
   await new Promise((done, fail) => {
     server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : e));
-    server.listen(port, HOST, done);
+    server.listen(port, lan ? LAN_BIND : HOST, done);
   });
   const actual = server.address().port;
-  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now() });
+  const baseUrl = publicOrigin ?? "http://" + (lan ? addresses[0] : HOST) + ":" + actual;
+  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
   let closed;
   const close = () => {
     closed ??= new Promise((done) => {
@@ -8672,12 +8708,12 @@ async function startServer({ home, port = DEFAULT_PORT }) {
     });
     return closed;
   };
-  return { port: actual, secret, close };
+  return { port: actual, secret, close, baseUrl, addresses, lan };
 }
-async function runServe({ home, port, print, fail }) {
+async function runServe({ home, port, lan = false, publicUrl, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port });
+    srv = await startServer({ home, port, lan, publicUrl });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`\u2717 ${e.message}`);
@@ -8689,8 +8725,18 @@ async function runServe({ home, port, print, fail }) {
     process.once("SIGTERM", stop);
     process.once("SIGHUP", stop);
     process.once("exit", () => removeInfo(home, srv.secret));
-    print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
-    print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
+    if (lan) {
+      print("Serving pages on " + LAN_BIND + ":" + srv.port + " (Ctrl-C to stop). am render prints a link for each page.");
+      print("WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.");
+      for (const address of srv.addresses) print("LAN address: http://" + address + ":" + srv.port);
+    } else {
+      print("Serving pages on http://" + HOST + ":" + srv.port + " (Ctrl-C to stop). am render prints a link for each page.");
+      print("Reaching it from another computer: run ssh -L " + srv.port + ":" + HOST + ":" + srv.port + " user@host there, then open the links in its browser.");
+    }
+    if (publicUrl) {
+      print("Public link origin: " + srv.baseUrl);
+      if (srv.baseUrl.startsWith("http://")) print("WARNING: --public-url uses HTTP; links and their capability tokens are not encrypted in transit.");
+    }
   });
 }
 
@@ -8708,7 +8754,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
-  am serve  [--port 8765]                         serve pages on 127.0.0.1 so a remote host can open them over http (am render then prints a link:)
+  am serve  [--port 8765] [--lan] [--public-url https://host.example]  serve private page links; LAN binding requires explicit --lan
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
@@ -8877,6 +8923,8 @@ async function main(argv, io = {}) {
         from: { type: "string" },
         days: { type: "string" },
         port: { type: "string" },
+        lan: { type: "boolean" },
+        "public-url": { type: "string" },
         all: { type: "boolean" },
         "dry-run": { type: "boolean" },
         help: { type: "boolean", short: "h" },
@@ -9239,7 +9287,7 @@ function cmdServe(opts, { print, fail, env }) {
     return 2;
   }
   const port = opts.port === void 0 ? DEFAULT_PORT : Number(opts.port);
-  return runServe({ home: amHome(env), port, print, fail });
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts["public-url"], print, fail });
 }
 function cmdLint(src, opts, { print, fail }) {
   let doc2;

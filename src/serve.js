@@ -4,8 +4,8 @@
 // nothing about other pages, and a restart (new secret) revokes every old link. Only .html files directly inside pages/ and videos/ are served.
 
 import { createServer } from 'node:http';
-import { connect } from 'node:net';
-import { uptime } from 'node:os';
+import { connect, isIP } from 'node:net';
+import { networkInterfaces, uptime } from 'node:os';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { lstat, realpath, readFile } from 'node:fs/promises';
@@ -14,11 +14,48 @@ import { ensureHome } from './home.js';
 
 export const DEFAULT_PORT = 8765;
 const HOST = '127.0.0.1';
+const LAN_BIND = '0.0.0.0';
 const TOKEN_LENGTH = 22;
 const PREFIX = Object.freeze({ p: 'pages', v: 'videos' });
 const PREFIX_OF = Object.freeze({ pages: 'p', videos: 'v' });
 // Only loopback names are accepted: an SSH tunnel may map any local port, but a DNS-rebinding page arrives with its own host name.
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
+
+// IPv4 LAN addresses only: IPv6 is not enabled by the IPv4-only 0.0.0.0 listener.
+// Sort for a stable link address; the startup message also lists every candidate.
+export function lanIPv4Addresses(interfaces = networkInterfaces()) {
+  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? [])
+    .filter(({ address, family, internal }) => (family === 'IPv4' || family === 4)
+      && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith('169.254.'))
+    .map(({ address }) => address))].sort();
+}
+
+// A public URL is a pure HTTP(S) origin. Credentials, paths, queries, fragments and
+// exotic schemes would make printed capability links misleading or unsafe.
+export function publicUrlOrigin(input) {
+  const error = () => new ServeError('--public-url must be an http:// or https:// origin without a path, credentials, query or fragment');
+  if (typeof input !== 'string' || !/^https?:\/\/[^\s/?#]+\/?$/i.test(input)) throw error();
+  let url;
+  try { url = new URL(input); } catch { throw error(); }
+  if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
+    || !url.hostname || url.hostname === LAN_BIND) throw error();
+  return url.origin;
+}
+
+// A fixed public hostname is matched exactly. LAN IPs may carry a port chosen by
+// the client or reverse proxy; unknown DNS names never enter the allowlist.
+function hostAllowed(host, additional) {
+  if (LOOPBACK_HOST.test(host ?? '')) return true;
+  if (typeof host !== 'string') return false;
+  const value = host.toLowerCase();
+  return additional.some((allowed) => {
+    if (value === allowed.toLowerCase()) return true;
+    if (isIP(allowed) !== 4 || !value.startsWith(allowed + ':')) return false;
+    const port = value.slice(allowed.length + 1);
+    return /^[1-9][0-9]{0,4}$/.test(port) && Number(port) <= 65535;
+  });
+}
+
 // All pages share one origin over HTTP, and a page can hold a script (an ```html block). sandbox without allow-same-origin
 // gives every page an opaque origin of its own, so a script can neither fetch another page nor read the localStorage keys
 // that name other pages' links. The page keeps its scripts, its outbound links (popups that leave the sandbox) and the
@@ -47,8 +84,9 @@ export function pageToken(secret, dir, file) {
   return createHmac('sha256', secret).update(`${dir}/${file}`).digest('base64url').slice(0, TOKEN_LENGTH);
 }
 
-export function pageLink({ port, secret }, dir, file) {
-  return `http://${HOST}:${port}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
+export function pageLink({ port, secret, baseUrl }, dir, file) {
+  const origin = baseUrl ?? ('http://' + HOST + ':' + port);
+  return origin + '/' + PREFIX_OF[dir] + '/' + pageToken(secret, dir, file) + '/' + encodeURIComponent(file);
 }
 
 // A servable file name: one path segment, no traversal, .html only.
@@ -82,9 +120,11 @@ const bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1000 - B
 export function readServeInfo(home) {
   try {
     const info = JSON.parse(readFileSync(infoPath(home), 'utf8'));
+    const validBase = info?.baseUrl === undefined
+      || (typeof info.baseUrl === 'string' && publicUrlOrigin(info.baseUrl) === info.baseUrl);
     const ok = info && Number.isInteger(info.port) && typeof info.secret === 'string' && info.secret.length > 0
-      && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid);
-    return ok ? { pid: info.pid, port: info.port, secret: info.secret } : null;
+      && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
+    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
   } catch {
     return null;
   }
@@ -142,10 +182,10 @@ async function resolvePage(home, dir, file) {
   }
 }
 
-function handler(home, secret) {
+function handler(home, secret, allowedHosts) {
   return async (req, res) => {
     try {
-      if (!LOOPBACK_HOST.test(req.headers.host ?? '')) return notFound(req, res);
+      if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
       if (req.method !== 'GET' && req.method !== 'HEAD') {
         res.setHeader('Allow', 'GET, HEAD');
         return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
@@ -187,20 +227,28 @@ function listening(port, timeout = 500) {
   });
 }
 
-// Start listening on 127.0.0.1 (port 0 picks a free port). Resolves with { port, secret, close }.
-export async function startServer({ home, port = DEFAULT_PORT }) {
+// Default: loopback only. LAN listening and the public link origin are explicit opt-ins.
+export async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses }) {
+  const addresses = lan ? (lanAddresses ?? lanIPv4Addresses()) : [];
+  if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4
+    || address === LAN_BIND || address.startsWith('127.')))) {
+    throw new ServeError('--lan needs at least one active non-loopback IPv4 interface');
+  }
+  const publicOrigin = publicUrl === undefined ? null : publicUrlOrigin(publicUrl);
+  const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : [])];
   const running = readServeInfo(home);
   if (running && await listening(running.port)) throw new ServeError(`am serve is already running on http://${HOST}:${running.port} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString('hex');
-  const server = createServer(handler(home, secret));
+  const server = createServer(handler(home, secret, allowedHosts));
   await new Promise((done, fail) => {
     server.once('error', (e) => fail(e.code === 'EADDRINUSE'
       ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`)
       : e));
-    server.listen(port, HOST, done);
+    server.listen(port, lan ? LAN_BIND : HOST, done);
   });
   const actual = server.address().port;
-  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now() });
+  const baseUrl = publicOrigin ?? ('http://' + (lan ? addresses[0] : HOST) + ':' + actual);
+  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
   let closed;
   const close = () => {
     closed ??= new Promise((done) => {
@@ -210,14 +258,14 @@ export async function startServer({ home, port = DEFAULT_PORT }) {
     });
     return closed;
   };
-  return { port: actual, secret, close };
+  return { port: actual, secret, close, baseUrl, addresses, lan };
 }
 
 // am serve: run in the foreground until Ctrl-C / SIGTERM / SIGHUP. Resolves with the exit code.
-export async function runServe({ home, port, print, fail }) {
+export async function runServe({ home, port, lan = false, publicUrl, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port });
+    srv = await startServer({ home, port, lan, publicUrl });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`✗ ${e.message}`);
@@ -230,7 +278,17 @@ export async function runServe({ home, port, print, fail }) {
     process.once('SIGTERM', stop);
     process.once('SIGHUP', stop); // the SSH session or terminal that runs the server closed
     process.once('exit', () => removeInfo(home, srv.secret));
-    print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
-    print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
+    if (lan) {
+      print('Serving pages on ' + LAN_BIND + ':' + srv.port + ' (Ctrl-C to stop). am render prints a link for each page.');
+      print('WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.');
+      for (const address of srv.addresses) print('LAN address: http://' + address + ':' + srv.port);
+    } else {
+      print('Serving pages on http://' + HOST + ':' + srv.port + ' (Ctrl-C to stop). am render prints a link for each page.');
+      print('Reaching it from another computer: run ssh -L ' + srv.port + ':' + HOST + ':' + srv.port + ' user@host there, then open the links in its browser.');
+    }
+    if (publicUrl) {
+      print('Public link origin: ' + srv.baseUrl);
+      if (srv.baseUrl.startsWith('http://')) print('WARNING: --public-url uses HTTP; links and their capability tokens are not encrypted in transit.');
+    }
   });
 }
