@@ -360,3 +360,103 @@ test('rtl: the reply view and bidi.js use the one RTL_LETTER definition, and the
   assert.ok(RTL_LETTER.test('א') && RTL_LETTER.test('ا'));
   assert.ok(!RTL_LETTER.test('﻿') && !RTL_LETTER.test('a1'));
 });
+
+// A path or flag inside a Hebrew sentence: the run has Hebrew, so it is not isolated whole, and the slash, dot or dash at the edge of
+// the Latin word took the sentence direction (`src/` showed as `/src`). Such a word is isolated by itself.
+test('rtl: a Latin word that starts or ends with punctuation is isolated inside a Hebrew sentence', () => {
+  const bdi = (s) => `<bdi dir="ltr">${s}</bdi>`;
+  const p = (s) => isolateLtrRuns(`<p>${s}</p>`);
+  assert.equal(p('ערכו את src/ ידנית'), `<p>ערכו את ${bdi('src/')} ידנית</p>`);
+  assert.equal(p('הריצו את /usr/bin עכשיו'), `<p>הריצו את ${bdi('/usr/bin')} עכשיו</p>`);
+  assert.equal(p('הריצו ./run.sh ואז --force וגם ~/.config'), `<p>הריצו ${bdi('./run.sh')} ואז ${bdi('--force')} וגם ${bdi('~/.config')}</p>`);
+  assert.equal(p('ראו https://example.com/docs/ לפרטים'), `<p>ראו ${bdi('https://example.com/docs/')} לפרטים</p>`);
+  assert.equal(p('התיקייה C:\\tmp\\ ריקה'), `<p>התיקייה ${bdi('C:\\tmp\\')} ריקה</p>`);
+  assert.equal(p('נתיבים כמו #tag או $HOME או C++ שימושיים'), `<p>נתיבים כמו ${bdi('#tag')} או ${bdi('$HOME')} או ${bdi('C++')} שימושיים</p>`);
+  assert.equal(p('הגודל הוא -5px בלבד'), `<p>הגודל הוא ${bdi('-5px')} בלבד</p>`);
+});
+
+test('rtl: sentence punctuation and a Hebrew prefix stay outside the isolate of a Latin word', () => {
+  const bdi = (s) => `<bdi dir="ltr">${s}</bdi>`;
+  const p = (s) => isolateLtrRuns(`<p>${s}</p>`);
+  // The full stop belongs to the sentence; docs/a.md has punctuation only between letters and needs no isolate.
+  assert.equal(p('ערכו את src/ ואת docs/a.md.'), `<p>ערכו את ${bdi('src/')} ואת docs/a.md.</p>`);
+  assert.equal(p('עדכנו את ./run.sh.'), `<p>עדכנו את ${bdi('./run.sh')}.</p>`);
+  assert.equal(p('מה בתיקייה src/? ו-/usr/bin; וגם src/, ואז src/:'), `<p>מה בתיקייה ${bdi('src/')}? ו-${WJ}${bdi('/usr/bin')}; וגם ${bdi('src/')}, ואז ${bdi('src/')}:</p>`);
+  assert.equal(p('התיקייה (src/) ו (./a.sh) ריקות'), `<p>התיקייה (${bdi('src/')}) ו (${bdi('./a.sh')}) ריקות</p>`);
+  assert.equal(p('הדגל &quot;--force&quot; וגם "--dry-run" ו-&#39;src/&#39;'), `<p>הדגל &quot;${bdi('--force')}&quot; וגם "${bdi('--dry-run')}" ו-${WJ}&#39;${bdi('src/')}&#39;</p>`);
+  assert.equal(p('מה זה src/؟ כן، src/،'), `<p>מה זה ${bdi('src/')}؟ כן، ${bdi('src/')}،</p>`);
+  // A Hebrew prefix joined with a hyphen or a maqaf stays with the word, outside the isolate.
+  assert.equal(p('ב-src/ ובמקף ב־src/ בלבד'), `<p>ב-${WJ}${bdi('src/')} ובמקף ב־${bdi('src/')} בלבד</p>`);
+  // An entity at the end of a word is not cut at its semicolon.
+  assert.equal(p('ראו src/a&amp; כאן'), `<p>ראו ${bdi('src/a&amp;')} כאן</p>`);
+});
+
+test('rtl: Latin words with no punctuation at the edge, numbers and Hebrew words are left as they are', () => {
+  const same = (s) => assert.equal(isolateLtrRuns(`<p>${s}</p>`), `<p>${s}</p>`, s);
+  same('ערכו את src/cli.js ואת api.example.com ידנית.');
+  same('העלאה לשרת staging, ושם Redis וגם Node.js טובים.');
+  same('היא כתבה "Redis" וגם e.g. וגם etc. לפעמים');
+  same('בין 1/2 לבין 3/4 וגם ... או -- בלבד');
+  same('אמרה: שלום/להתראות או עברית/ערבית');
+});
+
+test('rtl: the word rule does not wrap what is already isolated, and skips code, attributes, svg and pre', () => {
+  // A signed number is isolated by its own rule; a word with a unit gets one isolate, not two.
+  assert.equal(isolateLtrRuns('<p>ירידה של -5% וגם -5px בעומס</p>'), '<p>ירידה של <bdi dir="ltr">-5%</bdi> וגם <bdi dir="ltr">-5px</bdi> בעומס</p>');
+  // A run with no Hebrew is isolated whole, once.
+  assert.equal(isolateLtrRuns('<p>see src/ and ./run.sh</p>'), '<p><bdi dir="ltr">see src/ and ./run.sh</bdi></p>');
+  // Inline code is isolated by the style sheet; its text is not touched.
+  assert.equal(isolateLtrRuns('<p>ערכו את <code>src/</code> ואת <code>--force x/</code> ידנית</p>'), '<p>ערכו את <code>src/</code> ואת <code>--force x/</code> ידנית</p>');
+  // Attribute values, svg and pre.
+  const html = '<p title="src/ --force" data-p="/usr/bin">שלום</p><svg><text>שלום src/</text></svg><pre>שלום src/</pre>';
+  assert.equal(isolateLtrRuns(html), html);
+  // A word inside inline tags is isolated inside them.
+  assert.equal(isolateLtrRuns('<p>ערכו <strong>src/</strong> ו <a href="/a/b/">/usr/bin</a> ידנית</p>'), '<p>ערכו <strong><bdi dir="ltr">src/</bdi></strong> ו <a href="/a/b/"><bdi dir="ltr">/usr/bin</bdi></a> ידנית</p>');
+});
+
+test('rtl: a path in a Hebrew paragraph is isolated on the page, and a left-to-right page gets no isolate', () => {
+  const he = hebrewPage('## A שלבים\nערכו את src/ ידנית ואת `src/` ואת docs/a.md.\n');
+  assert.match(he, /<p>ערכו את <bdi dir="ltr">src\/<\/bdi> ידנית ואת <code>src\/<\/code> ואת docs\/a\.md\.<\/p>/);
+  const en = renderDoc('---\nlang: en\n---\n## A Steps\nEdit src/ by hand and /usr/bin and --force.\n').html;
+  assert.doesNotMatch(en, /<bdi/);
+});
+
+// ── annot on a right-to-left page ──
+const annot = (text, dir) => COMPONENTS.get('annot').render(text, { args: '', uid: () => 'u1', ui: {}, dir });
+const rowsOf = (html) => [...html.matchAll(/class="am-seg-n" style="--row: (\d+)"/g)].map((m) => Number(m[1]));
+
+test('rtl: an annot sentence is set in the sans font, because no monospace font has Hebrew letters', () => {
+  const rule = RTL_CSS.match(/html\[dir="rtl"\] \.am-annot-line \{([^}]*)\}/);
+  assert.ok(rule, 'a rule for the annot sentence');
+  assert.match(rule[1], /font-family: var\(--font-sans\)/);
+  assert.match(RTL_CSS, /html\[dir="rtl"\] [^{]*\.am-annot-meta/);
+});
+
+test('rtl: annot notes are placed with the widths of the sans font, as the sentence is drawn in it', () => {
+  // The first note is 118 px wide with its gap. The second span starts after 96 px of Hebrew in the sans font, but after 126 px
+  // if the sentence were monospace (a space is half as wide in the sans font), so only the sans estimate puts it on a second row.
+  const text = '[אבגד]{הערה ארוכה למדי כאן} ו ו ו ו ו [חזרה]{הערה}';
+  assert.deepEqual(rowsOf(annot(text, 'ltr')), [0, 0]);
+  assert.deepEqual(rowsOf(annot(text, 'rtl')), [0, 1]);
+});
+
+test('rtl: an annot block on a Hebrew page keeps Latin terms, paths and notes in order', () => {
+  const html = hebrewPage(`## A משפט
+\`\`\`annot
+# משפט 1 | 13 מילים
+ערכו את [src/]{נתיב}, ואת [Redis]{שם המוצר} ואת [המטמון]{!לא "מטמון"} ידנית ב-/usr/bin.
+> כתבו הוראה אחת בכל משפט
+\`\`\`
+`);
+  assert.match(html, /<span class="am-seg"><span class="am-seg-t"><bdi dir="ltr">src\/<\/bdi><\/span><span class="am-seg-n" style="--row: 0">נתיב<\/span><\/span>/);
+  assert.match(html, /<span class="am-seg-t">Redis<\/span>/);
+  assert.match(html, /ב-⁠<bdi dir="ltr">\/usr\/bin<\/bdi>\.<\/div>/);
+  assert.match(html, /am-annot-head"><span>משפט 1<\/span><span class="am-annot-meta">13 מילים<\/span>/);
+});
+
+test('rtl: annot on a left-to-right page is drawn as before', () => {
+  const text = '# Head | meta\nMake sure [the hydraulic reservoir]{Technical name} is [full]{!Not "replenished"}.\n> Caption';
+  assert.equal(annot(text, 'ltr'), annot(text));
+  assert.equal(annot(text, 'ltr'), annot(text, undefined));
+  assert.doesNotMatch(renderDoc(`---\nlang: en\n---\n## A S\n\`\`\`annot\n${text}\n\`\`\`\n`).html, /am-seg-n[^>]*>[^<]*<bdi/);
+});

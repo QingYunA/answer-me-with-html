@@ -14,6 +14,8 @@ html[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {
   font-family: var(--font-sans); letter-spacing: normal; text-transform: none;
 }
 html[dir="rtl"] .am-head h1 { letter-spacing: normal; }
+/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */
+html[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }
 
 /* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */
 html[dir="rtl"] .am-diagram svg { direction: rtl; }

@@ -778,3 +778,56 @@ test('e2e: a page inside a host document gets its theme, mode, style and languag
   await open(own, DESKTOP);
   assert.deepEqual(await evaluate(ROOT_ATTRS), ['fr', '', 'dark', 'off']);
 });
+
+// An annot block on a right-to-left page: the sentence reads from the right, each note starts at the right edge of its span, and notes that
+// share a row do not run into each other (the rows are chosen from widths estimated for the sans font the sentence is set in).
+const ANNOT_DRAFT = (lang, sentences, head) => `---\nlang: ${lang}\n---\n## A Annot\n\`\`\`annot\n${head}\n${sentences.join('\n')}\n\`\`\`\n`;
+const ANNOT_ROWS = `(() => [...document.querySelectorAll('.am-annot-line')].map((line) => {
+  const edge = (r) => ({ left: Math.round(r.left * 10) / 10, right: Math.round(r.right * 10) / 10 });
+  const notes = [...line.querySelectorAll('.am-seg-n')].map((n) => ({
+    row: n.style.getPropertyValue('--row'), note: edge(n.getBoundingClientRect()), seg: edge(n.parentElement.getBoundingClientRect()),
+  }));
+  const head = line.closest('.am-annot').querySelector('.am-annot-head');
+  return {
+    font: getComputedStyle(line).fontFamily, body: getComputedStyle(document.body).fontFamily, notes,
+    title: edge(head.firstElementChild.getBoundingClientRect()), meta: head.children[1] ? edge(head.children[1].getBoundingClientRect()) : null,
+  };
+}))()`;
+
+for (const [lang, sentences, head] of [
+  ['he', [
+    'ודאו שה[מאגר ההידראולי]{השם הטכני המלא} [מלא]{!לא "מוחלף"} לפני שמתחילים לעבוד עם [Redis]{שם המוצר בלבד} בסביבה.',
+    'ערכו את [src/]{נתיב התיקייה} ואת [המטמון]{רכיב} [ידנית]{!לא אוטומטית אף פעם} היום.',
+  ], '# משפט | 13 מילים'],
+  ['en', [
+    'Make sure that [the hydraulic reservoir]{The full technical name} is [full]{!Not "replenished"} before you work with [Redis]{Product name only}.',
+    'Edit [src/]{The folder path} and [the cache]{A component} [by hand]{!Never automatic at all} today.',
+  ], '# Sentence | 13 words'],
+]) {
+  test(`e2e: annot on a ${lang} page keeps its notes at the start edge of their span, with no two notes of a row overlapping`, { skip: SKIP, timeout: 60000 }, async () => {
+    if (!cdp) await launch();
+    const file = join(tmp, `annot-${lang}.html`);
+    writeFileSync(file, renderDoc(ANNOT_DRAFT(lang, sentences, head)).html);
+    await open(file, DESKTOP);
+    const lines = await evaluate(ANNOT_ROWS);
+    assert.equal(lines.length, 2);
+    const rtl = lang === 'he';
+    for (const l of lines) {
+      assert.ok(l.notes.length >= 3, 'the notes are drawn');
+      for (const n of l.notes) {
+        // A note starts at the start edge of its span: the right edge on a right-to-left page.
+        assert.ok(Math.abs((rtl ? n.note.right - n.seg.right : n.note.left - n.seg.left)) <= 1, `${lang}: note ${JSON.stringify(n)} starts at its span`);
+      }
+      for (const [i, a] of l.notes.entries()) {
+        for (const b of l.notes.slice(i + 1).filter((x) => x.row === a.row)) {
+          assert.ok(a.note.right <= b.note.left + 0.5 || b.note.right <= a.note.left + 0.5, `${lang}: notes ${JSON.stringify(a)} and ${JSON.stringify(b)} share a row and overlap`);
+        }
+      }
+      // The title is on the start side of the head, the meta on the other.
+      if (l.meta) assert.ok(rtl ? l.title.left > l.meta.left : l.title.left < l.meta.left, `${lang}: head order`);
+      // No monospace font on a right-to-left page; the sentence takes the font of the page.
+      if (rtl) assert.equal(l.font, l.body);
+      else assert.notEqual(l.font, l.body);
+    }
+  });
+}

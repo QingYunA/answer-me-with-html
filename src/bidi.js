@@ -28,6 +28,24 @@ const PREFIX = /((?:^|[\s(])\p{Script=Hebrew}{1,3}-)(?=[^\s-])/gu;
 // A number with a sign in front ("-5", "+2", "~11", the sign of a change count) at the start of a word. In right-to-left text the sign
 // would show on the right of the digits; isolated, it stays on their left the way numbers are always written.
 const SIGNED = /(^|[\s(])([+\-−±~]\d[\d.,]*%?)/g;
+// A Latin word in a Hebrew sentence (a path, a flag, a URL): non-space characters with a left-to-right letter and no right-to-left letter. A
+// slash, dot or dash at its edge would take the sentence direction and land on the wrong side (`src/` shows as `/src`), so a word that
+// starts or ends with punctuation or a symbol is isolated by itself. Punctuation inside it (`docs/a.md`) is between letters and stays put.
+// What belongs to the sentence stays outside the isolate: an opening bracket or quote, a Hebrew prefix joined with a hyphen or a maqaf
+// (the one-letter prefix "in" in front of `src/`), and a closing bracket or quote, a full stop, a comma and the like at the end. A quote
+// is `&quot;` or `&#39;` in the html, and the `;` that ends an entity is not punctuation.
+const WORD = /\S+/g;
+const WORD_LEAD = /^(?:\p{Script=Hebrew}{1,3}[-\u05BE]|[([{«“‘"']|&quot;|&#39;)+/u;
+const WORD_TRAIL = /(?:[.,:!?)\]}»”’…"'،؛؟]|(?<!&[#\w]+);|&quot;|&#39;)+$/u;
+const EDGE_NEUTRAL = /^[\p{P}\p{S}]|[\p{P}\p{S}]$/u;
+
+function isolateWord(word) {
+  const lead = word.match(WORD_LEAD)?.[0] ?? '';
+  const rest = word.slice(lead.length);
+  const trail = rest.match(WORD_TRAIL)?.[0] ?? '';
+  const core = rest.slice(0, rest.length - trail.length);
+  return isLtrOnly(core) && EDGE_NEUTRAL.test(decode(core)) ? `${lead}<bdi dir="ltr">${core}</bdi>${trail}` : word;
+}
 
 // One line of svg text. A left-to-right-only line is wrapped in a left-to-right isolate (U+2066 … U+2069), so a wrapped label such as
 // `src/` on its own line reads `src/`. The marks take no space and are not drawn. A line with a Hebrew letter keeps the page direction:
@@ -70,7 +88,7 @@ export function isolateLtrRuns(html) {
       const fixed = run.map((t) => {
         if (/^<code(?=[ >])/i.test(t)) code++;
         else if (/^<\/code>/i.test(t)) code--;
-        return t.startsWith('<') || code > 0 ? t : t.replace(SIGNED, '$1<bdi dir="ltr">$2</bdi>').replace(PREFIX, `$1${WJ}`);
+        return t.startsWith('<') || code > 0 ? t : t.replace(WORD, isolateWord).replace(SIGNED, '$1<bdi dir="ltr">$2</bdi>').replace(PREFIX, `$1${WJ}`);
       });
       out.push(...fixed);
     }
