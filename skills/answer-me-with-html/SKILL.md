@@ -111,6 +111,11 @@ Lead: one or two sentences with the core conclusion (optional).
 ## A Panel title {span=2 meta="small text, top right"}
 Plain Markdown: paragraphs, lists, tables, quotes.
 Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗ / ! badges.
+A table needs a delimiter row under the header, or the whole block shows as plain text:
+
+| Task | Status |
+| --- | --- |
+| Build | ok |
 
 ## B {bare}            ← bare: no title bar (suits a kv title block)
 ```
@@ -133,7 +138,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 | Metadata / title block | `kv [cols=2]` | `key: value`, `* wide cell: value` |
 | Conclusion / warning | `callout <info\|ok\|warn\|err> title` | Markdown body |
 | A decision the user must make before you go on | `ask [multi]` | question line, then `* suggested option \| note`, `- other option` |
-| Multi-dimension comparison, can / cannot list | Markdown table | write ok / no / warn in the status column |
+| Multi-dimension comparison, can / cannot list | Markdown table | write ok / no / warn in the status column; put a delimiter row under the header row, or the block shows as plain text (am help table) |
 | What a real screen, photo or render looks like, as an existing file | image | `![what it shows](/absolute/path.png)` alone on a line |
 | Code that exists in the project | code block that quotes the file | ```` ```ts src=path/to/file.ts lines=18-30 hl=22 ```` and an empty block |
 | A plan, refactor or PR summary that changes structure | `flow` or `tree` with change markers | start a line with `+ ` added, `- ` removed, `~ ` changed (a node only): `+ A -> B`, `- A -> B`, `~ Node`, tree `+ file.js`, `- dir/` |

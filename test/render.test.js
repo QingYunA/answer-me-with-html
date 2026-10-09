@@ -604,3 +604,24 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
   backdrop.click();
   assert.equal(lb.hasAttribute('hidden'), true, 'lightbox closes on backdrop click');
 });
+
+// A table without a delimiter row is not a table: Markdown would show the block as plain text with pipes, so the render refuses the
+// draft and names the line, instead of losing the table silently.
+test('render: a table without a delimiter row is refused with its line and the example', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n| Task | Status |\n| Build | ok |\n'),
+    (err) => err instanceof RenderError && err.component === 'table' && err.line === 5 && /delimiter row/.test(err.message) && err.example.includes('| --- | --- |'),
+  );
+});
+
+test('render: a table with a delimiter row renders, and the summary counts it', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n| Task | Status |\n| --- | --- |\n| Build | ok |\n');
+  assert.ok(html.includes('<table>'));
+  assert.equal(stats.tables, 1);
+});
+
+test('render: one pipe line alone, or a delimiter row alone, is not a table and passes', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n| just one line\nplain text after it\n');
+  assert.ok(html.includes('just one line'));
+  assert.equal(stats.tables, 0);
+});

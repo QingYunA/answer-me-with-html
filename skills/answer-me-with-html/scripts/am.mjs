@@ -7075,9 +7075,36 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
+var TABLE_PIPE_ROW = /^ {0,3}\|/;
+var TABLE_DELIMITER = /^ {0,3}\|?(?:[:\- ]*\|)+[:\- ]*$/;
+var TABLE_EXAMPLE = "| Task | Status |\n| --- | --- |\n| Build | ok |";
+function checkTables(blocks) {
+  for (const block2 of blocks) {
+    if (block2.type !== "md") continue;
+    const lines = block2.text.split("\n");
+    let run2 = [];
+    let runStart = 0;
+    const flush = () => {
+      if (run2.length >= 2 && !TABLE_DELIMITER.test(run2[1])) {
+        throw new RenderError("table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text", { line: block2.line + runStart, component: "table", example: TABLE_EXAMPLE });
+      }
+      run2 = [];
+    };
+    for (let i = 0; i < lines.length; i++) {
+      if (TABLE_PIPE_ROW.test(lines[i])) {
+        if (!run2.length) runStart = i;
+        run2.push(lines[i].trim());
+      } else {
+        flush();
+      }
+    }
+    flush();
+  }
+}
 function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
+  checkTables([...parsed.intro, ...parsed.panels.flatMap((p) => p.blocks)]);
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
   if (meta.template === "video") throw new ParseError("template: video is a video draft; render it with am video", 0);
   const problem = themes2.problem(meta.theme, "page");
@@ -7086,7 +7113,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
   if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
-  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
+  const stats = { panels: doc2.panels.length, components: {}, tables: 0, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, dir: language.dir, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc2.intro.find((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
@@ -7104,6 +7131,7 @@ function hasVisuals({ intro, panels }) {
 function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
     const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx));
+    if (b.type === "md" && ctx.stats.tables !== void 0) ctx.stats.tables += (result.match(/<table>/g) ?? []).length;
     noteHtml(b, notes, ctx);
     return embedImages(b, result, ctx);
   }).join("\n");
@@ -8414,7 +8442,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|table|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -8437,6 +8465,10 @@ Intro (optional, shown below the title)
 ## A Panel title {span=2 meta="top-right note"}
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a \u2713 / \u2717 / ! badge.
+A table needs the delimiter row under the header row (see am help table):
+| Task | Status |
+| --- | --- |
+| Build | ok |
 
 \`\`\`flow LR          \u2190 fence language = component name, followed by component arguments
 A -> B
@@ -8668,6 +8700,15 @@ function cmdRender(src, opts, ctx, baseDir) {
   emit(result, file, ctx);
   return finish(file, opts, config, ctx);
 }
+var TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the body rows
+
+| Task | Status |
+| --- | --- |
+| Build | ok |
+
+- The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
+- Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a \u2713 / \u2717 / ! badge.
+- A wide table needs no attributes: the page sizes it to the panel.`;
 var PATCH_HELP = `Replace one panel of a rendered page in place
 
 Usage:
@@ -8887,7 +8928,8 @@ function summaryLine(result) {
     return `video \xB7 ${meta.theme} \xB7 ${count(stats.panels, "scene")} \xB7 ${count(result.beats, "beat")} \xB7 ${result.duration.toFixed(1)}s \xB7 voice: ${result.voiceName}`;
   }
   const comps = Object.entries(stats.components).map(([k2, v]) => `${k2}\xD7${v}`).join(" ");
-  return `${meta.template} \xB7 ${meta.theme} \xB7 ${count(stats.panels, "panel")}${comps ? ` \xB7 ${comps}` : ""}`;
+  const parts = [meta.template, meta.theme, count(stats.panels, "panel"), comps, stats.tables ? `table\xD7${stats.tables}` : ""];
+  return parts.filter(Boolean).join(" \xB7 ");
 }
 var count = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 function finish(file, opts, config, ctx) {
@@ -9076,13 +9118,14 @@ function cmdHelp(name, { print, fail }) {
   if (name === "format") return print(FORMAT), 0;
   if (name === "image") return print(IMAGE_HELP), 0;
   if (name === "code") return print(CODE_HELP), 0;
+  if (name === "table") return print(TABLE_HELP), 0;
   if (name === "video") return print(VIDEO_FORMAT), 0;
   if (name === "patch") return print(PATCH_HELP), 0;
   if (name === "theme") return print(THEME_HELP), 0;
   if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, patch, theme`);
+    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, table, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}

@@ -34,6 +34,36 @@ export class LintError extends Error {
   }
 }
 
+// A table without a delimiter row under its first row is not a table: Markdown shows the block as plain text with pipes, so the draft
+// would lose the table silently. Refuse it with the example that fixes it.
+const TABLE_PIPE_ROW = /^ {0,3}\|/;
+const TABLE_DELIMITER = /^ {0,3}\|?(?:[:\- ]*\|)+[:\- ]*$/;
+const TABLE_EXAMPLE = '| Task | Status |\n| --- | --- |\n| Build | ok |';
+
+function checkTables(blocks) {
+  for (const block of blocks) {
+    if (block.type !== 'md') continue;
+    const lines = block.text.split('\n');
+    let run = [];
+    let runStart = 0;
+    const flush = () => {
+      if (run.length >= 2 && !TABLE_DELIMITER.test(run[1])) {
+        throw new RenderError('table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text', { line: block.line + runStart, component: 'table', example: TABLE_EXAMPLE });
+      }
+      run = [];
+    };
+    for (let i = 0; i < lines.length; i++) {
+      if (TABLE_PIPE_ROW.test(lines[i])) {
+        if (!run.length) runStart = i;
+        run.push(lines[i].trim());
+      } else {
+        flush();
+      }
+    }
+    flush();
+  }
+}
+
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
 // baseDir: where relative image paths are read from; codeDir: where relative code paths are read from (the folder the agent works in).
@@ -41,6 +71,7 @@ export class LintError extends Error {
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
+  checkTables([...parsed.intro, ...parsed.panels.flatMap((p) => p.blocks)]);
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
   if (meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
   const problem = themes.problem(meta.theme, 'page');
@@ -52,7 +83,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
+  const stats = { panels: doc.panels.length, components: {}, tables: 0, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, dir: language.dir, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
@@ -74,6 +105,7 @@ function hasVisuals({ intro, panels }) {
 export function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
     const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)));
+    if (b.type === 'md' && ctx.stats.tables !== undefined) ctx.stats.tables += (result.match(/<table>/g) ?? []).length;
     noteHtml(b, notes, ctx);
     return embedImages(b, result, ctx);
   }).join('\n');

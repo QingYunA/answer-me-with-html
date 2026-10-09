@@ -43,7 +43,7 @@ Usage:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|table|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -67,6 +67,10 @@ Intro (optional, shown below the title)
 ## A Panel title {span=2 meta="top-right note"}
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+A table needs the delimiter row under the header row (see am help table):
+| Task | Status |
+| --- | --- |
+| Build | ok |
 
 \`\`\`flow LR          ← fence language = component name, followed by component arguments
 A -> B
@@ -298,6 +302,16 @@ function cmdRender(src, opts, ctx, baseDir) {
   emit(result, file, ctx);
   return finish(file, opts, config, ctx);
 }
+
+const TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the body rows
+
+| Task | Status |
+| --- | --- |
+| Build | ok |
+
+- The delimiter row (|---|---|) under the header row is required; without it the whole block shows as plain text.
+- Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+- A wide table needs no attributes: the page sizes it to the panel.`;
 
 const PATCH_HELP = `Replace one panel of a rendered page in place
 
@@ -548,7 +562,8 @@ function summaryLine(result) {
     return `video · ${meta.theme} · ${count(stats.panels, 'scene')} · ${count(result.beats, 'beat')} · ${result.duration.toFixed(1)}s · voice: ${result.voiceName}`;
   }
   const comps = Object.entries(stats.components).map(([k, v]) => `${k}×${v}`).join(' ');
-  return `${meta.template} · ${meta.theme} · ${count(stats.panels, 'panel')}${comps ? ` · ${comps}` : ''}`;
+  const parts = [meta.template, meta.theme, count(stats.panels, 'panel'), comps, stats.tables ? `table×${stats.tables}` : ''];
+  return parts.filter(Boolean).join(' · ');
 }
 
 // "1 file", "2 files".
@@ -749,13 +764,14 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'format') return print(FORMAT), 0;
   if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'code') return print(CODE_HELP), 0;
+  if (name === 'table') return print(TABLE_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, table, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);
