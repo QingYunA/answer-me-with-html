@@ -16,6 +16,7 @@ if (panels.length > 1) {
   const TABLE_COL_MIN = 96; // per table column, px
   const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line
   const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line
+  const TIMELINE_ITEM_MIN = 120; // per horizontal timeline item, px: the time, title and note stay readable
   const DIAGRAM_MIN = 160;
   const RESIZE_DELAY = 150;
   const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';
@@ -99,7 +100,9 @@ if (panels.length > 1) {
       const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);
       // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.
       const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);
-      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);
+      // A horizontal timeline is not a scroller: its items share the width, so the floor is what keeps the labels apart.
+      const timelines = [...el.querySelectorAll('.am-timeline--h')].map((tl) => (Number(tl.style.getPropertyValue('--n')) || 1) * TIMELINE_ITEM_MIN + el.offsetWidth - tl.clientWidth);
+      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs, ...timelines);
       const from = Math.min(width, Math.floor(floor / STEP) * STEP);
       const samples = [];
       let fits = null;

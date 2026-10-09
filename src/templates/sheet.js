@@ -1,5 +1,6 @@
 // sheet: drawing board. Letter-numbered panels in a grid; under the blueprint theme the frame has coordinate ticks (decorative only, no interaction).
 import { panelHtml, headHtml } from './panel.js';
+import { contentLines } from '../components/error.js';
 
 const ruler = (side, labels) =>
   `<div class="am-ruler am-ruler--${side}" aria-hidden="true">${labels.map((l) => `<span>${l}</span>`).join('')}</div>`;
@@ -37,12 +38,29 @@ function tableColumns(blocks) {
 
 const svgWidth = (html) => Math.max(0, ...[...html.matchAll(/<svg\b[^>]*?\swidth="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1])));
 
+const TIMELINE_ITEMS_PER_SPAN = 3;
+
+// A horizontal timeline shows its items side by side; about three per column keep the time, title and note readable. The runtime floor
+// (TIMELINE_ITEM_MIN in runtime/layout-dom.js) keeps the same items apart when the layout script runs; this is the fallback without it.
+// A vertical timeline (the default above six items, or with the v argument) already reads in one column.
+function timelineSpan(blocks) {
+  let need = 1;
+  for (const b of blocks) {
+    if (b.type !== 'fence' || b.lang !== 'timeline') continue;
+    const items = contentLines(b.text).length;
+    const vertical = /\bv(ertical)?\b/.test(b.args) || (!/\bh(orizontal)?\b/.test(b.args) && items > 6);
+    if (!vertical) need = Math.max(need, Math.ceil(items / TIMELINE_ITEMS_PER_SPAN));
+  }
+  return need;
+}
+
 // How many columns the panel content needs at least. Panels with an explicit span do not go through here.
 export function minSpan(panel) {
   const tableCols = tableColumns(panel.blocks ?? []);
   const byTable = tableCols >= WIDE_TABLE_COLS ? Math.ceil(tableCols / TABLE_COLS_PER_SPAN) : 1;
   const byDiagram = Math.ceil(svgWidth(panel.html ?? '') / DIAGRAM_PX_PER_SPAN);
-  return Math.max(1, byTable, byDiagram);
+  const byTimeline = timelineSpan(panel.blocks ?? []);
+  return Math.max(1, byTable, byDiagram, byTimeline);
 }
 
 export function sheet({ meta, introHtml, panels, language }) {
