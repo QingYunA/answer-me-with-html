@@ -1,9 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { main } from '../src/cli.js';
 
 let dir;
@@ -121,11 +121,111 @@ test('cli render: style 80 prints warnings and still renders; strict refuses to 
   assert.equal(soft.code, 0);
   assert.match(soft.out, /STE 1 warning[\s\S]*L2 \[word\] not recommended: "Utilize" → use/);
 
-  const before = readdirSync(join(dir, 'pages')).length;
+  const count = () => ['pages', 'drafts'].map((d) => readdirSync(join(dir, d)).length).join();
+  const before = count();
   const strict = await run(['render', '-', '--style', 'strict'], { stdin: bad });
   assert.equal(strict.code, 1);
   assert.match(strict.err, /STE check failed/);
-  assert.equal(readdirSync(join(dir, 'pages')).length, before, 'a strict failure writes no file');
+  assert.equal(count(), before, 'a strict failure writes no file');
+});
+
+// Render with an injected clock and opener; each call is one second later, so every file gets its own name.
+function drafting(home) {
+  const opened = [];
+  let now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const call = async (args, stdin = '') => {
+    const out = sink();
+    const err = sink();
+    now += 1000;
+    const code = await main(args, {
+      stdout: out.stream, stderr: err.stream, stdin: Readable.from([stdin]),
+      env: { AM_HOME: home, AM_NO_UPDATE_CHECK: '1' }, cwd: home, now: () => now, open: (f) => opened.push(f),
+    });
+    return { code, out: out.text, err: err.text };
+  };
+  return { call, opened };
+}
+
+const WARNED = '---\ntitle: Draft\n---\n## A\nUtilize the tool.\n';
+const FIXED = '---\ntitle: Draft\n---\n## A\nUse the tool.\n';
+const draftOf = (out) => out.match(/^~ draft (.+\.html)$/m)?.[1];
+
+test('cli render: a page with warnings is a draft in drafts/, not opened; --replace renders again and deletes it', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-draft-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const { call, opened } = drafting(home);
+
+  const first = await call(['render', '-'], WARNED);
+  assert.equal(first.code, 0, first.err);
+  const draft = draftOf(first.out);
+  assert.equal(dirname(draft), join(home, 'drafts'));
+  assert.ok(existsSync(draft));
+  assert.doesNotMatch(first.out, /^✓ /m, 'a draft has no ✓ line');
+  assert.match(first.out, new RegExp(`--replace ${draft}`));
+  assert.ok(!existsSync(join(home, 'pages')), 'a draft writes nothing to pages/');
+  assert.deepEqual(opened, [], 'a draft does not open');
+
+  const again = await call(['render', '-', '--replace', draft], WARNED);
+  const second = draftOf(again.out);
+  assert.ok(second && second !== draft);
+  assert.deepEqual(readdirSync(join(home, 'drafts')), [basename(second)], 'the replaced draft is gone');
+
+  const done = await call(['render', '-', '--replace', second], FIXED);
+  assert.equal(done.code, 0, done.err);
+  const page = done.out.match(/^✓ (.+\.html)$/m)[1];
+  assert.equal(dirname(page), join(home, 'pages'));
+  assert.deepEqual(readdirSync(join(home, 'drafts')), []);
+  assert.deepEqual(readdirSync(join(home, 'pages')), [basename(page)], 'one answer leaves one page');
+  assert.deepEqual(opened, [page]);
+});
+
+test('cli render: --replace takes only a draft, and a failed render keeps the draft', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-draft-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const { call } = drafting(home);
+  const draft = draftOf((await call(['render', '-'], WARNED)).out);
+
+  const page = join(home, 'keep.html');
+  writeFileSync(page, 'x');
+  const refused = await call(['render', '-', '--replace', page], FIXED);
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /--replace takes a draft/);
+  assert.ok(existsSync(page), 'a file outside drafts/ is never deleted');
+  assert.ok(!existsSync(join(home, 'pages')), 'a refused --replace renders nothing');
+
+  const broken = await call(['render', '-', '--replace', draft], '## A\n```flow\nA -> B');
+  assert.equal(broken.code, 1);
+  assert.ok(existsSync(draft), 'the draft stays when the new render fails');
+});
+
+test('cli render: -o writes a page with warnings to that path, not to drafts/', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-draft-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const { call } = drafting(home);
+  const r = await call(['render', '-', '-o', 'out.html'], WARNED);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /^✓ .+out\.html$/m);
+  assert.ok(existsSync(join(home, 'out.html')) && !existsSync(join(home, 'drafts')));
+});
+
+test('cli publish: moves a draft into pages/ and opens it; anything else is refused', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-draft-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const { call, opened } = drafting(home);
+  const draft = draftOf((await call(['render', '-'], WARNED)).out);
+  const html = readFileSync(draft, 'utf8');
+
+  const r = await call(['publish', draft]);
+  assert.equal(r.code, 0, r.err);
+  const page = join(home, 'pages', basename(draft));
+  assert.match(r.out, new RegExp(`^✓ ${page}$`, 'm'));
+  assert.equal(readFileSync(page, 'utf8'), html, 'publish keeps the draft as it is');
+  assert.ok(!existsSync(draft));
+  assert.deepEqual(opened, [page]);
+
+  assert.equal((await call(['publish', draft])).code, 2, 'a missing draft');
+  assert.equal((await call(['publish', page])).code, 2, 'a page in pages/');
+  assert.equal((await call(['publish'])).code, 2, 'no argument');
 });
 
 test('cli lint: checks only; warnings under strict return 1; off skips the check', async () => {

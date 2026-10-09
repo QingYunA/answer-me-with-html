@@ -3,7 +3,7 @@
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync3, existsSync as existsSync6 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync3, existsSync as existsSync6, lstatSync as lstatSync2, renameSync as renameSync4, rmSync as rmSync6 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.0";
@@ -8277,7 +8277,7 @@ async function runUpdateCheck(home, fetchImpl = fetch) {
 // src/housekeeping.js
 var CLEAN = Object.freeze({
   days: 30,
-  // am clean deletes pages and videos older than 30 days by default
+  // am clean deletes pages, drafts and videos older than 30 days by default
   bigBytes: 200 * 2 ** 20,
   // notify at once above 200 MB
   staleDays: 30,
@@ -8287,7 +8287,7 @@ var CLEAN = Object.freeze({
   hintEveryDays: 7
   // the same notice at most once every 7 days
 });
-var DIRS3 = ["pages", "videos", "cache"];
+var DIRS3 = ["pages", "drafts", "videos", "cache"];
 function walk(dir) {
   let entries;
   try {
@@ -8318,7 +8318,7 @@ function usage(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join6(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...["pages", "drafts", "videos"].flatMap((d) => walk(join6(home, d)).filter((f2) => all || f2.mtime < cutoff)),
     ...walk(join6(home, "cache"))
   ];
   if (!dryRun) {
@@ -8338,7 +8338,7 @@ function cleanHint(state, use, now = Date.now()) {
   const pages = `${use.pages.count} page${use.pages.count === 1 ? "" : "s"}`;
   const parts = `${pages} ${mb(use.pages.bytes)}, videos ${mb(use.videos.bytes)}, voice-over cache ${mb(use.cache.bytes)}`;
   const when = state.lastClean ? `last cleaned ${days} days ago` : "never cleaned";
-  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages and videos older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
+  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages, drafts and videos older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
 }
 function afterRender({ home, env, config, current, scriptPath, background, now = Date.now() }) {
   let state = readState(home);
@@ -8699,8 +8699,9 @@ var MAX_LISTED_WARNINGS = 20;
 var USAGE = `Answer me with HTML ${VERSION} \u2014 renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--no-open] [--theme ${["auto", ...themeNames("page")].join("|")}]
+  am render <file|->  [-o <path>] [--replace <draft>] [--no-open] [--theme ${["auto", ...themeNames("page")].join("|")}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
+  am publish <draft>  [--no-open]                 move a draft into pages/ as it is and open it
   am patch  <html> --panel <title> [file|-] [--from file] [--theme \u2026] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
@@ -8716,6 +8717,8 @@ Usage:
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
+- A render with STE or code warnings is a draft: it goes to drafts/ instead, does not open, and prints "~ draft <path>".
+  Fix the draft and render again with --replace <draft> (the draft is deleted once the new file is written), or keep it with am publish <draft>.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 var FORMAT = `Draft format (extended Markdown)
@@ -8864,6 +8867,7 @@ async function main(argv, io = {}) {
       allowPositionals: true,
       options: {
         out: { type: "string", short: "o" },
+        replace: { type: "string" },
         "no-open": { type: "boolean" },
         open: { type: "boolean" },
         theme: { type: "string" },
@@ -8899,6 +8903,8 @@ ${USAGE}`);
       return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
     case "patch":
       return cmdPatch(arg, rest[0], opts, ctx);
+    case "publish":
+      return cmdPublish(arg, opts, ctx);
     case "video":
       return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case "lint":
@@ -8956,7 +8962,12 @@ function shouldOpen(opts, env, config) {
   return config.open !== false;
 }
 function cmdRender(src, opts, ctx, baseDir) {
-  const { fail } = ctx;
+  const { fail, print } = ctx;
+  const replaced = opts.replace === void 0 ? null : draftPath(opts.replace, ctx);
+  if (replaced === false) {
+    fail(`\u2717 --replace takes a draft that am render wrote (a .html file in ${join9(amHome(ctx.env), "drafts")})`);
+    return 2;
+  }
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
@@ -8965,8 +8976,47 @@ function cmdRender(src, opts, ctx, baseDir) {
   } catch (e) {
     return reportError(e, fail);
   }
-  const file = outputPath("pages", result.meta.title, opts, ctx);
-  emit(result, file, ctx);
+  const draft = !opts.out && isDraft(result);
+  const file = outputPath(draft ? "drafts" : "pages", result.meta.title, opts, ctx);
+  emit(result, file, ctx, "", draft ? "~ draft" : "\u2713");
+  if (replaced && replaced !== resolve4(file)) rmSync6(replaced, { force: true });
+  if (!draft) return finish(file, opts, config, ctx);
+  print(`  Not opened. Fix the draft and run am render again with --replace ${file}, or keep it as it is with am publish ${file}`);
+  printHints(config, ctx);
+  return 0;
+}
+function isDraft(result) {
+  return result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0;
+}
+function draftPath(arg, { env, io }) {
+  const path = resolve4(io.cwd ?? process.cwd(), arg);
+  return dirname3(path) === resolve4(amHome(env), "drafts") && basename4(path).endsWith(".html") ? path : false;
+}
+function cmdPublish(arg, opts, ctx) {
+  const { fail, print, env } = ctx;
+  const draft = arg === void 0 ? false : draftPath(arg, ctx);
+  let isFile = false;
+  try {
+    isFile = draft !== false && lstatSync2(draft).isFile();
+  } catch {
+  }
+  if (!isFile) {
+    fail(`\u2717 am publish takes a draft that am render wrote (a .html file in ${join9(amHome(env), "drafts")})`);
+    return 2;
+  }
+  const home = resolve4(amHome(env));
+  const file = join9(home, "pages", basename4(draft));
+  if (existsSync6(file)) {
+    fail(`\u2717 ${file} already exists; the draft was not moved`);
+    return 1;
+  }
+  const config = loadConfig(ctx);
+  ensureHome(home);
+  mkdirSync3(dirname3(file), { recursive: true });
+  renameSync4(draft, file);
+  print(`\u2713 ${file}`);
+  const link = serveLink(home, file);
+  if (link) print(`  link: ${link}`);
   return finish(file, opts, config, ctx);
 }
 var PATCH_HELP = `Replace one panel of a rendered page in place
@@ -9161,9 +9211,9 @@ function writePage(file, html, env) {
   mkdirSync3(dirname3(file), { recursive: true });
   writeFileSync6(file, html);
 }
-function emit(result, file, { print, env }, note2 = "") {
+function emit(result, file, { print, env }, note2 = "", mark = "\u2713") {
   writePage(file, result.html, env);
-  print(`\u2713 ${file}`);
+  print(`${mark} ${file}`);
   const link = serveLink(amHome(env), file);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note2}`);
@@ -9228,8 +9278,8 @@ function cmdClean(opts, { print, fail, env }) {
   const before = usage(home);
   const dry = Boolean(opts["dry-run"]);
   const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry });
-  const scope = opts.all ? "all pages and videos" : `pages and videos older than ${count(days, "day")}`;
-  print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, "page")}, ${count(before.videos.count, "video")}, ${mb(before.cache.bytes)} voice-over cache)`);
+  const scope = opts.all ? "all pages, drafts and videos" : `pages, drafts and videos older than ${count(days, "day")}`;
+  print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, "page")}, ${count(before.drafts.count, "draft")}, ${count(before.videos.count, "video")}, ${mb(before.cache.bytes)} voice-over cache)`);
   print(dry ? `Would delete ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.` : `\u2713 Deleted ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
   return 0;
 }

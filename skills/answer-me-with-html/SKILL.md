@@ -77,9 +77,10 @@ AM_EOF
 
 4. Read the output:
    - `✓ <path>`: success. Whether the browser opens automatically depends on the user's settings (`am config`); `--no-open` affects only this run.
-   - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again.
-   - `code n warnings`: a code block is longer than 40 lines, or a diff hunk has a different number of lines than its `@@` header says. Cut the block or fix the header to the lines that make the point and render again, or keep it if every line matters.
-   - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, keep the page and say so.
+   - `~ draft <path>`: the page has STE or code warnings, so the CLI wrote it to `drafts/`, not `pages/`, and did not open it. Fix the draft as the warnings below say, then render again with `--replace <draft path>`: the CLI deletes that draft once the new file is written, so only one page remains. Never give a draft path to the user.
+   - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again (no file was written).
+   - `code n warnings`: a code block is longer than 40 lines, or a diff hunk has a different number of lines than its `@@` header says. Cut the block or fix the header to the lines that make the point and render again, or, if every line matters, keep it with `am publish <draft path>`.
+   - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, run `am publish <draft path>` to move the last draft into `pages/` as it is, and say so.
    - `! Cleanup hint: …` or `! Update hint: …`: pass it on to the user in one sentence at the end of the reply, and ask whether to clean up / update. **Do not run am clean or the update command yourself**; wait until the user agrees. The CLI throttles these: the cleanup hint appears at most once every 7 days, the update hint at most once every 3 days.
 5. Reply in the terminal with only 2–3 lines: one core conclusion + the page link. Do not paste the draft or the HTML back into the terminal. Write this reply after the render, as the last step of the turn: render the page first, then reply. No tool call comes after the reply.
    If the render output has a `link: http://…` line, the user runs `am serve`: use that URL as the page link instead, with the URL as the label too, and skip the `file://` link below. Never start `am serve` yourself; only the user starts it.

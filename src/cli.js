@@ -1,7 +1,7 @@
 // am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, lstatSync, renameSync, rmSync } from 'node:fs';
 import { VERSION } from './assets.js';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -33,8 +33,9 @@ const MAX_LISTED_WARNINGS = 20;
 const USAGE = `Answer me with HTML ${VERSION} — renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
+  am render <file|->  [-o <path>] [--replace <draft>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
+  am publish <draft>  [--no-open]                 move a draft into pages/ as it is and open it
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
   am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
@@ -50,6 +51,8 @@ Usage:
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
+- A render with STE or code warnings is a draft: it goes to drafts/ instead, does not open, and prints "~ draft <path>".
+  Fix the draft and render again with --replace <draft> (the draft is deleted once the new file is written), or keep it with am publish <draft>.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 
@@ -204,6 +207,7 @@ export async function main(argv, io = {}) {
       allowPositionals: true,
       options: {
         out: { type: 'string', short: 'o' },
+        replace: { type: 'string' },
         'no-open': { type: 'boolean' },
         open: { type: 'boolean' },
         theme: { type: 'string' },
@@ -238,6 +242,7 @@ export async function main(argv, io = {}) {
   switch (cmd) {
     case 'render': return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
+    case 'publish': return cmdPublish(arg, opts, ctx);
     case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
@@ -290,7 +295,12 @@ export function shouldOpen(opts, env, config) {
 }
 
 function cmdRender(src, opts, ctx, baseDir) {
-  const { fail } = ctx;
+  const { fail, print } = ctx;
+  const replaced = opts.replace === undefined ? null : draftPath(opts.replace, ctx);
+  if (replaced === false) {
+    fail(`✗ --replace takes a draft that am render wrote (a .html file in ${join(amHome(ctx.env), 'drafts')})`);
+    return 2;
+  }
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
@@ -299,8 +309,55 @@ function cmdRender(src, opts, ctx, baseDir) {
   } catch (e) {
     return reportError(e, fail);
   }
-  const file = outputPath('pages', result.meta.title, opts, ctx);
-  emit(result, file, ctx);
+  // -o is an exact path the caller chose, so it is never a draft.
+  const draft = !opts.out && isDraft(result);
+  const file = outputPath(draft ? 'drafts' : 'pages', result.meta.title, opts, ctx);
+  emit(result, file, ctx, '', draft ? '~ draft' : '✓');
+  if (replaced && replaced !== resolve(file)) rmSync(replaced, { force: true });
+  if (!draft) return finish(file, opts, config, ctx);
+  print(`  Not opened. Fix the draft and run am render again with --replace ${file}, or keep it as it is with am publish ${file}`);
+  printHints(config, ctx);
+  return 0;
+}
+
+// A page with STE or code warnings is a draft: the Agent fixes the draft and renders again. Drafts live in drafts/, next to
+// pages/ and not inside it, so pages/ (and anything that lists or serves it) holds only finished pages.
+function isDraft(result) {
+  return result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0;
+}
+
+// The absolute path of a draft, or false when arg does not name a .html file directly inside drafts/. The file may be gone.
+function draftPath(arg, { env, io }) {
+  const path = resolve(io.cwd ?? process.cwd(), arg);
+  return dirname(path) === resolve(amHome(env), 'drafts') && basename(path).endsWith('.html') ? path : false;
+}
+
+function cmdPublish(arg, opts, ctx) {
+  const { fail, print, env } = ctx;
+  const draft = arg === undefined ? false : draftPath(arg, ctx);
+  let isFile = false;
+  try {
+    isFile = draft !== false && lstatSync(draft).isFile();
+  } catch {
+    // A missing draft is reported below.
+  }
+  if (!isFile) {
+    fail(`✗ am publish takes a draft that am render wrote (a .html file in ${join(amHome(env), 'drafts')})`);
+    return 2;
+  }
+  const home = resolve(amHome(env));
+  const file = join(home, 'pages', basename(draft));
+  if (existsSync(file)) {
+    fail(`✗ ${file} already exists; the draft was not moved`);
+    return 1;
+  }
+  const config = loadConfig(ctx);
+  ensureHome(home);
+  mkdirSync(dirname(file), { recursive: true });
+  renameSync(draft, file);
+  print(`✓ ${file}`);
+  const link = serveLink(home, file);
+  if (link) print(`  link: ${link}`);
   return finish(file, opts, config, ctx);
 }
 
@@ -521,10 +578,10 @@ function writePage(file, html, env) {
   writeFileSync(file, html);
 }
 
-// Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
-function emit(result, file, { print, env }, note = '') {
+// Write the page, print the path after mark, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
+function emit(result, file, { print, env }, note = '', mark = '✓') {
   writePage(file, result.html, env);
-  print(`✓ ${file}`);
+  print(`${mark} ${file}`);
   // With am serve running, a page inside the data directory also gets an http link.
   const link = serveLink(amHome(env), file);
   if (link) print(`  link: ${link}`);
@@ -600,8 +657,8 @@ function cmdClean(opts, { print, fail, env }) {
   const before = usage(home);
   const dry = Boolean(opts['dry-run']);
   const r = clean(home, { days, all: Boolean(opts.all), dryRun: dry });
-  const scope = opts.all ? 'all pages and videos' : `pages and videos older than ${count(days, 'day')}`;
-  print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, 'page')}, ${count(before.videos.count, 'video')}, ${mb(before.cache.bytes)} voice-over cache)`);
+  const scope = opts.all ? 'all pages, drafts and videos' : `pages, drafts and videos older than ${count(days, 'day')}`;
+  print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, 'page')}, ${count(before.drafts.count, 'draft')}, ${count(before.videos.count, 'video')}, ${mb(before.cache.bytes)} voice-over cache)`);
   print(dry
     ? `Would delete ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.`
     : `✓ Deleted ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
