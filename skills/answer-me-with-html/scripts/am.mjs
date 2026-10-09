@@ -109,6 +109,19 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
 .am-diagram .am-delta-badge text { fill: var(--paper, #ffffff); font: 700 11px var(--font-sans, sans-serif); text-decoration: none; }
 
+/* er: entities and relationships use the flow rules above (an entity is an .am-node, a relationship path and its end marks are .am-edge). A marked field row adds a tinted band,
+   colored text and its sign at the start of the row; Before and After show a plain schema, so the bands and signs hide there and the rows keep their place. */
+.am-view-before .am-er-band, .am-view-after .am-er-band, .am-view-before .am-er-sign, .am-view-after .am-er-sign { visibility: hidden; }
+.am-er-sign { font-weight: 700; }
+.am-view-changes .am-er-band[data-delta="added"] { fill: var(--ok-bg); }
+.am-view-changes .am-er-band[data-delta="removed"] { fill: var(--err-bg); }
+.am-view-changes .am-er-band[data-delta="changed"] { fill: var(--warn-bg); }
+.am-view-changes .am-er-sign[data-delta="added"], .am-view-changes .am-er-field[data-delta="added"], .am-view-changes .am-er-key[data-delta="added"] { fill: var(--ok); }
+.am-view-changes .am-er-sign[data-delta="removed"], .am-view-changes .am-er-field[data-delta="removed"], .am-view-changes .am-er-key[data-delta="removed"] { fill: var(--err); }
+.am-view-changes .am-er-sign[data-delta="changed"], .am-view-changes .am-er-field[data-delta="changed"], .am-view-changes .am-er-key[data-delta="changed"] { fill: var(--warn); }
+.am-view-changes .am-er-field[data-delta="removed"] { text-decoration: line-through; }
+.am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
+
 /* tree */
 .am-tree .am-delta-badge {
   display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 15px; height: 15px; flex: none;
@@ -5898,6 +5911,7 @@ var HEAD_LH = 20;
 var FIELD_LH = 17;
 var PAD = 11;
 var KEY_GAP = 12;
+var SIGN_W = 14;
 var MIN_WIDTH = 92;
 var LOOP_OUT = 34;
 var LOOP_STEP = 20;
@@ -5928,12 +5942,32 @@ User 1--* Order: places       \u2190 A <cardinality>--<cardinality> B: label (op
 - A Mermaid line such as USER ||--o{ ORDER is an error that shows the line written for this component.
 - An entity a field or a relationship names must be written at column 0.
 - A field that points at its own entity draws a loop: beside the box, or below it in LR and RL.
-- The default direction is TB (top to bottom).`,
+- The default direction is TB (top to bottom).
+- Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space: an entity line at column 0, a field line after its indentation, or a relationship line:
+\`\`\`er
+User
+  ~ email varchar(320) UK
+  + phone string
+Order
+  + coupon_id FK -> Coupon
+  - legacy_ref string
++ Coupon
+  id PK
+- AuditLog
+  id PK
++ User 1--* Coupon: owns
+\`\`\`
+  - An entity is marked only by its own line; a marked field does not mark it. The fields of a + or - entity inherit its marker, and a field with another marker is an error. ~ marks a field as changed and does not show the old value. Markers combine with *.
+  - A relationship from an FK field takes the marker of that field; otherwise it is added or removed with an entity at either end. A written relationship line takes its own marker. To change one, remove the old line with - and add the new one with +; ~ on a relationship line is an error.
+  - The Changes view draws added in the theme's ok color, removed faded with struck-through text, changed with a warn outline, and each marked entity with a +, \u2212 or ~ badge. A marked field row gets a tinted band and its sign at the start of the row. A count row (entities, fields and written relationship lines) and a Before / Changes / After switch sit under the diagram: Before and After show the schema as it was and as it will be, plain and without the items that are not in that view.
+  - A line that starts with a marker and a space is always read as a marker.`,
   example: "```er LR\n*User\n  id PK\n  email string UK\nOrder\n  id PK\n  user_id FK -> User\nUser 1--* Order: places\n```",
-  render(text, { args, ui, dir: pageDir = "ltr" }) {
+  render(text, { args, ui, video, dir: pageDir = "ltr" }) {
     const model = parseEr(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    return `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
+    const html = `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
+    const states = [...model.entities.values()].flatMap((e) => [e.state, ...e.fields.map((x2) => x2.state)]).concat(model.written.map((rel) => rel.state));
+    return withDelta(html, states.map((state) => state ?? null), { ui, video });
   }
 };
 function parseEr(text) {
@@ -5941,29 +5975,32 @@ function parseEr(text) {
   const written = [];
   let current = null;
   for (const { raw, text: line, line: n } of contentLines(text)) {
+    const { mark, text: body } = splitMarker(line);
+    const state = markState(mark);
     if (/^\s/.test(raw)) {
       if (!current) throw new ComponentError(`"${line}": a field line must follow an entity; write the entity name at the start of its own line first`, n);
-      current.fields.push(parseField(line, n));
+      current.fields.push(settleField(parseField(body, n), mark, current, n));
       continue;
     }
-    const rel = line.match(RELATIONSHIP);
+    const rel = body.match(RELATIONSHIP);
     if (rel) {
-      written.push({ from: rel[1], fromCard: rel[2], to: rel[4], toCard: rel[3], label: rel[5]?.trim() ?? "", line: n });
+      if (mark === "~") throw new ComponentError('er: ~ marks an entity or a field, not a relationship. To change a relationship, remove the old line and add the new one: "- A 1--* B" then "+ A 1--1 B"', n);
+      written.push({ from: rel[1], fromCard: rel[2], to: rel[4], toCard: rel[3], label: rel[5]?.trim() ?? "", line: n, ...state && { state } });
       current = null;
       continue;
     }
-    const mermaid = line.match(MERMAID);
+    const mermaid = body.match(MERMAID);
     if (mermaid && MERMAID_CARDS[mermaid[2]] && MERMAID_CARDS[mermaid[3]]) {
-      throw new ComponentError(`"${line}" is Mermaid syntax; write ${erLineOf(mermaid)}`, n);
+      throw new ComponentError(`"${line}" is Mermaid syntax; write ${mark && mark !== "~" ? `${mark} ` : ""}${erLineOf(mermaid)}`, n);
     }
-    if (line.includes("--") || line.includes("{") || line.includes("}")) {
+    if (body.includes("--") || body.includes("{") || body.includes("}")) {
       throw new ComponentError(`"${line}" is not an entity of this component; write A 1--* B for a relationship, or the entity name at column 0 on its own line`, n);
     }
-    const hi = line.startsWith("*");
-    const name = (hi ? line.slice(1) : line).trim();
+    const hi = body.startsWith("*");
+    const name = (hi ? body.slice(1) : body).trim();
     if (!name) throw new ComponentError("an entity needs a name", n);
     if (entities.has(name)) throw new ComponentError(`entity "${name}" is written twice`, n);
-    current = { name, hi, fields: [], line: n };
+    current = { name, hi, fields: [], line: n, ...state && { state } };
     entities.set(name, current);
   }
   if (!entities.size) throw new ComponentError("an entity relationship diagram needs at least one entity (a line at column 0)", 1);
@@ -5977,7 +6014,35 @@ function parseEr(text) {
       if (!entities.has(name)) throw new ComponentError(`no entity "${name}"; write it at column 0`, rel.line);
     }
   }
+  checkEnds(entities, written);
   return { entities, written };
+}
+function checkEnds(entities, written) {
+  const replaced = new Set(written.map((rel) => pairKey(rel.from, rel.to)));
+  const implied = [...entities.values()].flatMap((entity) => entity.fields.filter((field) => field.ref && !replaced.has(pairKey(entity.name, field.ref))).map((field) => ({ from: entity.name, to: field.ref, line: field.line, state: field.state === "changed" ? void 0 : field.state })));
+  for (const rel of [...implied, ...written]) {
+    const ends = [rel.from, rel.to].map((name) => entities.get(name));
+    const added = ends.find((e) => e.state === "added");
+    const removed = ends.find((e) => e.state === "removed");
+    if (rel.state === "added" && removed) {
+      throw new ComponentError(`er: the + relationship ${rel.from} to ${rel.to} touches the removed entity ${removed.name}, so it would dangle in the After view. Remove the + or keep ${removed.name}`, rel.line);
+    }
+    if (rel.state === "removed" && added) {
+      throw new ComponentError(`er: the - relationship ${rel.from} to ${rel.to} touches the added entity ${added.name}, so it would dangle in the Before view. Remove the - or do not add ${added.name}`, rel.line);
+    }
+    if (!rel.state && added && removed) {
+      throw new ComponentError(`er: the relationship ${rel.from} to ${rel.to} joins the added entity ${added.name} and the removed entity ${removed.name}, so it exists in neither view. Remove it or change an entity marker`, rel.line);
+    }
+  }
+}
+function settleField(field, mark, entity, n) {
+  const own = markState(mark);
+  const inherited = entity.state === "added" || entity.state === "removed" ? entity.state : null;
+  if (inherited && own && own !== inherited) {
+    throw new ComponentError(`er: "${mark}" under the ${inherited} entity ${entity.name} contradicts it. The fields of a ${inherited} entity are ${inherited} too; remove the marker or move the field`, n);
+  }
+  const state = inherited ?? own;
+  return state ? { ...field, state } : field;
 }
 function parseField(line, n) {
   const tokens = line.split(/\s+/);
@@ -6003,19 +6068,28 @@ function erLineOf(mermaid) {
   return `${from} ${MERMAID_CARDS[left]}--${MERMAID_CARDS[right]} ${to}${text ? `: ${text}` : ""}`;
 }
 function relationships({ entities, written }) {
+  const ends = (...names) => {
+    const states = names.map((name) => entities.get(name).state);
+    return ["removed", "added"].find((s) => states.includes(s));
+  };
+  const withState = (rel, state) => state ? { ...rel, state } : rel;
   const implied = [];
   for (const entity of entities.values()) {
     for (const field of entity.fields) {
-      if (field.ref) implied.push({ from: entity.name, fromCard: "*", to: field.ref, toCard: "1", label: "", line: field.line });
+      if (!field.ref) continue;
+      const own = field.state === "changed" ? null : field.state;
+      implied.push(withState({ from: entity.name, fromCard: "*", to: field.ref, toCard: "1", label: "", line: field.line }, own ?? ends(entity.name, field.ref)));
     }
   }
   const replaced = new Set(written.map((rel) => pairKey(rel.from, rel.to)));
-  return [...implied.filter((rel) => !replaced.has(pairKey(rel.from, rel.to))), ...written];
+  const lines = written.map((rel) => withState(rel, rel.state ?? ends(rel.from, rel.to) ?? implied.find((x2) => pairKey(x2.from, x2.to) === pairKey(rel.from, rel.to) && x2.state)?.state));
+  return [...implied.filter((rel) => !replaced.has(pairKey(rel.from, rel.to))), ...lines];
 }
 var pairKey = (a, b) => [a, b].sort().join("\0");
 var fieldText = (field) => field.type ? `${field.name} ${field.type}` : field.name;
 var nameWidth = (entity) => measure(entity.name, FS3, { bold: true });
-var rowWidth = (entity, field) => measure(fieldText(field), FIELD_FS, { bold: entity.hi }) + keyWidth(entity, field) + 2 * PAD;
+var rowWidth = (entity, field) => measure(fieldText(field), FIELD_FS, { bold: entity.hi }) + keyWidth(entity, field) + signWidth(entity) + 2 * PAD;
+var signWidth = (entity) => entity.fields.some((x2) => x2.state) ? SIGN_W : 0;
 var keyWidth = (entity, field) => field.marker ? measure(field.marker, KEY_FS, { mono: true, bold: entity.hi }) + KEY_GAP : 0;
 function nodeSize2(entity) {
   const rows = entity.fields.map((field) => rowWidth(entity, field));
@@ -6065,7 +6139,7 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   });
   const edgeSvg = straight.map(({ rel, data, points }) => {
     const label2 = rel.label ? labelSvg(rel.label, data.x, data.y, pageDir) : "";
-    return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
+    return `<g data-step="${stepOf.get(rel.line)}"${deltaAttr(rel.state)}><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
   });
   const nodeSvg = [...entities.values()].map((entity) => {
     const { x: x2, y: y2 } = centre(entity.name);
@@ -6129,12 +6203,17 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
   const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top2 + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top2 + PAD + HEAD_LH)}"/>`;
+  const rtl = pageDir === "rtl";
+  const shift = (rtl ? -1 : 1) * signWidth(entity);
   const fields2 = entity.fields.map((field, i) => {
     const cy = top2 + PAD + HEAD_LH + FIELD_LH * (i + 0.5) + 1;
-    const marker = field.marker ? `<text class="am-er-key am-cluster-label" x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
-    return `<text class="am-er-field" style="font-size:${FIELD_FS}px" x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
+    const mark = deltaAttr(field.state);
+    const marker = field.marker ? `<text class="am-er-key am-cluster-label"${mark} x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
+    const band = field.state ? `<rect class="am-er-band"${mark} x="${f(left + 1)}" y="${f(cy - FIELD_LH / 2)}" width="${f(size.width - 2)}" height="${FIELD_LH}"/><text class="am-er-sign"${mark} x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(SIGN[field.state], pageDir))}</text>` : "";
+    return `${band}<text class="am-er-field"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
   }).join("");
-  return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}</g>`;
+  const badge = badgeSvg(entity.state, rtl ? left : left + size.width, top2);
+  return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"${deltaAttr(entity.state)}><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}${badge}</g>`;
 }
 function loopBeside(rel, x2, y2, size, nth, s) {
   const edge = x2 + s * size.width / 2;
@@ -6170,7 +6249,7 @@ function loopSvg({ rel, a, b, c, away, label }, step, pageDir) {
   const path = `<path class="am-edge" d="M${f(a.x)},${f(a.y)} C${f(c[0].x)},${f(c[0].y)} ${f(c[1].x)},${f(c[1].y)} ${f(b.x)},${f(b.y)}"/>`;
   const ends = `${endMark(a, { x: a.x + away.x, y: a.y + away.y }, rel.fromCard)}${endMark(b, { x: b.x + away.x, y: b.y + away.y }, rel.toCard)}`;
   const text = label ? labelSvg(rel.label, label.x, label.y, pageDir) : "";
-  return `<g data-step="${step}">${path}${ends}${text}</g>`;
+  return `<g data-step="${step}"${deltaAttr(rel.state)}>${path}${ends}${text}</g>`;
 }
 function labelWidth2(text) {
   return measure(text, EDGE_FS2) + 10;

@@ -1,4 +1,4 @@
-// Change markers (#122): a line in flow or tree that starts with "+ ", "- " or "~ " shows what a plan adds, removes and changes.
+// Change markers (#122, #155): a line in flow, tree or er that starts with "+ ", "- " or "~ " shows what a plan adds, removes and changes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -9,6 +9,7 @@ import { main } from '../src/cli.js';
 import { COMPONENTS, ComponentError } from '../src/components/index.js';
 import { splitMarker } from '../src/components/delta.js';
 import { parseFlow } from '../src/components/flow.js';
+import { parseEr, relationships } from '../src/components/er.js';
 import { renderDoc } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
 import { LANGUAGES } from '../src/languages/registry.js';
@@ -280,6 +281,213 @@ test('tree: the labels follow the page language', () => {
   assert.match(render('tree', TREE, 'list', { ui: zh }), /\+1 新增/);
 });
 
+// ── er ──
+const ER = 'User\n  id PK\n  ~ email varchar(320) UK\n  + phone string\nOrder\n  id PK\n  user_id FK -> User\n  + coupon_id FK -> Coupon\n  - legacy_ref string\n+ Coupon\n  id PK\n  code string UK\n- AuditLog\n  id PK\n  user_id FK -> User\n~ Product\n  id PK';
+const erOf = (text, args = '', extra) => render('er', text, args, extra);
+const entityStates = (model) => Object.fromEntries([...model.entities.values()].map((e) => [e.name, e.state ?? null]));
+const fieldStates = (model, name) => model.entities.get(name).fields.map((x) => [x.name, x.state ?? null]);
+const relStates = (text) => relationships(parseEr(text)).map((r) => [r.from, r.to, r.state ?? null]);
+
+test('parseEr: an entity line takes + - or ~, and the marker combines with *', () => {
+  const m = parseEr(ER);
+  assert.deepEqual(entityStates(m), { User: null, Order: null, Coupon: 'added', AuditLog: 'removed', Product: 'changed' });
+  const hi = parseEr('+ *Coupon\n~ *Product\n- AuditLog');
+  assert.equal(hi.entities.get('Coupon').hi, true);
+  assert.deepEqual(entityStates(hi), { Coupon: 'added', Product: 'changed', AuditLog: 'removed' });
+});
+
+test('parseEr: a field marker comes after the indentation; the fields of an added or removed entity inherit its marker, ~ is not inherited', () => {
+  const m = parseEr(ER);
+  assert.deepEqual(fieldStates(m, 'User'), [['id', null], ['email', 'changed'], ['phone', 'added']]);
+  assert.deepEqual(fieldStates(m, 'Order'), [['id', null], ['user_id', null], ['coupon_id', 'added'], ['legacy_ref', 'removed']]);
+  assert.deepEqual(fieldStates(m, 'Coupon'), [['id', 'added'], ['code', 'added']]);
+  assert.deepEqual(fieldStates(m, 'AuditLog'), [['id', 'removed'], ['user_id', 'removed']]);
+  assert.deepEqual(fieldStates(m, 'Product'), [['id', null]]);
+  assert.deepEqual(m.entities.get('Order').fields[2], { name: 'coupon_id', type: '', marker: 'FK', ref: 'Coupon', line: 8, state: 'added' });
+  assert.deepEqual(fieldStates(parseEr('~ T\n  ~ a\n  b'), 'T'), [['a', 'changed'], ['b', null]]);
+});
+
+test('parseEr: marked fields do not mark their entity', () => {
+  assert.deepEqual(entityStates(parseEr('User\n  + phone string\n  - legacy string\n  ~ email string')), { User: null });
+});
+
+test('parseEr: a field whose marker differs from the marker of its added or removed entity is an error at its line; the same marker is fine', () => {
+  const removed = lineError(() => parseEr('- AuditLog\n  id PK\n  + note string'), 3);
+  assert.match(removed, /"\+" under the removed entity AuditLog contradicts it/);
+  lineError(() => parseEr('+ Coupon\n  - code string'), 2);
+  lineError(() => parseEr('+ Coupon\n  ~ code string'), 2);
+  assert.deepEqual(fieldStates(parseEr('+ Coupon\n  + code string'), 'Coupon'), [['code', 'added']]);
+  assert.deepEqual(fieldStates(parseEr('- Coupon\n  - code string'), 'Coupon'), [['code', 'removed']]);
+});
+
+test('parseEr: a relationship line takes + or -, and ~ is an error with the - then + example', () => {
+  const m = parseEr('User\nCoupon\nAuditLog\n+ User 1--* Coupon: has\n- User 1--* AuditLog\nUser 1--1 Coupon');
+  assert.deepEqual(m.written.map((r) => [r.from, r.to, r.label, r.state ?? null]), [['User', 'Coupon', 'has', 'added'], ['User', 'AuditLog', '', 'removed'], ['User', 'Coupon', '', null]]);
+  const msg = lineError(() => parseEr('User\nOrder\n~ User 1--* Order'), 3);
+  assert.match(msg, /~ marks an entity or a field, not a relationship/);
+  assert.match(msg, /"- A 1--\* B" then "\+ A 1--1 B"/);
+});
+
+test('parseEr: a marker needs a space after it; otherwise the line is plain text as before', () => {
+  const m = parseEr('User\n  -legacy string\n  +1 votes\n  ~x');
+  assert.deepEqual(m.entities.get('User').fields.map((x) => [x.name, x.state ?? null]), [['-legacy', null], ['+1', null], ['~x', null]]);
+  assert.deepEqual(entityStates(parseEr('-Old\n+New')), { '-Old': null, '+New': null });
+});
+
+test('parseEr: a marked entity written twice, a marked Mermaid line and a bad name are still errors', () => {
+  assert.match(errorOf(() => parseEr('User\n+ User')).message, /written twice/);
+  assert.match(errorOf(() => parseEr('+ USER ||--o{ ORDER : places')).message, /write \+ USER 1--\* ORDER: places/);
+  assert.match(errorOf(() => parseEr('~ USER ||--o{ ORDER')).message, /write USER 1--\* ORDER$/);
+  assert.match(errorOf(() => parseEr('+ Order\n  + user_id FK -> Usr')).message, /no entity "Usr"/);
+});
+
+test('er relationships: an implied one takes the + or - of its FK field, a ~ field leaves it unmarked', () => {
+  const states = (text) => relStates(`${text}\nUser\n  id PK\nCoupon\n  id PK`);
+  assert.deepEqual(states('Order\n  + coupon_id FK -> Coupon\n  user_id FK -> User\n  - old_id FK -> User'), [['Order', 'Coupon', 'added'], ['Order', 'User', null], ['Order', 'User', 'removed']]);
+  assert.deepEqual(states('Order\n  ~ coupon_id FK -> Coupon'), [['Order', 'Coupon', null]]);
+});
+
+test('er relationships: otherwise a relationship is added or removed with an entity at either end', () => {
+  const m = 'Order\n  user_id FK -> User\nUser\n  id PK\n+ Coupon\n  order_id FK -> Order\n- AuditLog\n  user_id FK -> User\nOrder 1--* Coupon: used\nAuditLog 1--1 User';
+  assert.deepEqual(relStates(m), [['Order', 'User', null], ['Order', 'Coupon', 'added'], ['AuditLog', 'User', 'removed']]);
+  assert.deepEqual(relStates('~ A\nB\nA 1--1 B'), [['A', 'B', null]]);
+});
+
+test('parseEr: an unmarked relationship line between an added and a removed entity is an error at its line', () => {
+  const written = lineError(() => parseEr('+ A\n- B\nA 1--1 B'), 3);
+  assert.match(written, /joins the added entity A and the removed entity B, so it exists in neither view/);
+  lineError(() => parseEr('+ A\n  id PK\nC\n- B\n  id PK\nC 1--* A\nB 1--* C\nA *--1 B'), 8);
+});
+
+test('parseEr: a + relationship cannot touch a removed entity, written or from a + FK field (error at its line)', () => {
+  const written = lineError(() => parseEr('User\n- AuditLog\n+ User 1--* AuditLog'), 3);
+  assert.match(written, /the \+ relationship User to AuditLog touches the removed entity AuditLog, so it would dangle in the After view/);
+  const field = lineError(() => parseEr('- AuditLog\n  id PK\nOrder\n  + log_id FK -> AuditLog'), 4);
+  assert.match(field, /touches the removed entity AuditLog/);
+  const inherited = lineError(() => parseEr('- AuditLog\n  id PK\n+ Coupon\n  id PK\n  x FK -> AuditLog'), 5);
+  assert.match(inherited, /touches the removed entity AuditLog/);
+});
+
+test('parseEr: a - relationship cannot touch an added entity, written or from a - FK field (error at its line)', () => {
+  const written = lineError(() => parseEr('User\n+ Coupon\n- User 1--* Coupon'), 3);
+  assert.match(written, /the - relationship User to Coupon touches the added entity Coupon, so it would dangle in the Before view/);
+  const field = lineError(() => parseEr('+ Coupon\n  id PK\nOrder\n  - coupon_id FK -> Coupon'), 4);
+  assert.match(field, /touches the added entity Coupon/);
+});
+
+test('parseEr: relationships whose markers agree with their ends are fine, including a - field of a removed entity and a replaced FK', () => {
+  assert.equal(errorOf(() => parseEr('User\n  id PK\n- AuditLog\n  id PK\n  user_id FK -> User')), null);
+  assert.equal(errorOf(() => parseEr('User\n  id PK\n+ Coupon\n  id PK\n  + owner FK -> User\n- User 1--* Order\nOrder')), null);
+  assert.equal(errorOf(() => parseEr('A\n- B\n- A 1--1 B')), null);
+  assert.equal(errorOf(() => parseEr('A\n+ B\n+ A 1--1 B')), null);
+});
+
+test('er relationships: a written line without a marker keeps the state of the FK field it replaces', () => {
+  assert.deepEqual(relStates('Order\n  + coupon_id FK -> Coupon\nCoupon\nOrder *--1 Coupon: uses'), [['Order', 'Coupon', 'added']]);
+});
+
+test('er relationships: an own marker on a written line wins, and it replaces the implied relationship of the same pair', () => {
+  const rels = relationships(parseEr('Order\n  user_id FK -> User\nUser\n- User 1--* Order\n+ User 1--1 Order'));
+  assert.deepEqual(rels.map((r) => [r.fromCard, r.toCard, r.state]), [['1', '*', 'removed'], ['1', '1', 'added']]);
+});
+
+test('er: the count row counts marked entities, fields and written relationship lines, and an implied relationship is not counted again', () => {
+  const html = erOf(ER);
+  assert.match(html, /^<figure class="am-diagram am-er am-view-changes"><svg/);
+  // added: Coupon + its 2 fields + phone + coupon_id; removed: AuditLog + its 2 fields + legacy_ref; changed: Product + email
+  assert.match(html, /<span class="am-delta-count am-delta-count--added">\+5 added<\/span>/);
+  assert.match(html, /<span class="am-delta-count am-delta-count--removed">−4 removed<\/span>/);
+  assert.match(html, /<span class="am-delta-count am-delta-count--changed">~2 changed<\/span>/);
+  assert.match(html, /<span class="am-delta-switch" role="group" aria-label="View" hidden>/);
+  const lines = erOf('User\nCoupon\n+ User 1--* Coupon\n- User 1--1 Coupon');
+  assert.match(lines, /\+1 added/);
+  assert.match(lines, /−1 removed/);
+});
+
+test('er: marked entities and relationships carry data-delta and the entity gets a corner badge', () => {
+  const html = erOf(ER);
+  for (const [state, name] of [['added', 'Coupon'], ['removed', 'AuditLog'], ['changed', 'Product']]) {
+    assert.match(html, new RegExp(`<g class="am-node am-node--er" data-key="${name}" data-step="\\d+" data-delta="${state}">`));
+  }
+  assert.doesNotMatch(html, /data-key="Order"[^>]*data-delta/);
+  assert.equal((html.match(/<g class="am-delta-badge am-delta-badge--/g) || []).length, 3);
+  assert.match(html, /<g class="am-delta-badge am-delta-badge--removed" data-delta="removed"[^>]*><circle[^>]*\/><text[^>]*>−<\/text><\/g>/);
+  assert.equal((html.match(/<g data-step="\d+" data-delta="added"><path class="am-edge"/g) || []).length, 1, 'coupon_id');
+  assert.equal((html.match(/<g data-step="\d+" data-delta="removed"><path class="am-edge"/g) || []).length, 1, 'AuditLog user_id');
+});
+
+test('er: a self-reference with a marker carries it too', () => {
+  const html = erOf('Employee\n  id PK\n+ Employee 1--* Employee: manages');
+  assert.match(html, /<g data-step="\d+" data-delta="added"><path class="am-edge"/);
+});
+
+test('er: a marked field row has a band, a sign at the start of the row, and data-delta on every part; unmarked rows are untouched', () => {
+  const html = erOf('User\n  id PK\n  ~ email string UK\n  + phone string\n  - legacy string');
+  assert.equal((html.match(/<rect class="am-er-band" data-delta="(added|removed|changed)"/g) || []).length, 3);
+  assert.match(html, /<text class="am-er-sign" data-delta="changed" x="[\d.]+" y="[\d.]+" dominant-baseline="central">~<\/text>/);
+  assert.match(html, /<text class="am-er-sign" data-delta="removed"[^>]*>−<\/text>/);
+  assert.match(html, /<text class="am-er-field" data-delta="added" style="font-size:12px"[^>]*>[^<]*phone string[^<]*<\/text>/);
+  assert.match(html, /<text class="am-er-key am-cluster-label" data-delta="changed"[^>]*>UK<\/text>/);
+  assert.match(html, /<text class="am-er-field" style="font-size:12px"[^>]*>id<\/text><text class="am-er-key am-cluster-label"[^>]*>PK<\/text>/, 'the unmarked row has no data-delta');
+  assert.equal((html.match(/class="am-er-sign"/g) || []).length, 3);
+});
+
+test('er: the fields of an added entity all carry its state', () => {
+  const html = erOf('+ Coupon\n  id PK\n  code string');
+  assert.equal((html.match(/<rect class="am-er-band" data-delta="added"/g) || []).length, 2);
+  assert.match(html, /\+3 added/);
+});
+
+test('er: an entity with a marked field makes room for the sign; an entity without one keeps its size', () => {
+  const widthOf = (text, name) => Number(erOf(text).match(new RegExp(`data-key="${name}"[^>]*><rect class="am-node-shape" x="[\\d.]+" y="[\\d.]+" width="([\\d.]+)"`))[1]);
+  assert.ok(widthOf('User\n  email varchar(320) UK', 'User') < widthOf('User\n  ~ email varchar(320) UK', 'User'));
+  assert.equal(widthOf('User\n  email varchar(320) UK\nOrder\n  + id PK', 'User'), widthOf('User\n  email varchar(320) UK', 'User'));
+});
+
+test('er: the sign sits at the start of the row, which is the right on a right-to-left page', () => {
+  const text = 'User\n  + phone string';
+  const at = (html, re) => Number(html.match(re)[1]);
+  const ltr = erOf(text, '', { dir: 'ltr' });
+  const rtl = erOf(text, '', { dir: 'rtl' });
+  const box = (html) => html.match(/<rect class="am-node-shape" x="([\d.]+)" y="[\d.]+" width="([\d.]+)"/).slice(1).map(Number);
+  const [lx, lw] = box(ltr);
+  const [rx, rw] = box(rtl);
+  const sign = (html) => at(html, /class="am-er-sign"[^>]* x="([\d.]+)"/);
+  const name = (html) => at(html, /class="am-er-field"[^>]* x="([\d.]+)"[^>]*>[^<]*phone/);
+  assert.ok(sign(ltr) < name(ltr) && sign(ltr) < lx + lw / 2, 'left to right: sign first, on the left');
+  assert.ok(sign(rtl) > name(rtl) && sign(rtl) > rx + rw / 2, 'right to left: sign first, on the right');
+  assert.ok(Math.abs(sign(rtl) - (rx + rw - 11)) < 0.2);
+  assert.match(rtl, /<svg [^>]*direction="rtl"/);
+});
+
+test('er: the entity badge sits in the corner opposite the one where reading starts', () => {
+  const box = (html) => html.match(/<rect class="am-node-shape" x="([\d.]+)" y="[\d.]+" width="([\d.]+)"/).slice(1).map(Number);
+  const badgeX = (html) => Number(html.match(/class="am-delta-badge[^>]*transform="translate\(([\d.]+),/)[1]);
+  const ltr = erOf('+ User\n  id PK', '', { dir: 'ltr' });
+  const rtl = erOf('+ User\n  id PK', '', { dir: 'rtl' });
+  assert.ok(Math.abs(badgeX(ltr) - (box(ltr)[0] + box(ltr)[1])) < 0.2);
+  assert.ok(Math.abs(badgeX(rtl) - box(rtl)[0]) < 0.2);
+});
+
+test('er: a diagram without markers has no delta markup', () => {
+  const plain = ER.replace(/^[+\-~] /gm, '').replace(/^( {2})[+\-~] /gm, '$1');
+  const html = erOf(plain, 'LR');
+  assert.doesNotMatch(html, /delta|am-er-band|am-er-sign/);
+  assert.match(html, /^<figure class="am-diagram am-er">/);
+});
+
+test('er: marked and unmarked layouts place the boxes alike when no field is marked (the view switch moves nothing)', () => {
+  const boxes = (h) => [...h.matchAll(/<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)].map((m) => m.slice(1).join(','));
+  assert.deepEqual(boxes(erOf('User\n  id PK\n+ Coupon\n  id PK\nUser 1--* Coupon')), boxes(erOf('User\n  id PK\nCoupon\n  id PK\nUser 1--* Coupon')));
+});
+
+test('er: the labels follow the page language', () => {
+  const html = erOf(ER, '', { ui: zh });
+  assert.match(html, /\+5 新增/);
+  assert.match(html, /−4 删除/);
+  assert.match(html, /~2 修改/);
+});
+
 // ── page and video ──
 const page = (fence) => `---\ntitle: T\nlang: en\n---\n## A Panel\n${fence}\n`;
 
@@ -294,6 +502,14 @@ test('page: the delta styles and script come only with a page that has markers',
 
 test('page: a tree with markers brings the same styles and script', () => {
   assert.match(renderDoc(page(`\`\`\`tree\n${TREE}\n\`\`\``)).html, /\.am-view-after \[data-delta="removed"\]/);
+});
+
+test('page: an er with markers brings the same styles and script, and an er without does not', () => {
+  const marked = renderDoc(page(`\`\`\`er\n${ER}\n\`\`\``)).html;
+  assert.match(marked, /\.am-view-after \[data-delta="removed"\]/);
+  assert.match(marked, /\.am-er-band/);
+  assert.match(marked, /am-view-changes/);
+  assert.doesNotMatch(renderDoc(page('```er\nUser\n  id PK\n```')).html, /data-delta|am-delta|am-er-band/);
 });
 
 test('page: the view switch script swaps the am-view class of its diagram and the pressed button', () => {
@@ -311,6 +527,17 @@ test('video: marked items use the same colors and badges, with no switch', async
   assert.match(html, /am-delta-count/);
   assert.doesNotMatch(html, /data-view=/);
   assert.match(html, /\.am-delta-badge/);
+});
+
+test('video: a marked er scene keeps its colors, badges and count row, with no switch', async () => {
+  const src = `---\ntitle: T\nlang: en\n---\n> Intro.\n\n## First\n\`\`\`er\n${ER}\n\`\`\`\n> One line.\n`;
+  const { html } = await renderVideo(src);
+  assert.match(html, /data-delta="added"/);
+  assert.match(html, /am-delta-badge/);
+  assert.match(html, /class="am-er-band" data-delta=/);
+  assert.match(html, /\+5 added/);
+  assert.doesNotMatch(html, /data-view=/);
+  assert.match(html, /\.am-er-band/);
 });
 
 test('video: a video without markers is not touched', async () => {
@@ -352,6 +579,19 @@ test('cli patch: a page with change markers keeps them, with their styles and sc
     assert.match(html, /data-delta="added"/);
     assert.match(html, /\.am-view-before \[data-delta="added"\]/);
     assert.match(html, /New text\./);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('cli: am help er documents the markers', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-delta-'));
+  try {
+    const r = await run(dir, ['help', 'er']);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /Change markers/);
+    assert.match(r.out, /Before \/ Changes \/ After/);
+    assert.match(r.out, /\+ coupon_id FK -> Coupon/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -459,4 +699,16 @@ test('delta css: the connector hooks redraw the stretches in Before and After', 
     for (const kind of ['full', 'short', 'none']) assert.match(css, new RegExp(`\\.am-view-${view} \\.am-tree-list li\\[data-line-${view}="${kind}"\\]::after`));
     for (const kind of ['full', 'start', 'end', 'none']) assert.match(css, new RegExp(`\\.am-view-${view} \\.am-tree-col\\[data-line-${view}="${kind}"\\]::before`));
   }
+});
+
+test('delta css: er rows are tinted, colored and signed in the Changes view only, and Before and After hide the bands and signs without moving anything', () => {
+  const css = cssOf();
+  for (const [state, tone] of [['added', 'ok'], ['removed', 'err'], ['changed', 'warn']]) {
+    assert.match(css, new RegExp(`\\.am-view-changes \\.am-er-band\\[data-delta="${state}"\\] \\{ fill: var\\(--${tone}-bg\\); \\}`));
+    for (const part of ['sign', 'field', 'key']) assert.match(css, new RegExp(`\\.am-view-changes \\.am-er-${part}\\[data-delta="${state}"\\][^{]*\\{ fill: var\\(--${tone}\\); \\}`));
+  }
+  const hide = rules(css).find((r) => /\.am-er-band/.test(r.selector) && /visibility: hidden/.test(r.body));
+  assert.ok(hide);
+  for (const sel of ['.am-view-before .am-er-band', '.am-view-after .am-er-band', '.am-view-before .am-er-sign', '.am-view-after .am-er-sign']) assert.ok(hide.selector.includes(sel), sel);
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /\.am-er[^{]*\{[^}]*display: none/);
 });

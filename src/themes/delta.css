@@ -31,6 +31,19 @@
 .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
 .am-diagram .am-delta-badge text { fill: var(--paper, #ffffff); font: 700 11px var(--font-sans, sans-serif); text-decoration: none; }
 
+/* er: entities and relationships use the flow rules above (an entity is an .am-node, a relationship path and its end marks are .am-edge). A marked field row adds a tinted band,
+   colored text and its sign at the start of the row; Before and After show a plain schema, so the bands and signs hide there and the rows keep their place. */
+.am-view-before .am-er-band, .am-view-after .am-er-band, .am-view-before .am-er-sign, .am-view-after .am-er-sign { visibility: hidden; }
+.am-er-sign { font-weight: 700; }
+.am-view-changes .am-er-band[data-delta="added"] { fill: var(--ok-bg); }
+.am-view-changes .am-er-band[data-delta="removed"] { fill: var(--err-bg); }
+.am-view-changes .am-er-band[data-delta="changed"] { fill: var(--warn-bg); }
+.am-view-changes .am-er-sign[data-delta="added"], .am-view-changes .am-er-field[data-delta="added"], .am-view-changes .am-er-key[data-delta="added"] { fill: var(--ok); }
+.am-view-changes .am-er-sign[data-delta="removed"], .am-view-changes .am-er-field[data-delta="removed"], .am-view-changes .am-er-key[data-delta="removed"] { fill: var(--err); }
+.am-view-changes .am-er-sign[data-delta="changed"], .am-view-changes .am-er-field[data-delta="changed"], .am-view-changes .am-er-key[data-delta="changed"] { fill: var(--warn); }
+.am-view-changes .am-er-field[data-delta="removed"] { text-decoration: line-through; }
+.am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
+
 /* tree */
 .am-tree .am-delta-badge {
   display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 15px; height: 15px; flex: none;

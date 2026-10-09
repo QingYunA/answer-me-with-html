@@ -409,7 +409,7 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
-function badgeSvg(state, x, y) {
+export function badgeSvg(state, x, y) {
   if (!state) return '';
   return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
