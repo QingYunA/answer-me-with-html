@@ -3,7 +3,7 @@
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync5, existsSync as existsSync5 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync3, existsSync as existsSync6 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.4.15";
@@ -320,7 +320,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join8, resolve as resolve4, dirname as dirname3, basename as basename4 } from "node:path";
+import { join as join9, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -8083,13 +8083,27 @@ function connect(url) {
 
 // src/housekeeping.js
 import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync3 } from "node:fs";
-import { join as join5 } from "node:path";
+import { join as join6 } from "node:path";
 
 // src/state.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, mkdirSync as mkdirSync2, renameSync as renameSync2 } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, renameSync as renameSync2 } from "node:fs";
+import { join as join5 } from "node:path";
+
+// src/home.js
+import { mkdirSync as mkdirSync2, existsSync as existsSync4, statSync as statSync3, chmodSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
 import { join as join4 } from "node:path";
+var defaultHome = () => join4(homedir2(), ".answer-me-with-html");
+function ensureHome(home) {
+  const fresh = !existsSync4(home);
+  mkdirSync2(home, { recursive: true, mode: 448 });
+  if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
+  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+}
+
+// src/state.js
 var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join4(home, "state.json");
+var statePath = (home) => join5(home, "state.json");
 function readState(home) {
   try {
     const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
@@ -8100,7 +8114,7 @@ function readState(home) {
 }
 function writeState(home, patch) {
   const next = { ...readState(home), ...patch };
-  mkdirSync2(home, { recursive: true });
+  ensureHome(home);
   const tmp = `${statePath(home)}.${process.pid}.tmp`;
   writeFileSync3(tmp, `${JSON.stringify(next, null, 2)}
 `);
@@ -8191,7 +8205,7 @@ function walk(dir) {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join5(dir, e.name);
+    const p = join6(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
       const s = lstatSync(p);
@@ -8204,7 +8218,7 @@ function walk(dir) {
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 function usage(home) {
   const parts = Object.fromEntries(DIRS3.map((d) => {
-    const files = walk(join5(home, d));
+    const files = walk(join6(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
@@ -8212,8 +8226,8 @@ function usage(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join5(home, d)).filter((f2) => all || f2.mtime < cutoff)),
-    ...walk(join5(home, "cache"))
+    ...["pages", "videos"].flatMap((d) => walk(join6(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...walk(join6(home, "cache"))
   ];
   if (!dryRun) {
     for (const f2 of victims) rmSync3(f2.path, { force: true });
@@ -8253,9 +8267,8 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
 }
 
 // src/config.js
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, mkdirSync as mkdirSync3, rmSync as rmSync4, existsSync as existsSync4 } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join6, dirname } from "node:path";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, rmSync as rmSync4, existsSync as existsSync5 } from "node:fs";
+import { join as join7, dirname } from "node:path";
 var ConfigError = class extends Error {
   constructor(message) {
     super(message);
@@ -8273,10 +8286,10 @@ var CONFIG_KEYS = Object.freeze({
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
 function amHome(env = process.env) {
-  return env.AM_HOME || join6(homedir2(), ".answer-me-with-html");
+  return env.AM_HOME || defaultHome();
 }
 function configPath(env = process.env) {
-  return join6(amHome(env), "config.json");
+  return join7(amHome(env), "config.json");
 }
 var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
 function configChoices(key, themes2) {
@@ -8299,7 +8312,7 @@ function coerce2(key, raw, themes2) {
 }
 function readStored(env) {
   const file = configPath(env);
-  if (!existsSync4(file)) return { stored: {} };
+  if (!existsSync5(file)) return { stored: {} };
   try {
     const data = JSON.parse(readFileSync6(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
@@ -8327,7 +8340,7 @@ function writeStored(stored, env) {
     rmSync4(file, { force: true });
     return;
   }
-  mkdirSync3(dirname(file), { recursive: true });
+  ensureHome(dirname(file));
   writeFileSync4(file, `${JSON.stringify(stored, null, 2)}
 `);
 }
@@ -8404,9 +8417,9 @@ import { createServer } from "node:http";
 import { connect as connect2 } from "node:net";
 import { uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5, mkdirSync as mkdirSync4 } from "node:fs";
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5 } from "node:fs";
 import { lstat, realpath, readFile } from "node:fs/promises";
-import { join as join7, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
+import { join as join8, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var TOKEN_LENGTH = 22;
@@ -8428,7 +8441,7 @@ var ServeError = class extends Error {
     this.name = "ServeError";
   }
 };
-var infoPath = (home) => join7(home, "serve.json");
+var infoPath = (home) => join8(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -8476,7 +8489,7 @@ function serveLink(home, file) {
   }
 }
 function writeInfo(home, info) {
-  mkdirSync4(home, { recursive: true });
+  ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   rmSync5(tmp, { force: true });
   writeFileSync5(tmp, `${JSON.stringify(info)}
@@ -8496,8 +8509,8 @@ function reply(req, res, status, type, body = "") {
 var notFound = (req, res) => reply(req, res, 404, "text/plain; charset=utf-8", "Not found\n");
 async function resolvePage(home, dir, file) {
   try {
-    const root = await realpath(join7(home, dir));
-    const path = join7(root, file);
+    const root = await realpath(join8(home, dir));
+    const path = join8(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
     return real.startsWith(root + sep2) ? real : null;
@@ -9005,9 +9018,10 @@ function validVoice(voice, fail) {
 }
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes: themes2 }) {
   const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
+  if (provider) ensureHome(amHome(env));
   const result = await renderVideo(src, {
     provider,
-    cacheDir: join8(amHome(env), "cache", "tts"),
+    cacheDir: join9(amHome(env), "cache", "tts"),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -9047,11 +9061,16 @@ function themeWarnings({ fail, themes: themes2 }) {
 }
 function outputPath(dir, title, opts, { env, io }) {
   if (opts.out) return resolve4(io.cwd ?? process.cwd(), opts.out);
-  return join8(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join9(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+}
+function writePage(file, html, env) {
+  const home = resolve4(amHome(env));
+  if (resolve4(file).startsWith(home + sep3)) ensureHome(home);
+  mkdirSync3(dirname3(file), { recursive: true });
+  writeFileSync6(file, html);
 }
 function emit(result, file, { print, env }, note2 = "") {
-  mkdirSync5(dirname3(file), { recursive: true });
-  writeFileSync6(file, result.html);
+  writePage(file, result.html, env);
   print(`\u2713 ${file}`);
   const link = serveLink(amHome(env), file);
   if (link) print(`  link: ${link}`);
@@ -9244,13 +9263,13 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join8(amHome(env), "themes", `${target}.json`);
+  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join9(amHome(env), "themes", `${target}.json`);
   const name = isFile ? basename4(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
   if (!isFile && getTheme(name)) {
     theme = getTheme(name);
-  } else if (existsSync5(path)) {
+  } else if (existsSync6(path)) {
     ({ theme, errors } = readThemeFile(path, themeNames("video")));
   } else {
     fail(`\u2717 No theme named "${target}": ${path} does not exist`);
@@ -9268,8 +9287,7 @@ function cmdTheme(action, target, opts, ctx) {
   const files = ["light", "dark"].map((mode) => {
     const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: "off" }, {}, { themes: themes2 });
     const file = outputPath("pages", `theme-${name}-${mode}`, {}, ctx);
-    mkdirSync5(dirname3(file), { recursive: true });
-    writeFileSync6(file, result.html);
+    writePage(file, result.html, env);
     print(`\u2713 ${file}`);
     return file;
   });

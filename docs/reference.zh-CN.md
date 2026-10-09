@@ -125,7 +125,7 @@ A -> B: 你好
 AM_EOF
 ````
 
-页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。
+页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
 
 ## 语言
 

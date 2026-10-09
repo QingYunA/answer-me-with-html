@@ -125,7 +125,7 @@ A -> B: hello
 AM_EOF
 ````
 
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them.
+Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
 
 ## Languages
 

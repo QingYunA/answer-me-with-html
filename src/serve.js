@@ -7,9 +7,10 @@ import { createServer } from 'node:http';
 import { connect } from 'node:net';
 import { uptime } from 'node:os';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, renameSync, rmSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { lstat, realpath, readFile } from 'node:fs/promises';
 import { join, resolve, dirname, basename, sep } from 'node:path';
+import { ensureHome } from './home.js';
 
 export const DEFAULT_PORT = 8765;
 const HOST = '127.0.0.1';
@@ -104,7 +105,7 @@ export function serveLink(home, file) {
 }
 
 function writeInfo(home, info) {
-  mkdirSync(home, { recursive: true });
+  ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   rmSync(tmp, { force: true }); // the mode applies only to a file that writeFileSync creates
   // wx: fail rather than write through a file or symlink that appeared after the rmSync.

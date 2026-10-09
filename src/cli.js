@@ -3,7 +3,7 @@
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname, basename } from 'node:path';
+import { join, resolve, dirname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
@@ -19,6 +19,7 @@ import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { ensureHome } from './home.js';
 import { hasCommand } from './sys.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
@@ -455,6 +456,7 @@ function validVoice(voice, fail) {
 
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   const provider = io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
+  if (provider) ensureHome(amHome(env)); // the narration cache lives in the data directory
   const result = await renderVideo(src, {
     provider,
     cacheDir: join(amHome(env), 'cache', 'tts'),
@@ -511,10 +513,17 @@ function outputPath(dir, title, opts, { env, io }) {
   return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 
+// Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
+function writePage(file, html, env) {
+  const home = resolve(amHome(env));
+  if (resolve(file).startsWith(home + sep)) ensureHome(home);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, html);
+}
+
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
 function emit(result, file, { print, env }, note = '') {
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, result.html);
+  writePage(file, result.html, env);
   print(`✓ ${file}`);
   // With am serve running, a page inside the data directory also gets an http link.
   const link = serveLink(amHome(env), file);
@@ -750,8 +759,7 @@ function cmdTheme(action, target, opts, ctx) {
   const files = ['light', 'dark'].map((mode) => {
     const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes });
     const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, result.html);
+    writePage(file, result.html, env);
     print(`✓ ${file}`);
     return file;
   });

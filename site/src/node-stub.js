@@ -20,6 +20,7 @@ export function writeFileSync(path) { throw notFound(path); }
 export function mkdirSync(path) { throw notFound(path); }
 export function mkdtempSync(path) { throw notFound(path); }
 export function renameSync(path) { throw notFound(path); }
+export function chmodSync(path) { throw notFound(path); }
 export function rmSync() {}
 
 // node:os
