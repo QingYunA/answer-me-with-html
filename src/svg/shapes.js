@@ -1,5 +1,6 @@
 // Shared helpers for SVG fragments: number formatting, smooth polylines, arrow markers, multi-line text.
 import { esc } from './text.js';
+import { svgLine } from '../bidi.js';
 
 export const f = (n) => String(Math.round(n * 10) / 10);
 
@@ -27,11 +28,12 @@ export function arrowDefs(uid, variants = []) {
   return `<defs>${[marker('', ''), ...variants.map((v) => marker(`-${v}`, ` am-arrow--${v}`))].join('')}</defs>`;
 }
 
-// Lay out multi-line text vertically centred on (cx, cy).
-export function textLines(lines, cx, cy, lineHeight, attrs = '') {
+// Lay out multi-line text vertically centred on (cx, cy). dir: the page direction; on a right-to-left page a line with no
+// right-to-left letter is isolated as left to right (src/bidi.js), so a wrapped `src/` or `lint:` keeps its punctuation in place.
+export function textLines(lines, cx, cy, lineHeight, attrs = '', dir = 'ltr') {
   const top = cy - ((lines.length - 1) * lineHeight) / 2;
   return lines
-    .map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(line)}</text>`)
+    .map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`)
     .join('');
 }
 
@@ -43,8 +45,15 @@ export function diagramLabel(ui, kind, names) {
   return `${u[kind]}${u.colon}${names.join(u.sep)}`;
 }
 
-export function svgOpen(width, height, label) {
+// dir: the page direction. A right-to-left drawing says so on the root, so its text reads right to left wherever the svg is shown
+// (a copy in the diagram viewer, a page embedded in another document); a left-to-right drawing keeps the tag it always had.
+export function svgOpen(width, height, label, dir = 'ltr') {
   const w = Math.ceil(width);
   const h = Math.ceil(height);
-  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}" xmlns="http://www.w3.org/2000/svg">`;
+  const direction = dir === 'rtl' ? ' direction="rtl"' : '';
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}"${direction} xmlns="http://www.w3.org/2000/svg">`;
 }
+
+// A right-to-left page reads a drawing from the right: mirror(width) maps an x of the left-to-right layout to its mirror image
+// (the first node or participant on the right, arrows pointing left). Text is not mirrored, only placed.
+export const mirror = (width, rtl) => (rtl ? (x) => width - x : (x) => x);
