@@ -21,6 +21,7 @@ const LOOP_OUT = 34; // how far a self-reference loops out of the box
 const LOOP_STEP = 20; // and how much farther each further self-reference of the same entity goes
 const LOOP_END = 18; // how far apart its two ends sit on the edge
 const LOOP_LABEL = 24; // the room a loop's label takes below the loop, which the next loop of the same entity leaves free
+const LOOP_GAP = 6; // and what is left under the lowest loop of an entity before the next box of its rank
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
 // Cardinalities. `*` is many, `0..1` is zero or one, `1..*` is one or more; the end mark is drawn from the word.
 const CARDS = ['1\\.\\.\\*', '0\\.\\.1', '\\*', '1'];
@@ -165,12 +166,27 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
   g.setDefaultEdgeLabel(() => ({}));
   // dagre reserves ids such as "\x00" internally; entities always get internal numbers, so no written name can collide.
   const key = new Map([...entities.keys()].map((name, i) => [name, `n${i}`]));
+  // With the ranks running sideways (LR, RL) a self-reference loops below its box, so dagre gets a taller node for an entity
+  // that has one: the box is drawn at the top of it and the loops hang into the space under the box, clear of the next entity.
+  const below = rankdir === 'LR' || rankdir === 'RL';
+  const room = new Map();
+  if (below) {
+    for (const name of entities.keys()) {
+      const own = loops.filter((rel) => rel.from === name);
+      if (own.length) room.set(name, loopRoom(own));
+    }
+  }
   const sizes = new Map();
   for (const entity of entities.values()) {
     const size = nodeSize(entity);
     sizes.set(entity.name, size);
-    g.setNode(key.get(entity.name), { width: size.width, height: size.height });
+    g.setNode(key.get(entity.name), { width: size.width, height: size.height + (room.get(entity.name) ?? 0) });
   }
+  // Where the box of an entity is drawn: dagre's node is centred on the box, or taller and the box at its top.
+  const centre = (name) => {
+    const { x, y } = g.node(key.get(name));
+    return { x, y: y - (room.get(name) ?? 0) / 2 };
+  };
   // A self-reference does not go through dagre, which would draw a line out of the box; it is drawn as a loop below.
   rels.filter((rel) => rel.from !== rel.to).forEach((rel, i) => {
     const label = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS) + 10, height: 18, labelpos: 'c' } : {};
@@ -185,15 +201,22 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
   const steps = [...new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
   const stepOf = new Map(steps.map((line, i) => [line, i]));
 
-  const edgeSvg = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
+  // dagre clips an edge to the node it knows, which is taller than the drawn box when loops hang below it: the ends of such an
+  // edge are clipped to the box again, along the line from the centre of the box to the next point of the edge.
+  const straight = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
     const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
     const points = data.points.map((p) => ({ ...p }));
+    if (room.has(rel.from)) points[0] = clipToBox(centre(rel.from), sizes.get(rel.from), data.points[1]);
+    if (room.has(rel.to)) points[points.length - 1] = clipToBox(centre(rel.to), sizes.get(rel.to), data.points[data.points.length - 2]);
+    return { rel, data, points };
+  });
+  const edgeSvg = straight.map(({ rel, data, points }) => {
     const label = rel.label ? labelSvg(rel.label, data.x, data.y, pageDir) : '';
     return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label}</g>`;
   });
 
   const nodeSvg = [...entities.values()].map((entity) => {
-    const { x, y } = g.node(key.get(entity.name));
+    const { x, y } = centre(entity.name);
     const size = sizes.get(entity.name);
     return nodeSvgOf(entity, x, y, size, stepOf.get(entity.line), pageDir);
   });
@@ -203,12 +226,11 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
   // self-references of one entity take their own distance, so both stay visible, and the drawing has to be wide enough
   // (or tall enough) for the farthest one and its label.
   const s = rtl ? -1 : 1;
-  const below = rankdir === 'LR' || rankdir === 'RL';
   const seen = new Map();
   const loopSpecs = loops.map((rel) => {
     const { nth, depth } = seen.get(rel.from) ?? { nth: 0, depth: 0 };
     seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
-    const { x, y } = g.node(key.get(rel.from));
+    const { x, y } = centre(rel.from);
     const size = sizes.get(rel.from);
     return below ? loopBelow(rel, x, y, size, depth, s) : loopBeside(rel, x, y, size, nth, s);
   });
@@ -223,15 +245,13 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
     ys.push(y);
   };
   for (const entity of entities.values()) {
-    const { x, y } = g.node(key.get(entity.name));
+    const { x, y } = centre(entity.name);
     const size = sizes.get(entity.name);
     at(x - size.width / 2, y - size.height / 2);
     at(x + size.width / 2, y + size.height / 2);
   }
-  const straight = rels.filter((rel) => rel.from !== rel.to);
-  straight.forEach((rel, i) => {
-    const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
-    for (const p of data.points) at(p.x, p.y);
+  straight.forEach(({ rel, data, points }) => {
+    for (const p of points) at(p.x, p.y);
     // dagre gives an edge a label position only when it has a label.
     if (rel.label) {
       const w = labelWidth(rel.label);
@@ -248,6 +268,22 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
   const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, 'er', [...entities.keys()].slice(0, 8));
   return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g></g></svg>`;
+}
+
+// The space under a box for the loops of its entity, in the order they are drawn (see loopBelow): the first one's distance
+// from the box, the steps down to the last one, and the label of the last.
+function loopRoom(own) {
+  const steps = own.slice(0, -1).reduce((depth, rel) => depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0), 0);
+  return LOOP_OUT + steps + (own.at(-1).label ? LOOP_LABEL : 0) + LOOP_GAP;
+}
+
+// The point where the line from the centre of a box towards `toward` leaves the box.
+function clipToBox(centre, size, toward) {
+  const dx = toward.x - centre.x;
+  const dy = toward.y - centre.y;
+  const k = Math.max(Math.abs(dx) / (size.width / 2), Math.abs(dy) / (size.height / 2));
+  if (k === 0) return { ...centre };
+  return { x: centre.x + dx / k, y: centre.y + dy / k };
 }
 
 function nodeSvgOf(entity, x, y, size, step, pageDir) {

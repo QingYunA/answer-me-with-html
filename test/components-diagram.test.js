@@ -383,3 +383,31 @@ test('er: in LR and RL a self-reference loops below its box, clear of the edge t
     }));
   }
 });
+
+test('er: in LR the room under a box for its loops keeps them clear of the other entities, and edges still end on the box', () => {
+  const body = 'Customer\n  id PK\nEmployee\n  id PK\n  manager_id FK -> Employee\nInvoice\n  id PK\nOrder\n  id PK\n  customer_id FK -> Customer\n  employee_id FK -> Employee\n  invoice_id FK -> Invoice\nEmployee 0..1--* Employee: reports to';
+  for (const dir of ['ltr', 'rtl']) {
+    const svg = erDir(body, 'LR', dir);
+    assert.doesNotMatch(svg, /NaN/);
+    const all = Object.fromEntries([...svg.matchAll(/data-key="(\w+)"[^>]*><rect class="am-node-shape" x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => [m[1], m.slice(2).map(Number)]));
+    const [x, y, w, h] = all.Employee;
+    const others = Object.entries(all).filter(([name]) => name !== 'Employee').map(([, box]) => box);
+    const apart = (a, b) => a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
+    // What the loop draws: its path, its two end marks and the label, as one bounding box under the Employee box.
+    const loop = svg.match(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/).slice(1).map(Number);
+    assert.ok(loop[3] > y + h, `${dir}: the loop lies below the Employee box`);
+    const label = svg.match(/<g class="am-edge-label"><rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/).slice(1).map(Number);
+    const hang = [Math.min(label[0], x), y + h, Math.max(label[0] + label[2], x + w) - Math.min(label[0], x), label[1] + label[3] - (y + h)];
+    assert.ok(hang[3] > 0);
+    for (const box of others) assert.ok(apart(hang, box), `${dir}: the loop and its label do not touch another entity`);
+    // Every end of an edge between two entities lies on the border of a drawn box, within 1px.
+    const onBorder = ([px, py]) => Object.values(all).some(([bx, by, bw, bh]) => {
+      const inside = px >= bx - 1 && px <= bx + bw + 1 && py >= by - 1 && py <= by + bh + 1;
+      const inner = px > bx + 1 && px < bx + bw - 1 && py > by + 1 && py < by + bh - 1;
+      return inside && !inner;
+    });
+    const edges = [...svg.matchAll(/<path class="am-edge" d="(M[^"]*L[^"C]*)"/g)].map((m) => m[1].match(/[\d.-]+,[\d.-]+/g).map((p) => p.split(',').map(Number)));
+    assert.equal(edges.length, 3);
+    for (const points of edges) assert.ok(onBorder(points[0]) && onBorder(points.at(-1)), `${dir}: an edge ends on a box border`);
+  }
+});

@@ -5774,6 +5774,7 @@ var LOOP_OUT = 34;
 var LOOP_STEP = 20;
 var LOOP_END = 18;
 var LOOP_LABEL = 24;
+var LOOP_GAP = 6;
 var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
 var CARDS = ["1\\.\\.\\*", "0\\.\\.1", "\\*", "1"];
 var MARKERS = /* @__PURE__ */ new Set(["PK", "FK", "UK"]);
@@ -5899,12 +5900,24 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   g.setGraph({ rankdir, nodesep: 44, ranksep: 62, marginx: 14, marginy: 14 });
   g.setDefaultEdgeLabel(() => ({}));
   const key = new Map([...entities.keys()].map((name, i) => [name, `n${i}`]));
+  const below = rankdir === "LR" || rankdir === "RL";
+  const room = /* @__PURE__ */ new Map();
+  if (below) {
+    for (const name of entities.keys()) {
+      const own = loops.filter((rel) => rel.from === name);
+      if (own.length) room.set(name, loopRoom(own));
+    }
+  }
   const sizes = /* @__PURE__ */ new Map();
   for (const entity of entities.values()) {
     const size = nodeSize2(entity);
     sizes.set(entity.name, size);
-    g.setNode(key.get(entity.name), { width: size.width, height: size.height });
+    g.setNode(key.get(entity.name), { width: size.width, height: size.height + (room.get(entity.name) ?? 0) });
   }
+  const centre = (name) => {
+    const { x: x2, y: y2 } = g.node(key.get(name));
+    return { x: x2, y: y2 - (room.get(name) ?? 0) / 2 };
+  };
   rels.filter((rel) => rel.from !== rel.to).forEach((rel, i) => {
     const label2 = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS2) + 10, height: 18, labelpos: "c" } : {};
     g.setEdge(key.get(rel.from), key.get(rel.to), label2, `e${i}`);
@@ -5914,24 +5927,28 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   if (rtl) mirrorLayout(g);
   const steps = [.../* @__PURE__ */ new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a, b) => a - b);
   const stepOf = new Map(steps.map((line, i) => [line, i]));
-  const edgeSvg = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
+  const straight = rels.filter((rel) => rel.from !== rel.to).map((rel, i) => {
     const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
     const points = data.points.map((p) => ({ ...p }));
+    if (room.has(rel.from)) points[0] = clipToBox(centre(rel.from), sizes.get(rel.from), data.points[1]);
+    if (room.has(rel.to)) points[points.length - 1] = clipToBox(centre(rel.to), sizes.get(rel.to), data.points[data.points.length - 2]);
+    return { rel, data, points };
+  });
+  const edgeSvg = straight.map(({ rel, data, points }) => {
     const label2 = rel.label ? labelSvg(rel.label, data.x, data.y, pageDir) : "";
     return `<g data-step="${stepOf.get(rel.line)}"><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
   });
   const nodeSvg = [...entities.values()].map((entity) => {
-    const { x: x2, y: y2 } = g.node(key.get(entity.name));
+    const { x: x2, y: y2 } = centre(entity.name);
     const size = sizes.get(entity.name);
     return nodeSvgOf(entity, x2, y2, size, stepOf.get(entity.line), pageDir);
   });
   const s = rtl ? -1 : 1;
-  const below = rankdir === "LR" || rankdir === "RL";
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((rel) => {
     const { nth, depth } = seen.get(rel.from) ?? { nth: 0, depth: 0 };
     seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
-    const { x: x2, y: y2 } = g.node(key.get(rel.from));
+    const { x: x2, y: y2 } = centre(rel.from);
     const size = sizes.get(rel.from);
     return below ? loopBelow(rel, x2, y2, size, depth, s) : loopBeside(rel, x2, y2, size, nth, s);
   });
@@ -5943,15 +5960,13 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
     ys.push(y2);
   };
   for (const entity of entities.values()) {
-    const { x: x2, y: y2 } = g.node(key.get(entity.name));
+    const { x: x2, y: y2 } = centre(entity.name);
     const size = sizes.get(entity.name);
     at3(x2 - size.width / 2, y2 - size.height / 2);
     at3(x2 + size.width / 2, y2 + size.height / 2);
   }
-  const straight = rels.filter((rel) => rel.from !== rel.to);
-  straight.forEach((rel, i) => {
-    const data = g.edge({ v: key.get(rel.from), w: key.get(rel.to), name: `e${i}` });
-    for (const p of data.points) at3(p.x, p.y);
+  straight.forEach(({ rel, data, points }) => {
+    for (const p of points) at3(p.x, p.y);
     if (rel.label) {
       const w = labelWidth(rel.label);
       at3(data.x - w / 2, data.y - 9);
@@ -5967,6 +5982,17 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
   return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
+}
+function loopRoom(own) {
+  const steps = own.slice(0, -1).reduce((depth, rel) => depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0), 0);
+  return LOOP_OUT + steps + (own.at(-1).label ? LOOP_LABEL : 0) + LOOP_GAP;
+}
+function clipToBox(centre, size, toward) {
+  const dx = toward.x - centre.x;
+  const dy = toward.y - centre.y;
+  const k2 = Math.max(Math.abs(dx) / (size.width / 2), Math.abs(dy) / (size.height / 2));
+  if (k2 === 0) return { ...centre };
+  return { x: centre.x + dx / k2, y: centre.y + dy / k2 };
 }
 function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const left = x2 - size.width / 2;
