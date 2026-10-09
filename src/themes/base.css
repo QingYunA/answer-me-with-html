@@ -214,6 +214,22 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
 .am-timeline--v .am-tl-title { display: inline; font-size: 14px; }
 .am-timeline--v .am-tl-text { margin-top: 2px; }
+/* .am-tl-wrap is the container (src/components/timeline.js): a horizontal timeline answers to the width it has, not to the width of the window, since a
+   sheet puts panels two or three to a row. Below 560 px (about 90 px for each of the six items a timeline has by default) its dates
+   wrap and the dots cover them, so it lays out like timeline v: line and dots at the start, text beside them. */
+.am-tl-wrap { container-type: inline-size; }
+@container (max-width: 560px) {
+  .am-timeline--h { display: block; padding-top: 0; }
+  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
+    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  }
+  .am-timeline--h li:last-child::before { display: none; }
+  .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
+  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
+  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }
+  .am-timeline--h .am-tl-text { margin-top: 2px; }
+}
 
 /* ── annot sentence notes ──────────────────────── */
 .am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }
@@ -420,17 +436,6 @@ code, pre, kbd { font-family: var(--font-mono); }
   .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
   .am-doc-layout { grid-template-columns: minmax(0, 1fr); }
   .am-toc { position: static; }
-  /* A horizontal timeline is too narrow to read here: lay it out like timeline v (line and dots on the left, text on the right). */
-  .am-timeline--h { display: block; padding-top: 0; }
-  .am-timeline--h li { text-align: left; padding: 0 0 14px 22px; }
-  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
-    top: 6px; bottom: -6px; left: 5px; right: auto; border-top: 0; border-left: var(--bw) solid var(--line-2);
-  }
-  .am-timeline--h li:last-child::before { display: none; }
-  .am-timeline--h .am-tl-dot { position: absolute; left: 0; top: 4px; margin: 0; }
-  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-right: 8px; }
-  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }
-  .am-timeline--h .am-tl-text { margin-top: 2px; }
   .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
   /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about
      two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)

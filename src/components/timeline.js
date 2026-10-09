@@ -23,6 +23,6 @@ time | title | note (optional)
     const lis = items.map((it) => `<li class="am-tl-item${it.hi ? ' am-tl-item--hi' : ''}"><span class="am-tl-when">${esc(it.when)}</span><span class="am-tl-dot"></span><span class="am-tl-title">${mdInline(it.title)}</span>${it.detail ? `<span class="am-tl-text">${mdInline(it.detail)}</span>` : ''}</li>`);
     return vertical
       ? `<ol class="am-timeline am-timeline--v">${lis.join('')}</ol>`
-      : `<ol class="am-timeline am-timeline--h" style="--n: ${items.length}">${lis.join('')}</ol>`;
+      : `<div class="am-tl-wrap"><ol class="am-timeline am-timeline--h" style="--n: ${items.length}">${lis.join('')}</ol></div>`;
   },
 };

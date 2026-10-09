@@ -56,6 +56,8 @@ html[data-chapters] .amv-viewport { bottom: 96px; }
 .amv-fit { width: max-content; max-width: 1100px; transform-origin: 50% 50%; display: flex; flex-direction: column; gap: 28px; }
 .amv-fit .am-diagram { overflow: visible; }
 .amv-fit .am-diagram svg { max-width: none; overflow: visible; }
+/* The stage sizes .amv-fit to its content, which a size container would collapse to nothing; the stage is 1920 px wide, so a timeline stays horizontal. */
+.amv-fit .am-tl-wrap { container-type: normal; }
 .amv-fit .am-md { font-size: 26px; line-height: 1.6; }
 .amv-fit table { font-size: 24px; }
 .amv-fit th { font-size: 17px; }

@@ -29,9 +29,8 @@ html[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl
 
 /* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of
    neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */
-html[dir="rtl"] .am-timeline--h { container-type: inline-size; }
 html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }
-@media (max-width: 760px) {
+@container (max-width: 560px) {
   html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }
 }
 

@@ -734,6 +734,30 @@ test('e2e: a horizontal timeline turns vertical on a phone and stays horizontal 
   assert.equal(desktop.linesAcross, 4, `every item has its part of the horizontal line at ${DESKTOP}px`);
 });
 
+// The switch to the vertical layout follows the width the timeline has, not the window: a sheet puts panels two per row at 768 px,
+// and a five-item timeline in one of them got about 58 px a column, so its dates wrapped and the dots covered them.
+test('e2e: a horizontal timeline turns vertical in a narrow panel and stays horizontal in a wide one', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const tl = '```timeline\n2026-09 | Private beta | Ten design partners try the agent on real work\n2026-10 | Public beta | Anyone can sign up\n*2026-11 | Paid plans | Pro and Team plans open\n2027-Q1 | Mobile app | The phone app reaches parity\n2027-Q2 | Enterprise | Single sign-on and audit log\n```\n';
+  const { html } = renderDoc(`---\ntitle: Narrow timeline\nlang: en\n---\n## A Release plan\n${tl}\n## B History\n${tl}`);
+  const file = join(tmp, 'timeline-narrow.html');
+  writeFileSync(file, html);
+  const rows = `(() => [...document.querySelectorAll('.am-timeline--h')].map((ol) => {
+    const tops = [...ol.children].map((li) => li.getBoundingClientRect().top);
+    return { oneRow: tops.every((t) => t === tops[0]), panelWidth: Math.round(ol.getBoundingClientRect().width) };
+  }))()`;
+
+  await open(file, 768);
+  const narrow = await evaluate(rows);
+  assert.equal(narrow.length, 2);
+  assert.ok(narrow.every((t) => t.panelWidth < 400), `the panels sit two per row at 768 px (${JSON.stringify(narrow)})`);
+  assert.ok(narrow.every((t) => !t.oneRow), 'a timeline in a half-width panel lists its items one per row');
+
+  await open(file, DESKTOP);
+  const wide = await evaluate(rows);
+  assert.ok(wide.every((t) => t.panelWidth >= 400), `the panels are wider at ${DESKTOP}px (${JSON.stringify(wide)})`);
+});
+
 // A host that serves the page inside its own document drops the page's <html> tag, so the real root has none of the page's settings.
 const inHost = (html, rootAttrs = '') => `<!doctype html><html${rootAttrs}><body>${html.replace(/<!doctype[^>]*>\s*/i, '').replace(/<html[^>]*>/i, '').replace(/<\/html>/i, '')}`;
 const ROOT_ATTRS = "[...['lang','data-theme','data-mode','data-style']].map((a) => document.documentElement.getAttribute(a))";
