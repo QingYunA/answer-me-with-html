@@ -17,6 +17,8 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SITE = join(ROOT, 'site');
 const SRC = join(SITE, 'src');
 const REPO = 'QingYunA/answer-me-with-html';
+// Where the site is published (GitHub Pages with a custom domain). Absolute URLs in the pages (canonical, hreflang, share images) start here.
+const SITE_URL = 'https://answer-me-with-html.com/';
 
 // The page's own browser files, copied to assets/ without changes.
 const FRONT_FILES = ['main.js', 'playground.js', 'style.css'];
@@ -28,8 +30,8 @@ const PRERENDER = [
   ['render', 'examples/tcp.md', 'tcp-zh.html'],
 ];
 const PAGES = [
-  { lang: 'en', htmlLang: 'en', out: 'index.html', alt: 'zh/' },
-  { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/index.html', alt: '../' },
+  { lang: 'en', htmlLang: 'en', out: 'index.html', alt: 'zh/', path: '' },
+  { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/index.html', alt: '../', path: 'zh/' },
 ];
 
 // Node built-ins the render path imports, answered in the browser by node-stub.js.
@@ -179,7 +181,7 @@ async function writePages(dist, version) {
   if (!starCount) warn('could not read the GitHub star count; {{STARS}} is empty');
   const pages = PAGES.map((p) => {
     const base = '../'.repeat(p.out.split('/').length - 1);
-    const builtins = { LANG: p.htmlLang, VERSION: version, BASE: base, ALT_HREF: p.alt, STARS: starCount };
+    const builtins = { LANG: p.htmlLang, VERSION: version, BASE: base, ALT_HREF: p.alt, STARS: starCount, SITE_URL, CANONICAL: SITE_URL + p.path };
     const { html, missing } = fillTemplate(template, dicts[p.lang], builtins);
     if (missing.length) problems.push(`site/template.html uses keys site/i18n/${p.lang}.js does not define: ${missing.join(', ')}`);
     return { ...p, html };

@@ -36,10 +36,14 @@ function charWidth(ch, mono) {
   return 0.56;
 }
 
-export function measure(str, size = 13, { mono = false } = {}) {
+// Bold text is wider than the same text in regular weight. SVG is laid out here without font metrics, so this is the
+// estimate (`bold`), used for the text a theme draws bold such as a highlighted node.
+const BOLD = 1.06;
+
+export function measure(str, size = 13, { mono = false, bold = false } = {}) {
   let units = 0;
   for (const ch of String(str ?? '')) units += charWidth(ch, mono);
-  return Math.round(units * size * 100) / 100;
+  return Math.round(units * size * (bold ? BOLD : 1) * 100) / 100;
 }
 
 // Split into unbreakable layout units. A unit is one Han, kana or fullwidth character, one word of a script that
@@ -70,6 +74,17 @@ export function segmenter(locale, granularity) {
 
 // The smallest units a reader sees as whole.
 const graphemes = (text, locale) => [...segmenter(locale, 'grapheme').segment(text)].map((g) => g.segment);
+
+// The words in a text whose characters are not counted one by one: whitespace-separated words in every script, and the
+// words a script that writes no space between them is split into. A combining mark (an Indic vowel sign or virama,
+// Arabic or Hebrew vowel points) belongs to the word it sits in. The writing check (src/lint/ste.js) and the video
+// duration estimate (src/video/script.js) both count with this, so they cannot disagree about how much text a line holds.
+export function countWords(text) {
+  const unspaced = UNSPACED.find(([, re]) => re.test(text));
+  return unspaced
+    ? [...segmenter(unspaced[0], 'word').segment(text)].filter((s) => s.isWordLike).length
+    : text.match(/[\p{L}\p{N}][\p{L}\p{M}\p{N}'’-]*/gu)?.length ?? 0;
+}
 
 // Words of a script that writes none of them apart. Punctuation stays with the word it follows, so a line never starts with a lone full stop.
 function words(text, locale) {

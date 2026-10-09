@@ -8,11 +8,12 @@ import { pageCss } from './themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
-import { VERSION, RUNTIME_JS, DELTA_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, RTL_JS, DELTA_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 import { renderCode, CodeError } from './code.js';
+import { isolateLtrRuns } from './bidi.js';
 
 
 export class RenderError extends Error {
@@ -33,6 +34,60 @@ export class LintError extends Error {
   }
 }
 
+// A pipe block whose second line is not a delimiter row is not a table: Markdown shows the block as plain text with pipes, so the draft
+// would lose the table silently. Refuse it with the line the block starts at and the example that fixes it.
+const TABLE_PIPE_ROW = /^ {0,3}\|/;
+const TABLE_DELIMITER_CELL = /^:?-+:?$/;
+const TABLE_EXAMPLE = '| Task | Status |\n| --- | --- |\n| Build | ok |';
+
+// The cells of a table row, counted the way Markdown reads them: one cell per pipe, a pipe behind a backslash is text, and the two
+// edge pipes delimit nothing.
+function tableCells(line) {
+  const text = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const cells = [];
+  let cell = '';
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\\' && i + 1 < text.length) cell += text[i] + text[++i];
+    else if (text[i] === '|') { cells.push(cell.trim()); cell = ''; }
+    else cell += text[i];
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+// Why the second row is not the delimiter row of the header row, or null when it is one: every cell needs hyphens (---, :---, ---:), and
+// there must be one cell per header column — a short, long or empty delimiter row renders no table at all.
+function tableProblem(header, delimiter) {
+  const cells = tableCells(delimiter);
+  if (cells.some((cell) => !TABLE_DELIMITER_CELL.test(cell))) return 'table: the line under the first row must be a delimiter row (|---|---|); without it the whole block shows as plain text';
+  const columns = tableCells(header).length;
+  if (cells.length !== columns) return `table: the delimiter row has ${cells.length} column${cells.length === 1 ? '' : 's'}, the header row ${columns}; write one --- per column or the whole block shows as plain text`;
+  return null;
+}
+
+function checkTables(blocks) {
+  for (const block of blocks) {
+    if (block.type !== 'md') continue;
+    const lines = block.text.split('\n');
+    let run = [];
+    let runStart = 0;
+    const flush = () => {
+      const problem = run.length >= 2 ? tableProblem(run[0], run[1]) : null;
+      if (problem) throw new RenderError(problem, { line: block.line + runStart, component: 'table', example: TABLE_EXAMPLE });
+      run = [];
+    };
+    for (let i = 0; i < lines.length; i++) {
+      if (TABLE_PIPE_ROW.test(lines[i])) {
+        if (!run.length) runStart = i;
+        run.push(lines[i].trim());
+      } else {
+        flush();
+      }
+    }
+    flush();
+  }
+}
+
 // themes: the theme set to pick from (the CLI passes the built-in themes plus the user's theme files).
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
 // baseDir: where relative image paths are read from; codeDir: where relative code paths are read from (the folder the agent works in).
@@ -40,6 +95,7 @@ export class LintError extends Error {
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
+  checkTables([...parsed.intro, ...parsed.panels.flatMap((p) => p.blocks)]);
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
   if (meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
   const problem = themes.problem(meta.theme, 'page');
@@ -51,14 +107,16 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
+  const stats = { panels: doc.panels.length, components: {}, tables: 0, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
+  const ctx = { seq: 0, stats, ui, dir: language.dir, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
   if (loose) throw new RenderError(`${loose.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: loose.line, component: loose.lang, example: COMPONENTS.get(loose.lang).example });
   const introHtml = renderBlocks(doc.intro, ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
-  const body = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui });
+  const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language });
+  // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).
+  const body = language.dir === 'rtl' ? isolateLtrRuns(page) : page;
   const html = shell({ meta: doc.meta, language, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
   return { html, warnings, stats, meta: doc.meta, language };
 }
@@ -71,6 +129,7 @@ function hasVisuals({ intro, panels }) {
 export function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
     const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)));
+    if (b.type === 'md' && ctx.stats.tables !== undefined) ctx.stats.tables += (result.match(/<table>/g) ?? []).length;
     noteHtml(b, notes, ctx);
     return embedImages(b, result, ctx);
   }).join('\n');
@@ -111,12 +170,15 @@ function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
   if (RAW_LANGS.has(lang)) return text;
   const comp = COMPONENTS.get(lang);
-  if (!comp) return codeBlock(block, ctx);
+  if (!comp) {
+    if (lang === 'mermaid') checkMermaid(block, ctx);
+    return codeBlock(block, ctx);
+  }
   if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
-    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, video: ctx.video, warn });
+    return comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn });
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -125,6 +187,47 @@ function renderFence(block, ctx) {
       example: comp.example,
     });
   }
+}
+
+// `mermaid` is not a component: the page cannot draw it, so the fence shows as a code listing. Its source is still checked, so a
+// wrong diagram type or an unclosed quote is caught, and the author is pointed at the components that draw a diagram.
+const MERMAID_TYPES = ['graph', 'flowchart', 'sequenceDiagram', 'stateDiagram-v2', 'stateDiagram', 'classDiagram-v2', 'classDiagram', 'erDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'timeline', 'gitGraph', 'quadrantChart', 'xychart-beta', 'block-beta', 'packet-beta', 'sankey-beta', 'architecture-beta', 'kanban', 'requirementDiagram', 'radar-beta', 'treemap-beta', 'C4Context', 'C4Container', 'C4Component', 'C4Dynamic', 'C4Deployment', 'info'];
+const MERMAID_EXAMPLE = '```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```';
+
+// The first line that is neither blank nor a %% comment. A mermaid front matter block (--- ... ---) is skipped first.
+function mermaidHead(text) {
+  const lines = String(text).split('\n');
+  let i = 0;
+  if ((lines[0] ?? '').trim() === '---') {
+    const end = lines.findIndex((l, k) => k > 0 && l.trim() === '---');
+    if (end > 0) i = end + 1;
+  }
+  for (; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (!t || t.startsWith('%%')) continue;
+    return { text: t, line: i };
+  }
+  return null;
+}
+
+function mermaidHeadOrThrow(block) {
+  const head = mermaidHead(block.text);
+  if (!head) throw new RenderError('mermaid: the block is empty; write a diagram type and its body, or choose another fence language for a plain listing', { line: block.line + 1, component: 'mermaid', example: MERMAID_EXAMPLE });
+  const type = head.text.split(/[\s;{]/)[0];
+  if (!MERMAID_TYPES.includes(type)) throw new RenderError(`mermaid: "${head.text.length > 32 ? head.text.slice(0, 32) + '...' : head.text}" is not a diagram type; start with flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, gantt or pie`, { line: block.line + 1 + head.line, component: 'mermaid', example: MERMAID_EXAMPLE });
+  return head;
+}
+
+function checkMermaid(block, ctx) {
+  const warn = (idx, message) => ctx.stats.componentWarnings?.push({ line: block.line + 1 + idx, component: 'mermaid', message });
+  const head = mermaidHeadOrThrow(block);
+  warn(head.line, 'the page shows a mermaid block as a code listing; use the flow / sequence / tree component or an svg fence for a diagram');
+  const lines = block.text.split('\n');
+  const body = lines.slice(head.line + 1).filter((l) => l.trim() && !l.trim().startsWith('%%'));
+  if (!body.length) warn(head.line, 'the diagram type has no body');
+  lines.forEach((l, k) => {
+    if ((l.match(/"/g) ?? []).length % 2) warn(k, 'an unclosed double quote on this line');
+  });
 }
 
 // A fence that is not a component is code. In a video the block has no copy button.
@@ -140,9 +243,22 @@ function codeBlock(block, ctx) {
   }
 }
 
-export function timestamp(d = new Date()) {
+// order: 'ymd' (2026-10-07 22:44) or 'dmy' (7.10.2026 22:44, the way Hebrew readers write a date).
+export function timestamp(d = new Date(), order = 'ymd') {
   const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const time = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  if (order === 'dmy') return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} ${time}`;
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${time}`;
+}
+
+// The line under the page. On a right-to-left page the product name with its version and the time are each isolated, so the
+// Latin name, the version and the date do not merge into one left-to-right run.
+function colophon(language) {
+  const link = '<a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">Answer me with HTML</a>';
+  const label = esc(language.ui.generated ?? 'Generated by');
+  const time = esc(timestamp(new Date(), language.dateOrder));
+  if (language.dir === 'rtl') return `<footer class="am-colophon">${label} <bdi>${link} ${VERSION}</bdi> · <bdi>${time}</bdi></footer>`;
+  return `<footer class="am-colophon">${label} ${link} ${VERSION} · ${time}</footer>`;
 }
 
 // A diagram with change markers carries a count row; only then the page needs the delta styles and script.
@@ -172,7 +288,7 @@ function shell({ meta, language, body, source, embedded }) {
   const { ui, labelKey } = language;
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
-  const root = { lang: language.htmlLang, theme: meta.theme, mode: meta.mode, style: meta.style };
+  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -181,7 +297,7 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body) })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl' })}
 </style>
 </head>
 <body>
@@ -192,10 +308,10 @@ ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
 ${body}
-${lightboxShell(ui, body.includes('class="am-diagram'))}<footer class="am-colophon">Generated by <a href="https://github.com/QingYunA/answer-me-with-html" target="_blank" rel="noopener">Answer me with HTML</a> ${VERSION} · ${esc(timestamp())}</footer>
+${lightboxShell(ui, body.includes('class="am-diagram'))}${colophon(language)}
 ${sourceTag(source)}
 <script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}</script>
+${RUNTIME_JS}${language.dir === 'rtl' ? RTL_JS : ''}${hasDelta(body) ? DELTA_JS : ''}</script>
 </body>
 </html>
 `;

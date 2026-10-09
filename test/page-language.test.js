@@ -7,9 +7,9 @@ import { renderDoc } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
 
 // One label per language, taken from the toolbar button (page) and the play button (video).
-const COPY = { zh: '复制源稿', 'zh-Hant': '複製源稿', en: 'Copy source', ja: '原稿をコピー' }; // lang-ok: the page labels under test
+const COPY = { zh: '复制源稿', 'zh-Hant': '複製源稿', en: 'Copy source', ja: '原稿をコピー', he: 'העתקת המקור' }; // lang-ok: the page labels under test
 // The pause label tells Simplified from Traditional (the play label is the same word in both).
-const PAUSE = { zh: '暂停', 'zh-Hant': '暫停', en: 'Pause', ja: '一時停止' }; // lang-ok: the player labels under test
+const PAUSE = { zh: '暂停', 'zh-Hant': '暫停', en: 'Pause', ja: '一時停止', he: 'השהיה' }; // lang-ok: the player labels under test
 
 const htmlLangOf = (html) => html.match(/<html lang="([^"]*)"/)?.[1];
 const pageLabels = (html) => Object.keys(COPY).filter((k) => html.includes(`>${COPY[k]}</button>`));
@@ -85,7 +85,7 @@ const DETECTED = [
   ['Korean with a Hanja word', '## A 개요\n이것은 한국어로 쓴 짧은 설명이며 漢字 한 단어가 있습니다.\n', 'ko', 'en'], // lang-ok: draft text under test
   ['Russian', '## A Обзор\nЭто короткое описание на русском языке.\n', 'ru', 'en'],
   ['Arabic', '## A نظرة عامة\nهذا وصف قصير باللغة العربية.\n', 'ar', 'en'],
-  ['Hebrew', '## A סקירה\nזהו תיאור קצר בעברית.\n', 'he', 'en'],
+  ['Hebrew', '## A סקירה\nזהו תיאור קצר בעברית.\n', 'he', 'he'],
   ['Thai', '## A ภาพรวม\nนี่คือคำอธิบายสั้นๆ ภาษาไทย\n', 'th', 'en'],
   ['Greek', '## A Επισκόπηση\nΑυτή είναι μια σύντομη περιγραφή στα ελληνικά.\n', 'el', 'en'],
   // Latin text cannot be told apart by script: it stays English. The skill tells the agent to declare the language.
@@ -135,14 +135,15 @@ test('page language: the result reports script, direction and whether the langua
   const read = (declared) => page(declared).language;
   assert.deepEqual([read('zh').script, read('zh-tw').script, read('ar').script, read('fr').script], ['Hans', 'Hant', 'Arab', 'Latn']);
   assert.deepEqual([read('ar').dir, read('he').dir, read('zh').dir, read('ja').dir, read('fr').dir], ['rtl', 'rtl', 'ltr', 'ltr', 'ltr']);
-  assert.deepEqual([read('zh').supported, read('en-US').supported, read('ja').supported], [true, true, true]);
+  assert.deepEqual([read('zh').supported, read('en-US').supported, read('ja').supported, read('he').supported], [true, true, true, true]);
   assert.deepEqual([read('zh').declared, read('fr').declared, page(undefined).language.declared], [true, true, false]);
   assert.deepEqual([read('zh-tw').supported, read('zh-Hant').supported, read('zh-HK').supported], [true, true, true]);
   assert.deepEqual([read('fr').supported, read('ko').supported], [false, false]);
 });
 
-test('page language: right-to-left languages do not emit a dir attribute yet (mirrored layout is a separate issue)', () => {
-  assert.doesNotMatch(page('ar').html, /<html[^>]*\sdir=/);
+test('page language: a right-to-left language writes dir="rtl" on the root; a left-to-right one writes no dir at all', () => {
+  for (const tag of ['ar', 'he', 'fa', 'ur', 'yi']) assert.match(page(tag).html, /<html lang="[^"]+" dir="rtl" /, tag);
+  for (const tag of ['en', 'zh', 'ja', 'fr']) assert.doesNotMatch(page(tag).html, /<html[^>]*\sdir=/, tag);
 });
 
 // The video player reads the same language.

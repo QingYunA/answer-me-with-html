@@ -1,7 +1,7 @@
 // Video draft: reuses parseDoc's panel splitting. One "## " panel = one scene; lines starting with > in a panel are narration,
 // each narration line is one beat; [name] in narration focuses the camera on the same-named element. Everything else (components, Markdown) is visuals.
 import { parseDoc, ParseError } from '../parse.js';
-import { isCJK } from '../svg/text.js';
+import { isCJK, countWords } from '../svg/text.js';
 import { themeNames } from '../themes/registry.js';
 
 const NARRATION = /^\s*>\s?(.*)$/;
@@ -48,16 +48,17 @@ function beat(raw, line) {
   return { raw, text: raw.replace(FOCUS, '$1'), focus: focus[0] ?? null, line };
 }
 
-// Without a voice-over, reading time is estimated from word count: Chinese about 4.2 characters/s, English about 2.6 words/s.
+// Without a voice-over, reading time is estimated from word count: Chinese about 4.2 characters/s, words about 2.6/s.
+// The words come from countWords() in src/svg/text.js, the same counter the writing check uses, so a line in Cyrillic,
+// Arabic, Greek, Hebrew or Thai is measured like any other instead of falling to the floor.
 export function estimateSeconds(text) {
   let cjk = 0;
-  let latin = '';
+  let rest = '';
   for (const ch of text) {
     if (isCJK(ch)) cjk++;
-    latin += isCJK(ch) ? ' ' : ch;
+    rest += isCJK(ch) ? ' ' : ch;
   }
-  const words = latin.match(/[A-Za-z0-9][\w'’-]*/g)?.length ?? 0;
-  return Math.max(1.6, cjk / 4.2 + words / 2.6 + 0.3);
+  return Math.max(1.6, cjk / 4.2 + countWords(rest) / 2.6 + 0.3);
 }
 
 export const TIMING = Object.freeze({
@@ -88,7 +89,7 @@ export function buildTimeline(video, durations) {
     t += TIMING.transition;
     const beats = lay(s.beats);
     t += TIMING.tail - TIMING.gap;
-    return { title: s.title, start: round(start), end: round(t), beats };
+    return { id: s.id, title: s.title, start: round(start), end: round(t), beats };
   });
   t += TIMING.outro;
   return { duration: round(t), title, scenes };

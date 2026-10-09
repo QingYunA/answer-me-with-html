@@ -2,7 +2,7 @@
 // Component styles (base.css, video.css) reference only variables; a theme's decoration css is scoped to its own root selector.
 // Each theme provides light / dark values; auto mode follows the system prefers-color-scheme.
 
-import { BASE_CSS, DIFF_CSS, DELTA_CSS, VIDEO_CSS } from '../assets.js';
+import { BASE_CSS, DIFF_CSS, DELTA_CSS, RTL_CSS, VIDEO_CSS } from '../assets.js';
 import { themes } from './registry.js';
 import { fontLanguages, langSelector } from './fonts.js';
 
@@ -29,11 +29,12 @@ const languageFontCss = () => fontLanguages().map((l) => block(langSelector(l, '
 const ownLanguageFont = (t) => fontLanguages().map((l) => block(langSelector(l, 'html', `[data-theme="${t.name}"][data-mode]`), { '--font-sans': t.tokens.common['--font-sans'] }));
 
 // list: the page themes the page carries (default: the built-in ones). diff: the page has a diff block, delta: a diagram with change markers;
-// their styles come with the base ones.
-export function pageCss(list = themes('page'), { diff = false, delta = false } = {}) {
+// their styles come with the base ones. rtl: the page language is written right to left. base.css already uses logical properties;
+// rtl.css holds only what they cannot express (code stays left to right, label fonts, mirrored offsets).
+export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false } = {}) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, BASE_CSS, ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, BASE_CSS, ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones).

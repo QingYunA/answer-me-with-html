@@ -15,10 +15,11 @@ import { readThemeFile } from './themes/user.js';
 import { checkColors, COLOR_TOKENS } from './themes/check.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
-import { exportMp4, ExportError } from './video/export.js';
+import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { hasCommand } from './sys.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
@@ -34,15 +35,15 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
+  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
-                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
-  am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
+                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
+  am lint   <file|->  [--style off|80|strict]     check a draft (structure, components, STE) without writing a page
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|table|mermaid|video|patch|theme]  show component syntax / page draft format / code block / image syntax / table syntax / mermaid rules / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
@@ -66,6 +67,10 @@ Intro (optional, shown below the title)
 ## A Panel title {span=2 meta="top-right note"}
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+A table needs the delimiter row under the header row (see am help table):
+| Task | Status |
+| --- | --- |
+| Build | ok |
 
 \`\`\`flow LR          ← fence language = component name, followed by component arguments
 A -> B
@@ -79,6 +84,7 @@ A -> B
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
 - A placeholder such as <host> is shown as text. Inside a sentence only text-level tags stay (b, i, kbd, sup, a, span, br, img ...), and tags that break the page (script, style, iframe ...) are shown as text too. Put raw markup in an html or svg fence and code in backticks.
 - Any other fence language is a code block; \`\`\`ts src=path lines=18-30 quotes real code from a file; see am help code.
+- A \`\`\`mermaid fence is checked as mermaid source and shows as a code listing; the page cannot draw mermaid (see am help mermaid).
 - For the component list see am list; for one component's syntax see am help <component>.`;
 
 const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a file
@@ -162,12 +168,15 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
   timeline, limits, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
 - Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+  The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
+  the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
+  A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
   Set the ElevenLabs voice with ELEVENLABS_VOICE_ID and the model with ELEVENLABS_MODEL_ID (default eleven_v4_turbo).
   local calls a local OpenAI-compatible speech service (POST /v1/audio/speech, returns 16-bit PCM WAV):
   AM_TTS_URL (required, service base URL), AM_TTS_MODEL, AM_TTS_VOICE (required when the service has no default),
@@ -176,7 +185,12 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
-- Output goes to ~/.answer-me-with-html/videos/; --mp4 also saves an .mp4 with the same name (needs Chrome and ffmpeg, Node 22+).`;
+- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
+  speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
+- --mp4 also saves a 1080p .mp4 next to the page (H.264 + AAC; needs ffmpeg; about 1.3 times the video length).
+  --webm saves a 1080p .webm that the page encodes itself (VP9 + Opus; no ffmpeg; the time follows how much of the page moves).
+  Both need Chrome and Node 22+; give both to save both. The export button needs a secure context (a local file or
+  localhost): WebCodecs is not available to a page served over plain HTTP.`;
 
 export async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;
@@ -200,6 +214,7 @@ export async function main(argv, io = {}) {
         mode: { type: 'string' },
         voice: { type: 'string' },
         mp4: { type: 'boolean' },
+        webm: { type: 'boolean' },
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
@@ -225,7 +240,7 @@ export async function main(argv, io = {}) {
     case 'render': return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
     case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
-    case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
+    case 'lint': return withSource(arg, io, fail, (src, baseDir) => cmdLint(src, opts, ctx, baseDir));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
     case 'clean': return cmdClean(opts, { print, fail, env });
@@ -288,6 +303,27 @@ function cmdRender(src, opts, ctx, baseDir) {
   emit(result, file, ctx);
   return finish(file, opts, config, ctx);
 }
+
+const TABLE_HELP = `Markdown tables: a header row, a delimiter row, then the body rows
+
+| Task | Status |
+| --- | --- |
+| Build | ok |
+
+- The delimiter row (|---|---|) under the header row is required, with one --- per column of the header row; without it the whole block shows as plain text.
+- Write ok / no / warn in a cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+- A wide table needs no attributes: the page sizes it to the panel.`;
+
+const MERMAID_HELP = `Mermaid blocks: checked mermaid source, shown as a code listing
+
+\`\`\`mermaid
+flowchart LR
+  A[Start] --> B[Done]
+\`\`\`
+
+- A page cannot draw mermaid: the fence shows as a code listing, and its source is checked (a diagram type on the first line, closed quotes). am lint reports a bad block as well.
+- The first line names the diagram type: flowchart, graph, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, gantt, pie, mindmap, timeline, gitGraph, quadrantChart, xychart-beta, block-beta, packet-beta, sankey-beta, architecture-beta, kanban, requirementDiagram, C4Context ...
+- For a drawn diagram use the flow, sequence, tree, timeline or limits component, or paste a finished diagram as SVG in an \`\`\`svg fence.`;
 
 const PATCH_HELP = `Replace one panel of a rendered page in place
 
@@ -408,7 +444,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  emit(result, file, ctx, video ? ' (an MP4 with the same name is not updated; run am video --mp4 again if you need it)' : '');
+  emit(result, file, ctx, video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '');
   return finish(file, opts, config, ctx);
 }
 
@@ -427,7 +463,9 @@ async function cmdVideo(src, opts, ctx) {
   }
   const file = outputPath('videos', result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  if (opts.mp4 && !(await exportVideoMp4(file, result.wav, ctx))) return 1;
+  for (const format of ['mp4', 'webm']) {
+    if (opts[format] && !(await exportVideo(file, result.wav, format, ctx))) return 1;
+  }
   return finish(file, opts, config, ctx);
 }
 
@@ -448,20 +486,32 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
     onProgress: (msg) => fail(`  ${msg}`),
     themes,
   });
-  return { ...result, voiceName: provider ? provider.name : 'none (captions only)' };
+  return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
 }
 
-async function exportVideoMp4(file, wav, { print, fail, env }) {
-  const mp4 = `${file.replace(/\.html?$/i, '')}.mp4`;
+// The voice line of the one-line summary: the provider, and the languages that kept captions only because no voice is
+// installed for them.
+function voiceSummary(provider, captionsOnly = []) {
+  if (!provider) return 'none (captions only)';
+  if (!captionsOnly.length) return provider.name;
+  return `${provider.name} (no ${captionsOnly.map((c) => c.language).join(', ')} voice installed: captions only for those lines)`;
+}
+
+// A video file next to the page: an MP4 through ffmpeg, or a WebM from the browser's own encoder. Both drive the page's
+// render(t) frame by frame, so the picture is the same either way. Each flag writes its own format and nothing else.
+async function exportVideo(file, wav, format, { print, fail, env }) {
+  const out = `${file.replace(/\.html?$/i, '')}.${format}`;
   const started = Date.now();
   try {
-    await exportMp4(file, mp4, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    if (format === 'mp4') await exportMp4(file, out, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    else await exportWebm(file, out, { env, onProgress: (i, n) => fail(`  Exporting WebM: frame ${i}/${n}`) });
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;
-    fail(`✗ MP4 export failed: ${e.message}. The player page was written and plays in a browser`);
+    const hint = format === 'mp4' && !hasCommand('ffmpeg') ? '. Or add --webm for a video file without ffmpeg' : '';
+    fail(`✗ Video export failed: ${e.message}${hint}. The player page was written and plays in a browser`);
     return false;
   }
-  print(`✓ ${mp4} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
+  print(`✓ ${out} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
   return true;
 }
 
@@ -502,9 +552,9 @@ function emit(result, file, { print }, note = '') {
 }
 
 // What a component noticed in its own block (a group box that would be empty after a change). The page is still written.
-function printComponentWarnings(notes = [], print) {
+function printComponentWarnings(notes = [], print, wrote = 'the page is written') {
   if (!notes.length) return;
-  print(`  diagram ${count(notes.length, 'warning')} (the page is written; fix the draft if that is not what you meant):`);
+  print(`  diagram ${count(notes.length, 'warning')} (${wrote}; fix the draft if that is not what you meant):`);
   notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
@@ -524,7 +574,8 @@ function summaryLine(result) {
     return `video · ${meta.theme} · ${count(stats.panels, 'scene')} · ${count(result.beats, 'beat')} · ${result.duration.toFixed(1)}s · voice: ${result.voiceName}`;
   }
   const comps = Object.entries(stats.components).map(([k, v]) => `${k}×${v}`).join(' ');
-  return `${meta.template} · ${meta.theme} · ${count(stats.panels, 'panel')}${comps ? ` · ${comps}` : ''}`;
+  const parts = [meta.template, meta.theme, count(stats.panels, 'panel'), comps, stats.tables ? `table×${stats.tables}` : ''];
+  return parts.filter(Boolean).join(' · ');
 }
 
 // "1 file", "2 files".
@@ -568,7 +619,10 @@ function cmdClean(opts, { print, fail, env }) {
   return 0;
 }
 
-function cmdLint(src, opts, { print, fail }) {
+function cmdLint(src, opts, ctx, baseDir) {
+  const { print, fail } = ctx;
+  const config = loadConfig(ctx);
+  const { theme, mode } = config.values;
   let doc;
   try {
     doc = parseDoc(src);
@@ -579,6 +633,17 @@ function cmdLint(src, opts, { print, fail }) {
   if (!CHOICES.style.includes(style)) {
     fail(`✗ Invalid style value "${style}". Choose one of: ${CHOICES.style.join(' | ')}`);
     return 2;
+  }
+  // The source checks of every component and of the picture files run only in the render. Check the draft the same way, without writing
+  // a page, so a draft that passes am lint is one am render accepts (style: off here; the STE check below reports the writing rules).
+  if (doc.meta.template !== 'video') {
+    let result;
+    try {
+      result = renderDoc(src, { theme: opts.theme, template: opts.template, style: 'off', mode: opts.mode }, { theme, mode, style: 'off' }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
+    } catch (e) {
+      return reportError(e, fail);
+    }
+    printComponentWarnings(result.stats.componentWarnings, print, 'a page would be written');
   }
   // The language decides the rule family, exactly as it does in render and video: a draft whose language has no rules of
   // its own must be measured with the language-neutral ones, and must not get the Chinese or English rules.
@@ -725,13 +790,15 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'format') return print(FORMAT), 0;
   if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'code') return print(CODE_HELP), 0;
+  if (name === 'table') return print(TABLE_HELP), 0;
+  if (name === 'mermaid') return print(MERMAID_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, table, mermaid, video, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

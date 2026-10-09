@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
+  <a href="https://answer-me-with-html.com/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -152,7 +152,7 @@ Server -> Client: SYN-ACK
 > The [Server] answers with a SYN-ACK.
 ````
 
-`am video` turns it into a player page. The diagram builds step by step with the narration, and the camera follows the node named in brackets. The voice is inside the page, so it plays offline. Add `--mp4` for a video file. The agent only makes videos when you ask. Details: [video guide](docs/video.md).
+`am video` turns it into a player page. The diagram builds step by step with the narration, and the camera follows the node named in brackets. The voice is inside the page, so it plays offline. The player has a chapter strip to jump between scenes, a speed button, and an export button that encodes the video in the browser and downloads it (a local file or `localhost`, no ffmpeg). Add `--mp4` for an MP4 file (needs ffmpeg), or `--webm` for a WebM file the page encodes itself (no ffmpeg). The agent only makes videos when you ask. Details: [video guide](docs/video.md).
 
 ## Settings
 
@@ -248,6 +248,7 @@ The agent picks a component by the shape of the information:
 | Component | Good for |
 | :--- | :--- |
 | `flow` | Architecture, call chains, decision branches. Auto layout, with groups, decisions and databases |
+| `er` | A data model: entities with their columns (PK / FK / UK) and crow's-foot relationships |
 | `sequence` | Messages going back and forth between several parties over time |
 | `tree` | Folders, modules, taxonomies |
 | `timeline` | History, releases, phases |

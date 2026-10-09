@@ -604,3 +604,82 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
   backdrop.click();
   assert.equal(lb.hasAttribute('hidden'), true, 'lightbox closes on backdrop click');
 });
+
+// A table without a delimiter row is not a table: Markdown would show the block as plain text with pipes, so the render refuses the
+// draft and names the line, instead of losing the table silently.
+test('render: a table without a delimiter row is refused with its line and the example', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n| Task | Status |\n| Build | ok |\n'),
+    (err) => err instanceof RenderError && err.component === 'table' && err.line === 5 && /delimiter row/.test(err.message) && err.example.includes('| --- | --- |'),
+  );
+});
+
+test('render: a table with a delimiter row renders, and the summary counts it', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n| Task | Status |\n| --- | --- |\n| Build | ok |\n');
+  assert.ok(html.includes('<table>'));
+  assert.equal(stats.tables, 1);
+});
+
+// The delimiter row is only a delimiter row when every cell of it has hyphens and there is one cell per header column: a short, long or
+// empty one renders no table either, so the block would lose the table without a word.
+test('render: a delimiter row that does not match the header row is refused', () => {
+  const draft = (delimiter) => `---\ntitle: t\n---\n## A\n| Task | Status |\n${delimiter}\n| Build | ok |\n`;
+  for (const delimiter of ['| --- |', '| --- | --- | --- |', '| --- ||', '| | |', '| :-: |']) {
+    assert.throws(
+      () => renderDoc(draft(delimiter)),
+      (err) => err instanceof RenderError && err.component === 'table' && err.line === 5 && /the whole block shows as plain text/.test(err.message),
+      `accepted as a delimiter row: ${delimiter}`,
+    );
+  }
+  assert.throws(
+    () => renderDoc(draft('| --- |')),
+    (err) => /delimiter row has 1 column, the header row 2/.test(err.message),
+  );
+});
+
+test('render: a delimiter row with one cell per column renders, with alignment colons and escaped pipes in the header', () => {
+  const aligned = renderDoc('---\ntitle: t\n---\n## A\n| Task | Status | Note |\n| :--- | ---: | :--: |\n| Build | ok | fine |\n');
+  assert.ok(aligned.html.includes('<table>'));
+  assert.equal(aligned.stats.tables, 1);
+
+  // A pipe behind a backslash is text, not a cell: the header has two cells, and the delimiter row two as well.
+  const escaped = renderDoc('---\ntitle: t\n---\n## A\n| A \\| x | B |\n| --- | --- |\n| 1 | 2 |\n');
+  assert.ok(escaped.html.includes('<table>'));
+  assert.equal(escaped.stats.tables, 1);
+});
+
+test('render: one pipe line alone, or a delimiter row alone, is not a table and passes', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n| just one line\nplain text after it\n');
+  assert.ok(html.includes('just one line'));
+  assert.equal(stats.tables, 0);
+});
+
+// `mermaid` is not a component: the page shows the fence as a code listing. The source is still checked, and the author is pointed at
+// the components that draw a diagram.
+test('render: a mermaid block with an unknown first word is refused with its line and example', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nsqeuenceDiagram\n  A->>B: hi\n```\n'),
+    (err) => err instanceof RenderError && err.component === 'mermaid' && err.line === 6 && /not a diagram type/.test(err.message) && err.example.startsWith('```mermaid'),
+  );
+});
+
+test('render: an empty mermaid block is refused', () => {
+  assert.throws(
+    () => renderDoc('---\ntitle: t\n---\n## A\n```mermaid\n%% only a comment\n```\n'),
+    (err) => err instanceof RenderError && err.component === 'mermaid' && /block is empty/.test(err.message),
+  );
+});
+
+test('render: a valid mermaid block renders as a listing and warns to use a diagram component', () => {
+  const { html, stats } = renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nflowchart LR\n  A[Start] --> B[Done]\n```\n');
+  assert.match(html, /am-code-lang">mermaid/);
+  const warned = stats.componentWarnings.filter((w) => w.component === 'mermaid');
+  assert.equal(warned.length, 1);
+  assert.equal(warned[0].line, 6);
+  assert.match(warned[0].message, /code listing/);
+});
+
+test('render: an unclosed double quote in a mermaid block warns, and the page is still written', () => {
+  const { stats } = renderDoc('---\ntitle: t\n---\n## A\n```mermaid\nflowchart LR\n  A["oops] --> B\n```\n');
+  assert.ok(stats.componentWarnings.some((w) => w.component === 'mermaid' && /unclosed double quote/.test(w.message)));
+});

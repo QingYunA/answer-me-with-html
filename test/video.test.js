@@ -1,12 +1,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
 import { renderVideo, captionHtml, formatClock } from '../src/video/render.js';
-import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, pickMacVoices, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
+import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, parseMacVoices, macVoiceFor, parseEspeakVoices, espeakVoiceFor, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
 import { findChrome } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
@@ -73,6 +73,32 @@ test('estimateSeconds: estimates Chinese by character and English by word, with 
   assert.ok(Math.abs(estimateSeconds('一二三四五六七八九十一二三四五六七八九十一') - (21 / 4.2 + 0.3)) < 1e-9);
   assert.ok(estimateSeconds('one two three four five six seven eight nine ten') > 3.5);
   assert.equal(estimateSeconds('好'), 1.6);
+});
+
+test('estimateSeconds: counts words in every script, so a line is not held at the floor', () => {
+  // Seven words take the same time in English and in Cyrillic.
+  const seven = estimateSeconds('one two three four five six seven');
+  assert.equal(seven, estimateSeconds('один два три четыре пять шесть семь'));
+  // A combining mark (an Indic vowel sign or virama, Arabic or Hebrew vowel points) stays inside its word.
+  assert.equal(seven, estimateSeconds('नमस्ते दुनिया, यह एक परीक्षण वाक्य है'));
+  assert.equal(seven, estimateSeconds('كَتَبَ الوَلَدُ الدَّرْسَ فِي البَيْتِ كُلَّ يَوْمٍ'));
+  const lines = {
+    ru: 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.',
+    ar: 'يرسل العميل رسالة قصيرة إلى الخادم لطلب الاتصال، ويرد الخادم بتأكيده الخاص.',
+    el: 'Ο πελάτης στέλνει ένα σύντομο μήνυμα στον διακομιστή για να ζητήσει σύνδεση.',
+    he: 'הלקוח שולח הודעה קצרה לשרת כדי לבקש חיבור, והשרת עונה באישור שלו.',
+    th: 'ฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าวฉันกินข้าว',
+  };
+  for (const [lang, line] of Object.entries(lines)) assert.ok(estimateSeconds(line) > 4, `${lang}: ${estimateSeconds(line)} s`);
+  assert.equal(estimateSeconds('Привет'), 1.6, 'a single word still takes the floor');
+});
+
+test('renderVideo: a Cyrillic narration line is measured, not held for the 1.6 s floor', async () => {
+  const src = '---\nlang: ru\ntitle: T\n---\n## Scene\n- step\n> Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.\n';
+  const r = await renderVideo(src);
+  const data = JSON.parse(r.html.match(/id="amv-data">(.*?)<\/script>/)[1]);
+  const beat = data.segments[1].beats[0];
+  assert.ok(beat.end - beat.start > 4, `held ${beat.end - beat.start} s`);
 });
 
 test('buildTimeline: title, scene changes and narration follow in order with increasing times', () => {
@@ -192,6 +218,19 @@ test('local voice: retries a runaway or truncated duration up to three times and
   });
 });
 
+test('local voice: a clip that fits a line outside Latin and CJK is accepted on the first attempt', async () => {
+  const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
+  const text = 'Сначала клиент отправляет серверу короткое сообщение с просьбой открыть соединение, и сервер отвечает ему своим подтверждением.';
+  const e = estimateSeconds(text);
+  assert.ok(e > 4, `the line is not held at the floor: ${e} s`);
+  // A 5 s clip is a normal reading of this line (ratio 0.78, accepted), where the old 1.6 s estimate made it a runaway (3.1).
+  await withFakeFetch([5], async (calls) => {
+    const out = await p.synth(text);
+    assert.equal(calls.length, 1);
+    assert.equal(out.length, Math.round(5 * SAMPLE_RATE));
+  });
+});
+
 test('local voice: TtsError when the server returns an error or cannot be reached', async () => {
   const p = pickProvider('local', { AM_TTS_URL: 'http://x' });
   await withFakeFetch([{ status: 422, text: 'model required' }], async () => {
@@ -292,24 +331,105 @@ test('local voice: keeps the HTTP status code when reading fails after the respo
   });
 });
 
-test('pickMacVoices: recognizes long names separated by one space, prefers Tingting / Samantha', () => {
-  const out = [
-    'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',
-    'Tingting (中文（中国大陆）) zh_CN    # 你好！我叫婷婷。',
-    'Albert              en_US    # Hello! My name is Albert.',
-    'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
-  ].join('\n');
-  assert.deepEqual(pickMacVoices(out), { zh: 'Tingting (中文（中国大陆）)', en: 'Samantha (英语（美国）)', ja: undefined });
-  assert.deepEqual(pickMacVoices('Reed (中文（中国大陆）)  zh_CN  # x'), { zh: 'Reed (中文（中国大陆）)', en: undefined, ja: undefined });
+// The voices a machine may have installed, as `say -v '?'` lists them: name, locale, then a sample. Eddy carries every
+// locale of the shared voices; Majed shows a region of digits.
+const MAC_VOICES = parseMacVoices([
+  'Albert              en_US    # Hello! My name is Albert.',
+  'Amelie              fr_CA    # Bonjour! Je m’appelle Amélie.',
+  'Eddy (韩语（韩国）)      ko_KR    # 안녕하세요! 제 이름은 Eddy입니다.',
+  'Majed               ar_001   # مرحبًا! اسمي ماجد.',
+  'Meijia              zh_TW    # 你好！我叫美佳。',
+  'Reed (中文（中国大陆）)     zh_CN    # 你好！我叫Reed。',
+  'Samantha (英语（美国）)   en_US    # Hello! My name is Samantha.',
+  'Sinji               zh_HK    # 你好！我叫Sinji。',
+  'Thomas              fr_FR    # Bonjour! Je m’appelle Thomas.',
+  'Tingting (中文（中国大陆）) zh_CN    # 你好！我叫婷婷。',
+  'Yuna                ko_KR    # 안녕하세요! 제 이름은 Yuna입니다.',
+].join('\n'));
+
+test('parseMacVoices: reads each voice with its locale, including long names separated by one space', () => {
+  assert.equal(MAC_VOICES.length, 11);
+  assert.deepEqual(MAC_VOICES[0], { name: 'Albert', locale: 'en_US' });
+  assert.deepEqual(MAC_VOICES.at(-1), { name: 'Yuna', locale: 'ko_KR' });
+  assert.equal(MAC_VOICES.find((v) => v.locale === 'zh_CN').name, 'Reed (中文（中国大陆）)');
+  assert.equal(MAC_VOICES.find((v) => v.locale === 'ar_001').name, 'Majed', 'a region of digits is a locale too');
 });
 
-test('pickMacVoices: prefers Kyoko for Japanese', () => {
-  const out = [
+test('macVoiceFor: the voice of the line language, the region it implies, the language hint, or none at all', () => {
+  // A language with a hint: Chinese and Traditional Chinese use the locale the language file names.
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh'), 'Tingting (中文（中国大陆）)');
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh-Hant'), 'Meijia', 'Traditional Chinese takes the Taiwan voice');
+  assert.equal(macVoiceFor(MAC_VOICES, 'zh-HK'), 'Sinji', 'the locale of the tag itself wins over the hint');
+  // A language without a hint: the region the tag leaves out first, then any installed voice of the language.
+  assert.equal(macVoiceFor(MAC_VOICES, 'fr'), 'Thomas', 'fr implies fr_FR, not the fr_CA voice');
+  assert.equal(macVoiceFor(MAC_VOICES, 'fr-FR'), 'Thomas', 'the exact locale wins, Amelie is fr_CA');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ar'), 'Majed');
+  assert.equal(macVoiceFor(MAC_VOICES, 'ko'), 'Yuna', 'a shared voice (Eddy) is not preferred over the native one');
+  // The everyday voice beats a novelty voice that also carries en_US and sorts first.
+  assert.equal(macVoiceFor(MAC_VOICES, 'en'), 'Samantha (英语（美国）)');
+  // A language the machine has no voice for stays silent, rather than being read by another language.
+  assert.equal(macVoiceFor(MAC_VOICES, 'de'), null);
+  assert.equal(macVoiceFor(MAC_VOICES, 'th'), null);
+  assert.equal(macVoiceFor([{ name: 'Eddy (中文（中国大陆）)', locale: 'zh_CN' }], 'zh'), 'Eddy (中文（中国大陆）)', 'with no preferred voice installed, the first of the locale is used');
+  assert.equal(macVoiceFor([], 'de'), '', 'a machine that listed no voice at all keeps its default voice');
+});
+
+// The espeak-ng voices, as `espeak-ng --voices` lists them: a priority, the voice name, then the language. English and
+// French are listed by variant (en-us, fr-fr), as the real output does.
+const ESPEAK_VOICES = parseEspeakVoices([
+  'Pty Language       Age/Gender VoiceName          File                 Other Languages',
+  ' 5  cmn             --/M      Mandarin_(China)   zh                    ',
+  ' 2  en-us           --/M      English_(America)  gmw/en-US            (en 3)',
+  ' 5  fr-fr           --/M      French_(France)    roa/fr               (fr 5)',
+  ' 5  ja              --/M      Japanese           ja                    ',
+  ' 5  ko              --/M      Korean             ko                    ',
+  ' 5  my              --/M      Myanmar            my                    ',
+].join('\n'));
+
+test('espeak voices: the name from the language file, the language itself otherwise, none when not installed', () => {
+  assert.deepEqual(ESPEAK_VOICES, ['cmn', 'en-us', 'fr-fr', 'ja', 'ko', 'my']);
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'zh'), 'cmn', 'espeak-ng lists Mandarin, not zh');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'zh-Hant'), 'cmn');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'en'), 'en-us');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'ko'), 'ko');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'fr'), 'fr', 'a language listed by variant is installed');
+  assert.equal(espeakVoiceFor(ESPEAK_VOICES, 'th'), null, 'a language with no installed voice keeps its caption');
+  assert.equal(espeakVoiceFor([], 'th'), 'th', 'an unreadable voice list is not taken as "nothing installed"');
+});
+
+test('synthAll: a line the voice has no voice for stays silent, and the cache follows the voice chosen', async () => {
+  const cacheDir = join(dir, 'voice-choice');
+  const calls = [];
+  const provider = (voiceFor) => ({
+    name: 'fake',
+    id: 'fake',
+    usesLanguage: true,
+    concurrency: 1,
+    voiceFor,
+    async synth(text, { voice } = {}) {
+      calls.push(`${voice}:${text}`);
+      return Int16Array.from({ length: 100 }, () => 1000);
+    },
+  });
+  const texts = ['这句话用中文念。', 'この行は日本語です。', '이 줄은 한국어입니다.'];
+  const picked = ['zh', 'ja', 'ko'];
+  const first = await synthAll(texts, provider((language) => (language === 'ko' ? null : language)), { cacheDir, languageOf: (t) => picked[texts.indexOf(t)] });
+  assert.deepEqual(first.slice(0, 2).map((c) => c.length), [100, 100]);
+  assert.equal(first[2], null, 'the Korean line has no voice on this machine');
+  assert.deepEqual(calls, ['zh:这句话用中文念。', 'ja:この行は日本語です。']);
+  await synthAll(texts, provider((language) => (language === 'ko' ? null : language)), { cacheDir, languageOf: (t) => picked[texts.indexOf(t)] });
+  assert.equal(calls.length, 2, 'the second run is served from the cache');
+  await synthAll([texts[0]], provider(() => 'other'), { cacheDir, languageOf: () => 'zh' });
+  assert.equal(calls.length, 3, 'another voice for the same language does not reuse the cache');
+});
+
+test('macVoiceFor: prefers Kyoko for Japanese, and any voice of the locale when it is not installed', () => {
+  const voices = parseMacVoices([
     'Eddy (日本語（日本）)      ja_JP    # こんにちは! 私の名前はEddyです。',
     'Kyoko               ja_JP    # こんにちは! 私の名前はKyokoです。',
-  ].join('\n');
-  assert.equal(pickMacVoices(out).ja, 'Kyoko');
-  assert.equal(pickMacVoices(out.split('\n')[0]).ja, 'Eddy (日本語（日本）)');
+  ].join('\n'));
+  assert.equal(macVoiceFor(voices, 'ja'), 'Kyoko');
+  assert.equal(macVoiceFor([voices[0]], 'ja'), 'Eddy (日本語（日本）)');
 });
 
 // ── Render ──
@@ -365,6 +485,30 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
   assert.match(cli.html, /data-theme="shadcn" data-mode="dark"/);
   await assert.rejects(renderVideo(SRC, { overrides: { theme: 'neon' } }), /Invalid theme value "neon"/);
   assert.throws(() => renderDoc('---\ntheme: 3b1b\n---\n## A\n文字\n'), ParseError, 'pages do not support 3b1b');
+});
+
+test('player: a chapter strip, a tick per scene and a playback speed button, in the draft language', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /<nav class="amv-chapters" aria-label="章节"><\/nav>/, 'the strip is empty until the player script fills it');
+  assert.match(zh.html, /data-amv="rate" data-speed="速度"/);
+  assert.match(zh.html, /"id":"A"/, 'a chapter carries the letter the scene head shows');
+  assert.match(zh.html, /"segments":\[\{[^}]*"id":""/, 'the title card is not a chapter');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n\`\`\`flow\nA -> B\n\`\`\`\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /aria-label="Chapters"/);
+  assert.match(en.html, /data-speed="Speed"/);
+});
+
+test('player: the export button carries the page language, and the page carries the encoder and the writer', async () => {
+  const zh = await renderVideo(SRC);
+  assert.match(zh.html, /data-amv="export" data-label="导出" data-icon="&#8681;" aria-label="导出"/);
+  // The button needs both halves of the export in the page: the WebM writer, then the engine that drives it.
+  assert.match(zh.html, /\nwindow\.__amvWebm = \{ WebmWriter \};\n/);
+  assert.match(zh.html, /window\.__amvEnc = \{/);
+  assert.ok(zh.html.indexOf('window.__amvWebm') < zh.html.indexOf('window.__amvEnc'), 'the writer comes first');
+
+  const en = await renderVideo(`---\nlang: en\n---\n## One\n- point\n> A line.\n\n## Two\n- point\n> Another line.\n`);
+  assert.match(en.html, /data-amv="export" data-label="Export" data-icon="&#8681;" aria-label="Export"/);
 });
 
 test('video fonts: Japanese 3b1b titles use a Japanese serif; titles in other themes are not overridden', async () => {
@@ -493,6 +637,32 @@ test('e2e: --mp4 exports a 1080p30 video with an audio track', { skip: !E2E, tim
   const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'csv=p=0', join(dir, 'e2e.mp4')], { encoding: 'utf8' });
   assert.match(probe, /video,1920,1080/);
   assert.match(probe, /audio/);
+});
+
+// Node 20 has no built-in WebSocket, so the export stops at its Node check before it looks for ffmpeg.
+test('cli video: --mp4 without ffmpeg fails and points to --webm, instead of writing a WebM', { skip: typeof WebSocket === 'undefined' && 'needs Node 22+' }, async () => {
+  const path = process.env.PATH;
+  process.env.PATH = mkdtempSync(join(tmpdir(), 'am-no-ffmpeg-'));
+  try {
+    const r = await run(['video', '-', '-o', 'no-ffmpeg.html', '--mp4'], { stdin: SRC });
+    assert.equal(r.code, 1);
+    assert.match(r.err, /MP4 export needs ffmpeg/);
+    assert.match(r.err, /--webm/);
+    assert.ok(existsSync(join(dir, 'no-ffmpeg.html')), 'the player page is still written');
+    assert.ok(!existsSync(join(dir, 'no-ffmpeg.webm')), 'no WebM in place of the MP4');
+  } finally {
+    process.env.PATH = path;
+  }
+});
+
+test('e2e: --webm exports a 1080p WebM without ffmpeg', { skip: !E2E, timeout: 120000 }, async () => {
+  const short = '---\ntitle: WebM\n---\n## 场景\n```flow\nA -> B\n```\n> A 连到 B。\n';
+  const r = await run(['video', '-', '-o', 'e2e-webm.html', '--webm'], { stdin: short, ttsProvider: fakeProvider() });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /e2e-webm\.webm/);
+  assert.ok(!existsSync(join(dir, 'e2e-webm.mp4')));
+  const head = readFileSync(join(dir, 'e2e-webm.webm')).subarray(0, 64).toString('latin1');
+  assert.match(head, /webm/);
 });
 
 // ── Fixes after review ──
