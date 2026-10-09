@@ -3424,8 +3424,8 @@ function arrowDefs(uid, variants = []) {
   return `<defs>${[marker("", ""), ...variants.map((v) => marker(`-${v}`, ` am-arrow--${v}`))].join("")}</defs>`;
 }
 function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
-  const top = cy - (lines.length - 1) * lineHeight / 2;
-  return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`).join("");
+  const top2 = cy - (lines.length - 1) * lineHeight / 2;
+  return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top2 + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`).join("");
 }
 var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", er: "Entity relationship diagram", colon: ": ", sep: ", " };
 function diagramLabel(ui, kind2, names) {
@@ -5501,6 +5501,8 @@ var FS2 = 13;
 var LH2 = 17;
 var TEXT_MAX = 150;
 var EDGE_FS = 11.5;
+var CLUSTER_FS = 11;
+var CLUSTER_LABEL_H = 15;
 var DIRS = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
 var BRACKETS = [
   { open: "[(", close: ")]", shape: "db" },
@@ -5669,36 +5671,157 @@ function nodeSize(node) {
   }[node.shape];
   return { lines, width: size[0], height: size[1] };
 }
-function layout2({ nodes, edges, groups }, rankdir, id, ui, pageDir = "ltr") {
+var nodeKey = (i) => `n${i}`;
+var gkey = (i) => `g${i}`;
+var reserveKey = (i) => `r${i}`;
+function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   const g = new $o.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
-  const key = new Map([...nodes.keys()].map((name, i) => [name, `n${i}`]));
-  const gkey = (i) => `g${i}`;
+  const key = new Map([...nodes.keys()].map((name, i) => [name, nodeKey(i)]));
   const sizes = /* @__PURE__ */ new Map();
   for (const n of nodes.values()) {
     const s = nodeSize(n);
     sizes.set(n.id, s);
     g.setNode(key.get(n.id), { width: s.width, height: s.height });
   }
+  const vertical = rankdir === "TB" || rankdir === "BT";
   groups.forEach((grp, i) => {
     g.setNode(gkey(i), { label: grp.name });
     grp.members.forEach((m) => g.setParent(key.get(m), gkey(i)));
+    if (!reserve.has(i) || !vertical) return;
+    g.setNode(reserveKey(i), { width: widths[i] + 4, height: CLUSTER_LABEL_H });
+    g.setParent(reserveKey(i), gkey(i));
+    const down = edges.map((e) => rankdir === "TB" ? [e.from, e.to] : [e.to, e.from]);
+    const link = (a, b, name) => rankdir === "TB" ? g.setEdge(a, b, {}, name) : g.setEdge(b, a, {}, name);
+    const inside = new Set(grp.members);
+    const first = grp.members.filter((m) => !down.some(([a, b]) => b === m && a !== m && inside.has(a)));
+    (first.length ? first : grp.members.slice(0, 1)).forEach((m, k2) => {
+      link(reserveKey(i), key.get(m), `r${i}-${k2}`);
+      down.forEach(([a, b], j2) => {
+        if (b === m && !inside.has(a)) link(key.get(a), reserveKey(i), `r${i}-${k2}-${j2}`);
+      });
+    });
   });
   edges.forEach((e, i) => {
-    const label2 = e.label ? { label: e.label, width: measure(e.label, EDGE_FS) + 12, height: 18, labelpos: "c" } : {};
-    g.setEdge(key.get(e.from), key.get(e.to), label2, `e${i}`);
+    const label = e.label ? { label: e.label, width: measure(e.label, EDGE_FS) + 12, height: 18, labelpos: "c" } : {};
+    g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
   $o.layout(g);
-  const rtl = pageDir === "rtl";
   if (rtl) mirrorLayout(g);
+  if (!vertical) {
+    for (const [i, side] of reserve) {
+      const c = g.node(gkey(i));
+      insertStrip(g, side === "top" ? top(c) + 2 : top(c) + c.height - 2, CLUSTER_LABEL_H + 3);
+    }
+  }
+  return { g, key, sizes };
+}
+function insertStrip(g, y2, d) {
+  for (const v of g.nodes()) {
+    const n = g.node(v);
+    if (v.startsWith("g") && top(n) < y2 && top(n) + n.height > y2) {
+      n.height += d;
+      n.y += d / 2;
+    } else if (n.y > y2) n.y += d;
+  }
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => p.y > y2 ? { ...p, y: p.y + d } : p);
+    if (edge.y !== void 0 && edge.y > y2) edge.y += d;
+  }
+  g.graph().height += d;
+}
+var top = (n) => n.y - n.height / 2;
+function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, reserve) {
+  const boxes = [];
+  for (const n of nodes.values()) {
+    const { x: x2, y: y2 } = g.node(key.get(n.id));
+    const { width: w, height: h2 } = sizes.get(n.id);
+    boxes.push([x2 - w / 2, y2 - h2 / 2, x2 + w / 2, y2 + h2 / 2]);
+  }
+  const segments = [];
+  edges.forEach((e, i) => {
+    const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
+    const pts = data.points;
+    for (let k2 = 1; k2 < pts.length; k2++) segments.push([pts[k2 - 1], pts[k2]]);
+    if (e.label) {
+      const w = measure(e.label, EDGE_FS) + 10;
+      boxes.push([data.x - w / 2, data.y - 9, data.x + w / 2, data.y + 9]);
+    }
+  });
+  return groups.map((grp, i) => {
+    const c = g.node(gkey(i));
+    const left = c.x - c.width / 2;
+    const right = left + c.width;
+    const w = widths[i];
+    const own = grp.state ? [[rtl ? left - 8 : right - 8, top(c) - 8, rtl ? left + 8 : right + 8, top(c) + 8]] : [];
+    const free = (x02, y0, y1) => {
+      const box = [x02 - 5, y0 - 2, x02 + w + 5, y1 + 2];
+      const wide = [x02 - 10, y0 - 2, x02 + w + 10, y1 + 2];
+      return ![...boxes, ...own].some((b) => overlaps(wide, b)) && !segments.some(([p, q3]) => segmentHits(p, q3, box));
+    };
+    const room = g.hasNode(reserveKey(i)) ? g.node(reserveKey(i)) : null;
+    const baselines = reserve.get(i) === "bottom" ? [top(c) + c.height - 6] : room ? [top(c) + 14, room.y + 4] : [top(c) + 14];
+    for (const baseline2 of baselines) {
+      const [y0, y1] = [baseline2 - 11, baseline2 + 4];
+      for (let s = 0; s <= Math.max(0, c.width - 16 - w); s += 4) {
+        const x02 = rtl ? right - 8 - w - s : left + 8 + s;
+        if (free(x02, y0, y1)) {
+          boxes.push([x02, y0, x02 + w, y1]);
+          return [rtl ? x02 + w : x02, baseline2];
+        }
+      }
+    }
+    if (!room) return null;
+    const baseline = baselines.at(-1);
+    const x0 = room.x - w / 2;
+    boxes.push([x0, baseline - 11, x0 + w, baseline + 4]);
+    return [rtl ? x0 + w : x0, baseline];
+  });
+}
+var overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+function segmentHits(p, q3, [x0, y0, x1, y1]) {
+  const dx = q3.x - p.x;
+  const dy = q3.y - p.y;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [a, b] of [[-dx, p.x - x0], [dx, x1 - p.x], [-dy, p.y - y0], [dy, y1 - p.y]]) {
+    if (a === 0) {
+      if (b < 0) return false;
+    } else {
+      const t = b / a;
+      if (a < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+var labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== "rtl" }) + 2;
+function layout2(model, rankdir, id, ui, pageDir = "ltr") {
+  const { nodes, edges, groups } = model;
+  const rtl = pageDir === "rtl";
+  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+  let run2 = runLayout(model, rankdir, rtl, widths, /* @__PURE__ */ new Set());
+  let spots = placeLabels(run2, model, widths, rtl, /* @__PURE__ */ new Map());
+  const reserve = /* @__PURE__ */ new Map();
+  for (const side of ["top", "bottom"]) {
+    const crowded = spots.flatMap((s, i) => s ? [] : [i]);
+    if (!crowded.length) break;
+    for (const i of crowded) reserve.set(i, side);
+    run2 = runLayout(model, rankdir, rtl, widths, reserve);
+    spots = placeLabels(run2, model, widths, rtl, reserve);
+  }
+  const { g, key, sizes } = run2;
   const clusters = groups.map((grp, i) => {
     const c = g.node(gkey(i));
     const x2 = c.x - c.width / 2;
     const y2 = c.y - c.height / 2;
     const mark = deltaAttr(grp.state);
-    const [labelX, badgeX] = rtl ? [x2 + c.width - 8, x2] : [x2 + 8, x2 + c.width];
-    return `<rect class="am-cluster"${mark} x="${f(x2)}" y="${f(y2)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(y2 + 14)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y2)}`;
+    const badgeX = rtl ? x2 : x2 + c.width;
+    const [labelX, labelY] = spots[i] ?? [rtl ? x2 + c.width - 8 : x2 + 8, y2 + 14];
+    return `<rect class="am-cluster"${mark} x="${f(x2)}" y="${f(y2)}" width="${f(c.width)}" height="${f(c.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y2)}`;
   });
   const stepOf = new Map([.../* @__PURE__ */ new Set([...[...nodes.values()].map((n) => n.line), ...edges.map((e) => e.line)])].sort((a, b) => a - b).map((l3, k2) => [l3, k2]));
   const edgeSvg = edges.map((e, i) => {
