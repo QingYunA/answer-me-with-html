@@ -19,15 +19,17 @@ const assertMode = (p, mode) => isWin || assert.equal(modeOf(p).toString(8), mod
 
 const DRAFT = '---\ntitle: Private\n---\n## A one\nText\n';
 let tmp;
-let realHome;
+let saved;
+// os.homedir() reads HOME on POSIX and USERPROFILE on Windows.
+const HOME_VARS = ['HOME', 'USERPROFILE'];
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), 'am-private-'));
-  realHome = process.env.HOME;
-  process.env.HOME = join(tmp, 'user'); // os.homedir() reads HOME on POSIX
-  mkdirSync(process.env.HOME);
+  saved = HOME_VARS.map((k) => process.env[k]);
+  for (const k of HOME_VARS) process.env[k] = join(tmp, 'user');
+  mkdirSync(join(tmp, 'user'));
 });
 afterEach(() => {
-  process.env.HOME = realHome;
+  HOME_VARS.forEach((k, i) => { if (saved[i] === undefined) delete process.env[k]; else process.env[k] = saved[i]; });
   rmSync(tmp, { recursive: true, force: true });
 });
 
