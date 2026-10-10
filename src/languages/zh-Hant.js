@@ -28,6 +28,6 @@ export default {
   },
   videoUi: {
     play: '播放', pause: '暫停', chapters: '章節', speed: '速度', export: '匯出',
-    drawn: '製圖', date: '日期', scenes: '場景', duration: '時長', sheet: '第 {n} 張 / 共 {total} 張',
+    drawn: '製圖', date: '日期', scenes: '場景', duration: '時長', sheet: '圖 {n} / {total}',
   },
 };

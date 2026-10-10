@@ -29,6 +29,6 @@ export default {
   },
   videoUi: {
     play: '再生', pause: '一時停止', chapters: '章', speed: '速度', export: '書き出し',
-    drawn: '作図', date: '日付', scenes: 'シーン', duration: '再生時間', sheet: '{n} / {total} 枚目',
+    drawn: '作図', date: '日付', scenes: 'シーン', duration: '再生時間', sheet: 'シート {n} / {total}',
   },
 };

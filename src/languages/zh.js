@@ -23,6 +23,6 @@ export default {
   },
   videoUi: {
     play: '播放', pause: '暂停', chapters: '章节', speed: '速度', export: '导出',
-    drawn: '制图', date: '日期', scenes: '场景', duration: '时长', sheet: '第 {n} 张 / 共 {total} 张',
+    drawn: '制图', date: '日期', scenes: '场景', duration: '时长', sheet: '图 {n} / {total}',
   },
 };

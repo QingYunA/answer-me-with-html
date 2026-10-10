@@ -480,7 +480,7 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
   const def = await renderVideo(SRC);
   assert.match(def.html, /data-theme="blueprint" data-mode="light" data-style="80" data-video/);
   assert.match(def.html, /class="amv-sheet"/, 'sheet frame');
-  assert.match(def.html, /第 01 张 \/ 共 02 张/); // lang-ok: the Chinese scene header under test
+  assert.match(def.html, /图 01 \/ 02/); // lang-ok: the Chinese scene header under test
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${SRC.split('---\n').slice(2).join('---\n')}`);
   assert.match(dark.html, /data-theme="3b1b" data-mode="dark"/);
   const cli = await renderVideo(SRC, { overrides: { theme: 'shadcn', mode: 'dark' } });
@@ -512,9 +512,9 @@ const sheetLabels = async (lang, body = '## One\n- point\n> A line.\n\n## Two\n-
 
 test('player: the title block and the scene header are written in the draft language', async () => {
   assert.deepEqual(await sheetLabels('en'), { cells: ['DRAWN', 'DATE', 'SCENES', 'DURATION'], heads: ['SHEET 01 / 02', 'SHEET 02 / 02'] });
-  assert.deepEqual(await sheetLabels('zh'), { cells: ['制图', '日期', '场景', '时长'], heads: ['第 01 张 / 共 02 张', '第 02 张 / 共 02 张'] }); // lang-ok: Chinese labels under test
-  assert.deepEqual(await sheetLabels('zh-TW'), { cells: ['製圖', '日期', '場景', '時長'], heads: ['第 01 張 / 共 02 張', '第 02 張 / 共 02 張'] }); // lang-ok: Chinese labels under test
-  assert.deepEqual(await sheetLabels('ja'), { cells: ['作図', '日付', 'シーン', '再生時間'], heads: ['01 / 02 枚目', '02 / 02 枚目'] }); // lang-ok: Japanese labels under test
+  assert.deepEqual(await sheetLabels('zh'), { cells: ['制图', '日期', '场景', '时长'], heads: ['图 01 / 02', '图 02 / 02'] }); // lang-ok: Chinese labels under test
+  assert.deepEqual(await sheetLabels('zh-TW'), { cells: ['製圖', '日期', '場景', '時長'], heads: ['圖 01 / 02', '圖 02 / 02'] }); // lang-ok: Chinese labels under test
+  assert.deepEqual(await sheetLabels('ja'), { cells: ['作図', '日付', 'シーン', '再生時間'], heads: ['シート 01 / 02', 'シート 02 / 02'] }); // lang-ok: Japanese labels under test
   assert.deepEqual(await sheetLabels('he'), { cells: ['שורטט', 'תאריך', 'סצנות', 'משך'], heads: ['גיליון 01 מתוך 02', 'גיליון 02 מתוך 02'] });
 });
 
@@ -532,7 +532,7 @@ test('player: a draft whose language has no file keeps the English title block a
 
 test('player: the labels follow the language the draft is detected as, and carry the numbers the language places', async () => {
   const detected = await sheetLabels('', '## 握手\n- 客户端\n> 客户端向服务器发送请求。\n');
-  assert.deepEqual(detected, { cells: ['制图', '日期', '场景', '时长'], heads: ['第 01 张 / 共 01 张'] }); // lang-ok: Chinese labels under test
+  assert.deepEqual(detected, { cells: ['制图', '日期', '场景', '时长'], heads: ['图 01 / 01'] }); // lang-ok: Chinese labels under test
 });
 
 test('player: the export button carries the page language, and the page carries the encoder and the writer', async () => {

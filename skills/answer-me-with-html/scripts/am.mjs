@@ -389,7 +389,7 @@ var zh_default = {
     date: "\u65E5\u671F",
     scenes: "\u573A\u666F",
     duration: "\u65F6\u957F",
-    sheet: "\u7B2C {n} \u5F20 / \u5171 {total} \u5F20"
+    sheet: "\u56FE {n} / {total}"
   }
 };
 
@@ -451,7 +451,7 @@ var zh_Hant_default = {
     date: "\u65E5\u671F",
     scenes: "\u5834\u666F",
     duration: "\u6642\u9577",
-    sheet: "\u7B2C {n} \u5F35 / \u5171 {total} \u5F35"
+    sheet: "\u5716 {n} / {total}"
   }
 };
 
@@ -569,7 +569,7 @@ var ja_default = {
     date: "\u65E5\u4ED8",
     scenes: "\u30B7\u30FC\u30F3",
     duration: "\u518D\u751F\u6642\u9593",
-    sheet: "{n} / {total} \u679A\u76EE"
+    sheet: "\u30B7\u30FC\u30C8 {n} / {total}"
   }
 };
 
