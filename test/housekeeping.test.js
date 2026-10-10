@@ -36,18 +36,16 @@ test('usage: counts files and bytes per directory', () => {
   assert.equal(u.total, 1157);
 });
 
-test('clean: by default deletes pages, drafts and videos older than 30 days + the whole voice cache, keeps new files and config', () => {
+test('clean: by default deletes pages and videos older than 30 days + the whole voice cache, keeps new files and config', () => {
   const old = file('pages/old.html', 10, 40);
   const fresh = file('pages/new.html', 10, 1);
-  const oldDraft = file('drafts/old.html', 10, 31);
-  const freshDraft = file('drafts/new.html', 10, 1);
   const oldVideo = file('videos/old.html', 10, 31);
   const cache = file('cache/tts/x.pcm', 10, 0);
   file('config.json', 2);
   const r = clean(home, { now: NOW });
-  assert.deepEqual(r, { files: 4, bytes: 40 });
-  assert.ok(!existsSync(old) && !existsSync(oldDraft) && !existsSync(oldVideo) && !existsSync(cache));
-  assert.ok(existsSync(fresh) && existsSync(freshDraft) && existsSync(join(home, 'config.json')));
+  assert.deepEqual(r, { files: 3, bytes: 30 });
+  assert.ok(!existsSync(old) && !existsSync(oldVideo) && !existsSync(cache));
+  assert.ok(existsSync(fresh) && existsSync(join(home, 'config.json')));
   assert.equal(readState(home).lastClean, NOW);
 });
 
@@ -221,13 +219,13 @@ test('cli clean: symlinked root directories are not counted; dry run and real ru
   t.after(() => rmSync(outside, { recursive: true, force: true }));
   const target = join(outside, 'keep.txt');
   writeFileSync(target, '外部文件');
-  for (const dir of ['pages', 'drafts', 'videos', 'cache']) {
+  for (const dir of ['pages', 'videos', 'cache']) {
     symlinkSync(outside, join(home, dir), process.platform === 'win32' ? 'junction' : 'dir');
   }
   const skipped = await run(['clean', '--all', '--dry-run']);
   assert.equal(skipped.code, 0, skipped.err);
   assert.match(skipped.out, /Would delete 0 files, freeing 0 KB/);
-  assert.match(skipped.out, /0 KB in total: 0 pages, 0 drafts, 0 videos, 0 KB voice-over cache/);
+  assert.match(skipped.out, /0 KB in total: 0 pages, 0 videos, 0 KB voice-over cache/);
 
   // Make pages a normal directory again to confirm the printed count comes from the files actually cleaned.
   rmSync(join(home, 'pages'));

@@ -6,13 +6,13 @@ import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
 
 export const CLEAN = Object.freeze({
-  days: 30,                 // am clean deletes pages, drafts and videos older than 30 days by default
+  days: 30,                 // am clean deletes pages and videos older than 30 days by default
   bigBytes: 200 * 2 ** 20,  // notify at once above 200 MB
   staleDays: 30,            // more than 30 days since the last cleanup…
   staleBytes: 20 * 2 ** 20, // …and above 20 MB: notify
   hintEveryDays: 7,         // the same notice at most once every 7 days
 });
-const DIRS = ['pages', 'drafts', 'videos', 'cache'];
+const DIRS = ['pages', 'videos', 'cache'];
 
 // List regular files in a directory. Symlinks and unreadable entries are skipped, so stats never fail on a single file.
 function walk(dir) {
@@ -46,11 +46,11 @@ export function usage(home) {
   return { ...parts, total: DIRS.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 
-// Delete pages, drafts and videos older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
+// Delete pages and videos older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
 export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...['pages', 'drafts', 'videos'].flatMap((d) => walk(join(home, d)).filter((f) => all || f.mtime < cutoff)),
+    ...['pages', 'videos'].flatMap((d) => walk(join(home, d)).filter((f) => all || f.mtime < cutoff)),
     ...walk(join(home, 'cache')),
   ];
   if (!dryRun) {
@@ -73,7 +73,7 @@ export function cleanHint(state, use, now = Date.now()) {
   const pages = `${use.pages.count} page${use.pages.count === 1 ? '' : 's'}`;
   const parts = `${pages} ${mb(use.pages.bytes)}, videos ${mb(use.videos.bytes)}, voice-over cache ${mb(use.cache.bytes)}`;
   const when = state.lastClean ? `last cleaned ${days} days ago` : 'never cleaned';
-  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages, drafts and videos older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
+  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages and videos older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
 }
 
 // Called after every render: record the first-use time, return the notices to print, and schedule the background version check when needed.

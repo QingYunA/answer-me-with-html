@@ -125,7 +125,7 @@ A -> B: hello
 AM_EOF
 ````
 
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. A render with STE or code warnings is a draft: it goes to `drafts/` next to `pages/`, does not open, and prints `~ draft <path>`. Fix the draft and run `am render … --replace <draft>` to render again and delete the draft, or run `am publish <draft>` to move it into `pages/` as it is. With `-o`, the page goes to that path even when it has warnings. This keeps `pages/` to the pages you were given, even when you browse or serve the folder. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
+Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
 
 ## Languages
 
@@ -211,7 +211,7 @@ ssh -L 8765:127.0.0.1:8765 user@host   # on your own computer, then open the lin
 **Cleaning up.** Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
 
 - `/answer-me-with-html:clean` (plugin), or say "clean up the pages", previews first and then asks.
-- `am clean` deletes pages, drafts and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
+- `am clean` deletes pages and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
 
 **Old always-on plugin.** It is gone from this repository, but your copy keeps adding the reminder until you remove it. Run `/plugin uninstall answer-me-with-html-always@answer-me-with-html`, then add the always-on rule from the [README](../README.md#always-on-mode-recommended).
 
