@@ -42,7 +42,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
-  am serve  [--port 8765]                         serve pages on 127.0.0.1 so a remote host can open them over http (am render then prints a link:)
+  am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
@@ -219,6 +219,8 @@ export async function main(argv, io = {}) {
         from: { type: 'string' },
         days: { type: 'string' },
         port: { type: 'string' },
+        lan: { type: 'boolean' },
+        'public-url': { type: 'string' },
         all: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
@@ -634,7 +636,7 @@ function cmdServe(opts, { print, fail, env }) {
     return 2;
   }
   const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
-  return runServe({ home: amHome(env), port, print, fail });
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts['public-url'], print, fail });
 }
 
 function cmdLint(src, opts, { print, fail }) {

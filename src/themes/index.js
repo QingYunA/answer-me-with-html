@@ -37,11 +37,13 @@ export function pageCss(list = themes('page'), { diff = false, delta = false, rt
   return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, BASE_CSS, ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...decorations].join('\n\n');
 }
 
-// list: the video themes the player carries (default: the built-in ones).
-export function videoCss(list = themes('video'), { diff = false, delta = false } = {}) {
+// list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page
+// styles bring rtl.css (its html[dir="rtl"][data-video] block mirrors the player), and a theme's video.rtlCss mirrors what its own css places.
+export function videoCss(list = themes('video'), { diff = false, delta = false, rtl = false } = {}) {
   const parts = list.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : '',
     t.video.css ? scoped(t.video.css, videoSel(t)) : '',
+    rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : '',
   ]).filter(Boolean);
-  return [pageCss(list.filter((t) => t.scope.includes('page')), { diff, delta }), VIDEO_CSS, ...parts].join('\n\n');
+  return [pageCss(list.filter((t) => t.scope.includes('page')), { diff, delta, rtl }), VIDEO_CSS, ...parts].join('\n\n');
 }

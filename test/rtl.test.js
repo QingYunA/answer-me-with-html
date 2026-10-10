@@ -3,10 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDoc } from '../src/render.js';
+import { renderVideo } from '../src/video/render.js';
 import { COMPONENTS } from '../src/components/index.js';
 import { replyText } from '../src/runtime/reply-text.js';
 import { readFileSync } from 'node:fs';
-import { RTL_CSS, RTL_JS } from '../src/assets.js';
+import { RTL_CSS, RTL_JS, VIDEO_JS } from '../src/assets.js';
 import { isolateLtrRuns, svgLine } from '../src/bidi.js';
 import { RTL_LETTER } from '../src/runtime/rtl-letter.js';
 
@@ -459,4 +460,51 @@ test('rtl: annot on a left-to-right page is drawn as before', () => {
   assert.equal(annot(text, 'ltr'), annot(text));
   assert.equal(annot(text, 'ltr'), annot(text, undefined));
   assert.doesNotMatch(renderDoc(`---\nlang: en\n---\n## A S\n\`\`\`annot\n${text}\n\`\`\`\n`).html, /am-seg-n[^>]*>[^<]*<bdi/);
+});
+
+// ── Video pages: the player and its scenes lay out right to left like a page (#158) ──
+const HE_VIDEO = (theme) => `---\nlang: he\n${theme ? `theme: ${theme}\n` : ''}---\n## א זרימה\n\`\`\`flow LR\nלקוח -> שרת: SYN\n\`\`\`\n> [לקוח] שולח בקשה.\n`;
+const EN_VIDEO = (theme) => HE_VIDEO(theme).replace('lang: he', 'lang: en').replace('לקוח -> שרת', 'Client -> Server').replace(/> .*\n$/, '> The [Client] sends a request.\n');
+
+test('rtl video: a Hebrew video page writes dir="rtl" on the root, a left-to-right one does not', async () => {
+  const he = await renderVideo(HE_VIDEO());
+  assert.equal(he.language.dir, 'rtl');
+  assert.match(he.html, /<html lang="he" dir="rtl" data-theme="[^"]+" data-mode="[^"]+" data-style="[^"]+" data-video>/);
+  for (const lang of ['en', 'zh', 'ja']) {
+    const { html } = await renderVideo(`---\nlang: ${lang}\n---\n## A x\n- y\n> z\n`);
+    assert.doesNotMatch(html, /<html[^>]* dir=/, lang);
+  }
+});
+
+test('rtl video: the scenes get the page direction, so a flow reads from the right', async () => {
+  const centres = async (src) => nodeCentres((await renderVideo(src)).html);
+  const he = await centres(HE_VIDEO());
+  const en = await centres(EN_VIDEO());
+  assert.ok(he['לקוח'] > he['שרת'], 'the first node is on the right in Hebrew');
+  assert.ok(en.Client < en.Server, 'the first node stays on the left in English');
+  assert.match((await renderVideo(HE_VIDEO())).html, /<svg [^>]*direction="rtl"/);
+  assert.doesNotMatch((await renderVideo(EN_VIDEO())).html, /<svg [^>]*direction=/);
+});
+
+test('rtl video: the right-to-left styles come only with a right-to-left video, and the player script is the same', async () => {
+  const he = (await renderVideo(HE_VIDEO())).html;
+  assert.ok(he.includes(RTL_CSS));
+  assert.ok(!(await renderVideo(EN_VIDEO())).html.includes(RTL_CSS));
+  assert.ok(he.includes(VIDEO_JS), 'one player script for both directions');
+});
+
+test('rtl video: the title block mirrors, and the whole controls row stays left to right', () => {
+  const block = RTL_CSS.slice(RTL_CSS.indexOf('/* Video player'));
+  assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-titleblock div \+ div \{ border-left: 0; border-right: 1px solid var\(--line\); \}/);
+  assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-controls \{ direction: ltr; \}/);
+  assert.doesNotMatch(block, /\.amv-(track|time|rate)/, 'nothing inside the row needs a rule of its own');
+});
+
+test('rtl video: a theme mirrors what its own video css places, on a right-to-left video only', async () => {
+  const rule = { '3b1b': '.amv-scene-head { left: 72px; right: 96px; }', shadcn: '.amv-scene-n { margin: 12px 14px 12px 0; }' };
+  for (const [theme, css] of Object.entries(rule)) {
+    const sel = `html[data-video][data-theme="${theme}"] ${css}`;
+    assert.ok((await renderVideo(HE_VIDEO(theme))).html.includes(sel), theme);
+    assert.ok(!(await renderVideo(EN_VIDEO(theme))).html.includes(sel), theme);
+  }
 });

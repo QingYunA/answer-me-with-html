@@ -37,5 +37,7 @@ export default {
 & .amv-titleblock { display: none; }
 & .amv-caption { bottom: 56px; }
 & .amv-caption span { text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); font-size: 40px; }`,
+    // Right-to-left: the floating title keeps its 96 px inset on the side it starts from.
+    rtlCss: '& .amv-scene-head { left: 72px; right: 96px; }',
   },
 };

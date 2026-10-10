@@ -29,5 +29,6 @@ export default {
   video: {
     css: `& .amv-scene-n { margin: 12px 0 12px 14px; min-width: 40px; border-radius: 8px; font-size: 22px; }
 & .amv-scene-head { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }`,
+    rtlCss: '& .amv-scene-n { margin: 12px 14px 12px 0; }',
   },
 };

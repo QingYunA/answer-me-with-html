@@ -142,7 +142,7 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels.
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
 
 | Script in the text | Detected as |
 | :--- | :--- |
@@ -189,10 +189,15 @@ If your agent runs on a remote or headless machine, `am serve` lets you open its
 ````bash
 am serve              # http://127.0.0.1:8765, Ctrl-C to stop; --port N changes the port (0 picks a free one)
 ssh -L 8765:127.0.0.1:8765 user@host   # on your own computer, then open the links in your browser
+am serve --lan        # also listen on the local network (0.0.0.0), only on a network you trust
+am serve --public-url https://pages.example.com   # links use this address, for a reverse proxy or tunnel that adds TLS
 ````
 
 - While it runs, `am render`, `am patch` and `am video` print a `link:` line for each page they write into `~/.answer-me-with-html/pages/` or `videos/`, and the agent gives you that link instead of a `file://` one.
-- The server listens on `127.0.0.1` only. Use the SSH tunnel to reach it; do not expose the port to the internet or a shared network. There is no password and no TLS.
+- By default the server listens on `127.0.0.1` only, and the SSH tunnel is the recommended way to reach it. There is no password and no TLS.
+- `--lan` makes the server listen on `0.0.0.0`, every IPv4 interface and not only the address in the links, so another computer on the same network can open the links. It prints every LAN address with a warning, and the links use the first one: 192.168.x.x before 10.x.x.x before 172.16-31.x.x. The connection is plain HTTP and the token in a link is a bearer secret, so anyone on that network who sees the traffic or the link can open the page. Use it only on a trusted network, behind a firewall.
+- `--public-url https://host` is for a reverse proxy or tunnel that you run in front of `am serve` and that adds TLS. It sets the address that `link:` lines start with and the `Host` name the server accepts. It does not create TLS or open any port itself. Give it an origin only, with no path. Without `--lan` the server still listens on `127.0.0.1`, so the proxy must run on the same machine, and it must pass on the original `Host` header.
+- Without those flags the server answers only to `localhost`, `127.0.0.1` and `[::1]`; a request for any other host name or IP is a 404. Do not expose the port to the internet.
 - Links are per page: each one carries a token for that one page, and it does not open any other page. They stop working when the server restarts. The server shows no folder listing and serves only `.html` files.
 - Treat a link as the password of its page: anyone who can reach the port and has the link can open the page, including other users of the same machine. Share it only with yourself.
 - Give the tunnel a local port of its own. Do not reuse a port where you opened pages from another server or another host: a page from that other server could have left a service worker in your browser for that address, and it would see the pages served there later.
