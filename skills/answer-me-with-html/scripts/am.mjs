@@ -8519,8 +8519,20 @@ var TOKEN_LENGTH = 22;
 var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
+function lanRank(address) {
+  const [a, b] = address.split(".").map(Number);
+  if (a === 192 && b === 168) return 0;
+  if (a === 10) return 1;
+  if (a === 172 && b >= 16 && b <= 31) return 2;
+  return 3;
+}
+var compareOctets = (x2, y2) => {
+  const [p, q3] = [x2, y2].map((address) => address.split(".").map(Number));
+  const i = p.findIndex((n, k2) => n !== q3[k2]);
+  return i === -1 ? 0 : p[i] - q3[i];
+};
 function lanIPv4Addresses(interfaces = networkInterfaces()) {
-  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("169.254.")).map(({ address }) => address))].sort();
+  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("169.254.")).map(({ address }) => address))].sort((x2, y2) => lanRank(x2) - lanRank(y2) || compareOctets(x2, y2));
 }
 function publicUrlOrigin(input) {
   const error = () => new ServeError("--public-url must be an http:// or https:// origin without a path, credentials, query or fragment");
@@ -8565,8 +8577,8 @@ function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
 function pageLink({ port, secret, baseUrl }, dir, file) {
-  const origin = baseUrl ?? "http://" + HOST + ":" + port;
-  return origin + "/" + PREFIX_OF[dir] + "/" + pageToken(secret, dir, file) + "/" + encodeURIComponent(file);
+  const origin = baseUrl ?? `http://${HOST}:${port}`;
+  return `${origin}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
 }
 function validFileName(name) {
   return typeof name === "string" && name.length > 0 && name.endsWith(".html") && !/[/\\\0]/.test(name) && !name.includes("..");
@@ -8689,7 +8701,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const publicOrigin = publicUrl === void 0 ? null : publicUrlOrigin(publicUrl);
   const allowedHosts = [...addresses, ...publicOrigin ? [new URL(publicOrigin).host] : []];
   const running = readServeInfo(home);
-  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on http://${HOST}:${running.port} (pid ${running.pid}); stop it first`);
+  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString("hex");
   const server = createServer(handler(home, secret, allowedHosts));
   await new Promise((done, fail) => {
@@ -8697,7 +8709,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
     server.listen(port, lan ? LAN_BIND : HOST, done);
   });
   const actual = server.address().port;
-  const baseUrl = publicOrigin ?? "http://" + (lan ? addresses[0] : HOST) + ":" + actual;
+  const baseUrl = publicOrigin ?? `http://${lan ? addresses[0] : HOST}:${actual}`;
   writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
   let closed;
   const close = () => {
@@ -8726,15 +8738,15 @@ async function runServe({ home, port, lan = false, publicUrl, print, fail }) {
     process.once("SIGHUP", stop);
     process.once("exit", () => removeInfo(home, srv.secret));
     if (lan) {
-      print("Serving pages on " + LAN_BIND + ":" + srv.port + " (Ctrl-C to stop). am render prints a link for each page.");
+      print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print("WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.");
-      for (const address of srv.addresses) print("LAN address: http://" + address + ":" + srv.port);
+      for (const address of srv.addresses) print(`LAN address: http://${address}:${srv.port}`);
     } else {
-      print("Serving pages on http://" + HOST + ":" + srv.port + " (Ctrl-C to stop). am render prints a link for each page.");
-      print("Reaching it from another computer: run ssh -L " + srv.port + ":" + HOST + ":" + srv.port + " user@host there, then open the links in its browser.");
+      print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
+      print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
     }
     if (publicUrl) {
-      print("Public link origin: " + srv.baseUrl);
+      print(`Public link origin: ${srv.baseUrl}`);
       if (srv.baseUrl.startsWith("http://")) print("WARNING: --public-url uses HTTP; links and their capability tokens are not encrypted in transit.");
     }
   });
@@ -8754,7 +8766,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
-  am serve  [--port 8765] [--lan] [--public-url https://host.example]  serve private page links; LAN binding requires explicit --lan
+  am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components

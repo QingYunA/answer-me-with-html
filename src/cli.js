@@ -42,7 +42,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
-  am serve  [--port 8765] [--lan] [--public-url https://host.example]  serve private page links; LAN binding requires explicit --lan
+  am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components

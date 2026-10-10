@@ -21,13 +21,31 @@ const PREFIX_OF = Object.freeze({ pages: 'p', videos: 'v' });
 // Only loopback names are accepted: an SSH tunnel may map any local port, but a DNS-rebinding page arrives with its own host name.
 const LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
 
+// Which private range an address is in, most likely a person's own LAN first. Docker's bridge (172.17.0.1) sits in
+// 172.16/12, so it ranks behind a 192.168/16 or 10/8 address.
+function lanRank(address) {
+  const [a, b] = address.split('.').map(Number);
+  if (a === 192 && b === 168) return 0;
+  if (a === 10) return 1;
+  if (a === 172 && b >= 16 && b <= 31) return 2;
+  return 3;
+}
+
+// Octet-by-octet comparison: a plain string sort would put 10.0.0.9 after 10.0.0.10.
+const compareOctets = (x, y) => {
+  const [p, q] = [x, y].map((address) => address.split('.').map(Number));
+  const i = p.findIndex((n, k) => n !== q[k]);
+  return i === -1 ? 0 : p[i] - q[i];
+};
+
 // IPv4 LAN addresses only: IPv6 is not enabled by the IPv4-only 0.0.0.0 listener.
-// Sort for a stable link address; the startup message also lists every candidate.
+// Ordered by range (192.168, 10, 172.16/12, others), then numerically: the first one becomes the printed link origin,
+// and the startup message also lists every candidate.
 export function lanIPv4Addresses(interfaces = networkInterfaces()) {
   return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? [])
     .filter(({ address, family, internal }) => (family === 'IPv4' || family === 4)
       && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith('169.254.'))
-    .map(({ address }) => address))].sort();
+    .map(({ address }) => address))].sort((x, y) => lanRank(x) - lanRank(y) || compareOctets(x, y));
 }
 
 // A public URL is a pure HTTP(S) origin. Credentials, paths, queries, fragments and
@@ -85,8 +103,8 @@ export function pageToken(secret, dir, file) {
 }
 
 export function pageLink({ port, secret, baseUrl }, dir, file) {
-  const origin = baseUrl ?? ('http://' + HOST + ':' + port);
-  return origin + '/' + PREFIX_OF[dir] + '/' + pageToken(secret, dir, file) + '/' + encodeURIComponent(file);
+  const origin = baseUrl ?? `http://${HOST}:${port}`;
+  return `${origin}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
 }
 
 // A servable file name: one path segment, no traversal, .html only.
@@ -237,7 +255,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   const publicOrigin = publicUrl === undefined ? null : publicUrlOrigin(publicUrl);
   const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : [])];
   const running = readServeInfo(home);
-  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on http://${HOST}:${running.port} (pid ${running.pid}); stop it first`);
+  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString('hex');
   const server = createServer(handler(home, secret, allowedHosts));
   await new Promise((done, fail) => {
@@ -247,7 +265,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
     server.listen(port, lan ? LAN_BIND : HOST, done);
   });
   const actual = server.address().port;
-  const baseUrl = publicOrigin ?? ('http://' + (lan ? addresses[0] : HOST) + ':' + actual);
+  const baseUrl = publicOrigin ?? `http://${lan ? addresses[0] : HOST}:${actual}`;
   writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
   let closed;
   const close = () => {
@@ -279,15 +297,15 @@ export async function runServe({ home, port, lan = false, publicUrl, print, fail
     process.once('SIGHUP', stop); // the SSH session or terminal that runs the server closed
     process.once('exit', () => removeInfo(home, srv.secret));
     if (lan) {
-      print('Serving pages on ' + LAN_BIND + ':' + srv.port + ' (Ctrl-C to stop). am render prints a link for each page.');
+      print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print('WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.');
-      for (const address of srv.addresses) print('LAN address: http://' + address + ':' + srv.port);
+      for (const address of srv.addresses) print(`LAN address: http://${address}:${srv.port}`);
     } else {
-      print('Serving pages on http://' + HOST + ':' + srv.port + ' (Ctrl-C to stop). am render prints a link for each page.');
-      print('Reaching it from another computer: run ssh -L ' + srv.port + ':' + HOST + ':' + srv.port + ' user@host there, then open the links in its browser.');
+      print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
+      print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
     }
     if (publicUrl) {
-      print('Public link origin: ' + srv.baseUrl);
+      print(`Public link origin: ${srv.baseUrl}`);
       if (srv.baseUrl.startsWith('http://')) print('WARNING: --public-url uses HTTP; links and their capability tokens are not encrypted in transit.');
     }
   });
