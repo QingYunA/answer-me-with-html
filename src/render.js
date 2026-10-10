@@ -14,6 +14,7 @@ import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 import { renderCode, CodeError } from './code.js';
 import { isolateLtrRuns } from './bidi.js';
+import { hasMath } from './math.js';
 
 
 export class RenderError extends Error {
@@ -52,7 +53,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
   if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [] };
+  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, ui, dir: language.dir, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
@@ -73,8 +74,9 @@ function hasVisuals({ intro, panels }) {
 
 export function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
-    const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)));
-    noteHtml(b, notes, ctx);
+    const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)), { math: !ctx.video });
+    noteHtml(b, notes.filter((n) => !n.math), ctx);
+    noteMath(b, notes.filter((n) => n.math), ctx);
     return embedImages(b, result, ctx);
   }).join('\n');
 }
@@ -91,6 +93,18 @@ function noteHtml(block, notes, ctx) {
     const n = used.get(tag) ?? 0;
     used.set(tag, n + 1);
     ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message });
+  }
+}
+
+// The math notes of one block, each with the draft line of its formula. The nth note about the same formula points at its nth place in the block.
+function noteMath(block, notes, ctx) {
+  if (!notes.length || !ctx.stats.mathWarnings) return;
+  const first = block.type === 'md' ? block.line : block.line + 1;
+  const next = new Map();
+  for (const { at, message } of notes) {
+    const index = block.text.indexOf(at, next.get(at) ?? 0);
+    next.set(at, index + 1);
+    ctx.stats.mathWarnings.push({ line: first + (index < 0 ? 0 : block.text.slice(0, index).split('\n').length - 1), message });
   }
 }
 
@@ -200,7 +214,7 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl' })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body) })}
 </style>
 </head>
 <body>

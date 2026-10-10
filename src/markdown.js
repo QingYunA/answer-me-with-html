@@ -1,22 +1,30 @@
-// Markdown → HTML (GFM). Four extras: tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure;
+// Markdown → HTML (GFM). Five extras: $…$ and $$ math (math.js); tables get a horizontally scrolling wrapper; status words in cells render as badges; an image on its own line becomes a captioned figure;
 // raw HTML is filtered (see raw-html.js): a placeholder such as <host> shows as text, tags that break the page are escaped, event handlers and javascript: links are removed.
 
 import { Marked } from 'marked';
 import { filterBlocks, filterInline } from './raw-html.js';
+import { mathExtension } from './math.js';
 
 // What the raw-HTML filter changed while collectHtmlNotes is running. Rendering is synchronous, so nothing leaks between calls.
 let sink = null;
 const note = (at, message) => sink?.push({ at, message });
 
+// Whether $ starts a formula (src/math.js). A video draft turns it off: scenes have no math styles.
+let mathOn = true;
+
 // Runs render() and returns its result with the notes about the raw HTML it changed: [{ at, message }], at being the tag as the draft wrote it.
-export function collectHtmlNotes(render) {
+// A formula that Temml cannot read adds a note too, { at, message, math: true }, at being the formula as the draft wrote it.
+export function collectHtmlNotes(render, { math = true } = {}) {
   const outer = sink;
+  const outerMath = mathOn;
   const notes = [];
   sink = notes;
+  mathOn = math;
   try {
     return { result: render(), notes };
   } finally {
     sink = outer;
+    mathOn = outerMath;
   }
 }
 
@@ -25,6 +33,9 @@ const marked = new Marked({ gfm: true });
 const inline = new Marked({ gfm: true });
 marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tokens, { lex: (source) => marked.lexer(source), note }) } });
 inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+const math = mathExtension({ enabled: () => mathOn, note: (at, message) => sink?.push({ at, message, math: true }) });
+marked.use(math);
+inline.use(math);
 
 const STATUS = {
   ok: { cls: 'ok', icon: '✓' },

@@ -1,0 +1,9 @@
+/* Math (src/math.js). Temml's own rules come before this file (src/themes/math-css.js). MathML takes its colour from the text around it, so every theme and mode works. */
+.am-math-block { display: block; max-width: 100%; overflow-x: auto; margin: 10px 0; }
+/* Inline formulas wrap at relations and operators (Chromium, wrap: "tex"); one part that cannot break scrolls inside its box and never widens the panel. */
+math:not(.tml-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+/* A formula that Temml could not read: the TeX as written, in the error colour. */
+.am-math-error {
+  font-family: var(--font-mono); font-size: 0.9em; color: var(--err); background: var(--err-bg);
+  padding: 1px 5px; border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere;
+}

@@ -3,12 +3,13 @@
 // Japanese with kana gets only the sentence and paragraph length checks: Japanese `的` is a suffix (`基本的`, `具体的`), not the Chinese structural particle.
 // A language other than Chinese, English and Japanese gets only the language-neutral rules: sentence length (in words, or in characters for CJK text) and paragraph length.
 // Image captions (the alt text) are checked like any other text.
-// Skipped: code and inline code, ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
+// Skipped: code and inline code, math ($…$ and $$ blocks), ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
 
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES, ZH_WORDS } from './wordlist.zh.js';
 import { isCJK, isJapanese, countWords } from '../svg/text.js';
 import { COMPONENTS } from '../components/index.js';
+import { stripMath, opensDisplay, closesDisplay, isDisplayLine } from '../math.js';
 
 const LIMITS = { zh: { procedural: 35, descriptive: 45 }, en: { procedural: 20, descriptive: 25 } };
 const MAX_SENTENCES = 6;
@@ -68,9 +69,7 @@ export function lintDoc(doc, language) {
 }
 
 function clean(text) {
-  return text
-    .replace(/~~[^~]*~~/g, '')
-    .replace(/`[^`]*`/g, '')
+  return stripMath(text.replace(/~~[^~]*~~/g, '').replace(/`[^`]*`/g, ''))
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, '')
@@ -86,12 +85,22 @@ function lintMarkdown(text, startLine, out, family) {
     para = null;
   };
   let inHtml = false;
+  let inMath = false;
   text.split('\n').forEach((raw, i) => {
     const line = startLine + i;
     const t = raw.trim();
     if (/^<(div|svg|table|details|figure)/i.test(t)) inHtml = true;
     if (inHtml) {
       if (/<\/(div|svg|table|details|figure)>\s*$/i.test(t)) inHtml = false;
+      return flush();
+    }
+    // The TeX of a $$ block is not text: it gives no words and no sentences.
+    if (inMath) {
+      if (!t || closesDisplay(t)) inMath = false;
+      return flush();
+    }
+    if (opensDisplay(raw) || isDisplayLine(raw)) {
+      inMath = opensDisplay(raw);
       return flush();
     }
     if (!t || /^#{1,6}\s/.test(t) || /^[-*_]{3,}$/.test(t)) return flush();

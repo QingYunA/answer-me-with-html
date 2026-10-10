@@ -61,7 +61,7 @@ export function svgLine(line, dir) {
 // Tags that stay inside a run of text: a run with one of them is still one piece of a sentence.
 const INLINE = new Set(['a', 'abbr', 'b', 'cite', 'code', 'del', 'dfn', 'em', 'i', 'ins', 'kbd', 'mark', 'q', 's', 'samp', 'strong', 'sub', 'sup', 'u', 'var']);
 // Elements whose content is not page text: skipped whole.
-const SKIP = new Set(['svg', 'pre', 'script', 'style', 'textarea', 'select', 'option', 'title']);
+const SKIP = new Set(['svg', 'math', 'pre', 'script', 'style', 'textarea', 'select', 'option', 'title']);
 // A tag ends at the first `>` outside a quoted attribute value, so `<span title="a > b">` is one tag, not a tag followed by the text ` b">`.
 const TOKEN = /<!--[\s\S]*?-->|<\/?([a-zA-Z][\w-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>|[^<]+|</g;
 
