@@ -34,6 +34,8 @@ Full syntax for a component: `am help <component>`.
 
 Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload.
 
+The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block or table, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
+
 For a decision the reader must make, write an `ask` block in the panel it changes:
 
 ````markdown
@@ -46,7 +48,7 @@ Which cache do we use?
 
 - The first line is the question. Each option starts with `*` (the suggestion, selected at the start) or `-`. Write 2 to 6 options.
 - One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options that start picked.
-- The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text comes back quoted with `>`.
+- The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text and remark notes come back quoted with `>`.
 
 Full syntax: `am help ask`.
 
@@ -201,7 +203,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 - Links are per page: each one carries a token for that one page, and it does not open any other page. They stop working when the server restarts. The server shows no folder listing and serves only `.html` files.
 - Treat a link as the password of its page: anyone who can reach the port and has the link can open the page, including other users of the same machine. Share it only with yourself.
 - Give the tunnel a local port of its own. Do not reuse a port where you opened pages from another server or another host: a page from that other server could have left a service worker in your browser for that address, and it would see the pages served there later.
-- Each page opens in a browser sandbox of its own, so a script in one page cannot read another. Because of that, Reply answers and comments on an `http://` link last only until you close the page: copy the reply before you close it.
+- Each page opens in a browser sandbox of its own, so a script in one page cannot read another. Because of that, Reply answers, comments and remarks on an `http://` link last only until you close the page: copy the reply before you close it.
 
 ## Updating and cleaning up
 
