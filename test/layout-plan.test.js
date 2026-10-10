@@ -184,12 +184,22 @@ test('a page with cols: 12 plans at most six columns per row and costs about the
     return { result, ms: performance.now() - t0 };
   };
   time(6); // warm up
-  const six = Math.min(time(6).ms, time(6).ms);
-  const { result, ms } = time(12);
+  // Both sides are wall clock on a machine that is not idle, so each is the best of three runs, taken alternately: one
+  // stalled sample cannot set the numerator while a fast one sets the denominator. That is how this failed on CI --
+  // 390 ms against 101 ms, where both sides really cost about the same.
+  let result;
+  let six = Infinity;
+  let twelve = Infinity;
+  for (let i = 0; i < 3; i++) {
+    six = Math.min(six, time(6).ms);
+    const run = time(12);
+    twelve = Math.min(twelve, run.ms);
+    result ??= run.result;
+  }
   assert.deepEqual(order(result), panels.map((_, i) => i));
   assert.ok(Math.max(...result.rows.map((r) => r.columns.length)) <= 6, 'no row has more than six columns');
   // Relative, so a slow or instrumented machine does not fail it: without the cap cols: 12 took about 8x cols: 6.
-  assert.ok(ms < six * 3 + 50, `cols: 12 took ${Math.round(ms)} ms, cols: 6 took ${Math.round(six)} ms`);
+  assert.ok(twelve < six * 3 + 50, `cols: 12 took ${Math.round(twelve)} ms, cols: 6 took ${Math.round(six)} ms`);
 });
 
 test('a span still means a share of cols when cols is above the planner cap', () => {
