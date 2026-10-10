@@ -10,6 +10,12 @@ export default {
     serif: '"Noto Serif Hebrew", "Frank Ruehl CLM", David, "Times New Roman"',
   },
   ui: {
+    remark: {
+      button: 'סימון',
+      hint: 'הערה (אופציונלי)', save: 'שמירה', remove: 'הסרה',
+      section: 'סימונים',
+      kinds: { suggestion: 'הצעה', keep: 'להשאיר', question: 'שאלה', concern: 'חשש' },
+    },
     theme: 'ערכת עיצוב', modeLabel: 'מצב',
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
     copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',

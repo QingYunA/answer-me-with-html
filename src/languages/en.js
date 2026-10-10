@@ -5,7 +5,7 @@ export default {
   voice: { say: 'en_US', espeak: 'en-us' },
   ui: {
     remark: {
-      on: 'Remark on', off: 'Remark',
+      button: 'Remark',
       hint: 'Optional note', save: 'Save', remove: 'Remove',
       section: 'Remarks',
       kinds: { suggestion: 'suggestion', keep: 'keep', question: 'question', concern: 'concern' },

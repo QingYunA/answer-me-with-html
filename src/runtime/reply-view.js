@@ -11,13 +11,15 @@ const escHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;',
 // A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.
 const dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');
 
-// The only inline Markdown src/runtime/reply-text.js writes: **answer** and _(note)_. Each piece is isolated in its own direction,
+// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the "quote" of a remark. Each piece is isolated in its own direction,
 // so a Latin answer inside a Hebrew line keeps its place, and "A · title" still starts with the panel letter.
 const piece = (tag, text) => `<${tag}><bdi dir="${dirOf(text)}">${text}</bdi></${tag}>`;
 function inline(s) {
   return escHtml(s)
     .replace(/\*\*(.+?)\*\*/g, (_, t) => piece('strong', t))
-    .replace(/(^|\s)_(.+?)_(?=\s|$)/g, (_, pre, t) => pre + piece('em', t));
+    .replace(/(^|\s)_(.+?)_(?=\s|$)/g, (_, pre, t) => pre + piece('em', t))
+    // The quoted start of a marked block ("- **A · concern** "text""): isolated, so Latin text in a Hebrew line keeps its place.
+    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir="${dirOf(t)}">${t}</bdi>&quot;`);
 }
 
 // The reply text (src/runtime/reply-text.js) as HTML, one block per line.

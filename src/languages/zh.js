@@ -7,7 +7,7 @@ export default {
   voice: { say: 'zh_CN', espeak: 'cmn' },
   ui: {
     remark: {
-      on: '标注中', off: '标注',
+      button: '标注',
       hint: '批注（可选）', save: '保存', remove: '删除',
       section: '标注',
       kinds: { suggestion: '建议', keep: '保留', question: '疑问', concern: '关注' },

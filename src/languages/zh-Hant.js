@@ -12,7 +12,7 @@ export default {
   },
   ui: {
     remark: {
-      on: '標註中', off: '標註',
+      button: '標註',
       hint: '批註（可選）', save: '儲存', remove: '刪除',
       section: '標註',
       kinds: { suggestion: '建議', keep: '保留', question: '疑問', concern: '關注' },

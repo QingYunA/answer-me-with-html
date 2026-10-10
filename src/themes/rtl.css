@@ -67,3 +67,8 @@ html[dir="rtl"][data-video] .amv-titleblock { text-align: right; }
 html[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }
 html[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }
 html[dir="rtl"][data-video] .amv-controls { direction: ltr; }
+
+/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */
+html[dir="rtl"] pre .am-mark-note { direction: rtl; }
+/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */
+html[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }
