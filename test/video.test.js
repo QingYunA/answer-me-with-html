@@ -480,7 +480,7 @@ test('video theme: blueprint light by default; a draft may set 3b1b; the command
   const def = await renderVideo(SRC);
   assert.match(def.html, /data-theme="blueprint" data-mode="light" data-style="80" data-video/);
   assert.match(def.html, /class="amv-sheet"/, 'sheet frame');
-  assert.match(def.html, /SHEET 01 \/ 02/);
+  assert.match(def.html, /第 01 张 \/ 共 02 张/); // lang-ok: the Chinese scene header under test
   const dark = await renderVideo(`---\ntheme: 3b1b\n---\n${SRC.split('---\n').slice(2).join('---\n')}`);
   assert.match(dark.html, /data-theme="3b1b" data-mode="dark"/);
   const cli = await renderVideo(SRC, { overrides: { theme: 'shadcn', mode: 'dark' } });
@@ -499,6 +499,40 @@ test('player: a chapter strip, a tick per scene and a playback speed button, in 
   const en = await renderVideo(`---\nlang: en\n---\n## One\n\`\`\`flow\nA -> B\n\`\`\`\n> A line.\n\n## Two\n- point\n> Another line.\n`);
   assert.match(en.html, /aria-label="Chapters"/);
   assert.match(en.html, /data-speed="Speed"/);
+});
+
+// The title block cells and the scene header of the video are labels of the draft language (#172).
+const sheetLabels = async (lang, body = '## One\n- point\n> A line.\n\n## Two\n- point\n> Another line.\n') => {
+  const { html } = await renderVideo(`${lang ? `---\nlang: ${lang}\n---\n` : ''}${body}`);
+  return {
+    cells: [...html.matchAll(/<div><b>([^<]*)<\/b><span>/g)].map((m) => m[1]),
+    heads: [...html.matchAll(/<span class="amv-scene-meta">([^<]*)<\/span>/g)].map((m) => m[1]),
+  };
+};
+
+test('player: the title block and the scene header are written in the draft language', async () => {
+  assert.deepEqual(await sheetLabels('en'), { cells: ['DRAWN', 'DATE', 'SCENES', 'DURATION'], heads: ['SHEET 01 / 02', 'SHEET 02 / 02'] });
+  assert.deepEqual(await sheetLabels('zh'), { cells: ['制图', '日期', '场景', '时长'], heads: ['第 01 张 / 共 02 张', '第 02 张 / 共 02 张'] }); // lang-ok: Chinese labels under test
+  assert.deepEqual(await sheetLabels('zh-TW'), { cells: ['製圖', '日期', '場景', '時長'], heads: ['第 01 張 / 共 02 張', '第 02 張 / 共 02 張'] }); // lang-ok: Chinese labels under test
+  assert.deepEqual(await sheetLabels('ja'), { cells: ['作図', '日付', 'シーン', '再生時間'], heads: ['01 / 02 枚目', '02 / 02 枚目'] }); // lang-ok: Japanese labels under test
+  assert.deepEqual(await sheetLabels('he'), { cells: ['שורטט', 'תאריך', 'סצנות', 'משך'], heads: ['גיליון 01 מתוך 02', 'גיליון 02 מתוך 02'] });
+});
+
+test('player: Hebrew labels are set in the sans font without letter spacing, and a left-to-right video keeps the monospace label', async () => {
+  const rule = /html\[dir="rtl"\]\[data-video\] \.amv-titleblock b, html\[dir="rtl"\]\[data-video\] \.amv-scene-meta \{ font-family: var\(--font-sans\); letter-spacing: normal; \}/;
+  assert.match((await renderVideo('---\nlang: he\n---\n## א\n- ישן\n> משפט.\n')).html, rule);
+  assert.doesNotMatch((await renderVideo('---\nlang: en\n---\n## One\n- point\n> A line.\n')).html, rule);
+});
+
+test('player: a draft whose language has no file keeps the English title block and scene header', async () => {
+  const english = { cells: ['DRAWN', 'DATE', 'SCENES', 'DURATION'], heads: ['SHEET 01 / 02', 'SHEET 02 / 02'] };
+  assert.deepEqual(await sheetLabels('fr'), english);
+  assert.deepEqual(await sheetLabels(''), english, 'an English draft that declares no language');
+});
+
+test('player: the labels follow the language the draft is detected as, and carry the numbers the language places', async () => {
+  const detected = await sheetLabels('', '## 握手\n- 客户端\n> 客户端向服务器发送请求。\n');
+  assert.deepEqual(detected, { cells: ['制图', '日期', '场景', '时长'], heads: ['第 01 张 / 共 01 张'] }); // lang-ok: Chinese labels under test
 });
 
 test('player: the export button carries the page language, and the page carries the encoder and the writer', async () => {

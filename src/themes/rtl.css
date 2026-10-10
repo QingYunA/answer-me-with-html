@@ -63,5 +63,7 @@ html[dir="rtl"] .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 1
    button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */
 html[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }
 html[dir="rtl"][data-video] .amv-titleblock { text-align: right; }
+/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */
+html[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }
 html[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }
 html[dir="rtl"][data-video] .amv-controls { direction: ltr; }

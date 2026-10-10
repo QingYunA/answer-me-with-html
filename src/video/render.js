@@ -39,7 +39,7 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, dir: language.dir, video: true });
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, dir: language.dir, video: true }, language.videoUi);
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }
@@ -78,11 +78,11 @@ function playerData(video, meta, timeline) {
   };
 }
 
-function renderScenes(video, meta, timeline, ctx) {
+function renderScenes(video, meta, timeline, ctx, ui) {
   const total = video.scenes.length;
   return [
-    titleScene(meta, renderBlocks(video.intro, ctx), { scenes: total, duration: timeline.duration }),
-    ...video.scenes.map((s, i) => scene(s, i, total, renderBlocks(s.blocks, ctx))),
+    titleScene(meta, renderBlocks(video.intro, ctx), { scenes: total, duration: timeline.duration }, ui),
+    ...video.scenes.map((s, i) => scene(s, i, total, renderBlocks(s.blocks, ctx), ui)),
   ].join('\n');
 }
 
@@ -101,19 +101,19 @@ export function formatClock(seconds) {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
 }
 
-function titleScene(meta, introHtml, { scenes, duration }) {
+function titleScene(meta, introHtml, { scenes, duration }, ui) {
   const mmss = formatClock(duration);
-  const cells = [['DRAWN', 'Answer me with HTML'], ['DATE', timestamp().slice(0, 10)], ['SCENES', String(scenes)], ['DURATION', mmss]];
-  const block = `<div class="amv-titleblock">${cells.map(([k, v]) => `<div><b>${k}</b><span>${esc(v)}</span></div>`).join('')}</div>`;
+  const cells = [[ui.drawn, 'Answer me with HTML'], [ui.date, timestamp().slice(0, 10)], [ui.scenes, String(scenes)], [ui.duration, mmss]];
+  const block = `<div class="amv-titleblock">${cells.map(([k, v]) => `<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('')}</div>`;
   return `<section class="amv-scene amv-scene--title" data-i="0">
 <div class="amv-title-wrap"><h1 class="amv-title">${esc(meta.title || 'Answer me with HTML')}</h1>${meta.subtitle ? `<p class="amv-subtitle">${esc(meta.subtitle)}</p>` : ''}${introHtml ? `<div class="amv-intro">${introHtml}</div>` : ''}${block}</div>
 </section>`;
 }
 
-function scene(s, i, total, body) {
+function scene(s, i, total, body, ui) {
   const pad = (n) => String(n).padStart(2, '0');
   return `<section class="amv-scene" data-i="${i + 1}">
-<header class="amv-scene-head"><span class="amv-scene-n">${esc(s.id)}</span><span class="amv-scene-title">${esc(s.title)}</span><span class="amv-scene-meta">SHEET ${pad(i + 1)} / ${pad(total)}</span></header>
+<header class="amv-scene-head"><span class="amv-scene-n">${esc(s.id)}</span><span class="amv-scene-title">${esc(s.title)}</span><span class="amv-scene-meta">${esc(ui.sheet.replace('{n}', pad(i + 1)).replace('{total}', pad(total)))}</span></header>
 <div class="amv-body"><div class="amv-fit">${body}</div></div>
 </section>`;
 }
