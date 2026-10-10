@@ -22,6 +22,7 @@ export const inlineAssets = {
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
         `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,
         `export const VIDEO_JS = ${JSON.stringify(read('../src/runtime/video.js'))};`,
+        `export const VIDEO_RTL_JS = ${JSON.stringify(read('../src/runtime/video-rtl.js'))};`,
         `export const VIDEO_EXPORT_JS = ${JSON.stringify(read('../src/runtime/video-export.js'))};`,
         `export const VIDEO_MUX_JS = ${JSON.stringify(`${unexport(read('../src/video/webm.js'))}\nwindow.__amvWebm = { WebmWriter };\n`)};`,
       ].join('\n'),

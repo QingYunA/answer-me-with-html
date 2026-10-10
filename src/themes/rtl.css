@@ -57,3 +57,13 @@ html[dir="rtl"] .am-rv-tag {
 html[dir="rtl"] .am-rv-a { padding-inline-start: 1.6em; }
 html[dir="rtl"] .am-rv-a em { color: var(--ink-2); }
 html[dir="rtl"] .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }
+
+/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.
+   A theme mirrors its own placements with video.rtlCss. The progress bar stays left to right, as in common video players, and so do
+   the chapter ticks on it, which are placed from the left. */
+html[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }
+html[dir="rtl"][data-video] .amv-titleblock { text-align: right; }
+html[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }
+html[dir="rtl"][data-video] .amv-track { direction: ltr; }
+/* The clock ("0:12 / 0:24") and the speed ("1×") are numbers, not text: they read left to right in every language. */
+html[dir="rtl"][data-video] .amv-time, html[dir="rtl"][data-video] .amv-rate { direction: ltr; }

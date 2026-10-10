@@ -6,7 +6,7 @@ import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
-import { VERSION, VIDEO_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
+import { VERSION, VIDEO_JS, VIDEO_RTL_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
@@ -39,7 +39,7 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, video: true });
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, dir: language.dir, video: true });
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }
@@ -130,14 +130,14 @@ function shell({ meta, language, scenesHtml, data, wav, voice, source, embedded 
   const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
   return `<!doctype html>
-${rootTag({ lang: language.htmlLang, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
+${rootTag({ lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${videoCss(embedded, { diff: scenesHtml.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(scenesHtml) })}
+${videoCss(embedded, { diff: scenesHtml.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(scenesHtml), rtl: language.dir === 'rtl' })}
 </style>
 </head>
 <body>
@@ -169,7 +169,7 @@ ${VIDEO_MUX_JS}</script>
 <script>
 ${VIDEO_EXPORT_JS}</script>
 <script>
-${VIDEO_JS}</script>
+${VIDEO_JS}</script>${language.dir === 'rtl' ? `\n<script>\n${VIDEO_RTL_JS}</script>` : ''}
 </body>
 </html>
 `;

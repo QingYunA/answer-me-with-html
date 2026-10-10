@@ -4,13 +4,16 @@ import { Readable, Writable } from 'node:stream';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawn } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
 import { renderVideo, captionHtml, formatClock } from '../src/video/render.js';
 import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, parseMacVoices, macVoiceFor, parseEspeakVoices, espeakVoiceFor, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
-import { findChrome } from '../src/video/export.js';
+import { findChrome, connect, devtoolsUrl } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { COMPONENTS } from '../src/components/index.js';
+import { VIDEO_RTL_JS } from '../src/assets.js';
 import { main } from '../src/cli.js';
 
 let dir;
@@ -609,6 +612,19 @@ title: 补丁视频
   assert.doesNotMatch(after, /旧画面/);
 });
 
+test('cli patch: a Hebrew video page is still right to left after one scene changes', async () => {
+  const vid = '---\nlang: he\n---\n## א ראשון\n- ישן\n> משפט ישן.\n\n## ב שני\n- נשאר\n> משפט שני.\n';
+  const made = await run(['video', '-', '-o', 'vid-he.html', '--voice', 'off'], { stdin: vid });
+  assert.equal(made.code, 0, made.err);
+  const patched = await run(['patch', 'vid-he.html', '--panel', 'א ראשון'], { stdin: '## א ראשון\n- חדש\n> משפט חדש.\n' });
+  assert.equal(patched.code, 0, patched.err);
+  const after = readFileSync(join(dir, 'vid-he.html'), 'utf8');
+  assert.match(after, /<html lang="he" dir="rtl" [^>]*data-video>/);
+  assert.ok(after.includes(VIDEO_RTL_JS), 'the chapter strip script stays');
+  assert.match(after, /חדש/);
+  assert.doesNotMatch(after, /ישן/);
+});
+
 test('cli help video / config voice', async () => {
   assert.match((await run(['help', 'video'])).out, /Video draft format/);
   const set = await run(['config', 'set', 'voice', 'off']);
@@ -760,5 +776,63 @@ test('ElevenLabs: defaults to eleven_v4_turbo, ELEVENLABS_MODEL_ID changes the m
     assert.notEqual(def.id, flash.id);
   } finally {
     globalThis.fetch = realFetch;
+  }
+});
+
+// A Hebrew video: the player draws it right to left, the chapter strip keeps the active chapter in view, and both exports work.
+const HEBREW = '---\ntitle: לחיצת יד\nlang: he\n---\n## א שלום\n```flow LR\nלקוח -> שרת: SYN\n```\n> [לקוח] שולח בקשה לשרת.\n';
+const hebrewChapters = (n) => `---\nlang: he\n---\n${Array.from({ length: n }, (_, i) => `## פרק מספר ${i + 1} עם כותרת ארוכה\n- נקודה\n> משפט בפרק ${i + 1}.\n`).join('\n')}`;
+
+test('e2e: a Hebrew video exports to MP4 and WebM at 1080p', { skip: !E2E, timeout: 180000 }, async () => {
+  const mp4 = await run(['video', '-', '-o', 'e2e-he.html', '--mp4'], { stdin: HEBREW, ttsProvider: fakeProvider() });
+  assert.equal(mp4.code, 0, mp4.err);
+  const { execFileSync } = await import('node:child_process');
+  assert.match(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'csv=p=0', join(dir, 'e2e-he.mp4')], { encoding: 'utf8' }), /video,1920,1080/);
+  const webm = await run(['video', '-', '-o', 'e2e-he-webm.html', '--webm'], { stdin: HEBREW, ttsProvider: fakeProvider() });
+  assert.equal(webm.code, 0, webm.err);
+  assert.match(readFileSync(join(dir, 'e2e-he-webm.webm')).subarray(0, 64).toString('latin1'), /webm/);
+});
+
+test('e2e: the chapter strip of a Hebrew video scrolls to the active chapter', { skip: !E2E || !findChrome() || typeof WebSocket === 'undefined' }, async () => {
+  const r = await renderVideo(hebrewChapters(14));
+  const file = join(dir, 'chapters-he.html');
+  (await import('node:fs')).writeFileSync(file, r.html);
+  const profile = mkdtempSync(join(tmpdir(), 'am-chapters-'));
+  const chrome = spawn(findChrome(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--mute-audio', '--force-device-scale-factor=1', '--window-size=1000,700', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let cdp;
+  try {
+    cdp = await connect(await devtoolsUrl(chrome));
+    const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+    const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+    await cdp.send('Page.enable', {}, sessionId);
+    const loaded = cdp.once('Page.loadEventFired');
+    await cdp.send('Page.navigate', { url: pathToFileURL(file).href }, sessionId);
+    await loaded;
+    const { result } = await cdp.send('Runtime.evaluate', {
+      awaitPromise: true,
+      returnByValue: true,
+      expression: `(async () => {
+        window.render(25);
+        await new Promise((r) => setTimeout(r, 1500));
+        const bar = document.querySelector('.amv-chapters').getBoundingClientRect();
+        const chip = document.querySelector('.amv-chap[aria-current]').getBoundingClientRect();
+        return { inView: chip.left >= bar.left && chip.right <= bar.right, offCentre: Math.abs((chip.left + chip.right) / 2 - (bar.left + bar.right) / 2) };
+      })()`,
+    }, sessionId);
+    assert.equal(result.value.inView, true, 'the active chip is inside the strip');
+    assert.ok(result.value.offCentre < 2, `the chip is centred (off by ${result.value.offCentre} px)`);
+  } finally {
+    cdp?.close();
+    await new Promise((resolve) => {
+      const timer = setTimeout(resolve, 3000);
+      chrome.once('exit', () => { clearTimeout(timer); resolve(); });
+      chrome.kill();
+    });
+    // Chrome helper processes can still write to the profile after the main process exits (#74); a leftover directory is not a failure.
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+    } catch (e) {
+      console.warn(`Could not remove ${profile}: ${e.message}`);
+    }
   }
 });
