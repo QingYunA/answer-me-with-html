@@ -103,6 +103,30 @@ For something a diagram cannot show, such as a real screen, use an image that al
 
 Full syntax: `am help image`.
 
+## Math
+
+For a formula in the text, write LaTeX between dollar signs:
+
+```markdown
+The weight of a vertex is $w(v)=\prod_{u\prec v}N_u^{-1}$.
+
+$$
+\widehat g=\sum_{i=1}^{n} w_i\widehat A_i\nabla_\theta\log\pi_\theta(a_i\mid s_i)
+$$
+```
+
+- `$…$` is an inline formula. A block is a line with only `$$`, the TeX on the lines after it, and a line with only `$$`; one line `$$ E = mc^2 $$` also works. A block has no blank line inside it.
+- [Temml](https://temml.org) typeset the TeX when the page is made and writes MathML, so the page needs no script and no network. A page with math carries a small math font (about 9 KB) and its styles; a page without math is unchanged. The formula takes the colour of the text, so every theme and mode works.
+- A formula stays left to right on a right-to-left page.
+- A display formula that is wider than its panel scrolls inside the panel. An inline formula wraps after a relation or an operator (`=`, `+`) in Chrome and Firefox; Safari does not wrap it. Put a long formula in a `$$` block.
+- A dollar sign that is not a formula stays text. The opening `$` has a non-space after it. The closing `$` has a non-space before it and no digit after it, so `$5 and $10` and `$5-$10` stay text. A closing `$` with a letter (A-Z, a-z) or `_` after it does not close either, so `$PATH:$HOME` stays text; write `$n$-th`, not `$n$th`. Write `\$` for a dollar sign. An inline formula is on one line.
+- Math works in the text of paragraphs, lists, tables, quotes, headings, callouts, `kv`, `ask`, `timeline` and `tree`. Code spans, code blocks, diagrams (`flow`, `er`, `sequence` and the others) and `am video` take no math. In a table cell write `\vert x \vert`, not `|x|`.
+- If Temml cannot read the TeX, the page is still written. The formula shows as raw TeX in red and monospace (the message is in its tooltip), and the render prints a warning with the draft line, like `L12 [math] $\foo$ is shown as raw TeX: ...`. A page with a math warning does not open; fix the TeX and render again with `--replace`.
+- `\ref`, `\eqref` and `\label` need a script that the page does not have. They give a warning and show nothing. `\tag{1}` works in a `$$` block.
+- The writing check skips the TeX.
+
+Syntax in the CLI: `am help format`.
+
 ## Use the CLI directly, without an agent
 
 The CLI is `scripts/am.mjs` inside the skill folder.

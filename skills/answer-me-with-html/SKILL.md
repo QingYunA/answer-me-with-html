@@ -119,6 +119,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 
 - The panel letter ID can be omitted; it is assigned automatically.
 - ```html / ```svg fenced blocks are embedded as-is. **Use them only when no component can express the content.**
+- Math in text: `$x^2$` inline, and `$$` on its own line before and after a block; put a long formula in a `$$` block. `\$` writes a dollar sign. Diagrams and video take no math.
 - Full reference: `am help format`; component syntax: `am help <component>`; component list: `am list`.
 
 ## 4. Choose components by the shape of the information
