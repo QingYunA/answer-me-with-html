@@ -187,12 +187,17 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 If your agent runs on a remote or headless machine, `am serve` lets you open its pages in your own browser over `http://`. Run it in a terminal on that machine and leave it running:
 
 ````bash
-am serve              # http://127.0.0.1:8765, Ctrl-C to stop; --port N changes the port (0 picks a free one)
-ssh -L 8765:127.0.0.1:8765 user@host   # on your own computer, then open the links in your browser
+am serve              # loopback only; --port N selects a port
+ssh -L 8765:127.0.0.1:8765 user@host   # recommended remote option
+am serve --lan        # opt in: listen on all IPv4 interfaces; requires trusted LAN/firewall
+am serve --public-url https://box.example.com  # print reverse-proxy URL, keep loopback binding
+am serve --lan --public-url https://box.example.com  # proxy accesses LAN backend
 ````
 
 - While it runs, `am render`, `am patch` and `am video` print a `link:` line for each page they write into `~/.answer-me-with-html/pages/` or `videos/`, and the agent gives you that link instead of a `file://` one.
-- The server listens on `127.0.0.1` only. Use the SSH tunnel to reach it; do not expose the port to the internet or a shared network. There is no password and no TLS.
+- By default, the server listens on `127.0.0.1` only. An SSH tunnel is the recommended remote option. `--lan` deliberately binds **all IPv4 interfaces** (`0.0.0.0`), not just the LAN IP printed in the link. Use it only on a trusted network with firewall rules. There is no built-in TLS; do not expose the port directly to the public internet.
+- `--public-url` changes the origin printed in `link:` lines; it accepts only an HTTP(S) origin without path, query or credentials. It **does not configure a reverse proxy or TLS**. Without `--lan`, binding stays on loopback and the proxy must be on the same host (or able to access loopback). Forward the original `Host` header. Prefer HTTPS: intercepted HTTP links expose bearer tokens.
+- On multi-homed hosts, `--lan` prints all detected IPv4 addresses, and the first address is used for links unless `--public-url` overrides it. Check that clients can reach the selected interface.
 - Links are per page: each one carries a token for that one page, and it does not open any other page. They stop working when the server restarts. The server shows no folder listing and serves only `.html` files.
 - Treat a link as the password of its page: anyone who can reach the port and has the link can open the page, including other users of the same machine. Share it only with yourself.
 - Give the tunnel a local port of its own. Do not reuse a port where you opened pages from another server or another host: a page from that other server could have left a service worker in your browser for that address, and it would see the pages served there later.

@@ -8520,7 +8520,7 @@ var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
 function lanIPv4Addresses(interfaces = networkInterfaces()) {
-  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("169.254.")).map(({ address }) => address))].sort();
+  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("127.") && !address.startsWith("169.254.")).map(({ address }) => address))].sort();
 }
 function publicUrlOrigin(input) {
   const error = () => new ServeError("--public-url must be an http:// or https:// origin without a path, credentials, query or fragment");
@@ -8612,10 +8612,14 @@ function serveLink(home, file) {
 function writeInfo(home, info) {
   ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
-  rmSync5(tmp, { force: true });
-  writeFileSync5(tmp, `${JSON.stringify(info)}
+  try {
+    rmSync5(tmp, { force: true });
+    writeFileSync5(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
-  renameSync3(tmp, infoPath(home));
+    renameSync3(tmp, infoPath(home));
+  } finally {
+    rmSync5(tmp, { force: true });
+  }
 }
 function removeInfo(home, secret) {
   try {
@@ -8698,7 +8702,13 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   });
   const actual = server.address().port;
   const baseUrl = publicOrigin ?? "http://" + (lan ? addresses[0] : HOST) + ":" + actual;
-  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+  try {
+    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+  } catch (e) {
+    server.closeAllConnections();
+    await new Promise((done) => server.close(done));
+    throw new ServeError(`Cannot save serve.json; server stopped: ${e.message}`);
+  }
   let closed;
   const close = () => {
     closed ??= new Promise((done) => {

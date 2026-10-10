@@ -69,3 +69,60 @@ test('LAN mode rejects missing usable addresses before opening a listener', asyn
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+test('server releases the listening port and temporary metadata if startup persistence fails', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  // A child process prevents a failed implementation from leaving this test runner with an open server handle.
+  const probe = String.raw`
+    import { createServer } from 'node:net';
+    import { mkdtempSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+    import { tmpdir } from 'node:os';
+    import { join } from 'node:path';
+    import { startServer, ServeError } from './src/serve.js';
+
+    const home = mkdtempSync(join(tmpdir(), 'am-serve-startup-'));
+    mkdirSync(join(home, 'serve.json')); // renameSync cannot replace a directory with the metadata file.
+    const reserve = createServer();
+    await new Promise((resolve) => reserve.listen(0, '127.0.0.1', resolve));
+    const port = reserve.address().port;
+    await new Promise((resolve) => reserve.close(resolve));
+
+    let controlledError = false;
+    try {
+      await startServer({ home, port });
+    } catch (e) {
+      controlledError = e instanceof ServeError;
+    }
+    const candidate = createServer();
+    let portReleased = false;
+    try {
+      await new Promise((resolve, reject) => {
+        candidate.once('error', reject);
+        candidate.listen(port, '127.0.0.1', resolve);
+      });
+      portReleased = true;
+      await new Promise((resolve) => candidate.close(resolve));
+    } catch {
+      // Previous server leaked its listener.
+    }
+    const noTempFile = !readdirSync(home).some((name) => name.endsWith('.tmp'));
+    rmSync(home, { recursive: true, force: true });
+    console.log(JSON.stringify({ controlledError, portReleased, noTempFile }));
+    process.exit(controlledError && portReleased && noTempFile ? 0 : 1);
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '--eval', probe], {
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    encoding: 'utf8', timeout: 6000,
+  });
+  assert.equal(result.status, 0, [result.stdout, result.stderr].join('\n'));
+});
+
+test('LAN discovery never advertises a loopback address even if the interface flag is inconsistent', () => {
+  assert.deepEqual(lanIPv4Addresses({
+    unusual: [
+      { address: '127.0.0.2', family: 'IPv4', internal: false },
+      { address: '10.2.3.4', family: 'IPv4', internal: false },
+    ],
+  }), ['10.2.3.4']);
+});
