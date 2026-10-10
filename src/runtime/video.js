@@ -329,7 +329,10 @@
     chips.forEach((c, k) => (k === i ? c.setAttribute('aria-current', 'true') : c.removeAttribute('aria-current')));
     const chip = chips[i];
     if (chip && bar.scrollWidth > bar.clientWidth) {
-      bar.scrollTo({ left: Math.max(0, chip.offsetLeft - (bar.clientWidth - chip.offsetWidth) / 2), behavior: 'smooth' });
+      // By where the chip is on screen, so the strip scrolls the same in either direction (a right-to-left strip scrolls with negative offsets).
+      const b = bar.getBoundingClientRect();
+      const c = chip.getBoundingClientRect();
+      bar.scrollBy({ left: c.left + c.width / 2 - (b.left + b.width / 2), behavior: 'smooth' });
     }
   }
 

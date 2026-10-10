@@ -13,7 +13,6 @@ import { findChrome, connect, devtoolsUrl } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { COMPONENTS } from '../src/components/index.js';
-import { VIDEO_RTL_JS } from '../src/assets.js';
 import { main } from '../src/cli.js';
 
 let dir;
@@ -620,7 +619,6 @@ test('cli patch: a Hebrew video page is still right to left after one scene chan
   assert.equal(patched.code, 0, patched.err);
   const after = readFileSync(join(dir, 'vid-he.html'), 'utf8');
   assert.match(after, /<html lang="he" dir="rtl" [^>]*data-video>/);
-  assert.ok(after.includes(VIDEO_RTL_JS), 'the chapter strip script stays');
   assert.match(after, /חדש/);
   assert.doesNotMatch(after, /ישן/);
 });
@@ -782,6 +780,7 @@ test('ElevenLabs: defaults to eleven_v4_turbo, ELEVENLABS_MODEL_ID changes the m
 // A Hebrew video: the player draws it right to left, the chapter strip keeps the active chapter in view, and both exports work.
 const HEBREW = '---\ntitle: לחיצת יד\nlang: he\n---\n## א שלום\n```flow LR\nלקוח -> שרת: SYN\n```\n> [לקוח] שולח בקשה לשרת.\n';
 const hebrewChapters = (n) => `---\nlang: he\n---\n${Array.from({ length: n }, (_, i) => `## פרק מספר ${i + 1} עם כותרת ארוכה\n- נקודה\n> משפט בפרק ${i + 1}.\n`).join('\n')}`;
+const englishChapters = (n) => `---\nlang: en\n---\n${Array.from({ length: n }, (_, i) => `## Chapter number ${i + 1} with a long title\n- point\n> A sentence in chapter ${i + 1}.\n`).join('\n')}`;
 
 test('e2e: a Hebrew video exports to MP4 and WebM at 1080p', { skip: !E2E, timeout: 180000 }, async () => {
   const mp4 = await run(['video', '-', '-o', 'e2e-he.html', '--mp4'], { stdin: HEBREW, ttsProvider: fakeProvider() });
@@ -793,9 +792,10 @@ test('e2e: a Hebrew video exports to MP4 and WebM at 1080p', { skip: !E2E, timeo
   assert.match(readFileSync(join(dir, 'e2e-he-webm.webm')).subarray(0, 64).toString('latin1'), /webm/);
 });
 
-test('e2e: the chapter strip of a Hebrew video scrolls to the active chapter', { skip: !E2E || !findChrome() || typeof WebSocket === 'undefined' }, async () => {
-  const r = await renderVideo(hebrewChapters(14));
-  const file = join(dir, 'chapters-he.html');
+for (const [name, draft] of [['Hebrew', hebrewChapters], ['English', englishChapters]]) {
+test(`e2e: the chapter strip of a ${name}-language video scrolls to the active chapter`, { skip: !E2E || !findChrome() || typeof WebSocket === 'undefined' }, async () => {
+  const r = await renderVideo(draft(14));
+  const file = join(dir, `chapters-${name}.html`);
   (await import('node:fs')).writeFileSync(file, r.html);
   const profile = mkdtempSync(join(tmpdir(), 'am-chapters-'));
   const chrome = spawn(findChrome(), ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--mute-audio', '--force-device-scale-factor=1', '--window-size=1000,700', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -836,3 +836,4 @@ test('e2e: the chapter strip of a Hebrew video scrolls to the active chapter', {
     }
   }
 });
+}

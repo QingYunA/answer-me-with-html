@@ -6,7 +6,7 @@ import { videoCss } from '../themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from '../themes/registry.js';
 import { lintDoc } from '../lint/ste.js';
 import { esc } from '../svg/text.js';
-import { VERSION, VIDEO_JS, VIDEO_RTL_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
+import { VERSION, VIDEO_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
@@ -169,7 +169,7 @@ ${VIDEO_MUX_JS}</script>
 <script>
 ${VIDEO_EXPORT_JS}</script>
 <script>
-${VIDEO_JS}</script>${language.dir === 'rtl' ? `\n<script>\n${VIDEO_RTL_JS}</script>` : ''}
+${VIDEO_JS}</script>
 </body>
 </html>
 `;

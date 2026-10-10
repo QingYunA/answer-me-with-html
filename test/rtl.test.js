@@ -7,7 +7,7 @@ import { renderVideo } from '../src/video/render.js';
 import { COMPONENTS } from '../src/components/index.js';
 import { replyText } from '../src/runtime/reply-text.js';
 import { readFileSync } from 'node:fs';
-import { RTL_CSS, RTL_JS, VIDEO_RTL_JS } from '../src/assets.js';
+import { RTL_CSS, RTL_JS, VIDEO_JS } from '../src/assets.js';
 import { isolateLtrRuns, svgLine } from '../src/bidi.js';
 import { RTL_LETTER } from '../src/runtime/rtl-letter.js';
 
@@ -486,21 +486,18 @@ test('rtl video: the scenes get the page direction, so a flow reads from the rig
   assert.doesNotMatch((await renderVideo(EN_VIDEO())).html, /<svg [^>]*direction=/);
 });
 
-test('rtl video: the right-to-left styles and the chapter strip script come only with a right-to-left video', async () => {
+test('rtl video: the right-to-left styles come only with a right-to-left video, and the player script is the same', async () => {
   const he = (await renderVideo(HE_VIDEO())).html;
   assert.ok(he.includes(RTL_CSS));
-  assert.ok(he.includes(VIDEO_RTL_JS));
-  assert.ok(he.indexOf(VIDEO_RTL_JS) > he.indexOf('window.render = render'), 'the strip script runs after the player script has built the strip');
-  const en = (await renderVideo(EN_VIDEO())).html;
-  assert.ok(!en.includes(RTL_CSS));
-  assert.ok(!en.includes(VIDEO_RTL_JS));
+  assert.ok(!(await renderVideo(EN_VIDEO())).html.includes(RTL_CSS));
+  assert.ok(he.includes(VIDEO_JS), 'one player script for both directions');
 });
 
-test('rtl video: the title block mirrors, and the clock, the speed and the progress bar stay left to right', () => {
+test('rtl video: the title block mirrors, and the whole controls row stays left to right', () => {
   const block = RTL_CSS.slice(RTL_CSS.indexOf('/* Video player'));
   assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-titleblock div \+ div \{ border-left: 0; border-right: 1px solid var\(--line\); \}/);
-  assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-track \{ direction: ltr; \}/);
-  assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-time, html\[dir="rtl"\]\[data-video\] \.amv-rate \{ direction: ltr; \}/);
+  assert.match(block, /html\[dir="rtl"\]\[data-video\] \.amv-controls \{ direction: ltr; \}/);
+  assert.doesNotMatch(block, /\.amv-(track|time|rate)/, 'nothing inside the row needs a rule of its own');
 });
 
 test('rtl video: a theme mirrors what its own video css places, on a right-to-left video only', async () => {
