@@ -79,6 +79,13 @@ function canonicalTag(value) {
 // The language subtag of a tag: `zh-Hant` -> `zh`.
 export const baseLanguage = (tag) => new Intl.Locale(tag).language;
 
+// The narration voice hints of a language, from its own language file (`voice`: the macOS locale and the espeak-ng
+// voice to prefer). null for a language without a file: its tag names the voice itself.
+export function voiceHints(tag) {
+  const locale = new Intl.Locale(tag).maximize();
+  return findLanguage(locale.language, locale.script)?.voice ?? null;
+}
+
 // Node 20 has the `textInfo` property, newer versions the `getTextInfo()` method.
 function directionOf(locale) {
   const info = typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : locale.textInfo;
@@ -89,7 +96,8 @@ function directionOf(locale) {
 // keeps it unless the draft declares one; it is not a declaration); text: the draft, for detection.
 // Returns { tag, declared, htmlLang, script, dir, supported, labelKey, ui, videoUi }:
 //   declared  whether the draft states its language; htmlLang  the <html lang> value; supported  whether the language has its own labels;
-//   labelKey  the key theme label objects use; ui / videoUi  the page and player labels (English when not supported).
+//   labelKey  the key theme label objects use; ui / videoUi  the page and player labels (English when not supported);
+//   metaKeys  names for common frontmatter keys (author, date, ...) shown under the title; dateOrder  'ymd' or 'dmy' for the render time.
 export function resolveLanguage({ declared, previous, text = '' }) {
   const declaredTag = canonicalTag(declared);
   const tag = declaredTag ?? canonicalTag(previous) ?? detectLang(text);
@@ -105,7 +113,9 @@ export function resolveLanguage({ declared, previous, text = '' }) {
     dir: directionOf(locale),
     supported: Boolean(entry),
     labelKey: labels.id,
-    ui: labels.ui,
+    ui: labels.deltaCounts ? { ...labels.ui, delta: { ...labels.ui.delta, counts: labels.deltaCounts } } : labels.ui,
     videoUi: labels.videoUi,
+    metaKeys: labels.metaKeys ?? {},
+    dateOrder: labels.dateOrder ?? 'ymd',
   });
 }

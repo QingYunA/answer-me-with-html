@@ -8,7 +8,11 @@ if (replyBtn) {
   const panels = [...document.querySelectorAll('.am-panel')];
   const asks = [...document.querySelectorAll('.am-ask')];
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
-  const keyOf = (ask) => ask.querySelector('legend')?.textContent.trim() ?? ask.dataset.ask;
+  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved
+  // answers hold the text as the draft wrote it.
+  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');
+  const textOf = (el) => el?.textContent.replace(WJ, '').trim();
+  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;
   const touched = new Set();
   const boxes = new Map();
 
@@ -33,7 +37,7 @@ if (replyBtn) {
   const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);
   const panelOf = (el) => {
     const panel = el.closest('.am-panel');
-    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: panel?.querySelector('.am-panel-head h2')?.textContent.trim() ?? '' };
+    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };
   };
 
   const saved = load();
@@ -99,7 +103,7 @@ if (replyBtn) {
   const compose = () => {
     const decisions = asks.map((ask) => ({
       panel: panelOf(ask).id,
-      question: ask.querySelector('legend')?.textContent.trim() ?? '',
+      question: textOf(ask.querySelector('legend')) ?? '',
       picked: picked(ask),
       suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),
       touched: touched.has(ask),
@@ -107,8 +111,8 @@ if (replyBtn) {
     const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));
     const remarks = window.__amRemarkData?.() ?? [];
     const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;
-    const title = document.querySelector('.am-head h1')?.textContent.trim() ?? document.title;
-    return empty ? '' : replyText({ title, decisions, comments, ui }) + (window.__amRemarkText?.() ?? '');
+    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;
+    return empty ? '' : replyText({ title, decisions, comments, ui, rtl: document.documentElement.dir === 'rtl' }) + (window.__amRemarkText?.() ?? '');
   };
 
   replyBtn.addEventListener('click', () => {

@@ -4,7 +4,7 @@ import { SANS, MONO } from './fonts.js';
 export default {
   name: 'shadcn',
   summary: 'shadcn cards',
-  label: { zh: '卡片', 'zh-Hant': '卡片', en: 'Cards', ja: 'カード' }, // lang-ok: viewer-facing theme labels
+  label: { zh: '卡片', 'zh-Hant': '卡片', en: 'Cards', ja: 'カード', he: 'כרטיסים' }, // lang-ok: viewer-facing theme labels
   scope: ['page', 'video'],
   tokens: {
     common: { '--font-sans': SANS, '--font-mono': MONO, '--radius': '8px', '--shadow': '0 1px 2px 0 rgba(0,0,0,0.05)', '--bw': '1px', '--head-font': 'var(--font-sans)' },
@@ -29,5 +29,6 @@ export default {
   video: {
     css: `& .amv-scene-n { margin: 12px 0 12px 14px; min-width: 40px; border-radius: 8px; font-size: 22px; }
 & .amv-scene-head { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }`,
+    rtlCss: '& .amv-scene-n { margin: 12px 14px 12px 0; }',
   },
 };

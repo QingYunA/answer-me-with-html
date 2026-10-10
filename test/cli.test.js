@@ -1,9 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, basename } from 'node:path';
 import { main } from '../src/cli.js';
 
 let dir;
@@ -126,6 +126,74 @@ test('cli render: style 80 prints warnings and still renders; strict refuses to 
   assert.equal(strict.code, 1);
   assert.match(strict.err, /STE check failed/);
   assert.equal(readdirSync(join(dir, 'pages')).length, before, 'a strict failure writes no file');
+});
+
+// Render in a fresh data directory with an injected clock and opener; each call is one second later, so every page gets its own name.
+function retrying(t) {
+  const home = mkdtempSync(join(tmpdir(), 'am-replace-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const opened = [];
+  let now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const call = async (args, stdin = '') => {
+    const out = sink();
+    const err = sink();
+    now += 1000;
+    const code = await main(args, {
+      stdout: out.stream, stderr: err.stream, stdin: Readable.from([stdin]),
+      env: { AM_HOME: home, AM_NO_UPDATE_CHECK: '1' }, cwd: home, now: () => now, open: (f) => opened.push(f),
+    });
+    return { code, out: out.text, err: err.text, file: out.text.match(/^✓ (.+\.html)$/m)?.[1] };
+  };
+  return { home, call, opened };
+}
+
+const WARNED = '---\ntitle: Retry\n---\n## A\nUtilize the tool.\n';
+const FIXED = '---\ntitle: Retry\n---\n## A\nUse the tool.\n';
+
+test('cli render: a page with warnings goes to pages/ but does not open; --open still opens it', async (t) => {
+  const { home, call, opened } = retrying(t);
+  const r = await call(['render', '-'], WARNED);
+  assert.equal(r.code, 0, r.err);
+  assert.equal(dirname(r.file), join(home, 'pages'));
+  // includes, not a RegExp: a Windows path has backslashes.
+  assert.ok(r.out.includes(`Not opened because of the warnings; to render again, add --replace ${r.file}`), r.out);
+  assert.deepEqual(opened, []);
+
+  const forced = await call(['render', '-', '--open'], WARNED);
+  assert.deepEqual(opened, [forced.file]);
+  assert.doesNotMatch(forced.out, /Not opened/);
+  const quiet = await call(['render', '-', '--no-open'], WARNED);
+  assert.doesNotMatch(quiet.out, /Not opened/, 'no note when the page would not open anyway');
+});
+
+test('cli render: --replace deletes the earlier page once the new one is written, so one answer leaves one page', async (t) => {
+  const { home, call, opened } = retrying(t);
+  const first = await call(['render', '-'], WARNED);
+  const second = await call(['render', '-', '--replace', first.file], WARNED);
+  assert.ok(second.file !== first.file && existsSync(second.file));
+  assert.ok(!existsSync(first.file));
+
+  const done = await call(['render', '-', '--replace', second.file], FIXED);
+  assert.equal(done.code, 0, done.err);
+  assert.deepEqual(readdirSync(join(home, 'pages')), [basename(done.file)]);
+  assert.deepEqual(opened, [done.file], 'only the page without warnings opens');
+});
+
+test('cli render: --replace takes only a page in pages/, and a failed render keeps the page', async (t) => {
+  const { home, call } = retrying(t);
+  const page = (await call(['render', '-'], WARNED)).file;
+
+  const outside = join(home, 'keep.html');
+  writeFileSync(outside, 'x');
+  const refused = await call(['render', '-', '--replace', outside], FIXED);
+  assert.equal(refused.code, 2);
+  assert.match(refused.err, /--replace takes a page that am render wrote/);
+  assert.ok(existsSync(outside), 'a file outside pages/ is never deleted');
+  assert.deepEqual(readdirSync(join(home, 'pages')), [basename(page)], 'a refused --replace renders nothing');
+
+  const broken = await call(['render', '-', '--replace', page], '## A\n```flow\nA -> B');
+  assert.equal(broken.code, 1);
+  assert.ok(existsSync(page), 'the page stays when the new render fails');
 });
 
 test('cli lint: checks only; warnings under strict return 1; off skips the check', async () => {

@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { COMPONENTS, ComponentError } from '../src/components/index.js';
 
 const ctx = (args = '') => ({ args, uid: (() => { let n = 0; return () => `u${++n}`; })() });
@@ -61,6 +62,17 @@ test('timeline: vertical with more than 6 items or the v argument', () => {
   const many = Array.from({ length: 7 }, (_, i) => `${2000 + i} | 事件${i}`).join('\n');
   assert.match(render('timeline', many), /am-timeline--v/);
   assert.match(render('timeline', 'a | b', 'v'), /am-timeline--v/);
+});
+
+test('timeline: a horizontal one sits in a container that base.css queries, so a narrow panel makes it vertical', () => {
+  assert.match(render('timeline', '1979 | a\n1986 | b'), /^<div class="am-tl-wrap"><ol class="am-timeline am-timeline--h" style="--n: 2">.*<\/ol><\/div>$/s);
+  assert.doesNotMatch(render('timeline', 'a | b', 'v'), /am-tl-wrap/);
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  assert.match(css, /\.am-tl-wrap \{ container-type: inline-size; \}/);
+  assert.match(css, /@container \(max-width: \d+px\) \{[^@]*\.am-timeline--h li \{/);
+  // The video stage shrink-wraps its content, which a size container would collapse to nothing.
+  assert.match(readFileSync(new URL('../src/themes/video.css', import.meta.url), 'utf8'), /\.amv-fit \.am-tl-wrap \{ container-type: normal; \}/);
+  assert.doesNotMatch(css.match(/@media \(max-width: 760px\) \{[\s\S]*?\n\}/)[0], /am-timeline/, 'the phone media query leaves the timeline to its container');
 });
 
 test('timeline: error when | is missing', () => {

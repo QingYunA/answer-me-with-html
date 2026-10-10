@@ -8,7 +8,7 @@
 | :--- | :--- | :--- | :--- |
 | 模型写什么 | 一份 Markdown 稿件 | 一份带类型的 JSON 规格 | `dsh-ui` 围栏里的 JSON |
 | 得到什么 | 一页回答整个问题的页面 | 一张可交互的图 | 聊天回复里的组件 |
-| 能放什么 | 正文、表格、引用自你文件的真实代码、11 种组件（flow、sequence、tree、timeline 等） | 5 种图：架构、工作流、时序、数据流、生命周期 | 30 多种组件：卡片、表格、图表、表单、测验、3D 场景 |
+| 能放什么 | 正文、表格、引用自你文件的真实代码、12 种组件（flow、er、sequence、tree、timeline 等） | 5 种图：架构、工作流、时序、数据流、生命周期 | 30 多种组件：卡片、表格、图表、表单、测验、3D 场景 |
 | 在哪能用 | 任何能运行 shell 命令的 Agent：Claude Code、Codex、Cursor、OpenCode、Pi | Claude Code、Codex、opencode、Cursor；Claude.ai 需上传 | DeepSeek Harness 的 Web 界面 |
 | 产物 | 单个 `.html` 文件，没有 CDN 和网络字体，离线能打开 | 单个 `.html` 文件 | 显示在聊天里；渲染完成的块可导出为 HTML |
 | 交互 | 在页面上评论、做决定；一键汇总成一条消息贴回给 Agent | 聚焦、路径追踪、搜索、演示模式，导出 PNG / SVG / WebM | 按钮、表单、测验把事件发回给模型；模型边写边渲染 |

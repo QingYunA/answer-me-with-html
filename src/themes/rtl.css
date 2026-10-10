@@ -1,0 +1,69 @@
+/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout
+   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */
+
+/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */
+html[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }
+html[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }
+
+/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width
+   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */
+html[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,
+html[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,
+html[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,
+html[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {
+  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;
+}
+html[dir="rtl"] .am-head h1 { letter-spacing: normal; }
+/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */
+html[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }
+
+/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */
+html[dir="rtl"] .am-diagram svg { direction: rtl; }
+
+/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */
+html[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }
+html[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }
+
+/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left
+   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the
+   start of its note would otherwise run together as one left-to-right piece. */
+html[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }
+
+/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of
+   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */
+html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }
+@container (max-width: 560px) {
+  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }
+}
+
+/* Reply sheet: a textarea gives the whole Markdown reply one direction, so "1. [E] ..." and "# Re: ..." came out reordered.
+   src/runtime/reply-view.js draws the reply instead, each line in its own direction; the textarea stays as the copy source. */
+html[dir="rtl"] .am-reply--view textarea {
+  position: absolute; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; resize: none;
+}
+html[dir="rtl"] .am-reply-view {
+  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;
+}
+html[dir="rtl"] .am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+html[dir="rtl"] .am-reply-view > div { text-align: start; unicode-bidi: isolate; }
+html[dir="rtl"] .am-rv-gap { height: .5em; }
+html[dir="rtl"] .am-rv-h1 { font-weight: 700; font-size: 15px; }
+html[dir="rtl"] .am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+html[dir="rtl"] .am-rv-tag {
+  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;
+  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+html[dir="rtl"] .am-rv-a { padding-inline-start: 1.6em; }
+html[dir="rtl"] .am-rv-a em { color: var(--ink-2); }
+html[dir="rtl"] .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }
+
+/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.
+   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play
+   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */
+html[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }
+html[dir="rtl"][data-video] .amv-titleblock { text-align: right; }
+/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */
+html[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }
+html[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }
+html[dir="rtl"][data-video] .amv-controls { direction: ltr; }

@@ -76,13 +76,15 @@ AM_EOF
 ````
 
 4. Read the output:
-   - `✓ <path>`: success. Whether the browser opens automatically depends on the user's settings (`am config`); `--no-open` affects only this run.
-   - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again.
+   - `✓ <path>`: success. Whether the browser opens automatically depends on the user's settings (`am config`); `--no-open` affects only this run. A page with STE or code warnings never opens automatically.
+   - `✗ L<line> [component] …` + `Correct example:`: fix that line following the example, then render again (no page was written).
    - `code n warnings`: a code block is longer than 40 lines, or a diff hunk has a different number of lines than its `@@` header says. Cut the block or fix the header to the lines that make the point and render again, or keep it if every line matters.
-   - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, keep the page and say so.
+   - `STE n warnings`: rewrite the flagged lines as suggested, then render again. Retry at most 2 rounds; if warnings remain, keep the last page and say so.
+   - Every time you render again after a `✓`, add `--replace <path from the last ✓ line>`. The CLI deletes that page once the new one is written, so one answer leaves one page.
    - `! Cleanup hint: …` or `! Update hint: …`: pass it on to the user in one sentence at the end of the reply, and ask whether to clean up / update. **Do not run am clean or the update command yourself**; wait until the user agrees. The CLI throttles these: the cleanup hint appears at most once every 7 days, the update hint at most once every 3 days.
 5. Reply in the terminal with only 2–3 lines: one core conclusion + the page link. Do not paste the draft or the HTML back into the terminal. Write this reply after the render, as the last step of the turn: render the page first, then reply. No tool call comes after the reply.
-   Write the page link as a Markdown link to a `file://` URL, with the URL as the label too: `[file:///abs/path.html](file:///abs/path.html)`. Take the absolute path from the `✓` line and add `file://` in front; do not percent-encode it. GUI hosts (Codex, Antigravity) render this as a clickable link, and a terminal still shows the full URL.
+   If the render output has a `link:` line, the user runs `am serve`: use that URL as the page link instead, with the URL as the label too, and skip the `file://` link below. Never start `am serve` yourself; only the user starts it.
+   Otherwise write the page link as a Markdown link to a `file://` URL, with the URL as the label too: `[file:///abs/path.html](file:///abs/path.html)`. Take the absolute path from the `✓` line and add `file://` in front; do not percent-encode it. GUI hosts (Codex, Antigravity) render this as a clickable link, and a terminal still shows the full URL.
 
 When a page already exists and only one panel needs to change, do not rewrite the whole page. Take the source draft from the HTML's `#am-source`, replace only the matching `##` section, and overwrite the page in place:
 
@@ -124,6 +126,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 | Shape of the information | Component | Minimal syntax |
 |---|---|---|
 | What connects to what, architecture, decision branches | `flow [LR]` | `A -> B: label`, `A --> C` dashed, `A -> B & C` fan-out, `{decision?}` `(start)` `[(database)]`, `*emphasis`, `group name: A, B` |
+| A data model: entities, their columns and the relations between them | `er [LR]` | entity at column 0, indented `name [type] [PK\|FK\|UK]` fields, `user_id FK -> User`, `User 1--* Order: places` |
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
 | Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |
@@ -135,7 +138,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 | Multi-dimension comparison, can / cannot list | Markdown table | write ok / no / warn in the status column |
 | What a real screen, photo or render looks like, as an existing file | image | `![what it shows](/absolute/path.png)` alone on a line |
 | Code that exists in the project | code block that quotes the file | ```` ```ts src=path/to/file.ts lines=18-30 hl=22 ```` and an empty block |
-| A plan, refactor or PR summary that changes structure | `flow` or `tree` with change markers | start a line with `+ ` added, `- ` removed, `~ ` changed (a node only): `+ A -> B`, `- A -> B`, `~ Node`, tree `+ file.js`, `- dir/` |
+| A plan, refactor or PR summary that changes structure | `flow`, `tree` or `er` with change markers | start a line with `+ ` added, `- ` removed, `~ ` changed (a node, field or entity only): `+ A -> B`, `- A -> B`, `~ Node`, tree `+ file.js`, `- dir/`, er `+ Coupon`, `  + phone string`, `+ User 1--* Coupon` |
 | A change to code | diff block | ```` ```diff file=path/to/file.ts ```` and the unified diff inside |
 | Code that does not exist yet, or a command | code block | ```` ```ts title="name · sketch" ```` with the code inside |
 
@@ -143,7 +146,7 @@ Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.
 - One panel, one question. With more than 8 panels, split the page or cut panels.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
-- To show what a plan, refactor or PR summary changes in structure, write one `flow` or `tree` and mark the changed lines with `+ `, `- ` or `~ `, not a before and an after. Leave unchanged lines bare. The page shows colors, badges and counts in its Changes view and adds a Before / After switch that shows the plain diagram on either side. To change a link, remove the old one with `-` and add the new one with `+`. A name that starts with `- ` needs brackets in `flow` (`[- Gateway]`) or `\- item` in `tree`. See `am help flow` and `am help tree`.
+- To show what a plan, refactor or PR summary changes in structure, write one `flow`, `tree` or `er` and mark the changed lines with `+ `, `- ` or `~ `, not a before and an after. Leave unchanged lines bare. The page shows colors, badges and counts in its Changes view and adds a Before / After switch that shows the plain diagram on either side. To change a link or a relationship, remove the old one with `-` and add the new one with `+`. A name that starts with `- ` needs brackets in `flow` (`[- Gateway]`) or `\- item` in `tree`. A marked entity gives its fields its marker; a marked field does not mark its entity. See `am help flow`, `am help tree` and `am help er`.
 - Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–40 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. In a diff block every line starts with `+`, `-`, a space or `@@`; do not cut lines with `...`, split the diff into two hunks. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.
 - Use an image only for what a diagram cannot show, such as a real UI. Use an existing file by its absolute path (PNG, JPG, GIF, WebP, AVIF or SVG, up to 5 MB). The alt text is the caption, so write what the picture shows. Never generate or invent an image. See `am help image`.
 - Use `ask` only for a fork that changes what you do next, such as a plan or a choice between options: 1 to 5 per page, each in the panel it changes, the question in 15 words or fewer. Mark the option you would pick with `*`. Every page has a Reply button: the user picks options, comments on any panel and copies one reply back. When a page has asks, say in your reply how many decisions are open and that the suggested options are what you would do.

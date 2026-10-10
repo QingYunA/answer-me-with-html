@@ -1,9 +1,9 @@
 // am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname, basename } from 'node:path';
+import { join, resolve, dirname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
@@ -15,30 +15,34 @@ import { readThemeFile } from './themes/user.js';
 import { checkColors, COLOR_TOKENS } from './themes/check.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
-import { exportMp4, ExportError } from './video/export.js';
+import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { ensureHome } from './home.js';
+import { hasCommand } from './sys.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
 import { readEmbeddedCode, MAX_CODE_LINES, LONG_CODE_LINES } from './code.js';
 import { languageIds } from './languages/registry.js';
+import { runServe, serveLink, DEFAULT_PORT } from './serve.js';
 
 const MAX_LISTED_WARNINGS = 20;
 
 const USAGE = `Answer me with HTML ${VERSION} — renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
+  am render <file|->  [-o <path>] [--replace <page>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--no-open]
+  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
-                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 also saves a video file)
+                                                  render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
+  am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am list                                         list templates, themes and components
@@ -46,6 +50,7 @@ Usage:
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
+- A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 
@@ -162,12 +167,15 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
   timeline, limits, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
 - Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+  The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
+  the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
+  A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
   Set the ElevenLabs voice with ELEVENLABS_VOICE_ID and the model with ELEVENLABS_MODEL_ID (default eleven_v4_turbo).
   local calls a local OpenAI-compatible speech service (POST /v1/audio/speech, returns 16-bit PCM WAV):
   AM_TTS_URL (required, service base URL), AM_TTS_MODEL, AM_TTS_VOICE (required when the service has no default),
@@ -176,7 +184,12 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
-- Output goes to ~/.answer-me-with-html/videos/; --mp4 also saves an .mp4 with the same name (needs Chrome and ffmpeg, Node 22+).`;
+- Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
+  speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
+- --mp4 also saves a 1080p .mp4 next to the page (H.264 + AAC; needs ffmpeg; about 1.3 times the video length).
+  --webm saves a 1080p .webm that the page encodes itself (VP9 + Opus; no ffmpeg; the time follows how much of the page moves).
+  Both need Chrome and Node 22+; give both to save both. The export button needs a secure context (a local file or
+  localhost): WebCodecs is not available to a page served over plain HTTP.`;
 
 export async function main(argv, io = {}) {
   const out = io.stdout ?? process.stdout;
@@ -192,6 +205,7 @@ export async function main(argv, io = {}) {
       allowPositionals: true,
       options: {
         out: { type: 'string', short: 'o' },
+        replace: { type: 'string' },
         'no-open': { type: 'boolean' },
         open: { type: 'boolean' },
         theme: { type: 'string' },
@@ -200,9 +214,13 @@ export async function main(argv, io = {}) {
         mode: { type: 'string' },
         voice: { type: 'string' },
         mp4: { type: 'boolean' },
+        webm: { type: 'boolean' },
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
+        port: { type: 'string' },
+        lan: { type: 'boolean' },
+        'public-url': { type: 'string' },
         all: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
@@ -229,6 +247,7 @@ export async function main(argv, io = {}) {
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
     case 'clean': return cmdClean(opts, { print, fail, env });
+    case 'serve': return cmdServe(opts, { print, fail, env });
     case '__update-check': return (await runUpdateCheck(amHome(env))) ? 0 : 1;
     case 'list': return cmdList(ctx), 0;
     case 'help': return cmdHelp(arg, { print, fail });
@@ -275,7 +294,12 @@ export function shouldOpen(opts, env, config) {
 }
 
 function cmdRender(src, opts, ctx, baseDir) {
-  const { fail } = ctx;
+  const { fail, print } = ctx;
+  const replaced = opts.replace === undefined ? null : pagePath(opts.replace, ctx);
+  if (replaced === false) {
+    fail(`✗ --replace takes a page that am render wrote (a .html file in ${join(amHome(ctx.env), 'pages')})`);
+    return 2;
+  }
   const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   let result;
@@ -286,7 +310,20 @@ function cmdRender(src, opts, ctx, baseDir) {
   }
   const file = outputPath('pages', result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  return finish(file, opts, config, ctx);
+  // Delete the earlier attempt only now: a render that fails above keeps it.
+  if (replaced && replaced !== resolve(file)) rmSync(replaced, { force: true });
+  // A page with STE or code warnings is likely to be rendered again, so it opens only when --open asks for it.
+  const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
+  if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
+  return finish(file, held ? { ...opts, 'no-open': true } : opts, config, ctx);
+}
+
+const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0;
+
+// The absolute path of a page, or false when arg does not name a .html file directly inside pages/. The file may be gone.
+function pagePath(arg, { env, io }) {
+  const path = resolve(io.cwd ?? process.cwd(), arg);
+  return dirname(path) === resolve(amHome(env), 'pages') && basename(path).endsWith('.html') ? path : false;
 }
 
 const PATCH_HELP = `Replace one panel of a rendered page in place
@@ -408,7 +445,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  emit(result, file, ctx, video ? ' (an MP4 with the same name is not updated; run am video --mp4 again if you need it)' : '');
+  emit(result, file, ctx, video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '');
   return finish(file, opts, config, ctx);
 }
 
@@ -427,7 +464,9 @@ async function cmdVideo(src, opts, ctx) {
   }
   const file = outputPath('videos', result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  if (opts.mp4 && !(await exportVideoMp4(file, result.wav, ctx))) return 1;
+  for (const format of ['mp4', 'webm']) {
+    if (opts[format] && !(await exportVideo(file, result.wav, format, ctx))) return 1;
+  }
   return finish(file, opts, config, ctx);
 }
 
@@ -439,6 +478,7 @@ function validVoice(voice, fail) {
 
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   const provider = io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
+  if (provider) ensureHome(amHome(env)); // the narration cache lives in the data directory
   const result = await renderVideo(src, {
     provider,
     cacheDir: join(amHome(env), 'cache', 'tts'),
@@ -448,20 +488,32 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
     onProgress: (msg) => fail(`  ${msg}`),
     themes,
   });
-  return { ...result, voiceName: provider ? provider.name : 'none (captions only)' };
+  return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
 }
 
-async function exportVideoMp4(file, wav, { print, fail, env }) {
-  const mp4 = `${file.replace(/\.html?$/i, '')}.mp4`;
+// The voice line of the one-line summary: the provider, and the languages that kept captions only because no voice is
+// installed for them.
+function voiceSummary(provider, captionsOnly = []) {
+  if (!provider) return 'none (captions only)';
+  if (!captionsOnly.length) return provider.name;
+  return `${provider.name} (no ${captionsOnly.map((c) => c.language).join(', ')} voice installed: captions only for those lines)`;
+}
+
+// A video file next to the page: an MP4 through ffmpeg, or a WebM from the browser's own encoder. Both drive the page's
+// render(t) frame by frame, so the picture is the same either way. Each flag writes its own format and nothing else.
+async function exportVideo(file, wav, format, { print, fail, env }) {
+  const out = `${file.replace(/\.html?$/i, '')}.${format}`;
   const started = Date.now();
   try {
-    await exportMp4(file, mp4, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    if (format === 'mp4') await exportMp4(file, out, { wav, env, onProgress: (i, n) => fail(`  Exporting MP4: frame ${i}/${n}`) });
+    else await exportWebm(file, out, { env, onProgress: (i, n) => fail(`  Exporting WebM: frame ${i}/${n}`) });
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;
-    fail(`✗ MP4 export failed: ${e.message}. The player page was written and plays in a browser`);
+    const hint = format === 'mp4' && !hasCommand('ffmpeg') ? '. Or add --webm for a video file without ffmpeg' : '';
+    fail(`✗ Video export failed: ${e.message}${hint}. The player page was written and plays in a browser`);
     return false;
   }
-  print(`✓ ${mp4} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
+  print(`✓ ${out} (exported in ${((Date.now() - started) / 1000).toFixed(0)}s)`);
   return true;
 }
 
@@ -483,11 +535,21 @@ function outputPath(dir, title, opts, { env, io }) {
   return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 
-// Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
-function emit(result, file, { print }, note = '') {
+// Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
+function writePage(file, html, env) {
+  const home = resolve(amHome(env));
+  if (resolve(file).startsWith(home + sep)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, result.html);
+  writeFileSync(file, html);
+}
+
+// Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
+function emit(result, file, { print, env }, note = '') {
+  writePage(file, result.html, env);
   print(`✓ ${file}`);
+  // With am serve running, a page inside the data directory also gets an http link.
+  const link = serveLink(amHome(env), file);
+  if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note}`);
   // The code the page now holds, so the user can check it before sharing the page.
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(', ')}`);
@@ -566,6 +628,15 @@ function cmdClean(opts, { print, fail, env }) {
     ? `Would delete ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.`
     : `✓ Deleted ${count(r.files, 'file')}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
   return 0;
+}
+
+function cmdServe(opts, { print, fail, env }) {
+  if (opts.port !== undefined && !(/^\d+$/.test(opts.port.trim()) && Number(opts.port) <= 65535)) {
+    fail('✗ --port needs a number from 0 to 65535 (0 picks a free port)');
+    return 2;
+  }
+  const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts['public-url'], print, fail });
 }
 
 function cmdLint(src, opts, { print, fail }) {
@@ -710,8 +781,7 @@ function cmdTheme(action, target, opts, ctx) {
   const files = ['light', 'dark'].map((mode) => {
     const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes });
     const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, result.html);
+    writePage(file, result.html, env);
     print(`✓ ${file}`);
     return file;
   });

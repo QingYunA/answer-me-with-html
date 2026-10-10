@@ -40,6 +40,15 @@ test('languages: a language that sets fonts also names the language ranges the f
   }
 });
 
+test('languages: every language names the video title block cells and places the scene header numbers', () => {
+  for (const entry of LANGUAGES) {
+    for (const key of ['drawn', 'date', 'scenes', 'duration', 'sheet']) {
+      assert.ok(typeof entry.videoUi[key] === 'string' && entry.videoUi[key].length > 0, `${entry.id} has no videoUi.${key}`);
+    }
+    assert.ok(entry.videoUi.sheet.includes('{n}') && entry.videoUi.sheet.includes('{total}'), `${entry.id} videoUi.sheet must place {n} and {total}`);
+  }
+});
+
 test('languages: includes diagram viewer labels (expand, close, diagram)', () => {
   for (const entry of LANGUAGES) {
     assert.equal(typeof entry.ui.expand, 'string', `${entry.id} missing ui.expand`);

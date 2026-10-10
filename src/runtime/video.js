@@ -12,6 +12,10 @@
   const caption = document.querySelector('.amv-caption span');
   const scenes = [...document.querySelectorAll('.amv-scene')];
   const segs = D.segments;
+  // One chapter per scene (the title card is not a chapter). The strip needs its space before anything measures the viewport,
+  // so the attribute goes on before section 1.
+  const chapterList = segs.slice(1);
+  if (chapterList.length > 1) root.setAttribute('data-chapters', '');
   const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
   const ease = (x) => { const v = clamp(x); return v < 0.5 ? 4 * v * v * v : 1 - (-2 * v + 2) ** 3 / 2; };
   const lerp = (a, b, p) => a + (b - a) * p;
@@ -276,23 +280,79 @@
   const toggleBtn = document.querySelector('[data-amv="toggle"]');
   const bigPlay = document.querySelector('.amv-bigplay');
   const marks = document.querySelector('.amv-marks');
+  const bar = document.querySelector('.amv-chapters');
+  const rateBtn = document.querySelector('[data-amv="rate"]');
+  const RATES = [0.5, 0.75, 1, 1.25, 1.5, 2];
   const fmt = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
   seek.max = D.duration;
-  segs.slice(1).forEach((s) => {
-    const m = document.createElement('i');
-    m.style.left = `${(s.start / D.duration) * 100}%`;
-    m.title = s.title;
-    marks.append(m);
+
+  // A tick on the track and a chip in the strip per scene; both jump to the start of the scene and keep playing.
+  const chips = chapterList.map((s, i) => {
+    const mark = document.createElement('i');
+    mark.style.left = `${(s.start / D.duration) * 100}%`;
+    mark.title = `${s.id} ${s.title} · ${fmt(s.start)}`;
+    mark.addEventListener('click', () => jump(s.start));
+    marks.append(mark);
+
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'amv-chap';
+    chip.title = `${s.title} · ${fmt(s.start)}`;
+    const letter = document.createElement('b');
+    letter.textContent = s.id || String.fromCharCode(65 + i);
+    const label = document.createElement('span');
+    label.textContent = s.title;
+    chip.append(letter, label);
+    chip.addEventListener('click', () => jump(s.start));
+    bar.append(chip);
+    return chip;
   });
 
   let playing = false;
   let base = 0;
   let t0 = 0;
-  const now = () => (!playing ? base : audio ? audio.currentTime : base + (performance.now() - t0) / 1000);
+  let rate = 1;
+  // The clock: the audio element when there is one, otherwise wall-clock time scaled by the playback rate.
+  const now = () => (!playing ? base : audio ? audio.currentTime : base + ((performance.now() - t0) / 1000) * rate);
+
+  function jump(t) {
+    seekTo(t);
+    if (!playing) play();
+  }
+
+  // The chip of the scene the picture is in, kept in view while the strip scrolls.
+  let activeChip = -1;
+  function markChapter(t) {
+    const i = chapterList.findLastIndex((s) => t >= s.start);
+    if (i === activeChip) return;
+    activeChip = i;
+    chips.forEach((c, k) => (k === i ? c.setAttribute('aria-current', 'true') : c.removeAttribute('aria-current')));
+    const chip = chips[i];
+    if (chip && bar.scrollWidth > bar.clientWidth) {
+      // By where the chip is on screen, so the strip scrolls the same in either direction (a right-to-left strip scrolls with negative offsets).
+      const b = bar.getBoundingClientRect();
+      const c = chip.getBoundingClientRect();
+      bar.scrollBy({ left: c.left + c.width / 2 - (b.left + b.width / 2), behavior: 'smooth' });
+    }
+  }
+
+  // Changing the rate must not move the clock: anchor it again at the time it shows now.
+  function setRate(r) {
+    const at = now();
+    rate = r;
+    if (audio) audio.playbackRate = r;
+    rateBtn.textContent = `${r}×`;
+    rateBtn.setAttribute('aria-label', `${rateBtn.dataset.speed ?? 'Speed'} ${r}×`);
+    if (playing) {
+      base = at;
+      t0 = performance.now();
+    }
+  }
 
   function updateUi(t) {
     if (document.activeElement !== seek) seek.value = t;
     timeEl.textContent = `${fmt(t)} / ${fmt(D.duration)}`;
+    markChapter(t);
   }
 
   function play() {
@@ -343,6 +403,73 @@
   bigPlay.addEventListener('click', play);
   stage.addEventListener('click', (e) => { if (e.target !== bigPlay) toggle(); });
   seek.addEventListener('input', () => seekTo(Number(seek.value)));
+  rateBtn.addEventListener('click', () => setRate(RATES[(RATES.indexOf(rate) + 1) % RATES.length]));
+
+  // ── Export: the page encodes itself (src/runtime/video-export.js) and offers the file as a download ──
+  // The engine needs no help from the page behind it: the stage is pinned into the frame while it copies styles, so
+  // the picture is 1920x1080 whatever the window shows. The overlay covers the scrubbing stage and the button keeps
+  // its place in the controls, so a second click stops the export.
+  const exportBtn = document.querySelector('[data-amv="export"]');
+  const SLICE = 1_048_572;   // 1 MiB rounded to a multiple of 3, so every base64 slice stands on its own
+  let exporting = false;
+
+  const decode = (b64) => {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+
+  async function runExport() {
+    if (exporting) { window.__amvEnc.cancel(); return; }
+    exporting = true;
+    const label = exportBtn.dataset.label || 'Export';
+    const overlay = document.createElement('div');
+    overlay.className = 'amv-exporting';
+    overlay.innerHTML = '<span><i></i></span><b></b>';
+    overlay.title = label;
+    overlay.addEventListener('click', () => window.__amvEnc.cancel());
+    // After the viewport and before the controls: the cover hides the picture, the controls stay clickable.
+    document.querySelector('.amv-viewport').after(overlay);
+    window.__amv.pauseForExport();
+    try {
+      const started = await window.__amvEnc.start({});
+      if (started.error) throw new Error(started.error);
+      for (;;) {
+        const p = window.__amvEnc.progress();
+        const pct = Math.round((p.done / Math.max(1, p.total)) * 100);
+        exportBtn.textContent = `${pct}%`;
+        overlay.querySelector('b').textContent = `${label} ${pct}%`;
+        overlay.querySelector('i').style.width = `${pct}%`;
+        if (p.error) throw new Error(p.error);
+        if (!p.running) break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      const size = window.__amvEnc.size();
+      const parts = [];
+      for (let at = 0; at < size; at += SLICE) parts.push(decode(window.__amvEnc.bytes(at, Math.min(SLICE, size - at))));
+      const url = URL.createObjectURL(new Blob(parts, { type: 'video/webm' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${(document.title || 'video').replace(/[\\/:*?"<>|]+/g, '-')}.webm`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      exportBtn.textContent = '✕';
+      overlay.querySelector('b').textContent = String((e && e.message) || e);
+      await new Promise((r) => setTimeout(r, 2500));
+    } finally {
+      overlay.remove();
+      exportBtn.textContent = exportBtn.dataset.icon || '⤓';
+      exporting = false;
+      window.__amv.resumeAfterExport();
+    }
+  }
+
+  if (window.__amvEnc && window.__amvEnc.supported()) exportBtn.addEventListener('click', runExport);
+  else exportBtn.remove();
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); toggle(); }
     if (e.key === 'ArrowRight') seekTo(now() + 5);
@@ -358,14 +485,27 @@
   }
   window.addEventListener('resize', fitStage);
 
-  // Export: place the stage 1:1 at the top left and call render(t) frame by frame.
+  // Export: place the stage 1:1 at the top left and call render(t) frame by frame. exportMode is for the CLI, which
+  // hides the controls and either screenshots the frames (ffmpeg) or drives the built-in encoder (see video-export.js).
   window.render = render;
+  let resumeAt;   // undefined: no export ran; null: playback was paused already; a number: carry on there
   window.__amv = {
     duration: D.duration,
     fps: D.fps,
     exportMode() { root.setAttribute('data-export', ''); stage.style.transform = ''; },
+    // The encoder poses every frame itself, so playback stops for the length of an export and carries on afterwards.
+    // The button and the engine both call this; only the first call decides where playback resumes.
+    pauseForExport() { if (resumeAt === undefined) resumeAt = playing ? now() : null; pause(); return resumeAt; },
+    resumeAfterExport() {
+      if (resumeAt === undefined || resumeAt === null) { resumeAt = undefined; return; }
+      const at = resumeAt;
+      resumeAt = undefined;
+      seekTo(at);
+      if (at < D.duration - 0.05) play();
+    },
   };
   fitStage();
+  setRate(rate);   // the button carries the speed on load
   // Poster: show the fully faded-in title card, but playback still starts at 0.
   render(Math.min(1, segs[0].end));
   updateUi(0);

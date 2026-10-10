@@ -1,7 +1,8 @@
 // state.json in the data directory: records times such as first use, last cleanup and version check.
 // Writes go to a temp file then rename, so concurrency or interruption never leaves a partial file; a bad file reads as empty state.
-import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
+import { ensureHome } from './home.js';
 
 export const DAY = 24 * 60 * 60 * 1000;
 
@@ -18,7 +19,7 @@ export function readState(home) {
 
 export function writeState(home, patch) {
   const next = { ...readState(home), ...patch };
-  mkdirSync(home, { recursive: true });
+  ensureHome(home);
   const tmp = `${statePath(home)}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
   renameSync(tmp, statePath(home));

@@ -16,10 +16,11 @@
   <a href="https://github.com/QingYunA/answer-me-with-html/releases"><img src="https://img.shields.io/github/v/release/QingYunA/answer-me-with-html?style=flat-square&logo=github&labelColor=16181d&color=2ea44f" alt="Release"></a>
   <a href="https://github.com/QingYunA/answer-me-with-html/stargazers"><img src="https://img.shields.io/github/stars/QingYunA/answer-me-with-html?style=flat-square&logo=github&labelColor=16181d&color=2ea44f" alt="Stars"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20OpenCode%20%C2%B7%20Pi-2ea44f?style=flat-square&labelColor=16181d" alt="Works with Claude Code, Codex, Cursor, OpenCode, Pi">
+  <a href="https://www.theagenticleaderboard.com/alternatives/answer-me-with-html/"><img src="https://www.theagenticleaderboard.com/badges/new/answer-me-with-html.svg" alt="The New 100"></a>
 </p>
 
 <p align="center">
-  <a href="https://qingyuna.github.io/answer-me-with-html/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
+  <a href="https://answer-me-with-html.com/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
 </p>
 
 <p align="center">
@@ -151,7 +152,7 @@ Server -> Client: SYN-ACK
 > [Server] 听到了，回一个 SYN-ACK："收到，我这边也没问题。"
 ````
 
-`am video` 把它做成一个播放页：图随旁白一步步画出来，镜头跟着方括号里的节点走。配音内嵌在页面里，离线也能播。加 `--mp4` 可以另存视频文件。只有你要视频时 Agent 才会做。细节见[解释视频的细节](docs/video.zh-CN.md)。
+`am video` 把它做成一个播放页：图随旁白一步步画出来，镜头跟着方括号里的节点走。配音内嵌在页面里，离线也能播。播放器带章节栏（在场景之间跳转）、倍速按钮，以及一个导出按钮 —— 同一个视频由浏览器自己编码并下载（本地文件或 `localhost` 打开即可，不需要 ffmpeg）。加 `--mp4` 另存 MP4 文件（需要 ffmpeg），加 `--webm` 另存由页面自己编码的 WebM 文件（不需要 ffmpeg）。只有你要视频时 Agent 才会做。细节见[解释视频的细节](docs/video.zh-CN.md)。
 
 ## 配置
 
@@ -247,6 +248,7 @@ Agent 会按信息的形状挑组件：
 | 组件 | 适合什么 |
 | :--- | :--- |
 | `flow` | 架构、调用链、决策分支。自动布局，支持分组、判断框、数据库 |
+| `er` | 数据模型：实体带字段（PK / FK / UK）和鸦爪式关系连线 |
 | `sequence` | 几方之间按时间顺序来回发消息 |
 | `tree` | 目录、模块、分类体系 |
 | `timeline` | 历史、版本、阶段 |

@@ -135,6 +135,38 @@ Server -> Client: reply
 
 ${fillerEn('F', 2)}
 ${fillerEn('G', 3)}`,
+  // Short cells in four columns beside a key-value grid: the table used to get about 96 px a column, one word per line.
+  'short-table.en': `---
+title: Narrow table
+cols: 3
+lang: en
+---
+## A What was tested {bare}
+\`\`\`kv 3
+Dry-run model: z-ai/glm-5.3
+Problems: 10 (7 proven optimal, 3 best known)
+Harness checks: 68 + 82, all passing
+\`\`\`
+
+## B How we got here
+- The decision: no UI first, check whether the process helps at all.
+- Four dry runs on GLM 5.3, two runs of the second arm stopped halfway.
+- The key returns 401, the key itself is invalid, not only the balance.
+
+## C What the dry runs showed
+| Problem | Arm | Result | State |
+|---|---|---|---|
+| golomb-12 | plain loop | length 85, known optimum | warn likely recalled |
+| golomb-12 | branch search | stopped after 22 events | no did not finish |
+| circle-packing-26 | plain loop | 1.4746, 56% of record | ok within budget |
+| circle-packing-26 rerun | plain loop | 99.76% of record | warn no headroom |
+
+## D What not to start
+Do not build the three screens. The decision waits for the kill test, and the dry runs show an open problem.
+
+## E Next step
+A new API key, then a full run: 10 problems by 2 arms by 3 seeds.
+`,
 };
 
 // Drafts where the server pads or widens a panel's span (row filling, wide tables and diagrams): the padding is no hint from the author,
@@ -451,7 +483,8 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
   for (const p of pages) {
     await open(p.file, DESKTOP);
     await waitFor(SETTLED, `${p.name} to lay out`);
-    assertJustified(p.name, DESKTOP, await measure(), p.ids);
+    const wide = await measure();
+    assertJustified(p.name, DESKTOP, wide, p.ids);
 
     await page('Emulation.setEmulatedMedia', { media: 'print' });
     await setWidth(A4_PORTRAIT);
@@ -460,7 +493,9 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
 
     await page('Emulation.setEmulatedMedia', { media: '' });
     await setWidth(DESKTOP);
-    await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${p.name} to lay out again after print`);
+    // Not just display: flex: a re-layout still pending from the print width can run once the media is screen again but before the
+    // viewport is back, and leave flex rows planned for the A4 width until the resize lays the page out again.
+    await waitFor(`document.querySelector('.am-grid').clientWidth === ${wide.width} && ${SETTLED}`, `${p.name} to lay out again after print`);
     assertJustified(p.name, DESKTOP, await measure(), p.ids);
   }
 
@@ -477,6 +512,37 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
     await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${name} to lay out again after printing`);
     assertJustified(name, DESKTOP, await measure(), p.ids);
   }
+});
+
+// A cell of two or more words shown one word per line is the defect: a table panel needs the width its columns read well at.
+const STACKED_CELLS = `[...document.querySelectorAll('.am-md td')].filter((td) => {
+  const words = td.textContent.trim().split(/\\s+/).length;
+  const range = document.createRange();
+  range.selectNodeContents(td);
+  const lines = new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+  return words >= 2 && lines >= words;
+}).map((td) => td.textContent.trim())`;
+
+test('e2e: a table with short cells keeps its words together on wide screens, and print leaves no hole beside a wide panel', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  for (const name of ['short-table.en', 'wide-table.en']) {
+    const p = pages.find((x) => x.name === name);
+    for (const width of [DESKTOP, 1300]) {
+      await open(p.file, width);
+      await waitFor(SETTLED, `${name} to lay out`);
+      assert.deepEqual(await evaluate(STACKED_CELLS), [], `${name} @${width}px: no cell shows one word per line`);
+    }
+  }
+  const p = pages.find((x) => x.name === 'short-table.en');
+  await open(p.file, DESKTOP);
+  await waitFor(SETTLED, 'short-table.en to lay out');
+  await page('Emulation.setEmulatedMedia', { media: 'print' });
+  await setWidth(A4_PORTRAIT);
+  await waitFor("getComputedStyle(document.querySelector('.am-grid')).display === 'grid'", 'the print layout');
+  const widths = await evaluate("[...document.querySelectorAll('.am-grid > .am-panel')].map((el) => Math.round(el.getBoundingClientRect().width))");
+  const grid = await evaluate("Math.round(document.querySelector('.am-grid').getBoundingClientRect().width)");
+  assert.ok(widths.every((w) => Math.abs(w - grid) <= 1), `print: every panel takes the full row, got ${widths.join(', ')} of ${grid}`);
+  await page('Emulation.setEmulatedMedia', { media: '' });
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -636,6 +702,65 @@ test('e2e: the expand button does not cover a node at the right edge of the draw
   assert.equal(await evaluate(clear), true, 'expand button sits above the drawing, not on it');
 });
 
+// A horizontal timeline is a row of centered columns joined by a line. On a phone it reads like timeline v instead:
+// one item per row, the dots and the line on the left, the text on the right.
+test('e2e: a horizontal timeline turns vertical on a phone and stays horizontal on a desktop', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\ntitle: Timeline\nlang: en\n---\n## A Plan\n```timeline\n2026-09 | Private beta | Ten design partners try the agent on real work\n2026-10 | Public beta\n*2026-11 | Paid plans | Pro and Team plans open with higher limits\n2027-Q1 | Mobile app\n```\n');
+  const file = join(tmp, 'timeline.html');
+  writeFileSync(file, html);
+  const shape = `(() => {
+    const items = [...document.querySelector('.am-timeline--h').children].map((li) => ({
+      top: li.getBoundingClientRect().top,
+      dotLeftOfTitle: li.querySelector('.am-tl-dot').getBoundingClientRect().right <= li.querySelector('.am-tl-title').getBoundingClientRect().left,
+      lineAcross: getComputedStyle(li, '::before').borderTopWidth !== '0px',
+    }));
+    return {
+      stacked: items.every((it, i) => i === 0 || it.top > items[i - 1].top),
+      oneRow: items.every((it) => it.top === items[0].top),
+      dotsLeft: items.every((it) => it.dotLeftOfTitle),
+      linesAcross: items.filter((it) => it.lineAcross).length,
+      pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  })()`;
+
+  await open(file, PHONE);
+  const phone = await evaluate(shape);
+  assert.equal(phone.stacked, true, `one item per row at ${PHONE}px`);
+  assert.equal(phone.dotsLeft, true, `every dot is left of its title at ${PHONE}px`);
+  assert.equal(phone.linesAcross, 0, `no horizontal line at ${PHONE}px`);
+  assert.ok(phone.pageOverflow <= 0, `the page does not scroll sideways at ${PHONE}px`);
+
+  await open(file, DESKTOP);
+  const desktop = await evaluate(shape);
+  assert.equal(desktop.oneRow, true, `all items in one row at ${DESKTOP}px`);
+  assert.equal(desktop.linesAcross, 4, `every item has its part of the horizontal line at ${DESKTOP}px`);
+});
+
+// The switch to the vertical layout follows the width the timeline has, not the window: a sheet puts panels two per row at 768 px,
+// and a five-item timeline in one of them got about 58 px a column, so its dates wrapped and the dots covered them.
+test('e2e: a horizontal timeline turns vertical in a narrow panel and stays horizontal in a wide one', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const tl = '```timeline\n2026-09 | Private beta | Ten design partners try the agent on real work\n2026-10 | Public beta | Anyone can sign up\n*2026-11 | Paid plans | Pro and Team plans open\n2027-Q1 | Mobile app | The phone app reaches parity\n2027-Q2 | Enterprise | Single sign-on and audit log\n```\n';
+  const { html } = renderDoc(`---\ntitle: Narrow timeline\nlang: en\n---\n## A Release plan\n${tl}\n## B History\n${tl}`);
+  const file = join(tmp, 'timeline-narrow.html');
+  writeFileSync(file, html);
+  const rows = `(() => [...document.querySelectorAll('.am-timeline--h')].map((ol) => {
+    const tops = [...ol.children].map((li) => li.getBoundingClientRect().top);
+    return { oneRow: tops.every((t) => t === tops[0]), panelWidth: Math.round(ol.getBoundingClientRect().width) };
+  }))()`;
+
+  await open(file, 768);
+  const narrow = await evaluate(rows);
+  assert.equal(narrow.length, 2);
+  assert.ok(narrow.every((t) => t.panelWidth < 400), `the panels sit two per row at 768 px (${JSON.stringify(narrow)})`);
+  assert.ok(narrow.every((t) => !t.oneRow), 'a timeline in a half-width panel lists its items one per row');
+
+  await open(file, DESKTOP);
+  const wide = await evaluate(rows);
+  assert.ok(wide.every((t) => t.panelWidth >= 400), `the panels are wider at ${DESKTOP}px (${JSON.stringify(wide)})`);
+});
+
 // A host that serves the page inside its own document drops the page's <html> tag, so the real root has none of the page's settings.
 const inHost = (html, rootAttrs = '') => `<!doctype html><html${rootAttrs}><body>${html.replace(/<!doctype[^>]*>\s*/i, '').replace(/<html[^>]*>/i, '').replace(/<\/html>/i, '')}`;
 const ROOT_ATTRS = "[...['lang','data-theme','data-mode','data-style']].map((a) => document.documentElement.getAttribute(a))";
@@ -656,3 +781,56 @@ test('e2e: a page inside a host document gets its theme, mode, style and languag
   await open(own, DESKTOP);
   assert.deepEqual(await evaluate(ROOT_ATTRS), ['fr', '', 'dark', 'off']);
 });
+
+// An annot block on a right-to-left page: the sentence reads from the right, each note starts at the right edge of its span, and notes that
+// share a row do not run into each other (the rows are chosen from widths estimated for the sans font the sentence is set in).
+const ANNOT_DRAFT = (lang, sentences, head) => `---\nlang: ${lang}\n---\n## A Annot\n\`\`\`annot\n${head}\n${sentences.join('\n')}\n\`\`\`\n`;
+const ANNOT_ROWS = `(() => [...document.querySelectorAll('.am-annot-line')].map((line) => {
+  const edge = (r) => ({ left: Math.round(r.left * 10) / 10, right: Math.round(r.right * 10) / 10 });
+  const notes = [...line.querySelectorAll('.am-seg-n')].map((n) => ({
+    row: n.style.getPropertyValue('--row'), note: edge(n.getBoundingClientRect()), seg: edge(n.parentElement.getBoundingClientRect()),
+  }));
+  const head = line.closest('.am-annot').querySelector('.am-annot-head');
+  return {
+    font: getComputedStyle(line).fontFamily, body: getComputedStyle(document.body).fontFamily, notes,
+    title: edge(head.firstElementChild.getBoundingClientRect()), meta: head.children[1] ? edge(head.children[1].getBoundingClientRect()) : null,
+  };
+}))()`;
+
+for (const [lang, sentences, head] of [
+  ['he', [
+    'ודאו שה[מאגר ההידראולי]{השם הטכני המלא} [מלא]{!לא "מוחלף"} לפני שמתחילים לעבוד עם [Redis]{שם המוצר בלבד} בסביבה.',
+    'ערכו את [src/]{נתיב התיקייה} ואת [המטמון]{רכיב} [ידנית]{!לא אוטומטית אף פעם} היום.',
+  ], '# משפט | 13 מילים'],
+  ['en', [
+    'Make sure that [the hydraulic reservoir]{The full technical name} is [full]{!Not "replenished"} before you work with [Redis]{Product name only}.',
+    'Edit [src/]{The folder path} and [the cache]{A component} [by hand]{!Never automatic at all} today.',
+  ], '# Sentence | 13 words'],
+]) {
+  test(`e2e: annot on a ${lang} page keeps its notes at the start edge of their span, with no two notes of a row overlapping`, { skip: SKIP, timeout: 60000 }, async () => {
+    if (!cdp) await launch();
+    const file = join(tmp, `annot-${lang}.html`);
+    writeFileSync(file, renderDoc(ANNOT_DRAFT(lang, sentences, head)).html);
+    await open(file, DESKTOP);
+    const lines = await evaluate(ANNOT_ROWS);
+    assert.equal(lines.length, 2);
+    const rtl = lang === 'he';
+    for (const l of lines) {
+      assert.ok(l.notes.length >= 3, 'the notes are drawn');
+      for (const n of l.notes) {
+        // A note starts at the start edge of its span: the right edge on a right-to-left page.
+        assert.ok(Math.abs((rtl ? n.note.right - n.seg.right : n.note.left - n.seg.left)) <= 1, `${lang}: note ${JSON.stringify(n)} starts at its span`);
+      }
+      for (const [i, a] of l.notes.entries()) {
+        for (const b of l.notes.slice(i + 1).filter((x) => x.row === a.row)) {
+          assert.ok(a.note.right <= b.note.left + 0.5 || b.note.right <= a.note.left + 0.5, `${lang}: notes ${JSON.stringify(a)} and ${JSON.stringify(b)} share a row and overlap`);
+        }
+      }
+      // The title is on the start side of the head, the meta on the other.
+      if (l.meta) assert.ok(rtl ? l.title.left > l.meta.left : l.title.left < l.meta.left, `${lang}: head order`);
+      // No monospace font on a right-to-left page; the sentence takes the font of the page.
+      if (rtl) assert.equal(l.font, l.body);
+      else assert.notEqual(l.font, l.body);
+    }
+  });
+}

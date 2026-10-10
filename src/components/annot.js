@@ -17,7 +17,7 @@ Sentence text, [annotated span]{note}, [wrong span]{!red note}.
 \`\`\`
 - Each # starts a group; a group can hold several sentences. Overlapping notes move to separate rows automatically.`,
   example: '```annot\n# 1 Procedural sentence | 13 words, limit 20\nMake sure that [the hydraulic reservoir]{Technical name} is [full]{!Not "replenished"}.\n> Write one instruction per sentence\n```',
-  render(text) {
+  render(text, { dir = 'ltr' } = {}) {
     const groups = [];
     let group = null;
     const ensure = () => group ?? (group = pushGroup(groups, {}));
@@ -28,7 +28,7 @@ Sentence text, [annotated span]{note}, [wrong span]{!red note}.
       } else if (t.startsWith('>')) {
         ensure().captions.push(t.replace(/^>\s*/, ''));
       } else {
-        ensure().lines.push(sentenceHtml(t, line));
+        ensure().lines.push(sentenceHtml(t, line, dir === 'rtl'));
       }
     }
     if (!groups.length) throw new ComponentError('annot needs at least one sentence', 1);
@@ -51,7 +51,9 @@ function groupHtml(g) {
   return `<div class="am-annot">${head}${lines}${caps}</div>`;
 }
 
-function sentenceHtml(sentence, line) {
+// On a right-to-left page the sentence is set in the sans font (src/themes/rtl.css), so its widths are measured as sans text. The notes start
+// at the right edge of their span, so a distance from the start of the sentence is the distance from its right edge.
+function sentenceHtml(sentence, line, rtl) {
   const stripped = sentence.replace(SEG, '');
   if (/\[[^\]]*\]\{|\]\{[^}]*$/.test(stripped)) {
     throw new ComponentError(`annot has an unclosed annotation; expected [span]{note}: "${sentence}"`, line);
@@ -65,7 +67,7 @@ function sentenceHtml(sentence, line) {
     out += esc(before);
     plain += before;
     const [, seg, bang, note] = m;
-    const x = measure(plain, TEXT_SIZE, { mono: true });
+    const x = measure(plain, TEXT_SIZE, { mono: !rtl });
     const noteHtml = note.trim()
       ? `<span class="am-seg-n" style="--row: ${placeNote(rows, x, x + measure(note, NOTE_SIZE) + NOTE_GAP)}">${esc(note.trim())}</span>`
       : '';
