@@ -44,7 +44,8 @@ const compareOctets = (x, y) => {
 export function lanIPv4Addresses(interfaces = networkInterfaces()) {
   return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? [])
     .filter(({ address, family, internal }) => (family === 'IPv4' || family === 4)
-      && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith('169.254.'))
+      && !internal && isIP(address) === 4 && address !== LAN_BIND
+      && !address.startsWith('127.') && !address.startsWith('169.254.'))
     .map(({ address }) => address))].sort((x, y) => lanRank(x) - lanRank(y) || compareOctets(x, y));
 }
 
@@ -165,10 +166,15 @@ export function serveLink(home, file) {
 function writeInfo(home, info) {
   ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
-  rmSync(tmp, { force: true }); // the mode applies only to a file that writeFileSync creates
-  // wx: fail rather than write through a file or symlink that appeared after the rmSync.
-  writeFileSync(tmp, `${JSON.stringify(info)}\n`, { mode: 0o600, flag: 'wx' });
-  renameSync(tmp, infoPath(home));
+  try {
+    rmSync(tmp, { force: true }); // the mode applies only to a file that writeFileSync creates
+    // wx: fail rather than write through a file or symlink that appeared after the rmSync.
+    writeFileSync(tmp, `${JSON.stringify(info)}\n`, { mode: 0o600, flag: 'wx' });
+    renameSync(tmp, infoPath(home));
+  } finally {
+    // A failed rename must not leave a secret-bearing temporary metadata file behind.
+    rmSync(tmp, { force: true });
+  }
 }
 
 // Remove serve.json only when it still describes this server.
@@ -266,7 +272,14 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   });
   const actual = server.address().port;
   const baseUrl = publicOrigin ?? `http://${lan ? addresses[0] : HOST}:${actual}`;
-  writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+  try {
+    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+  } catch (e) {
+    // Do not leave a possibly LAN-exposed listener open if its secret cannot be persisted.
+    server.closeAllConnections();
+    await new Promise((done) => server.close(done));
+    throw new ServeError(`Cannot save serve.json; server stopped: ${e.message}`);
+  }
   let closed;
   const close = () => {
     closed ??= new Promise((done) => {
