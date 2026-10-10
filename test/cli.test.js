@@ -155,7 +155,8 @@ test('cli render: a page with warnings goes to pages/ but does not open; --open 
   const r = await call(['render', '-'], WARNED);
   assert.equal(r.code, 0, r.err);
   assert.equal(dirname(r.file), join(home, 'pages'));
-  assert.match(r.out, new RegExp(`Not opened because of the warnings; to render again, add --replace ${r.file}`));
+  // includes, not a RegExp: a Windows path has backslashes.
+  assert.ok(r.out.includes(`Not opened because of the warnings; to render again, add --replace ${r.file}`), r.out);
   assert.deepEqual(opened, []);
 
   const forced = await call(['render', '-', '--open'], WARNED);
