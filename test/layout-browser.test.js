@@ -492,7 +492,9 @@ test('e2e: printing restores the plain grid with complete panels, and screen lay
 
     await page('Emulation.setEmulatedMedia', { media: '' });
     await setWidth(DESKTOP);
-    await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${p.name} to lay out again after print`);
+    // `display: flex` only says some layout ran: the grid can still hold the plan the print width got, because a re-layout is
+    // debounced by 150 ms. Wait for a layout that fits the width on screen (SETTLED measures the rows against the grid).
+    await waitFor(SETTLED, `${p.name} to lay out again after print`);
     assertJustified(p.name, DESKTOP, await measure(), p.ids);
   }
 
