@@ -8743,7 +8743,7 @@ async function runServe({ home, port, lan = false, publicUrl, print, fail }) {
       for (const address of srv.addresses) print(`LAN address: http://${address}:${srv.port}`);
     } else {
       print(`Serving pages on http://${HOST}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
-      print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
+      if (!publicUrl) print(`Reaching it from another computer: run ssh -L ${srv.port}:${HOST}:${srv.port} user@host there, then open the links in its browser.`);
     }
     if (publicUrl) {
       print(`Public link origin: ${srv.baseUrl}`);
