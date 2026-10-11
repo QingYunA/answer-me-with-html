@@ -9,6 +9,7 @@ import { CONFIG_KEYS } from '../../src/config.js';
 import { lintDoc } from '../../src/lint/ste.js';
 import { resolveLanguage } from '../../src/language.js';
 import { VERSION as PACKAGE_VERSION } from '../../src/assets.js';
+import { loadMath } from '../../src/math-load.js';
 
 export const VERSION = PACKAGE_VERSION;
 
@@ -27,6 +28,9 @@ const ROOT = '/';
 const EXPECTED = [RenderError, ParseError, LintError, ComponentError];
 
 const now = () => (globalThis.performance ?? Date).now();
+
+// render() is synchronous, so a caller awaits this first: it loads Temml (the separate temml.js, fetched once) when the draft may hold math.
+export const prepare = (source) => loadMath(source);
 
 // Returns { ok: true, html, warnings, stats, meta, ms } or { ok: false, error: { name, message, line, component, example }, ms }.
 // Draft errors are returned; anything else (a bug) is thrown.
