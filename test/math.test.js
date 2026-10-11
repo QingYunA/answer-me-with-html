@@ -37,7 +37,7 @@ test('math: inline formulas render as MathML with dir="ltr"', () => {
   for (const src of ['$x$', '($x$)', '$x$-axis', '$w(v)=\\prod_{u\\prec v}N_u^{-1}$。']) { // lang-ok: Chinese input under test
     const html = md(src);
     assert.equal(formulas(html), 1, src);
-    assert.match(html, /<math dir="ltr">/);
+    assert.match(html, /<math dir="ltr" data-am-tex="[^"]*">/);
   }
   assert.equal(texts('($x$)'), '<p>([M])</p>');
   assert.equal(texts('$x$-axis'), '<p>[M]-axis</p>');
@@ -64,7 +64,7 @@ test('math: the content is on one line', () => {
 });
 
 test('math: inline formulas use wrap: "tex" so a long one can break after a relation', () => {
-  assert.match(md('$a=b+c$'), /<math dir="ltr"><mrow><mi>a<\/mi><mo>=<\/mo><\/mrow><mrow><mi>b<\/mi><mo>\+<\/mo><\/mrow>/);
+  assert.match(md('$a=b+c$'), /<math dir="ltr" data-am-tex="[^"]*"><mrow><mi>a<\/mi><mo>=<\/mo><\/mrow><mrow><mi>b<\/mi><mo>\+<\/mo><\/mrow>/);
 });
 
 test('math: \\$ is a dollar sign in text and inside a formula', () => {
@@ -102,7 +102,7 @@ test('math: mdInline reads formulas too', () => {
 // ── display blocks ──
 test('math: a $$ line, the TeX and a closing $$ line make a display block', () => {
   const html = md('before\n\n$$\n\\frac{a}{b}\n$$\n\nafter');
-  assert.match(html, /<div class="am-math-block" dir="ltr"><math dir="ltr" display="block"/);
+  assert.match(html, /<div class="am-math-block" dir="ltr"><math dir="ltr" data-am-tex="[^"]*" display="block"/);
   assert.equal(formulas(html), 1);
   assert.match(html, /<p>before<\/p>/);
   assert.match(html, /<p>after<\/p>/);
@@ -118,13 +118,13 @@ test('math: a display block takes several lines, a closing $$ at the end of the 
 
 test('math: a one-line $$ … $$ paragraph is a display block', () => {
   const html = md('$$ E = mc^2 $$');
-  assert.match(html, /^<div class="am-math-block" dir="ltr"><math dir="ltr" display="block"/);
+  assert.match(html, /^<div class="am-math-block" dir="ltr"><math dir="ltr" data-am-tex="[^"]*" display="block"/);
   assert.equal(formulas(md('$$E=mc^2$$')), 1);
 });
 
 test('math: $$ inside a sentence is display math too', () => {
   const html = md('so $$x^2$$ holds');
-  assert.match(html, /<p>so <span class="am-math-block" dir="ltr"><math dir="ltr" display="block"/);
+  assert.match(html, /<p>so <span class="am-math-block" dir="ltr"><math dir="ltr" data-am-tex="[^"]*" display="block"/);
   assert.match(html, /<\/span> holds<\/p>/);
 });
 
@@ -140,7 +140,7 @@ test('math: display blocks work inside a list item and a quote', () => {
 });
 
 test('math: formulas in a table cell, a heading and a list item', () => {
-  assert.match(md('| a |\n|---|\n| $x^2$ |'), /<td><math dir="ltr">/);
+  assert.match(md('| a |\n|---|\n| $x^2$ |'), /<td><math dir="ltr" data-am-tex="[^"]*">/);
   assert.match(md('### Energy $E$'), /<h3[^>]*>Energy <math/);
   assert.match(md('- one $x$'), /<li>one <math/);
 });
@@ -226,7 +226,7 @@ test('math: the Temml styles and the font come only with a page that has math', 
   assert.doesNotMatch(withMath, /url\('Temml\.woff2'\)/);
   for (const body of ['plain text', 'costs $5 and $10', '`$x$`', '```\n$$\nx\n$$\n```']) {
     const html = renderDoc(draft(body)).html;
-    assert.doesNotMatch(html, /Temml|am-math/, body);
+    assert.doesNotMatch(html.replace(/<script>[\s\S]*<\/script>/, ''), /Temml|am-math/, body); // the page script names the class it marks
   }
 });
 
@@ -338,11 +338,11 @@ test('cli render: the agent fixes the TeX and renders again with --replace; the 
 test('cli patch: a panel with a formula is typeset again and keeps its source', async (t) => {
   const { call } = retrying(t);
   const page = await call(['render', '-'], '## A\nplain\n\n## B\nold\n');
-  assert.doesNotMatch(readFileSync(page.file, 'utf8'), /<math/);
+  assert.doesNotMatch(readFileSync(page.file, 'utf8').replace(/<script>[\s\S]*<\/script>/, ''), /<math/);
   const patched = await call(['patch', page.file, '--panel', 'B', '-'], '## B\nnew $x^2$\n');
   assert.equal(patched.code, 0, patched.err);
   const html = readFileSync(page.file, 'utf8');
-  assert.match(html, /<math dir="ltr">/);
+  assert.match(html, /<math dir="ltr" data-am-tex="[^"]*">/);
   assert.match(html, /new \$x\^2\$/);
   const again = await call(['patch', page.file, '--panel', 'B', '-'], '## B\nbad $\\foo$\n');
   assert.match(again.out, /\[math\]/);

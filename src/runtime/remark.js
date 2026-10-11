@@ -9,7 +9,8 @@
   const storeKey = `am-remark:${location.pathname}`;
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
-  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure):not(.am-head *, .am-panel-head *)';
+  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.
+  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';
   // A click on these does what it always did.
   const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';
   const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));
@@ -21,17 +22,18 @@
     return inlineBox.get(el);
   };
   // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run
-  // "2026" and "Ship" together), and the note chip is not part of it.
+  // "2026" and "Ship" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote
+  // (src/runtime/math-text.js), not as the MathML tokens.
   const blockText = (el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     let text = '';
     let last = null;
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (node.parentElement.closest('.am-mark-note')) continue;
-      let box = node.parentElement;
+      let box = formulaOf(node) ?? node.parentElement;
       while (box !== el && isInline(box)) box = box.parentElement;
       if (last && box !== last) text += ' ';
-      text += node.data.replace(WJ, '');
+      text += nodeText(node).replace(WJ, '');
       last = box;
     }
     return text;

@@ -10,9 +10,9 @@ if (replyBtn) {
   const asks = [...document.querySelectorAll('.am-ask')];
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
   // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved
-  // answers hold the text as the draft wrote it.
+  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).
   const WJ = new RegExp(String.fromCharCode(0x2060), 'g');
-  const textOf = (el) => el?.textContent.replace(WJ, '').trim();
+  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();
   const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;
   const touched = new Set();
   const boxes = new Map();

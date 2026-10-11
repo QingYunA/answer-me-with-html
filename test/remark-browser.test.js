@@ -318,6 +318,33 @@ for (const [name, p] of Object.entries(PAGES)) {
     assert.ok(out.popEdge < 2, `the popover starts at the block's start edge (off by ${out.popEdge}px)`);
     assert.equal(out.inView, true);
   });
+
+  // A mark is stored under the key of its block, and a reply made on an older page must still find it. These keys are what the runtime of
+  // 0.5.0 (before math in prose) stored for the same page; a page with a formula elsewhere must not change them.
+  test(`remark (${name}): the key of a block without math is the one it always was, also on a page with math`, { skip: SKIP }, async () => {
+    const file = render(`${name}-keys`, `${draftOf(p)}\n## C Formula\nEnergy $E = mc^2$ holds.\n`);
+    await load(file);
+    const keys = await evaluate(`(() => { ${PAGE_JS}
+      btn.click();
+      mark(at('p', ${JSON.stringify(p.first)}), 'keep', '');
+      mark(at('li', ${JSON.stringify(p.same)}, 0), 'keep', '');
+      mark(at('li', ${JSON.stringify(p.same)}, 1), 'keep', '');
+      mark(at('li', ${JSON.stringify(p.last)}), 'keep', '');
+      mark(at('table', ${JSON.stringify(p.row[0])}), 'keep', '');
+      mark(at('li', ${JSON.stringify(p.step[1])}), 'keep', '');
+      mark(at('p', 'Energy'), 'keep', '');
+      return stored().map((m) => m.key);
+    })()`);
+    assert.deepEqual(keys, [
+      `A|p|${p.first}`,
+      `A|li|${p.same}`,
+      `A|li|${p.same}\t1`,
+      `A|li|${p.last}`,
+      `A|table|${p.head.join(' ')} ${p.row.join(' ')}`,
+      `B|li|${p.step.join(' ')}`,
+      'C|p|Energy $E = mc^2$ holds.',
+    ]);
+  });
 }
 
 // `am serve` opens a page in a sandbox without allow-same-origin, where reading localStorage throws. Reply persistence already survives that.

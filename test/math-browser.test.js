@@ -149,8 +149,55 @@ test('math: remark mode and the Reply copy work on a paragraph with a formula', 
     document.querySelector('[data-am="reply"]').click();
     return document.querySelector('dialog.am-reply textarea').value;
   })()`);
-  // The runtime reads each MathML token as a line of its own, so the quote has spaces between them: readable, and stable across `am patch`.
-  assert.match(reply, /"Energy E = m c 2 holds for x , costs \$5 and \$10\./);
+  // MathML has no plain text, so the quote is the TeX the draft wrote (src/runtime/math-text.js).
+  assert.match(reply, /"Energy \$E=mc\^2\$ holds for \$x\$, costs \$5 and \$10\./);
   assert.match(reply, /> is this right\?/);
+  assert.deepEqual(await evaluate('window.__errors'), []);
+});
+
+test('math: a Reply quotes a formula as its TeX, inline and display, and a formula Temml cannot read once', { skip: SKIP }, async () => {
+  const draft = `---
+title: Quote check
+---
+## A Energy
+Energy $E = mc^2$ holds.
+
+Then $$a+b$$ shows.
+
+$$
+\\int_0^1 x\\,dx
+$$
+
+$$ x^2 $$
+
+- bad $\\frac{$ end
+
+\`\`\`ask
+Is $n$ big?
+* yes
+- no
+\`\`\`
+`;
+  await load(render('quote', draft));
+  const reply = await evaluate(`(() => {
+    const pop = document.querySelector('.am-remark-pop');
+    document.querySelector('[data-am="remark"]').click();
+    for (const el of document.querySelectorAll('main p, main li, main div.am-math-block')) {
+      el.click();
+      [...pop.querySelectorAll('.am-remark-kind')].find((b) => b.dataset.kind === 'question').click();
+      pop.querySelector('.am-btn').click();
+    }
+    document.querySelector('[data-am="reply"]').click();
+    return document.querySelector('dialog.am-reply textarea').value;
+  })()`);
+  const quotes = [...reply.matchAll(/^- \*\*A · [^*]+\*\* "(.*)"$/gm)].map((m) => m[1]);
+  assert.deepEqual(quotes, ['Energy $E = mc^2$ holds.', 'Then $$a+b$$ shows.', '$$ \\int_0^1 x\\,dx $$', '$$ x^2 $$', 'bad $\\frac{$ end']);
+  // A $$ block on its own is a block to mark: the bar and the note chip sit in it, and the chip has a box.
+  const chips = await evaluate(`[...document.querySelectorAll('div.am-math-block.am-mark')].map((b) => {
+    const chip = b.querySelector(':scope > .am-mark-note')?.getBoundingClientRect();
+    return Boolean(chip && chip.width > 0 && chip.height > 0);
+  })`);
+  assert.deepEqual(chips, [true, true]);
+  assert.match(reply, /^1\. \[A\] Is \$n\$ big\?$/m, 'a question with a formula reads it as TeX too');
   assert.deepEqual(await evaluate('window.__errors'), []);
 });

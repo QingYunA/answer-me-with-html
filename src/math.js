@@ -126,8 +126,9 @@ function typeset({ raw: padded, tex, display }, block, note) {
   try {
     const html = temml.renderToString(tex, { displayMode: display, throwOnError: true, ...(display ? {} : { wrap: 'tex' }) });
     if (NEEDS_SCRIPT.test(tex)) note(raw, `${preview(raw)} uses \\ref, \\eqref or \\label; a page has no script to resolve them, so they show nothing. Write a number with \\tag{1} in a $$ block`);
-    // dir="ltr" keeps a formula left to right on a right-to-left page.
-    return wrap(html.replace('<math', '<math dir="ltr"'));
+    // dir="ltr" keeps a formula left to right on a right-to-left page. data-am-tex is the formula as the draft wrote it, delimiters included:
+    // MathML has no plain text, so a Remark or a Reply quotes this instead (src/runtime/math-text.js). A function, because the TeX holds `$`.
+    return wrap(html.replace('<math', () => `<math dir="ltr" data-am-tex="${esc(raw)}"`));
   } catch (err) {
     const message = reason(err);
     note(raw, `${preview(raw)} is shown as raw TeX: ${message}`);
