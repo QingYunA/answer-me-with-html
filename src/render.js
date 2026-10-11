@@ -184,7 +184,7 @@ function colophon(language) {
 const withColophon = (body, language) => body.replace('<header class="am-head">', (head) => `${head}${colophon(language)}`);
 
 // The new-version button and its popover (a native popover, so it opens, closes on Esc and on a click outside with no script). The
-// button starts hidden: src/runtime/update.js shows it only on a page opened from disk or from this computer, not on a shared one.
+// button starts hidden; src/runtime/update.js shows it where the browser has popovers. withoutUpdateNotice takes both out again.
 function updateNotice(ui, update) {
   if (!update) return { button: '', popover: '' };
   const t = ui.update;
@@ -205,6 +205,14 @@ ${row(t.agentText, false)}
 </div>
 `,
   };
+}
+
+// The page without its new-version button and popover, for a reader on another device (src/serve.js): the notice is for the person
+// who made the page. Both come before the body, so the first match is the one updateNotice wrote.
+export function withoutUpdateNotice(html) {
+  return html
+    .replace(/<button class="am-btn am-btn--update"[^]*?<\/button>\n/, '')
+    .replace(/<div class="am-update" id="am-update" popover>[^]*?\n<\/div>\n/, '');
 }
 
 // A diagram with change markers carries a count row; only then the page needs the delta styles and script.

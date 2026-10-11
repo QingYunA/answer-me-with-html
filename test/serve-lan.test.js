@@ -5,6 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lanIPv4Addresses, publicUrlOrigin, pageLink, startServer, readServeInfo, ServeError } from '../src/serve.js';
+import { renderDoc, withoutUpdateNotice } from '../src/render.js';
 
 function fetch(port, path, host) {
   return new Promise((resolve, reject) => {
@@ -192,4 +193,38 @@ test('LAN discovery never advertises a loopback address even if the interface fl
       { address: '10.2.3.4', family: 'IPv4', internal: false },
     ],
   }), ['10.2.3.4']);
+});
+
+function body(port, path, host) {
+  return new Promise((resolve, reject) => {
+    const req = request({ hostname: '127.0.0.1', port, path, headers: { Host: host } }, res => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+test('a page goes to a LAN or public address without its new-version button, and to this computer with it', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'am-lan-update-'));
+  mkdirSync(join(home, 'pages'));
+  const update = { latest: '0.9.0', current: '0.5.0', command: 'npx skills update answer-me-with-html -y' };
+  const page = renderDoc('## A\nx', {}, {}, { update }).html;
+  writeFileSync(join(home, 'pages', 'test.html'), page);
+  let srv;
+  try {
+    srv = await startServer({ home, port: 0, lan: true, lanAddresses: ['192.168.8.20'], publicUrl: 'https://render.example' });
+    const path = new URL(pageLink(srv, 'pages', 'test.html')).pathname;
+    for (const host of ['127.0.0.1:' + srv.port, 'localhost']) assert.equal(await body(srv.port, path, host), page, host);
+    for (const host of ['192.168.8.20:' + srv.port, 'render.example']) {
+      const shared = await body(srv.port, path, host);
+      assert.equal(shared, withoutUpdateNotice(page), host);
+      assert.doesNotMatch(shared, /<button[^>]*data-am="(update|copy-text)"|id="am-update"/, host);
+    }
+  } finally {
+    if (srv) await srv.close();
+    rmSync(home, { recursive: true, force: true });
+  }
 });

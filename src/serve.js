@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { lstat, realpath, readFile } from 'node:fs/promises';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { ensureHome } from './home.js';
+import { withoutUpdateNotice } from './render.js';
 
 export const DEFAULT_PORT = 8765;
 const HOST = '127.0.0.1';
@@ -233,7 +234,10 @@ function handler(home, secret, allowedHosts) {
       if (dest !== undefined && dest !== 'document') return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
-      return reply(req, res, 200, 'text/html; charset=utf-8', await readFile(real));
+      // The new-version button is for the person who made the page: a reader through a LAN or public address gets the page without it.
+      const html = await readFile(real);
+      const body = LOOPBACK_HOST.test(req.headers.host) ? html : withoutUpdateNotice(html.toString('utf8'));
+      return reply(req, res, 200, 'text/html; charset=utf-8', body);
     } catch {
       return notFound(req, res);
     }

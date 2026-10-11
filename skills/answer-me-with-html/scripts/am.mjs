@@ -582,13 +582,11 @@ math:not(.tml-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; 
 var DELTA_JS = "\n// \u2500\u2500 Change markers: the Before / Changes / After switch \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// The switch starts hidden because it needs this script. It swaps the am-view-* class of its diagram; the delta styles show the colors and badges only in\n// the Changes view and hide the items that do not exist in the view.\n(() => {\n  const VIEWS = ['before', 'changes', 'after'];\n  const setView = (el, view) => {\n    el.classList.remove(...VIEWS.map((v) => `am-view-${v}`));\n    el.classList.add(`am-view-${view}`);\n  };\n  for (const bar of document.querySelectorAll('.am-delta-bar')) {\n    const view = bar.parentElement;\n    const group = bar.querySelector('.am-delta-switch');\n    if (!group) continue;\n    group.hidden = false;\n    group.addEventListener('click', (e) => {\n      const btn = e.target.closest('button[data-view]');\n      if (!btn) return;\n      setView(view, btn.dataset.view);\n      for (const b of group.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));\n    });\n  }\n  // The expand button copies only the drawing into the viewer; the viewer shows the view the diagram is in.\n  document.addEventListener('click', (e) => {\n    const host = e.target.closest?.('.am-diagram-expand')?.parentElement;\n    const canvas = document.querySelector('.am-lightbox-canvas');\n    const view = host && VIEWS.find((v) => host.classList.contains(`am-view-${v}`));\n    if (view && canvas) setView(canvas, view);\n  });\n})();\n";
 var UPDATE_CSS = "/* New-version button and popover (src/render.js adds this file only to a page that has the button). The popover sits under the\n   toolbar and stays hidden unless open, so a browser without native popovers never shows it. */\n.am-btn--update { color: var(--ok); border-color: var(--ok); white-space: nowrap; }\n.am-update { display: none; }\n.am-update:popover-open {\n  display: block; position: fixed; inset-block: 52px auto; inset-inline: auto 12px; margin: 0; width: min(380px, calc(100vw - 24px));\n  padding: 14px 16px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-update p { margin: 0 0 8px; }\n.am-update-title { font-weight: 600; color: var(--ok); }\n.am-update-label { color: var(--ink-2); font-size: 12px; }\n.am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }\n.am-update-row > :first-child {\n  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;\n  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);\n}\n.am-update a { color: var(--accent); font-size: 12px; }\n/* A phone has no room for the words: the button keeps only its dot, and its aria-label still names the version. */\n@media (max-width: 760px) {\n  .am-btn--update .am-update-text { display: none; }\n}\n@media print {\n  .am-update { display: none !important; }\n}\n";
 var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds this script after the page script.
-// The button is for the person who made the page: it shows on a page opened from disk or from this computer, and only where the
-// browser has native popovers (they open and close the popover with no script). A page shared with am serve --lan or --public-url
-// keeps it hidden.
+// The button shows where the browser has native popovers (they open and close the popover with no script). A page that am serve
+// sends to another device has no button (src/serve.js), so this script does not look at the address.
 (() => {
   const button = document.querySelector('[data-am="update"]');
-  const local = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-  if (!button || !local || !Object.hasOwn(HTMLElement.prototype, 'popover')) return;
+  if (!button || !Object.hasOwn(HTMLElement.prototype, 'popover')) return;
   button.hidden = false;
   // Each copy button copies its data-text and reads data-done for a moment.
   for (const copy of document.querySelectorAll('[data-am="copy-text"]')) {
@@ -7996,6 +7994,9 @@ ${row(t.agentText, false)}
 `
   };
 }
+function withoutUpdateNotice(html) {
+  return html.replace(/<button class="am-btn am-btn--update"[^]*?<\/button>\n/, "").replace(/<div class="am-update" id="am-update" popover>[^]*?\n<\/div>\n/, "");
+}
 var hasDelta = (html) => html.includes('class="am-delta-bar"');
 function lightboxShell(ui, hasDiagrams) {
   if (!hasDiagrams) return "";
@@ -9426,7 +9427,9 @@ function handler(home, secret, allowedHosts) {
       if (dest !== void 0 && dest !== "document") return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
-      return reply(req, res, 200, "text/html; charset=utf-8", await readFile(real));
+      const html = await readFile(real);
+      const body = LOOPBACK_HOST.test(req.headers.host) ? html : withoutUpdateNotice(html.toString("utf8"));
+      return reply(req, res, 200, "text/html; charset=utf-8", body);
     } catch {
       return notFound(req, res);
     }

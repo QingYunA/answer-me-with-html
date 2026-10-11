@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { renderDoc, RenderError } from '../src/render.js';
+import { renderDoc, RenderError, withoutUpdateNotice } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { getTheme } from '../src/themes/registry.js';
 import { COMPONENTS } from '../src/components/index.js';
@@ -132,6 +132,15 @@ test('render: a known newer version adds a hidden new-version button, its popove
   assert.match(html, /href="https:\/\/github\.com\/QingYunA\/answer-me-with-html\/releases"/);
   assert.match(html, /\.am-update:popover-open/);
   assert.match(html, /data-am="update"\]'\);/);
+});
+
+test('withoutUpdateNotice: takes out the button and the popover and leaves the rest of the page', () => {
+  const plain = renderDoc('## A\nx').html;
+  assert.equal(withoutUpdateNotice(plain), plain);
+  const stripped = withoutUpdateNotice(renderDoc('## A\nx', {}, {}, { update: UPDATE }).html);
+  assert.doesNotMatch(stripped, /<button[^>]*data-am="(update|copy-text)"|id="am-update"/);
+  assert.match(stripped, /<div class="am-toolbar"[^>]*>\n<label class="am-pick">/);
+  assert.match(stripped, /<\/div>\n<main class="am-sheet">/);
 });
 
 test('render: without a newer version the page carries nothing of the new-version notice', () => {
