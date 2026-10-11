@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { usage, clean, cleanHint, afterRender, CLEAN, mb } from '../src/housekeeping.js';
-import { updateHint, newer, updateCommand, shouldCheckUpdate, runUpdateCheck, parseVersion } from '../src/update.js';
+import { updateHint, newer, updateCommand, shouldCheckUpdate, runUpdateCheck, parseVersion, pageUpdate } from '../src/update.js';
 import { readState, writeState } from '../src/state.js';
 import { main } from '../src/cli.js';
 
@@ -140,6 +140,19 @@ test('newer / updateHint / updateCommand: hint only when a newer version exists,
   assert.match(updateHint({ latestVersion: '0.4.0' }, '0.3.0', '/x/.agents/skills/a/scripts/am.mjs'), /npx skills update answer-me-with-html -y/);
   assert.match(updateCommand('/Users/u/.claude/plugins/cache/answer-me-with-html/answer-me-with-html/0.3.0/skills/x/scripts/am.mjs'), /claude plugin update answer-me-with-html@answer-me-with-html/);
   assert.equal(updateHint({ latestVersion: '0.4.0', lastUpdateHint: NOW - DAY }, '0.3.0', '', NOW), null, 'throttled');
+});
+
+test('pageUpdate: the page gets the button whenever a newer version is known, with the plain command for the install method', () => {
+  assert.equal(pageUpdate({}, '0.3.0', '', {}, {}), null);
+  assert.equal(pageUpdate({ latestVersion: '0.3.0' }, '0.3.0', '', {}, {}), null);
+  assert.deepEqual(pageUpdate({ latestVersion: '0.4.0', lastUpdateHint: NOW }, '0.3.0', '/x/.agents/skills/a/scripts/am.mjs', {}, {}),
+    { latest: '0.4.0', current: '0.3.0', command: 'npx skills update answer-me-with-html -y' }, 'not throttled by the agent hint');
+  assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '/Users/u/.claude/plugins/cache/a/b/0.3.0/skills/x/scripts/am.mjs', {}, {}).command,
+    'claude plugin update answer-me-with-html@answer-me-with-html');
+  assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '/home/u/answer-me-with-html/bin/am.js', {}, {}).command, 'git pull && npm install');
+  assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '', { CI: 'true' }, {}), null);
+  assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '', { AM_NO_UPDATE_CHECK: '1' }, {}), null);
+  assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '', {}, { update_check: false }), null);
 });
 
 test('shouldCheckUpdate: once a week; no check under CI, AM_NO_UPDATE_CHECK or update_check off', () => {

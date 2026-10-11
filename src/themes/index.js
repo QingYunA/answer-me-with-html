@@ -2,7 +2,7 @@
 // Component styles (base.css, video.css) reference only variables; a theme's decoration css is scoped to its own root selector.
 // Each theme provides light / dark values; auto mode follows the system prefers-color-scheme.
 
-import { BASE_CSS, DIFF_CSS, DELTA_CSS, RTL_CSS, MATH_CSS, VIDEO_CSS } from '../assets.js';
+import { BASE_CSS, DIFF_CSS, DELTA_CSS, RTL_CSS, MATH_CSS, VIDEO_CSS, UPDATE_CSS } from '../assets.js';
 import { themes } from './registry.js';
 import { fontLanguages, langSelector } from './fonts.js';
 
@@ -32,10 +32,10 @@ const ownLanguageFont = (t) => fontLanguages().map((l) => block(langSelector(l, 
 // their styles come with the base ones. rtl: the page language is written right to left. base.css already uses logical properties;
 // rtl.css holds only what they cannot express (code stays left to right, label fonts, mirrored offsets). math: the page has a formula (src/math.js);
 // it carries the Temml styles with their font, about 20 KB, so a page without math does not.
-export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false } = {}) {
+export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, update = false } = {}) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, BASE_CSS, ...(math ? [MATH_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, BASE_CSS, ...(math ? [MATH_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page

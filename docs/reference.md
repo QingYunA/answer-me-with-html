@@ -232,7 +232,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 
 ## Updating and cleaning up
 
-**Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` from GitHub to read the latest version number. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Turn this off with `/answer-me-with-html:config update_check off`.
+**Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` from GitHub to read the latest version number. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Each page made while you are out of date also has a "New version" button at the start of the toolbar; click it for the update command and a copy button. The button shows only when you open the page from your own computer, not on a page you share with `am serve --lan` or `--public-url`, and the page itself never goes online. Turn this off with `/answer-me-with-html:config update_check off`.
 
 | Installed with | Update with |
 | :--- | :--- |

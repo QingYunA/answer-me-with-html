@@ -8,7 +8,7 @@ import { pageCss } from './themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
-import { VERSION, RUNTIME_JS, RTL_JS, DELTA_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, RTL_JS, DELTA_JS, UPDATE_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -39,7 +39,8 @@ export class LintError extends Error {
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
 // baseDir: where relative image paths are read from; codeDir: where relative code paths are read from (the folder the agent works in).
 // knownImages / knownCode: what the page already embeds, the fallback when a file is gone.
-export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode } = {}) {
+// update: { latest, current, command } from pageUpdate in src/update.js when a newer version is known; the page then has a new-version button.
+export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -63,7 +64,7 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language });
   // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).
   const body = language.dir === 'rtl' ? isolateLtrRuns(page) : page;
-  const html = shell({ meta: doc.meta, language, body, source, embedded: themes.embedFor(doc.meta.theme, 'page') });
+  const html = shell({ meta: doc.meta, language, body, source, embedded: themes.embedFor(doc.meta.theme, 'page'), update });
   return { html, warnings, stats, meta: doc.meta, language };
 }
 
@@ -182,6 +183,30 @@ function colophon(language) {
 // template's header is the first one in the body: the intro and the panels come after it.
 const withColophon = (body, language) => body.replace('<header class="am-head">', (head) => `${head}${colophon(language)}`);
 
+// The new-version button and its popover (a native popover, so it opens, closes on Esc and on a click outside with no script). The
+// button starts hidden: src/runtime/update.js shows it only on a page opened from disk or from this computer, not on a shared one.
+function updateNotice(ui, update) {
+  if (!update) return { button: '', popover: '' };
+  const t = ui.update;
+  const plain = t.button.replace('{version}', update.latest);
+  const fill = (s) => esc(s).replace('{version}', `<bdi>${esc(update.latest)}</bdi>`).replace('{current}', `<bdi>${esc(update.current)}</bdi>`);
+  // The command is code and reads left to right; the line for the agent is a sentence in the page language.
+  const row = (text, code) => `<div class="am-update-row">${code ? `<code dir="ltr">${esc(text)}</code>` : `<span>${esc(text)}</span>`}<button class="am-btn" type="button" data-am="copy-text" data-text="${esc(text)}" data-done="${esc(ui.done)}">${esc(ui.copyCode)}</button></div>`;
+  return {
+    button: `<button class="am-btn am-btn--update" type="button" data-am="update" popovertarget="am-update" aria-label="${esc(plain)}" hidden>● <span class="am-update-text">${fill(t.button)}</span></button>\n`,
+    popover: `<div class="am-update" id="am-update" popover>
+<p class="am-update-title">${fill(t.button)}</p>
+<p>${fill(t.current)}</p>
+<p class="am-update-label">${esc(t.run)}</p>
+${row(update.command, true)}
+<p class="am-update-label">${esc(t.agent)}</p>
+${row(t.agentText, false)}
+<a href="https://github.com/QingYunA/answer-me-with-html/releases" target="_blank" rel="noopener">${esc(t.notes)}</a>
+</div>
+`,
+  };
+}
+
 // A diagram with change markers carries a count row; only then the page needs the delta styles and script.
 export const hasDelta = (html) => html.includes('class="am-delta-bar"');
 
@@ -205,8 +230,9 @@ function lightboxShell(ui, hasDiagrams) {
 `;
 }
 
-function shell({ meta, language, body, source, embedded }) {
+function shell({ meta, language, body, source, embedded, update }) {
   const { ui, labelKey } = language;
+  const notice = updateNotice(ui, update);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
@@ -218,21 +244,21 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body) })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), update: Boolean(update) })}
 </style>
 </head>
 <body>
 <div class="am-toolbar"${rootCarrierAttrs(root)}>
-${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
+${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
-${withColophon(body, language)}
+${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>
-${RUNTIME_JS}${language.dir === 'rtl' ? RTL_JS : ''}${hasDelta(body) ? DELTA_JS : ''}</script>
+${RUNTIME_JS}${language.dir === 'rtl' ? RTL_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}</script>
 </body>
 </html>
 `;

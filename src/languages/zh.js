@@ -15,6 +15,7 @@ export default {
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
     copy: '复制源稿', done: '已复制 ✓', copyCode: '复制',
+    update: { button: '新版本 {version}', current: '当前 {current}。生成此页时检测到新版本。', run: '在终端运行：', agent: '或者告诉 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新内容' },
     reply: {
       button: '回复', comment: '评论', commentHint: '对这个面板的意见', title: '你的回复',
       hint: '复制后粘贴到对话里。', copy: '复制回复', close: '关闭', suggested: '建议',

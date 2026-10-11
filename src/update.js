@@ -1,5 +1,6 @@
 // New-version notice: once a week a background child process reads package.json on GitHub and writes the result into state.json;
-// on the next render, if a new version exists, print one "! Update hint" line for the Agent, which asks the user. Never updates automatically.
+// on the next render, if a new version exists, print one "! Update hint" line for the Agent, which asks the user, and put a
+// new-version button on the page. Never updates automatically.
 import { spawn } from 'node:child_process';
 import { DAY, writeState } from './state.js';
 
@@ -26,15 +27,28 @@ export function newer(a, b) {
   return i !== -1 && pa[i] > pb[i];
 }
 
-// Give the update command for the install method. scriptPath is the path of the running am script.
+// The update command for each install method, as the user types it.
+export const UPDATE_COMMANDS = Object.freeze({
+  plugin: 'claude plugin update answer-me-with-html@answer-me-with-html',
+  repo: 'git pull && npm install',
+  skills: 'npx skills update answer-me-with-html -y',
+});
+
+// How this copy was installed. scriptPath is the path of the running am script.
+export function installMethod(scriptPath = '') {
+  if (/[\\/]\.claude[\\/]plugins[\\/]/.test(scriptPath)) return 'plugin';
+  if (/[\\/]bin[\\/]am\.js$/.test(scriptPath)) return 'repo';
+  return 'skills';
+}
+
+// Give the update command for the install method, as an instruction for the Agent.
 export function updateCommand(scriptPath = '') {
-  if (/[\\/]\.claude[\\/]plugins[\\/]/.test(scriptPath)) {
-    return 'run claude plugin update answer-me-with-html@answer-me-with-html in a terminal (or click Update now on the Installed tab of /plugin), then /reload-plugins';
+  const method = installMethod(scriptPath);
+  if (method === 'plugin') {
+    return `run ${UPDATE_COMMANDS.plugin} in a terminal (or click Update now on the Installed tab of /plugin), then /reload-plugins`;
   }
-  if (/[\\/]bin[\\/]am\.js$/.test(scriptPath)) {
-    return 'run git pull && npm install in the answer-me-with-html repository';
-  }
-  return 'run npx skills update answer-me-with-html -y';
+  if (method === 'repo') return `run ${UPDATE_COMMANDS.repo} in the answer-me-with-html repository`;
+  return `run ${UPDATE_COMMANDS.skills}`;
 }
 
 // update_check off, CI and AM_NO_UPDATE_CHECK each turn off both the background check and the update notice.
@@ -44,6 +58,13 @@ export function updateHint(state, current, scriptPath, now = Date.now()) {
   if (!newer(state.latestVersion, current)) return null;
   if (state.lastUpdateHint && now - state.lastUpdateHint < UPDATE.hintEveryDays * DAY) return null;
   return `! Update hint: Answer me with HTML ${state.latestVersion} is available (current ${current}). Ask the user whether to update: ${updateCommand(scriptPath)}.`;
+}
+
+// The new-version button on the page: { latest, current, command } when a newer version is known, else null. Unlike updateHint it
+// is not throttled: the button is quiet until the user clicks it, so every page made while this copy is out of date carries it.
+export function pageUpdate(state, current, scriptPath, env, config) {
+  if (!updateEnabled(env, config) || !newer(state.latestVersion, current)) return null;
+  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)] };
 }
 
 export function shouldCheckUpdate(state, env, config, now = Date.now()) {

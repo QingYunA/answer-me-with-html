@@ -17,12 +17,13 @@ import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
-import { runUpdateCheck } from './update.js';
+import { runUpdateCheck, pageUpdate } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { ensureHome } from './home.js';
 import { hasCommand } from './sys.js';
 import { loadMath } from './math-load.js';
 import { replacePanel, PatchError } from './patch.js';
+import { readState } from './state.js';
 import { readPage } from './page.js';
 import { readEmbeddedImages } from './images.js';
 import { readEmbeddedCode, MAX_CODE_LINES, LONG_CODE_LINES } from './code.js';
@@ -311,7 +312,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   await loadMath(src);
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd() });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx) });
   } catch (e) {
     return reportError(e, fail);
   }
@@ -324,6 +325,9 @@ async function cmdRender(src, opts, ctx, baseDir) {
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
   return finish(file, held ? { ...opts, 'no-open': true } : opts, config, ctx);
 }
+
+// The new-version button for the page, from the version the background check last saw (src/update.js).
+const updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 
 const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 
@@ -444,7 +448,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html) });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx) });
     }
   } catch (e) {
     if (e instanceof TtsError) {
