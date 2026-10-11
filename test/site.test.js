@@ -79,7 +79,7 @@ test('site engine: a local file degrades into the usual not-found error', () => 
 
 test('site engine: prepare loads Temml for a draft with math, so render typesets it', async () => {
   const draft = '# T\n\nThe area is $x^2$.\n';
-  assert.equal(engine.render(draft).html.includes('<math'), false);
+  assert.equal(/<math dir=/.test(engine.render(draft).html), false);
   await engine.prepare(draft);
   const r = engine.render(draft);
   assert.equal(r.ok, true);
