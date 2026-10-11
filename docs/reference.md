@@ -34,7 +34,7 @@ Full syntax for a component: `am help <component>`.
 
 Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload.
 
-The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block or table, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
+The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
 For a decision the reader must make, write an `ask` block in the panel it changes:
 
@@ -123,6 +123,7 @@ $$
 - Math works in the text of paragraphs, lists, tables, quotes, headings, callouts, `kv`, `ask`, `timeline` and `tree`. Code spans, code blocks, diagrams (`flow`, `er`, `sequence` and the others) and `am video` take no math. In a table cell write `\vert x \vert`, not `|x|`.
 - If Temml cannot read the TeX, the page is still written. The formula shows as raw TeX in red and monospace (the message is in its tooltip), and the render prints a warning with the draft line, like `L12 [math] $\foo$ is shown as raw TeX: ...`. A page with a math warning does not open; fix the TeX and render again with `--replace`.
 - `\ref`, `\eqref` and `\label` need a script that the page does not have. They give a warning and show nothing. `\tag{1}` works in a `$$` block.
+- A Remark or a Reply quotes a formula as the TeX you wrote, with its `$` or `$$`: `Energy $E = mc^2$ holds`.
 - The writing check skips the TeX.
 
 Syntax in the CLI: `am help format`.
