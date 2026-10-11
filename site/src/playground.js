@@ -36,8 +36,9 @@ const pick = (all, key) => (UI.lang === 'zh' && all[`${key}.zh`]) || all[key] ||
 
 // render() never throws for draft errors; a bug in the renderer becomes an error result too.
 async function renderDraft(source, overrides) {
-  const { render } = await engine();
+  const { render, prepare } = await engine();
   try {
+    await prepare(source);
     return render(source, overrides);
   } catch (err) {
     return { ok: false, ms: 0, error: { name: 'Error', message: String(err?.message || err) } };

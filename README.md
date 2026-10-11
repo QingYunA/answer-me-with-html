@@ -287,7 +287,13 @@ There are two runtime dependencies: [marked](https://github.com/markedjs/marked)
 
 ## Community
 
-Discussion and feedback also happen on [LINUX DO](https://linux.do), a Chinese-language developer forum.
+Ask questions, share pages you made, suggest features, or just say hi.
+
+- [Discord](https://discord.gg/sYQuRRZNzQ)
+- QQ group: `1127099407`
+- [LINUX DO](https://linux.do), a Chinese-language developer forum
+
+Found a bug? Please open a [GitHub issue](https://github.com/QingYunA/answer-me-with-html/issues).
 
 ## Star History
 

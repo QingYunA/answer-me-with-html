@@ -286,7 +286,13 @@ npm run snapshot  # 与 origin/main 对比生成的 HTML（重构不能改变它
 
 ## 社区
 
-也欢迎到 [LINUX DO](https://linux.do) 讨论和反馈。
+有问题、想分享做出来的页面、有功能建议，或者只是想打个招呼，都欢迎来。
+
+- [Discord](https://discord.gg/sYQuRRZNzQ)
+- QQ 群：`1127099407`
+- [LINUX DO](https://linux.do) 中文开发者论坛
+
+发现 bug 请提 [GitHub issue](https://github.com/QingYunA/answer-me-with-html/issues)。
 
 ## Star 历史
 

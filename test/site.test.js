@@ -77,6 +77,16 @@ test('site engine: a local file degrades into the usual not-found error', () => 
   assert.match(r.error.message, /not found/);
 });
 
+test('site engine: prepare loads Temml for a draft with math, so render typesets it', async () => {
+  const draft = '# T\n\nThe area is $x^2$.\n';
+  assert.equal(engine.render(draft).html.includes('<math'), false);
+  await engine.prepare(draft);
+  const r = engine.render(draft);
+  assert.equal(r.ok, true);
+  assert.match(r.html, /<math dir="ltr"/);
+  assert.match(r.html, /@font-face[^}]*Temml/);
+});
+
 test('site engine: lint checks plain prose with lines counted in the text', () => {
   const warnings = engine.lint('This method is utilized prior to the request.', 'en');
   assert.ok(warnings.some((w) => w.rule === 'word' && w.line === 1), JSON.stringify(warnings));
