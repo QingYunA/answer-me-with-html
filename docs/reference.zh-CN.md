@@ -238,6 +238,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | :--- | :--- |
 | `npx skills add` | `npx skills update answer-me-with-html -y`，或直接对 Agent 说"更新一下 answer-me-with-html" |
 | `git clone` + `npm link` | 在仓库目录运行 `git pull && npm install` |
+| DeepSeek Harness 插件 | `dsh plugin --profile <profile> up <package>`；更新提示会自动填好 profile 和包名 |
 | Claude Code 插件 | 终端运行 `claude plugin update answer-me-with-html@answer-me-with-html`（或在 `/plugin` → Installed 里点 Update now），再 `/reload-plugins`。想自动更新，就在 `/plugin` → Marketplaces 里给这个插件市场打开自动更新。第三方插件市场默认不自动更新 |
 
 **清理**：页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录超过 200 MB，或超过 20 MB 且 30 天没清理过，Agent 会问你要不要清理，每周最多问一次。没有你的同意，什么都不会删。

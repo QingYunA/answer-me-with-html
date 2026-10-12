@@ -284,9 +284,14 @@ test('updateCommand: gives the exact dsh command, with the profile and package r
   // A scoped package keeps its scope, so the name stays the one `dsh plugin` takes.
   assert.match(updateCommand('/Users/u/.dsh/profiles/web/node_modules/@wjvalue/dsh-answer-me-with-html/skills/a/scripts/am.mjs'),
     /run dsh plugin --profile web up @wjvalue\/dsh-answer-me-with-html/);
-  // A DSH-looking path that does not parse falls back to the placeholders.
+  // A one-letter package name is still a package name.
   assert.equal(updateCommand('/Users/u/.dsh/profiles/web/node_modules/a/skills/x/scripts/am.mjs'),
     'run dsh plugin --profile web up a');
+  // A name that is not plain never goes into a command the agent runs: it becomes a placeholder.
+  assert.equal(updateCommand('/Users/u/.dsh/profiles/my web/node_modules/am;rm -rf ~/skills/x/scripts/am.mjs'),
+    'run dsh plugin --profile <profile> up <package>');
+  assert.equal(updateCommand('/Users/u/.dsh/profiles/web/node_modules/$(id)/skills/x/scripts/am.mjs'),
+    'run dsh plugin --profile web up <package>');
   // Windows-style separators classify the same way.
   assert.match(updateCommand('C:\\Users\\u\\.dsh\\profiles\\web\\node_modules\\answer-me-with-html\\skills\\a\\scripts\\am.mjs'),
     /run dsh plugin --profile web up answer-me-with-html/);

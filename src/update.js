@@ -67,10 +67,14 @@ export function installMethod(scriptPath = '') {
 // The DSH profile and package name, from ~/.dsh/profiles/<profile>/node_modules/<package>/… — null when
 // the path does not parse (a linked copy outside a profile, or a layout that changed).
 const DSH_PATH = /[\\/]\.dsh[\\/]profiles[\\/]([^\\/]+)[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/;
+// Only plain names go into a command the agent runs or the user pastes; anything else stays a placeholder.
+const PROFILE_NAME = /^[\w.-]+$/;
+const PACKAGE_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i;
 function dshUpdateCommand(scriptPath = '') {
   const m = scriptPath.match(DSH_PATH);
   if (!m) return UPDATE_COMMANDS.dsh;
-  return `dsh plugin --profile ${m[1]} up ${m[2]}`;
+  const pkg = m[2].replace(/\\/g, '/');
+  return `dsh plugin --profile ${PROFILE_NAME.test(m[1]) ? m[1] : '<profile>'} up ${PACKAGE_NAME.test(pkg) ? pkg : '<package>'}`;
 }
 
 // Give the update command for the install method, as an instruction for the Agent.
