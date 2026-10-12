@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync3, existsSync as existsSync6, rmSync as rmSync6 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, mkdirSync as mkdirSync3, existsSync as existsSync6, rmSync as rmSync6 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.2";
@@ -603,6 +603,7 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
   }
 })();
 `;
+var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // history.state survives a reload, so the page comes back where the reader was.\n  try {\n    const y = history.state?.amScrollY;\n    if (Number.isFinite(y)) addEventListener('load', () => scrollTo(0, y), { once: true });\n  } catch {\n    // No history state in this browser: the page opens at the top.\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    try {\n      history.replaceState({ ...history.state, amScrollY: scrollY }, '');\n    } catch {\n      // Without history state the page reloads at the top.\n    }\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n  });\n})();\n";
 var VIDEO_CSS = `/* Video player: the 1920\xD71080 stage scales to the window. All colors come from theme variables.
    Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
 html[data-video] {
@@ -795,6 +796,7 @@ var zh_default = {
     done: "\u5DF2\u590D\u5236 \u2713",
     copyCode: "\u590D\u5236",
     update: { button: "\u65B0\u7248\u672C {version}", current: "\u5F53\u524D {current}\u3002\u751F\u6210\u6B64\u9875\u65F6\u68C0\u6D4B\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u8FD9\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7EC8\u7AEF\u8FD0\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8BC9 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5185\u5BB9" },
+    live: { updated: "\u9875\u9762\u5DF2\u66F4\u65B0", reload: "\u5237\u65B0" },
     reply: {
       button: "\u56DE\u590D",
       comment: "\u8BC4\u8BBA",
@@ -866,6 +868,7 @@ var zh_Hant_default = {
     done: "\u5DF2\u8907\u88FD \u2713",
     copyCode: "\u8907\u88FD",
     update: { button: "\u65B0\u7248\u672C {version}", current: "\u76EE\u524D {current}\u3002\u7522\u751F\u6B64\u9801\u6642\u5075\u6E2C\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u9019\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7D42\u7AEF\u6A5F\u57F7\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8A34 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5167\u5BB9" },
+    live: { updated: "\u9801\u9762\u5DF2\u66F4\u65B0", reload: "\u91CD\u65B0\u6574\u7406" },
     reply: {
       button: "\u56DE\u8986",
       comment: "\u8A55\u8AD6",
@@ -931,6 +934,7 @@ var en_default = {
     done: "Copied \u2713",
     copyCode: "Copy",
     update: { button: "New version {version}", current: "You have {current}. Found when this page was made.", whatsNew: "What's new:", run: "Run in a terminal:", agent: "Or tell your agent:", agentText: "Update answer-me-with-html", notes: "See what's new" },
+    live: { updated: "Page updated", reload: "Reload" },
     reply: {
       button: "Reply",
       comment: "Comment",
@@ -1002,6 +1006,7 @@ var ja_default = {
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     copyCode: "\u30B3\u30D4\u30FC",
     update: { button: "\u65B0\u30D0\u30FC\u30B8\u30E7\u30F3 {version}", current: "\u73FE\u5728\u306F {current}\u3002\u3053\u306E\u30DA\u30FC\u30B8\u306E\u4F5C\u6210\u6642\u306B\u898B\u3064\u304B\u308A\u307E\u3057\u305F\u3002", whatsNew: "\u4ECA\u56DE\u306E\u66F4\u65B0\uFF1A", run: "\u30BF\u30FC\u30DF\u30CA\u30EB\u3067\u5B9F\u884C\uFF1A", agent: "\u307E\u305F\u306F Agent \u306B\u4F1D\u3048\u308B\uFF1A", agentText: "answer-me-with-html \u3092\u66F4\u65B0\u3057\u3066", notes: "\u66F4\u65B0\u5185\u5BB9\u3092\u898B\u308B" },
+    live: { updated: "\u30DA\u30FC\u30B8\u304C\u66F4\u65B0\u3055\u308C\u307E\u3057\u305F", reload: "\u518D\u8AAD\u307F\u8FBC\u307F" },
     reply: {
       button: "\u8FD4\u4FE1",
       comment: "\u30B3\u30E1\u30F3\u30C8",
@@ -1071,6 +1076,7 @@ var he_default = {
     done: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
     copyCode: "\u05D4\u05E2\u05EA\u05E7\u05D4",
     update: { button: "\u05D2\u05E8\u05E1\u05D4 \u05D7\u05D3\u05E9\u05D4 {version}", current: "\u05D4\u05D2\u05E8\u05E1\u05D4 \u05E9\u05DC\u05DB\u05DD {current}. \u05D4\u05D2\u05E8\u05E1\u05D4 \u05D4\u05D7\u05D3\u05E9\u05D4 \u05E0\u05DE\u05E6\u05D0\u05D4 \u05DB\u05E9\u05D4\u05D3\u05E3 \u05E0\u05D5\u05E6\u05E8.", whatsNew: "\u05DE\u05D4 \u05D7\u05D3\u05E9 \u05D1\u05D2\u05E8\u05E1\u05D4:", run: "\u05D4\u05E8\u05D9\u05E6\u05D5 \u05D1\u05D8\u05E8\u05DE\u05D9\u05E0\u05DC:", agent: "\u05D0\u05D5 \u05D1\u05E7\u05E9\u05D5 \u05DE\u05D4-Agent:", agentText: "\u05E2\u05D3\u05DB\u05DF \u05D0\u05EA answer-me-with-html", notes: "\u05DE\u05D4 \u05D7\u05D3\u05E9" },
+    live: { updated: "\u05D4\u05D3\u05E3 \u05E2\u05D5\u05D3\u05DB\u05DF", reload: "\u05E8\u05E2\u05E0\u05D5\u05DF" },
     reply: {
       button: "\u05EA\u05D2\u05D5\u05D1\u05D4",
       comment: "\u05D4\u05E2\u05E8\u05D4",
@@ -7753,9 +7759,9 @@ function readSlice(ref, range, baseDir) {
   }
   let size;
   try {
-    const stat = statSync2(path);
-    if (!stat.isFile()) throw new CodeError(`"${ref}" is not a file`);
-    size = stat.size;
+    const stat2 = statSync2(path);
+    if (!stat2.isFile()) throw new CodeError(`"${ref}" is not a file`);
+    size = stat2.size;
   } catch (err) {
     if (err instanceof CodeError) throw err;
     return null;
@@ -7836,8 +7842,8 @@ function renderDiff(text, opts, { copyButton, long }) {
   if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not a new-side line of the diff`);
   const file = opts.file ?? diff.title;
   const shownLang = extname2(file).slice(1).toLowerCase() || "diff";
-  const stat = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">\u2212${diff.del}</span></span>`;
-  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ""}>${esc(opts.title ?? file)}</span>${stat}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
+  const stat2 = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">\u2212${diff.del}</span></span>`;
+  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ""}>${esc(opts.title ?? file)}</span>${stat2}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
   const html = `<figure class="am-codeblock am-codeblock--diff">${head}<pre class="am-code am-code--diff${diff.numbered ? " am-code--dnum" : ""}"><code data-lang="${esc(shownLang)}">${diffRowsHtml(diff, hl)}</code></pre></figure>`;
   return { html, file: null, warnings: [...diff.warnings, ...long] };
 }
@@ -9292,8 +9298,8 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5 } from "node:fs";
-import { lstat, realpath, readFile } from "node:fs/promises";
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5, watch } from "node:fs";
+import { lstat, realpath, readFile, stat } from "node:fs/promises";
 import { join as join8, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
@@ -9301,6 +9307,8 @@ var LAN_BIND = "0.0.0.0";
 var TOKEN_LENGTH = 22;
 var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
+var EVENTS = "e";
+var SETTLE_MS = 150;
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
 function lanRank(address) {
   const [a, b] = address.split(".").map(Number);
@@ -9438,7 +9446,114 @@ async function resolvePage(home, dir, file) {
     return null;
   }
 }
-function handler(home, secret, allowedHosts) {
+function withLiveReload(html, eventPath) {
+  const lang = /<html\b[^>]*?\slang="([^"]*)"/.exec(html)?.[1];
+  const { ui } = resolveLanguage({ declared: lang });
+  const data = JSON.stringify({ url: eventPath, ui: ui.live }).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const script = `<script data-live="${data}">
+${LIVE_JS}</script>
+`;
+  const at3 = html.lastIndexOf("</body>");
+  return at3 === -1 ? html + script : html.slice(0, at3) + script + html.slice(at3);
+}
+function liveStreams(home) {
+  const streams = /* @__PURE__ */ new Map();
+  const seen = /* @__PURE__ */ new Map();
+  let watcher = null;
+  let timer = null;
+  let running = false;
+  let again = false;
+  const version = async (file) => {
+    try {
+      const s = await stat(await resolvePage(home, "pages", file));
+      return `${s.mtimeMs}:${s.size}:${s.ino}`;
+    } catch {
+      return null;
+    }
+  };
+  const compare = async () => {
+    for (const [file, open] of streams) {
+      const now = await version(file);
+      if (now === null || now === seen.get(file)) continue;
+      seen.set(file, now);
+      for (const res of open) if (!res.writableEnded) res.write("event: changed\ndata: changed\n\n");
+    }
+  };
+  const run2 = async () => {
+    timer = null;
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      do {
+        again = false;
+        await compare();
+      } while (again);
+    } catch {
+    } finally {
+      running = false;
+    }
+  };
+  const settle2 = () => {
+    clearTimeout(timer);
+    timer = setTimeout(run2, SETTLE_MS);
+  };
+  const startWatching = () => {
+    if (watcher) return;
+    try {
+      watcher = watch(join8(home, "pages"), settle2);
+    } catch {
+      return;
+    }
+    watcher.on("error", () => {
+      watcher?.close();
+      watcher = null;
+    });
+  };
+  return {
+    // The headers go out only after the page's version is recorded, so a change right after the stream opens is not missed.
+    async open(file, res, headers) {
+      startWatching();
+      const now = await version(file);
+      if (res.destroyed) return;
+      if (!streams.has(file)) {
+        streams.set(file, /* @__PURE__ */ new Set());
+        seen.set(file, now);
+      }
+      streams.get(file).add(res);
+      res.on("close", () => {
+        const open = streams.get(file);
+        open?.delete(res);
+        if (open?.size === 0) {
+          streams.delete(file);
+          seen.delete(file);
+        }
+      });
+      res.writeHead(200, headers);
+      res.write(": open\n\n");
+    },
+    close() {
+      clearTimeout(timer);
+      watcher?.close();
+      watcher = null;
+      for (const open of streams.values()) for (const res of open) res.end();
+      streams.clear();
+    }
+  };
+}
+async function openEvents(req, res, home, file, live) {
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    return reply(req, res, 405, "text/plain; charset=utf-8", "Method not allowed\n");
+  }
+  const { origin, "sec-fetch-dest": dest } = req.headers;
+  if (origin !== void 0 && origin !== "null" || dest !== void 0 && dest !== "empty") return notFound(req, res);
+  if (!await resolvePage(home, "pages", file)) return notFound(req, res);
+  return live.open(file, res, { ...HEADERS, "Content-Type": "text/event-stream; charset=utf-8", "Access-Control-Allow-Origin": "null" });
+}
+function handler(home, secret, allowedHosts, live) {
   return async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
@@ -9449,7 +9564,8 @@ function handler(home, secret, allowedHosts) {
       const parts = req.url.split(/[?#]/)[0].split("/");
       if (parts.length !== 4 || parts[0] !== "") return notFound(req, res);
       const [, prefix, token, raw] = parts;
-      const dir = Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
+      const events = prefix === EVENTS;
+      const dir = events ? "pages" : Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
       if (!dir || !token || !raw) return notFound(req, res);
       let file;
       try {
@@ -9458,12 +9574,14 @@ function handler(home, secret, allowedHosts) {
         return notFound(req, res);
       }
       if (!validFileName(file) || !tokenMatches(secret, dir, file, token)) return notFound(req, res);
+      if (events) return await openEvents(req, res, home, file, live);
       const dest = req.headers["sec-fetch-dest"];
       if (dest !== void 0 && dest !== "document") return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
       const html = await readFile(real);
-      const body = LOOPBACK_HOST.test(req.headers.host) ? html : withoutUpdateNotice(html.toString("utf8"));
+      const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString("utf8") : withoutUpdateNotice(html.toString("utf8"));
+      const body = dir === "pages" ? withLiveReload(page, `/${EVENTS}/${token}/${raw}`) : page;
       return reply(req, res, 200, "text/html; charset=utf-8", body);
     } catch {
       return notFound(req, res);
@@ -9492,7 +9610,8 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const running = readServeInfo(home);
   if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString("hex");
-  const server = createServer(handler(home, secret, allowedHosts));
+  const live = liveStreams(home);
+  const server = createServer(handler(home, secret, allowedHosts, live));
   await new Promise((done, fail) => {
     server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : e));
     server.listen(port, lan ? LAN_BIND : HOST, done);
@@ -9510,6 +9629,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const close = () => {
     closed ??= new Promise((done) => {
       removeInfo(home, secret);
+      live.close();
       server.close(() => done());
       server.closeAllConnections();
     });
@@ -10037,7 +10157,13 @@ function writePage(file, html, env) {
   const home = resolve4(amHome(env));
   if (resolve4(file).startsWith(home + sep3)) ensureHome(home);
   mkdirSync3(dirname3(file), { recursive: true });
-  writeFileSync6(file, html);
+  const tmp = join9(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
+  try {
+    writeFileSync6(tmp, html);
+    renameSync4(tmp, file);
+  } finally {
+    rmSync6(tmp, { force: true });
+  }
 }
 function emit(result, file, { print, env }, note2 = "") {
   writePage(file, result.html, env);

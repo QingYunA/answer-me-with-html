@@ -21,6 +21,7 @@ export default {
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
     copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',
     update: { button: '新版本 {version}', current: '目前 {current}。產生此頁時偵測到新版本。', whatsNew: '這次更新：', run: '在終端機執行：', agent: '或者告訴 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新內容' },
+    live: { updated: '頁面已更新', reload: '重新整理' },
     reply: {
       button: '回覆', comment: '評論', commentHint: '對這個面板的意見', title: '你的回覆',
       hint: '複製後貼到對話裡。', copy: '複製回覆', close: '關閉', suggested: '建議',

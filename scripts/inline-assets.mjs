@@ -24,6 +24,7 @@ export const inlineAssets = {
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
         `export const UPDATE_CSS = ${JSON.stringify(read('../src/themes/update.css'))};`,
         `export const UPDATE_JS = ${JSON.stringify(read('../src/runtime/update.js'))};`,
+        `export const LIVE_JS = ${JSON.stringify(read('../src/runtime/live.js'))};`,
         `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,
         `export const VIDEO_JS = ${JSON.stringify(read('../src/runtime/video.js'))};`,
         `export const VIDEO_EXPORT_JS = ${JSON.stringify(read('../src/runtime/video-export.js'))};`,

@@ -229,6 +229,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 - Treat a link as the password of its page: anyone who can reach the port and has the link can open the page, including other users of the same machine. Share it only with yourself.
 - Give the tunnel a local port of its own. Do not reuse a port where you opened pages from another server or another host: a page from that other server could have left a service worker in your browser for that address, and it would see the pages served there later.
 - Each page opens in a browser sandbox of its own, so a script in one page cannot read another. Because of that, Reply answers, comments and remarks on an `http://` link last only until you close the page: copy the reply before you close it.
+- An open page reloads by itself when its file changes, for example after `am patch` or a new render to the same file, and keeps its scroll position. If you have already answered, commented or marked something on the page, it does not reload; it shows "Page updated · Reload" instead, so you can copy your reply first. The server adds this to the pages it sends, not to the files: a page opened from `file://` does not reload. The page listens on `/e/<token>/<file>` with the token of its own link, and that link carries only "changed", never the page.
 
 ## Updating and cleaning up
 

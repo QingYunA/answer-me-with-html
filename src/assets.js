@@ -17,6 +17,7 @@ export const MATH_CSS = composeMathCss(read('./themes/math.css'));
 export const DELTA_JS = read('./runtime/delta.js');
 export const UPDATE_CSS = read('./themes/update.css');
 export const UPDATE_JS = read('./runtime/update.js');
+export const LIVE_JS = read('./runtime/live.js');
 export const VIDEO_CSS = read('./themes/video.css');
 export const VIDEO_JS = read('./runtime/video.js');
 export const VIDEO_EXPORT_JS = read('./runtime/video-export.js');

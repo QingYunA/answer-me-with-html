@@ -14,6 +14,7 @@ export default {
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     copy: 'Copy source', done: 'Copied ✓', copyCode: 'Copy',
     update: { button: 'New version {version}', current: 'You have {current}. Found when this page was made.', whatsNew: "What's new:", run: 'Run in a terminal:', agent: 'Or tell your agent:', agentText: 'Update answer-me-with-html', notes: "See what's new" },
+    live: { updated: 'Page updated', reload: 'Reload' },
     reply: {
       button: 'Reply', comment: 'Comment', commentHint: 'Your comment on this panel', title: 'Your reply',
       hint: 'Copy it and paste it into the chat.', copy: 'Copy reply', close: 'Close', suggested: 'suggested',

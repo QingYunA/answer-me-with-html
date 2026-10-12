@@ -1,7 +1,7 @@
 // am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { VERSION } from './assets.js';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -548,11 +548,18 @@ function outputPath(dir, title, opts, { env, io }) {
 }
 
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
+// The page is written to a temp file and renamed over the old one, so am serve (src/serve.js) never reloads a half-written page.
 function writePage(file, html, env) {
   const home = resolve(amHome(env));
   if (resolve(file).startsWith(home + sep)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, html);
+  const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
+  try {
+    writeFileSync(tmp, html);
+    renameSync(tmp, file);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
 }
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.

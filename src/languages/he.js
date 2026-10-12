@@ -20,6 +20,7 @@ export default {
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
     copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',
     update: { button: 'גרסה חדשה {version}', current: 'הגרסה שלכם {current}. הגרסה החדשה נמצאה כשהדף נוצר.', whatsNew: 'מה חדש בגרסה:', run: 'הריצו בטרמינל:', agent: 'או בקשו מה-Agent:', agentText: 'עדכן את answer-me-with-html', notes: 'מה חדש' },
+    live: { updated: 'הדף עודכן', reload: 'רענון' },
     reply: {
       button: 'תגובה', comment: 'הערה', commentHint: 'ההערה שלך על החלק הזה', title: 'התגובה שלך',
       hint: 'העתיקו והדביקו אותה בצ׳אט.', copy: 'העתקת התגובה', close: 'סגירה', suggested: 'מומלץ',

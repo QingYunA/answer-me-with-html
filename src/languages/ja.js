@@ -22,6 +22,7 @@ export default {
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     copy: '原稿をコピー', done: 'コピーしました ✓', copyCode: 'コピー',
     update: { button: '新バージョン {version}', current: '現在は {current}。このページの作成時に見つかりました。', whatsNew: '今回の更新：', run: 'ターミナルで実行：', agent: 'または Agent に伝える：', agentText: 'answer-me-with-html を更新して', notes: '更新内容を見る' },
+    live: { updated: 'ページが更新されました', reload: '再読み込み' },
     reply: {
       button: '返信', comment: 'コメント', commentHint: 'このパネルへのコメント', title: 'あなたの返信',
       hint: 'コピーしてチャットに貼り付けてください。', copy: '返信をコピー', close: '閉じる', suggested: '推奨',
