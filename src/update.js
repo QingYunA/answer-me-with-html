@@ -47,18 +47,30 @@ export function newer(a, b) {
   return i !== -1 && pa[i] > pb[i];
 }
 
-// The update command for each install method, as the user types it.
+// The update command for each install method, as the user types it. dsh needs the
+// profile and the package name, so it is filled in by dshUpdateCommand.
 export const UPDATE_COMMANDS = Object.freeze({
   plugin: 'claude plugin update answer-me-with-html@answer-me-with-html',
   repo: 'git pull && npm install',
   skills: 'npx skills update answer-me-with-html -y',
+  dsh: 'dsh plugin --profile <profile> up <package>',
 });
 
 // How this copy was installed. scriptPath is the path of the running am script.
 export function installMethod(scriptPath = '') {
   if (/[\\/]\.claude[\\/]plugins[\\/]/.test(scriptPath)) return 'plugin';
   if (/[\\/]bin[\\/]am\.js$/.test(scriptPath)) return 'repo';
+  if (/[\\/]\.dsh[\\/]profiles[\\/][^\\/]+[\\/]node_modules[\\/]/.test(scriptPath)) return 'dsh';
   return 'skills';
+}
+
+// The DSH profile and package name, from ~/.dsh/profiles/<profile>/node_modules/<package>/… — null when
+// the path does not parse (a linked copy outside a profile, or a layout that changed).
+const DSH_PATH = /[\\/]\.dsh[\\/]profiles[\\/]([^\\/]+)[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+)/;
+function dshUpdateCommand(scriptPath = '') {
+  const m = scriptPath.match(DSH_PATH);
+  if (!m) return UPDATE_COMMANDS.dsh;
+  return `dsh plugin --profile ${m[1]} up ${m[2]}`;
 }
 
 // Give the update command for the install method, as an instruction for the Agent.
@@ -68,6 +80,7 @@ export function updateCommand(scriptPath = '') {
     return `run ${UPDATE_COMMANDS.plugin} in a terminal (or click Update now on the Installed tab of /plugin), then /reload-plugins`;
   }
   if (method === 'repo') return `run ${UPDATE_COMMANDS.repo} in the answer-me-with-html repository`;
+  if (method === 'dsh') return `run ${dshUpdateCommand(scriptPath)}`;
   return `run ${UPDATE_COMMANDS.skills}`;
 }
 
@@ -85,7 +98,8 @@ export function updateHint(state, current, scriptPath, now = Date.now()) {
 export function pageUpdate(state, current, scriptPath, env, config) {
   if (!updateEnabled(env, config) || !newer(state.latestVersion, current)) return null;
   const highlights = parseHighlights({ ...state.latestHighlights, version: state.latestVersion }, state.latestVersion);
-  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)], highlights };
+  const command = installMethod(scriptPath) === 'dsh' ? dshUpdateCommand(scriptPath) : UPDATE_COMMANDS[installMethod(scriptPath)];
+  return { latest: state.latestVersion, current, command, highlights };
 }
 
 export function shouldCheckUpdate(state, env, config, now = Date.now()) {
