@@ -182,7 +182,8 @@ Is $n$ big?
   const reply = await evaluate(`(() => {
     const pop = document.querySelector('.am-remark-pop');
     document.querySelector('[data-am="remark"]').click();
-    for (const el of document.querySelectorAll('main p, main li, main div.am-math-block')) {
+    // The blocks remark mode marks: the page header (title, colophon) is not one of them.
+    for (const el of document.querySelectorAll('main p:not(.am-head *), main li, main div.am-math-block')) {
       el.click();
       [...pop.querySelectorAll('.am-remark-kind')].find((b) => b.dataset.kind === 'question').click();
       pop.querySelector('.am-btn').click();
