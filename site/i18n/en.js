@@ -314,6 +314,8 @@ export default {
   i_agent_note: '<a href="https://github.com/QingYunA/answer-me-with-html/blob/main/INSTALL.md">INSTALL.md</a> is written for agents. It keeps an existing install, asks you nothing, and ends with one report after it checks the result with the TCP page.',
   i_plugin: 'Claude Code plugin',
   i_plugin_d: 'Run these two commands inside Claude Code:',
+  i_dsh_d: 'Run this in a terminal. It installs the skill as a DeepSeek Harness plugin:',
+  i_dsh_note: 'Use the profile you run in; <code>web</code> is the shipped one. The skill is available in the next session.',
   i_npx_d: 'It asks which agents to install into. The installer, <a href="https://github.com/vercel-labs/skills">vercel-labs/skills</a>, supports more than 70 agents.',
   i_manual: 'Manual',
   i_manual_d: 'Copy the <code>skills/answer-me-with-html</code> folder into your agent’s skill folder. For Claude Code:',

@@ -20,7 +20,7 @@
 <p align="center">
   <a href="https://github.com/QingYunA/answer-me-with-html/releases"><img src="https://img.shields.io/github/v/release/QingYunA/answer-me-with-html?style=flat-square&logo=github&labelColor=16181d&color=2ea44f" alt="Release"></a>
   <a href="https://github.com/QingYunA/answer-me-with-html/stargazers"><img src="https://img.shields.io/github/stars/QingYunA/answer-me-with-html?style=flat-square&logo=github&labelColor=16181d&color=2ea44f" alt="Stars"></a>
-  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20OpenCode%20%C2%B7%20Pi-2ea44f?style=flat-square&labelColor=16181d" alt="Works with Claude Code, Codex, Cursor, OpenCode, Pi">
+  <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20OpenCode%20%C2%B7%20Pi%20%C2%B7%20DeepSeek%20Harness-2ea44f?style=flat-square&labelColor=16181d" alt="Works with Claude Code, Codex, Cursor, OpenCode, Pi, DeepSeek Harness">
   <a href="https://www.theagenticleaderboard.com/alternatives/answer-me-with-html/"><img src="https://www.theagenticleaderboard.com/badges/new/answer-me-with-html.svg" alt="The New 100"></a>
 </p>
 
@@ -91,6 +91,14 @@ Run this inside Claude Code:
 /plugin install answer-me-with-html@answer-me-with-html
 ```
 
+### DeepSeek Harness plugin
+
+Run this in a terminal, with the profile you run in (`web` is the shipped one):
+
+```bash
+dsh plugin --profile web add github:QingYunA/answer-me-with-html
+```
+
 ### One command
 
 ```bash
@@ -98,8 +106,6 @@ npx skills add QingYunA/answer-me-with-html
 ```
 
 It asks which agents to install into. The installer, [vercel-labs/skills](https://github.com/vercel-labs/skills), supports more than 70 agents.
-
-For DeepSeek Harness (`dsh`): `dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html`.
 
 <details>
 <summary>Manual install</summary>

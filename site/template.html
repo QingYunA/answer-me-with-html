@@ -100,7 +100,7 @@
       <div><dt>{{tb_license}}</dt><dd class="mono">MIT</dd></div>
       <div><dt>{{tb_output}}</dt><dd>{{tb_output_v}}</dd></div>
       <div><dt>{{tb_file}}</dt><dd>{{tb_file_v}}</dd></div>
-      <div class="tb-wide"><dt>{{tb_works}}</dt><dd>Claude Code · Codex · Cursor · OpenCode · Pi</dd></div>
+      <div class="tb-wide"><dt>{{tb_works}}</dt><dd>Claude Code · Codex · Cursor · OpenCode · Pi · DeepSeek Harness</dd></div>
     </dl>
   </div>
 
@@ -557,6 +557,7 @@
       <div class="seg-tabs" role="tablist" aria-label="{{i_tabs}}">
         <button role="tab" type="button" id="it-agent" aria-controls="ip-agent" aria-selected="true">{{i_agent}} <span class="rec mono">{{i_rec}}</span></button>
         <button role="tab" type="button" id="it-plugin" aria-controls="ip-plugin" aria-selected="false" tabindex="-1">{{i_plugin}}</button>
+        <button role="tab" type="button" id="it-dsh" aria-controls="ip-dsh" aria-selected="false" tabindex="-1" title="DeepSeek Harness">DSH</button>
         <button role="tab" type="button" id="it-npx" aria-controls="ip-npx" aria-selected="false" tabindex="-1">npx skills</button>
         <button role="tab" type="button" id="it-manual" aria-controls="ip-manual" aria-selected="false" tabindex="-1">{{i_manual}}</button>
       </div>
@@ -569,6 +570,11 @@
         <p>{{i_plugin_d}}</p>
         <div class="copybox"><pre>/plugin marketplace add QingYunA/answer-me-with-html
 /plugin install answer-me-with-html@answer-me-with-html</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+      </div>
+      <div class="tab-panel" role="tabpanel" id="ip-dsh" aria-labelledby="it-dsh" hidden>
+        <p>{{i_dsh_d}}</p>
+        <div class="copybox"><pre>dsh plugin --profile web add github:QingYunA/answer-me-with-html</pre><button type="button" class="copy-btn" data-done="{{copied}}">{{copy}}</button></div>
+        <p class="fine">{{i_dsh_note}}</p>
       </div>
       <div class="tab-panel" role="tabpanel" id="ip-npx" aria-labelledby="it-npx" hidden>
         <p>{{i_npx_d}}</p>

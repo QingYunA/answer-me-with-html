@@ -516,6 +516,7 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 /* ── Sheet 10 · install ────────────────────────────────── */
 .install { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 48px); align-items: start; }
 .tabs .seg-tabs { margin-bottom: 18px; }
+.tabs .seg-tabs > button { padding-inline: 10px; }
 .rec { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 5px; margin-left: 4px; border: 1px solid currentColor; opacity: 0.85; }
 .tab-panel > p:first-child { margin: 0 0 12px; }
 .copybox { position: relative; border: var(--bw) solid var(--line); background: var(--code-bg); }

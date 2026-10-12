@@ -336,6 +336,8 @@ export default {
   i_agent_note: '<a href="https://github.com/QingYunA/answer-me-with-html/blob/main/INSTALL.md">INSTALL.md</a> 是写给 Agent 看的：已有安装会保留，全程不向你提问，最后用 TCP 页面验证一遍，给你一份汇报。',
   i_plugin: 'Claude Code 插件',
   i_plugin_d: '在 Claude Code 里依次执行：',
+  i_dsh_d: '在终端里执行，把 skill 装成 DeepSeek Harness 插件：',
+  i_dsh_note: '换成你在用的 profile，自带的是 <code>web</code>。下一个会话就能用。',
   i_npx_d: '它会问你装到哪个 Agent。安装器来自 <a href="https://github.com/vercel-labs/skills">vercel-labs/skills</a>，支持 70 多种 Agent。',
   i_manual: '手动安装',
   i_manual_d: '把 <code>skills/answer-me-with-html</code> 目录放进你的 Agent 的 skill 目录。以 Claude Code 为例：',
