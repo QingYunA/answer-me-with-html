@@ -1,28 +1,28 @@
 {
-  "version": "0.5.1",
+  "version": "0.5.2",
   "en": [
-    "Math: `$…$` and `$$` blocks are typeset in the page, offline",
-    "Remark mode: mark blocks on the page, and Reply carries them back",
-    "Share pages with other devices: `am serve --lan` or `--public-url`"
+    "Install as a DeepSeek Harness plugin: `dsh plugin add`",
+    "In DeepSeek Harness, open the page from a card in the sidebar",
+    "Remark mode: marks on a timeline stay when the window width changes"
   ],
   "zh": [
-    "数学公式：`$…$` 和 `$$` 块直接排版，不用联网",
-    "标注模式：在页面上标记段落，点「回复」一起带回给 Agent",
-    "把页面分享给其他设备：`am serve --lan` 或 `--public-url`"
+    "可以装成 DeepSeek Harness 插件：`dsh plugin add`",
+    "在 DeepSeek Harness 里，从侧边栏的卡片直接打开页面",
+    "标注模式：窗口宽度变化后，时间线上的标记不再丢失"
   ],
   "zh-Hant": [
-    "數學公式：`$…$` 和 `$$` 區塊直接排版，不用連網",
-    "標註模式：在頁面上標記段落，點「回覆」一起帶回給 Agent",
-    "把頁面分享給其他裝置：`am serve --lan` 或 `--public-url`"
+    "可以裝成 DeepSeek Harness 外掛：`dsh plugin add`",
+    "在 DeepSeek Harness 裡，從側邊欄的卡片直接開啟頁面",
+    "標註模式：視窗寬度變化後，時間軸上的標記不再遺失"
   ],
   "ja": [
-    "数式：`$…$` と `$$` ブロックをページ内でオフライン組版",
-    "注記モード：ページ上のブロックに印を付け、「返信」で Agent に返す",
-    "他の端末とページを共有：`am serve --lan` または `--public-url`"
+    "DeepSeek Harness のプラグインとしてインストール：`dsh plugin add`",
+    "DeepSeek Harness では、サイドバーのカードからページを開ける",
+    "注記モード：ウィンドウ幅が変わってもタイムラインの印が消えない"
   ],
   "he": [
-    "נוסחאות: `$…$` ובלוקי `$$` מסודרים בדף, בלי רשת",
-    "מצב סימון: סמנו קטעים בדף, ו״תגובה״ מחזירה אותם ל-Agent",
-    "שיתוף דפים עם מכשירים אחרים: `am serve --lan` או `--public-url`"
+    "התקנה כתוסף של DeepSeek Harness: `dsh plugin add`",
+    "ב-DeepSeek Harness פותחים את הדף מכרטיס בסרגל הצד",
+    "מצב סימון: סימונים בציר זמן נשמרים כשרוחב החלון משתנה"
   ]
 }
