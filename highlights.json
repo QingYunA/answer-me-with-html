@@ -1,28 +1,28 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "en": [
-    "New `er` component for entity relationship diagrams",
-    "Right-to-left pages for Hebrew, Arabic and more",
-    "Video player: chapters, speed control and export without ffmpeg"
+    "Math: `$…$` and `$$` blocks are typeset in the page, offline",
+    "Remark mode: mark blocks on the page, and Reply carries them back",
+    "Share pages with other devices: `am serve --lan` or `--public-url`"
   ],
   "zh": [
-    "新增 `er` 组件，画实体关系图",
-    "支持从右往左的页面，如希伯来语、阿拉伯语",
-    "视频播放器：章节、倍速，导出不再需要 ffmpeg"
+    "数学公式：`$…$` 和 `$$` 块直接排版，不用联网",
+    "标注模式：在页面上标记段落，点「回复」一起带回给 Agent",
+    "把页面分享给其他设备：`am serve --lan` 或 `--public-url`"
   ],
   "zh-Hant": [
-    "新增 `er` 元件，畫實體關係圖",
-    "支援從右往左的頁面，如希伯來語、阿拉伯語",
-    "影片播放器：章節、倍速，匯出不再需要 ffmpeg"
+    "數學公式：`$…$` 和 `$$` 區塊直接排版，不用連網",
+    "標註模式：在頁面上標記段落，點「回覆」一起帶回給 Agent",
+    "把頁面分享給其他裝置：`am serve --lan` 或 `--public-url`"
   ],
   "ja": [
-    "実体関連図を描く `er` コンポーネントを追加",
-    "ヘブライ語やアラビア語など、右から左に読むページに対応",
-    "動画プレーヤー：チャプター、再生速度、ffmpeg なしの書き出し"
+    "数式：`$…$` と `$$` ブロックをページ内でオフライン組版",
+    "注記モード：ページ上のブロックに印を付け、「返信」で Agent に返す",
+    "他の端末とページを共有：`am serve --lan` または `--public-url`"
   ],
   "he": [
-    "רכיב `er` חדש לתרשימי ישויות וקשרים",
-    "דפים מימין לשמאל: עברית, ערבית ועוד",
-    "נגן הווידאו: פרקים, שליטה במהירות וייצוא בלי ffmpeg"
+    "נוסחאות: `$…$` ובלוקי `$$` מסודרים בדף, בלי רשת",
+    "מצב סימון: סמנו קטעים בדף, ו״תגובה״ מחזירה אותם ל-Agent",
+    "שיתוף דפים עם מכשירים אחרים: `am serve --lan` או `--public-url`"
   ]
 }
