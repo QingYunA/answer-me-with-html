@@ -5,12 +5,34 @@
 (() => {
   const { url, ui } = JSON.parse(document.currentScript.dataset.live);
   if (!window.EventSource) return;
-  // history.state survives a reload, so the page comes back where the reader was.
-  try {
-    const y = history.state?.amScrollY;
-    if (Number.isFinite(y)) addEventListener('load', () => scrollTo(0, y), { once: true });
-  } catch {
-    // No history state in this browser: the page opens at the top.
+  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,
+  // so the position goes in window.name, which a reload keeps. It is read once and cleared, so the next page in this tab never sees it.
+  const SCROLL = /^am-scroll:(\d+)$/;
+  const saved = SCROLL.exec(window.name);
+  if (saved) {
+    window.name = '';
+    // Otherwise the browser's own restore runs after load and puts the page back at the top.
+    try {
+      history.scrollRestoration = 'manual';
+    } catch {
+      // Not settable here: the restore below may lose to the browser's.
+    }
+    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.
+    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.
+    const y = Number(saved[1]);
+    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    let until = 0;
+    const stop = () => { until = 0; };
+    const hold = () => {
+      if (Date.now() > until) return READER.forEach((type) => removeEventListener(type, stop, true));
+      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);
+      requestAnimationFrame(hold);
+    };
+    addEventListener('load', () => {
+      until = Date.now() + 1000;
+      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));
+      hold();
+    }, { once: true });
   }
   // Theme and mode are page settings, not the reader's input.
   let input = false;
@@ -22,11 +44,7 @@
   const hasInput = () => input || Boolean(window.__amRemarkData?.().length);
 
   const reload = () => {
-    try {
-      history.replaceState({ ...history.state, amScrollY: scrollY }, '');
-    } catch {
-      // Without history state the page reloads at the top.
-    }
+    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${Math.round(scrollY)}`;
     location.reload();
   };
   let notice = null;
