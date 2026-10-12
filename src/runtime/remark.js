@@ -16,9 +16,12 @@
   const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));
 
   const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text
+  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key
+  // does not change with the width of the window (#194).
+  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';
   const inlineBox = new WeakMap();
   const isInline = (el) => {
-    if (!inlineBox.has(el)) inlineBox.set(el, getComputedStyle(el).display.startsWith('inline'));
+    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));
     return inlineBox.get(el);
   };
   // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run

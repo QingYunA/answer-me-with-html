@@ -345,6 +345,29 @@ for (const [name, p] of Object.entries(PAGES)) {
       'C|p|Energy $E = mc^2$ holds.',
     ]);
   });
+
+  // Below 560 px a horizontal timeline shows its date and title inline (src/themes/base.css). The key must not change with it, or a mark
+  // made on a wide screen is lost on a narrow one (#194).
+  test(`remark (${name}): a timeline item has the same key in a narrow and a wide window`, { skip: SKIP }, async () => {
+    const keyAt = async (width) => {
+      await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      try {
+        await load(render(`${name}-width-${width}`, `---\ntitle: Remark check\nlang: ${p.tag}\n---\n## B Release\n\`\`\`timeline\n${p.step.join(' | ')}\n\`\`\`\n`));
+        return await evaluate(`(() => { ${PAGE_JS}
+          btn.click();
+          mark(at('li', ${JSON.stringify(p.step[1])}), 'keep', '');
+          return { when: getComputedStyle(document.querySelector('.am-tl-when')).display, key: stored()[0].key };
+        })()`);
+      } finally {
+        await send('Emulation.clearDeviceMetricsOverride', {});
+      }
+    };
+    const narrow = await keyAt(480);
+    const wide = await keyAt(1440);
+    assert.deepEqual([narrow.when, wide.when], ['inline', 'block'], 'the two widths show the two timeline layouts');
+    assert.equal(narrow.key, `B|li|${p.step.join(' ')}`);
+    assert.equal(wide.key, narrow.key);
+  });
 }
 
 // `am serve` opens a page in a sandbox without allow-same-origin, where reading localStorage throws. Reply persistence already survives that.
