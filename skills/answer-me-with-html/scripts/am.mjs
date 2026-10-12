@@ -580,7 +580,7 @@ math:not(.tml-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; 
 }
 `;
 var DELTA_JS = "\n// \u2500\u2500 Change markers: the Before / Changes / After switch \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// The switch starts hidden because it needs this script. It swaps the am-view-* class of its diagram; the delta styles show the colors and badges only in\n// the Changes view and hide the items that do not exist in the view.\n(() => {\n  const VIEWS = ['before', 'changes', 'after'];\n  const setView = (el, view) => {\n    el.classList.remove(...VIEWS.map((v) => `am-view-${v}`));\n    el.classList.add(`am-view-${view}`);\n  };\n  for (const bar of document.querySelectorAll('.am-delta-bar')) {\n    const view = bar.parentElement;\n    const group = bar.querySelector('.am-delta-switch');\n    if (!group) continue;\n    group.hidden = false;\n    group.addEventListener('click', (e) => {\n      const btn = e.target.closest('button[data-view]');\n      if (!btn) return;\n      setView(view, btn.dataset.view);\n      for (const b of group.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));\n    });\n  }\n  // The expand button copies only the drawing into the viewer; the viewer shows the view the diagram is in.\n  document.addEventListener('click', (e) => {\n    const host = e.target.closest?.('.am-diagram-expand')?.parentElement;\n    const canvas = document.querySelector('.am-lightbox-canvas');\n    const view = host && VIEWS.find((v) => host.classList.contains(`am-view-${v}`));\n    if (view && canvas) setView(canvas, view);\n  });\n})();\n";
-var UPDATE_CSS = "/* New-version button and popover (src/render.js adds this file only to a page that has the button). The popover sits under the\n   toolbar and stays hidden unless open, so a browser without native popovers never shows it. */\n.am-btn--update { color: var(--ok); border-color: var(--ok); white-space: nowrap; }\n.am-update { display: none; }\n.am-update:popover-open {\n  display: block; position: fixed; inset-block: 52px auto; inset-inline: auto 12px; margin: 0; width: min(380px, calc(100vw - 24px));\n  padding: 14px 16px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-update p { margin: 0 0 8px; }\n.am-update-title { font-weight: 600; color: var(--ok); }\n.am-update-label { color: var(--ink-2); font-size: 12px; }\n.am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }\n.am-update-row > :first-child {\n  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;\n  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);\n}\n.am-update a { color: var(--accent); font-size: 12px; }\n/* A phone has no room for the words: the button keeps only its dot, and its aria-label still names the version. */\n@media (max-width: 760px) {\n  .am-btn--update .am-update-text { display: none; }\n}\n@media print {\n  .am-update { display: none !important; }\n}\n";
+var UPDATE_CSS = "/* New-version button and popover (src/render.js adds this file only to a page that has the button). The popover sits under the\n   toolbar and stays hidden unless open, so a browser without native popovers never shows it. */\n.am-btn--update { color: var(--ok); border-color: var(--ok); white-space: nowrap; }\n.am-update { display: none; }\n.am-update:popover-open {\n  display: block; position: fixed; inset-block: 52px auto; inset-inline: auto 12px; margin: 0; width: min(380px, calc(100vw - 24px));\n  padding: 14px 16px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-update p { margin: 0 0 8px; }\n.am-update-title { font-weight: 600; color: var(--ok); }\n.am-update-label { color: var(--ink-2); font-size: 12px; }\n.am-update-notes { margin: 0 0 12px; padding-inline-start: 18px; }\n.am-update-notes li { margin: 2px 0; }\n.am-update-notes code { font-size: 12px; }\n.am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }\n.am-update-row > :first-child {\n  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;\n  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);\n}\n.am-update a { color: var(--accent); font-size: 12px; }\n/* A phone has no room for the words: the button keeps only its dot, and its aria-label still names the version. */\n@media (max-width: 760px) {\n  .am-btn--update .am-update-text { display: none; }\n}\n@media print {\n  .am-update { display: none !important; }\n}\n";
 var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds this script after the page script.
 // The button shows where the browser has native popovers (they open and close the popover with no script). A page that am serve
 // sends to another device has no button (src/serve.js), so this script does not look at the address.
@@ -794,7 +794,7 @@ var zh_default = {
     copy: "\u590D\u5236\u6E90\u7A3F",
     done: "\u5DF2\u590D\u5236 \u2713",
     copyCode: "\u590D\u5236",
-    update: { button: "\u65B0\u7248\u672C {version}", current: "\u5F53\u524D {current}\u3002\u751F\u6210\u6B64\u9875\u65F6\u68C0\u6D4B\u5230\u65B0\u7248\u672C\u3002", run: "\u5728\u7EC8\u7AEF\u8FD0\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8BC9 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5185\u5BB9" },
+    update: { button: "\u65B0\u7248\u672C {version}", current: "\u5F53\u524D {current}\u3002\u751F\u6210\u6B64\u9875\u65F6\u68C0\u6D4B\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u8FD9\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7EC8\u7AEF\u8FD0\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8BC9 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5185\u5BB9" },
     reply: {
       button: "\u56DE\u590D",
       comment: "\u8BC4\u8BBA",
@@ -865,7 +865,7 @@ var zh_Hant_default = {
     copy: "\u8907\u88FD\u6E90\u7A3F",
     done: "\u5DF2\u8907\u88FD \u2713",
     copyCode: "\u8907\u88FD",
-    update: { button: "\u65B0\u7248\u672C {version}", current: "\u76EE\u524D {current}\u3002\u7522\u751F\u6B64\u9801\u6642\u5075\u6E2C\u5230\u65B0\u7248\u672C\u3002", run: "\u5728\u7D42\u7AEF\u6A5F\u57F7\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8A34 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5167\u5BB9" },
+    update: { button: "\u65B0\u7248\u672C {version}", current: "\u76EE\u524D {current}\u3002\u7522\u751F\u6B64\u9801\u6642\u5075\u6E2C\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u9019\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7D42\u7AEF\u6A5F\u57F7\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8A34 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5167\u5BB9" },
     reply: {
       button: "\u56DE\u8986",
       comment: "\u8A55\u8AD6",
@@ -930,7 +930,7 @@ var en_default = {
     copy: "Copy source",
     done: "Copied \u2713",
     copyCode: "Copy",
-    update: { button: "New version {version}", current: "You have {current}. Found when this page was made.", run: "Run in a terminal:", agent: "Or tell your agent:", agentText: "Update answer-me-with-html", notes: "See what's new" },
+    update: { button: "New version {version}", current: "You have {current}. Found when this page was made.", whatsNew: "What's new:", run: "Run in a terminal:", agent: "Or tell your agent:", agentText: "Update answer-me-with-html", notes: "See what's new" },
     reply: {
       button: "Reply",
       comment: "Comment",
@@ -1001,7 +1001,7 @@ var ja_default = {
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     copyCode: "\u30B3\u30D4\u30FC",
-    update: { button: "\u65B0\u30D0\u30FC\u30B8\u30E7\u30F3 {version}", current: "\u73FE\u5728\u306F {current}\u3002\u3053\u306E\u30DA\u30FC\u30B8\u306E\u4F5C\u6210\u6642\u306B\u898B\u3064\u304B\u308A\u307E\u3057\u305F\u3002", run: "\u30BF\u30FC\u30DF\u30CA\u30EB\u3067\u5B9F\u884C\uFF1A", agent: "\u307E\u305F\u306F Agent \u306B\u4F1D\u3048\u308B\uFF1A", agentText: "answer-me-with-html \u3092\u66F4\u65B0\u3057\u3066", notes: "\u66F4\u65B0\u5185\u5BB9\u3092\u898B\u308B" },
+    update: { button: "\u65B0\u30D0\u30FC\u30B8\u30E7\u30F3 {version}", current: "\u73FE\u5728\u306F {current}\u3002\u3053\u306E\u30DA\u30FC\u30B8\u306E\u4F5C\u6210\u6642\u306B\u898B\u3064\u304B\u308A\u307E\u3057\u305F\u3002", whatsNew: "\u4ECA\u56DE\u306E\u66F4\u65B0\uFF1A", run: "\u30BF\u30FC\u30DF\u30CA\u30EB\u3067\u5B9F\u884C\uFF1A", agent: "\u307E\u305F\u306F Agent \u306B\u4F1D\u3048\u308B\uFF1A", agentText: "answer-me-with-html \u3092\u66F4\u65B0\u3057\u3066", notes: "\u66F4\u65B0\u5185\u5BB9\u3092\u898B\u308B" },
     reply: {
       button: "\u8FD4\u4FE1",
       comment: "\u30B3\u30E1\u30F3\u30C8",
@@ -1070,7 +1070,7 @@ var he_default = {
     copy: "\u05D4\u05E2\u05EA\u05E7\u05EA \u05D4\u05DE\u05E7\u05D5\u05E8",
     done: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
     copyCode: "\u05D4\u05E2\u05EA\u05E7\u05D4",
-    update: { button: "\u05D2\u05E8\u05E1\u05D4 \u05D7\u05D3\u05E9\u05D4 {version}", current: "\u05D4\u05D2\u05E8\u05E1\u05D4 \u05E9\u05DC\u05DB\u05DD {current}. \u05D4\u05D2\u05E8\u05E1\u05D4 \u05D4\u05D7\u05D3\u05E9\u05D4 \u05E0\u05DE\u05E6\u05D0\u05D4 \u05DB\u05E9\u05D4\u05D3\u05E3 \u05E0\u05D5\u05E6\u05E8.", run: "\u05D4\u05E8\u05D9\u05E6\u05D5 \u05D1\u05D8\u05E8\u05DE\u05D9\u05E0\u05DC:", agent: "\u05D0\u05D5 \u05D1\u05E7\u05E9\u05D5 \u05DE\u05D4-Agent:", agentText: "\u05E2\u05D3\u05DB\u05DF \u05D0\u05EA answer-me-with-html", notes: "\u05DE\u05D4 \u05D7\u05D3\u05E9" },
+    update: { button: "\u05D2\u05E8\u05E1\u05D4 \u05D7\u05D3\u05E9\u05D4 {version}", current: "\u05D4\u05D2\u05E8\u05E1\u05D4 \u05E9\u05DC\u05DB\u05DD {current}. \u05D4\u05D2\u05E8\u05E1\u05D4 \u05D4\u05D7\u05D3\u05E9\u05D4 \u05E0\u05DE\u05E6\u05D0\u05D4 \u05DB\u05E9\u05D4\u05D3\u05E3 \u05E0\u05D5\u05E6\u05E8.", whatsNew: "\u05DE\u05D4 \u05D7\u05D3\u05E9 \u05D1\u05D2\u05E8\u05E1\u05D4:", run: "\u05D4\u05E8\u05D9\u05E6\u05D5 \u05D1\u05D8\u05E8\u05DE\u05D9\u05E0\u05DC:", agent: "\u05D0\u05D5 \u05D1\u05E7\u05E9\u05D5 \u05DE\u05D4-Agent:", agentText: "\u05E2\u05D3\u05DB\u05DF \u05D0\u05EA answer-me-with-html", notes: "\u05DE\u05D4 \u05D7\u05D3\u05E9" },
     reply: {
       button: "\u05EA\u05D2\u05D5\u05D1\u05D4",
       comment: "\u05D4\u05E2\u05E8\u05D4",
@@ -7973,9 +7973,13 @@ function colophon(language) {
   return `<p class="am-colophon">${label} ${link} ${VERSION} \xB7 ${time} \xB7 ${star}</p>`;
 }
 var withColophon = (body, language) => body.replace('<header class="am-head">', (head) => `${head}${colophon(language)}`);
-function updateNotice(ui, update) {
+function updateNotice(ui, update, labelKey) {
   if (!update) return { button: "", popover: "" };
   const t = ui.update;
+  const lines = update.highlights?.[labelKey] ?? update.highlights?.en;
+  const notes = lines ? `<p class="am-update-label">${esc(t.whatsNew)}</p>
+<ul class="am-update-notes">${lines.map((l3) => `<li>${esc(l3).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul>
+` : "";
   const plain = t.button.replace("{version}", update.latest);
   const fill2 = (s) => esc(s).replace("{version}", `<bdi>${esc(update.latest)}</bdi>`).replace("{current}", `<bdi>${esc(update.current)}</bdi>`);
   const row = (text, code) => `<div class="am-update-row">${code ? `<code dir="ltr">${esc(text)}</code>` : `<span>${esc(text)}</span>`}<button class="am-btn" type="button" data-am="copy-text" data-text="${esc(text)}" data-done="${esc(ui.done)}">${esc(ui.copyCode)}</button></div>`;
@@ -7985,7 +7989,7 @@ function updateNotice(ui, update) {
     popover: `<div class="am-update" id="am-update" popover>
 <p class="am-update-title">${fill2(t.button)}</p>
 <p>${fill2(t.current)}</p>
-<p class="am-update-label">${esc(t.run)}</p>
+${notes}<p class="am-update-label">${esc(t.run)}</p>
 ${row(update.command, true)}
 <p class="am-update-label">${esc(t.agent)}</p>
 ${row(t.agentText, false)}
@@ -8019,7 +8023,7 @@ function lightboxShell(ui, hasDiagrams) {
 }
 function shell({ meta, language, body, source, embedded, update }) {
   const { ui, labelKey } = language;
-  const notice = updateNotice(ui, update);
+  const notice = updateNotice(ui, update, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
   return `<!doctype html>
@@ -8949,8 +8953,20 @@ var UPDATE = Object.freeze({
   checkEveryDays: 7,
   hintEveryDays: 3,
   timeoutMs: 5e3,
-  url: "https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/package.json"
+  url: "https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/package.json",
+  highlightsUrl: "https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/highlights.json"
 });
+var HIGHLIGHTS = Object.freeze({ lines: 3, chars: 80 });
+var LANGUAGE_ID = /^[a-z]{2,3}(-[A-Za-z]{2,8})*$/;
+function parseHighlights(data, version) {
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.version !== version) return null;
+  const lists = Object.entries(data).flatMap(([id, lines]) => {
+    if (!LANGUAGE_ID.test(id) || !Array.isArray(lines)) return [];
+    const kept = lines.filter((l3) => typeof l3 === "string" && l3.trim() && l3.length <= HIGHLIGHTS.chars && !/[\u0000-\u001f\u007f]/.test(l3)).slice(0, HIGHLIGHTS.lines).map((l3) => l3.trim());
+    return kept.length ? [[id, kept]] : [];
+  });
+  return lists.length ? Object.fromEntries(lists) : null;
+}
 var SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
 function parseVersion(v) {
   const m = String(v).trim().match(SEMVER);
@@ -8989,7 +9005,8 @@ function updateHint(state, current, scriptPath, now = Date.now()) {
 }
 function pageUpdate(state, current, scriptPath, env, config) {
   if (!updateEnabled(env, config) || !newer(state.latestVersion, current)) return null;
-  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)] };
+  const highlights = parseHighlights({ ...state.latestHighlights, version: state.latestVersion }, state.latestVersion);
+  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)], highlights };
 }
 function shouldCheckUpdate(state, env, config, now = Date.now()) {
   if (!updateEnabled(env, config)) return false;
@@ -9005,15 +9022,20 @@ function spawnUpdateCheck(home, scriptPath) {
 }
 async function runUpdateCheck(home, fetchImpl = fetch) {
   try {
-    const res = await fetchImpl(UPDATE.url, { signal: AbortSignal.timeout(UPDATE.timeoutMs) });
-    if (!res.ok) return null;
-    const { version } = await res.json();
+    const { version } = await fetchJson(fetchImpl, UPDATE.url);
     if (!parseVersion(version)) return null;
-    writeState(home, { latestVersion: version.trim(), lastUpdateCheck: Date.now() });
-    return version.trim();
+    const latest = version.trim();
+    const highlights = parseHighlights(await fetchJson(fetchImpl, UPDATE.highlightsUrl).catch(() => null), latest);
+    writeState(home, { latestVersion: latest, latestHighlights: highlights, lastUpdateCheck: Date.now() });
+    return latest;
   } catch {
     return null;
   }
+}
+async function fetchJson(fetchImpl, url) {
+  const res = await fetchImpl(url, { signal: AbortSignal.timeout(UPDATE.timeoutMs) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 // src/housekeeping.js

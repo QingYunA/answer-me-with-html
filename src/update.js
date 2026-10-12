@@ -9,7 +9,27 @@ export const UPDATE = Object.freeze({
   hintEveryDays: 3,
   timeoutMs: 5000,
   url: 'https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/package.json',
+  highlightsUrl: 'https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/highlights.json',
 });
+
+// highlights.json: { "version": "x.y.z", "<language id>": ["line", ...], ... }, written in the release PR (CONTRIBUTING.md).
+export const HIGHLIGHTS = Object.freeze({ lines: 3, chars: 80 });
+const LANGUAGE_ID = /^[a-z]{2,3}(-[A-Za-z]{2,8})*$/;
+
+// The highlight lists of highlights.json when it describes `version`: { <language id>: [line, ...] }, or null. Only plain one-line
+// text within the limits is kept; the page escapes it and the CLI never prints it, so remote text stays out of the Agent's context.
+export function parseHighlights(data, version) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) || data.version !== version) return null;
+  const lists = Object.entries(data).flatMap(([id, lines]) => {
+    if (!LANGUAGE_ID.test(id) || !Array.isArray(lines)) return [];
+    const kept = lines
+      .filter((l) => typeof l === 'string' && l.trim() && l.length <= HIGHLIGHTS.chars && !/[\u0000-\u001f\u007f]/.test(l))
+      .slice(0, HIGHLIGHTS.lines)
+      .map((l) => l.trim());
+    return kept.length ? [[id, kept]] : [];
+  });
+  return lists.length ? Object.fromEntries(lists) : null;
+}
 
 const SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
 
@@ -64,7 +84,8 @@ export function updateHint(state, current, scriptPath, now = Date.now()) {
 // is not throttled: the button is quiet until the user clicks it, so every page made while this copy is out of date carries it.
 export function pageUpdate(state, current, scriptPath, env, config) {
   if (!updateEnabled(env, config) || !newer(state.latestVersion, current)) return null;
-  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)] };
+  const highlights = parseHighlights({ ...state.latestHighlights, version: state.latestVersion }, state.latestVersion);
+  return { latest: state.latestVersion, current, command: UPDATE_COMMANDS[installMethod(scriptPath)], highlights };
 }
 
 export function shouldCheckUpdate(state, env, config, now = Date.now()) {
@@ -83,16 +104,24 @@ export function spawnUpdateCheck(home, scriptPath) {
   }
 }
 
-// Accept only x.y.z version numbers and ignore anything else, so arbitrary remote text never reaches the Agent's context.
+// Accept only x.y.z version numbers and ignore anything else, so arbitrary remote text never reaches the Agent's context. The
+// highlights go only into state.json and the page (parseHighlights).
 export async function runUpdateCheck(home, fetchImpl = fetch) {
   try {
-    const res = await fetchImpl(UPDATE.url, { signal: AbortSignal.timeout(UPDATE.timeoutMs) });
-    if (!res.ok) return null;
-    const { version } = await res.json();
+    const { version } = await fetchJson(fetchImpl, UPDATE.url);
     if (!parseVersion(version)) return null;
-    writeState(home, { latestVersion: version.trim(), lastUpdateCheck: Date.now() });
-    return version.trim();
+    const latest = version.trim();
+    // The highlights are optional: a missing or malformed file leaves the version check as it was.
+    const highlights = parseHighlights(await fetchJson(fetchImpl, UPDATE.highlightsUrl).catch(() => null), latest);
+    writeState(home, { latestVersion: latest, latestHighlights: highlights, lastUpdateCheck: Date.now() });
+    return latest;
   } catch {
     return null;
   }
+}
+
+async function fetchJson(fetchImpl, url) {
+  const res = await fetchImpl(url, { signal: AbortSignal.timeout(UPDATE.timeoutMs) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }

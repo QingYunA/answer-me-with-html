@@ -39,7 +39,7 @@ export class LintError extends Error {
 // previousLanguage: the language the page had before (a patched page keeps it unless the draft declares one).
 // baseDir: where relative image paths are read from; codeDir: where relative code paths are read from (the folder the agent works in).
 // knownImages / knownCode: what the page already embeds, the fallback when a file is gone.
-// update: { latest, current, command } from pageUpdate in src/update.js when a newer version is known; the page then has a new-version button.
+// update: { latest, current, command, highlights } from pageUpdate in src/update.js when a newer version is known; the page then has a new-version button.
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update } = {}) {
   const choices = { theme: themes.choices('page') };
   const parsed = parseDoc(source, { defaults, choices });
@@ -185,9 +185,14 @@ const withColophon = (body, language) => body.replace('<header class="am-head">'
 
 // The new-version button and its popover (a native popover, so it opens, closes on Esc and on a click outside with no script). The
 // button starts hidden; src/runtime/update.js shows it where the browser has popovers. withoutUpdateNotice takes both out again.
-function updateNotice(ui, update) {
+function updateNotice(ui, update, labelKey) {
   if (!update) return { button: '', popover: '' };
   const t = ui.update;
+  // The highlights in the page language, else in English (the labels fall back the same way). `code` spans become <code>.
+  const lines = update.highlights?.[labelKey] ?? update.highlights?.en;
+  const notes = lines
+    ? `<p class="am-update-label">${esc(t.whatsNew)}</p>\n<ul class="am-update-notes">${lines.map((l) => `<li>${esc(l).replace(/`([^`]+)`/g, '<code>$1</code>')}</li>`).join('')}</ul>\n`
+    : '';
   const plain = t.button.replace('{version}', update.latest);
   const fill = (s) => esc(s).replace('{version}', `<bdi>${esc(update.latest)}</bdi>`).replace('{current}', `<bdi>${esc(update.current)}</bdi>`);
   // The command is code and reads left to right; the line for the agent is a sentence in the page language.
@@ -197,7 +202,7 @@ function updateNotice(ui, update) {
     popover: `<div class="am-update" id="am-update" popover>
 <p class="am-update-title">${fill(t.button)}</p>
 <p>${fill(t.current)}</p>
-<p class="am-update-label">${esc(t.run)}</p>
+${notes}<p class="am-update-label">${esc(t.run)}</p>
 ${row(update.command, true)}
 <p class="am-update-label">${esc(t.agent)}</p>
 ${row(t.agentText, false)}
@@ -240,7 +245,7 @@ function lightboxShell(ui, hasDiagrams) {
 
 function shell({ meta, language, body, source, embedded, update }) {
   const { ui, labelKey } = language;
-  const notice = updateNotice(ui, update);
+  const notice = updateNotice(ui, update, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };

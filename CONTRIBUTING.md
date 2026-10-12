@@ -38,6 +38,7 @@ Serve [docs/demo/demo.html](docs/demo/demo.html) next to the rendered [examples/
 A release is a version bump merged to `main`. All installs read `main`: `npx skills update` takes the latest commit, and `claude plugin update` only updates when the version changes.
 
 1. `npm run release -- <x.y.z>` writes the version to all four manifests and rebuilds the bundle. `test/install.test.js` checks that they agree.
+   Then write `highlights.json` for the new version: up to 3 short lines (80 characters at most) from this release's highlights, one list for each language in `src/languages/`. The new-version popover on users' pages shows the list in the page language. `test/highlights.test.js` checks the version, the languages and the lengths.
 2. Run `npm test` and `npm run smoke:install`, then open and merge a `chore: release <x.y.z>` PR.
 3. Tag the merge commit and publish the GitHub Release:
    `git tag -a v<x.y.z> <sha> -m v<x.y.z> && git push origin v<x.y.z> && gh release create v<x.y.z> --verify-tag --notes-file <notes>`.

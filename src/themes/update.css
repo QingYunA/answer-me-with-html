@@ -10,6 +10,9 @@
 .am-update p { margin: 0 0 8px; }
 .am-update-title { font-weight: 600; color: var(--ok); }
 .am-update-label { color: var(--ink-2); font-size: 12px; }
+.am-update-notes { margin: 0 0 12px; padding-inline-start: 18px; }
+.am-update-notes li { margin: 2px 0; }
+.am-update-notes code { font-size: 12px; }
 .am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
 .am-update-row > :first-child {
   flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;
