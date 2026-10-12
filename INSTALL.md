@@ -78,6 +78,10 @@ dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html
 
 `dsh plugin add` needs `pnpm` on your `PATH`. The package declares a `dsh.bundle` patch (`cordis.patch.yml`), which mounts its `skills/` directory as a skill provider named `answer-me-with-html`. Nothing is copied into `~/.dsh/skills`. The skill is available in the next DSH session of that profile. If the output says "declares no dsh.bundle", the install did not register the skill: report it.
 
+A copy of the skill in `~/.agents/skills/answer-me-with-html` or `~/.dsh/skills/answer-me-with-html` takes precedence over the plugin, so DSH would keep using that copy. If one exists from an earlier install, ask the user before you move it away.
+
+DSH's default sandbox lets commands write only in the workspace and `/tmp`. When the skill saves a page to `~/.answer-me-with-html/pages`, DSH asks the user to approve the write.
+
 ## Step 4: Check that it works
 
 For a skill install:

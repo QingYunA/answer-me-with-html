@@ -62,6 +62,22 @@ test('install: package.json declares the DSH bundle patch, and the patch ships i
   assert.ok(pkg.files.includes(patch.replace(/^\.\//, '')), 'cordis.patch.yml must be listed in "files"');
 });
 
+// DSH's plugin page reads the icon and locale/<language>.json from the installed package; a bad file makes it reject the package's metadata.
+test('install: the DSH icon and display text ship in the package and fit what DSH reads', () => {
+  const pkg = json('package.json');
+  const icon = pkg.icon.replace(/^\.\//, '');
+  assert.match(icon, /\.svg$/);
+  assert.ok(pkg.files.includes(icon), `${icon} must be listed in "files"`);
+  assert.ok(readFileSync(join(ROOT, icon)).length <= 256 * 1024, 'DSH refuses an icon over 256 KiB');
+  assert.ok(pkg.files.includes('locale'));
+  const locales = readdirSync(join(ROOT, 'locale'));
+  assert.ok(locales.includes('en.json'), 'DSH reads the other languages only next to en.json');
+  for (const file of locales) {
+    const { meta } = json(`locale/${file}`);
+    for (const key of ['title', 'description']) assert.ok(typeof meta[key] === 'string' && meta[key].trim(), `${file}: meta.${key}`);
+  }
+});
+
 // The `!!js` expression is the one thing that can silently drop the skill from every DSH session, so run the shipped text the way the loader does.
 const skipSymlink = process.platform === 'win32' ? 'creating directory symlinks on Windows needs privileges' : false;
 test('install: the DSH patch resolves bundledSkillDir to the skills directory of the installed package', { skip: skipSymlink }, () => {
