@@ -72,7 +72,7 @@ p { text-wrap: pretty; }
 }
 .topbar-in { height: 100%; max-width: 1320px; margin: 0 auto; padding: 0 clamp(12px, 3vw, 24px); display: flex; align-items: center; gap: 24px; }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
-.brand-mark { flex: none; border: 1px solid var(--line); }
+.brand-mark { flex: none; }
 .nav { display: flex; gap: 2px; margin-left: auto; }
 .nav a {
   color: var(--ink-2); text-decoration: none; font-size: 14px; padding: 6px 12px; position: relative;
