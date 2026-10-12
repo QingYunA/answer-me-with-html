@@ -2,7 +2,7 @@
 // The real npx skills / claude plugin validate install checks run in the CI install job (scripts/smoke-install.mjs).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, mkdtempSync, cpSync, rmSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, symlinkSync, realpathSync, cpSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,5 +51,31 @@ test('install: the skill directory copied elsewhere renders a page without node_
     assert.match(execFileSync(process.execPath, [join(dir, 'skill/scripts/am.mjs'), '--version'], { encoding: 'utf8' }), new RegExp(VERSION.replace(/\./g, '\\.')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('install: package.json declares the DSH bundle patch, and the patch ships in the package', () => {
+  const pkg = json('package.json');
+  const patch = pkg.dsh?.bundle?.patch;
+  assert.equal(patch, './cordis.patch.yml');
+  assert.ok(existsSync(join(ROOT, patch)), `missing ${patch}`);
+  assert.ok(pkg.files.includes(patch.replace(/^\.\//, '')), 'cordis.patch.yml must be listed in "files"');
+});
+
+// The `!!js` expression is the one thing that can silently drop the skill from every DSH session, so run the shipped text the way the loader does.
+const skipSymlink = process.platform === 'win32' ? 'creating directory symlinks on Windows needs privileges' : false;
+test('install: the DSH patch resolves bundledSkillDir to the skills directory of the installed package', { skip: skipSymlink }, () => {
+  const expr = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8').match(/bundledSkillDir:\s*!!js\s*(.+)$/m)?.[1];
+  assert.ok(expr, 'cordis.patch.yml has no `bundledSkillDir: !!js <expr>` line');
+  const profile = mkdtempSync(join(tmpdir(), 'am-dsh-'));
+  try {
+    mkdirSync(join(profile, 'node_modules'));
+    symlinkSync(ROOT, join(profile, 'node_modules', json('package.json').name), 'dir');
+    const dir = new Function('baseUrl', `return ${expr}`)(`${profile}/`);
+    assert.equal(realpathSync(dir), realpathSync(join(ROOT, 'skills')));
+    assert.ok(existsSync(join(dir, 'answer-me-with-html/SKILL.md')));
+    assert.ok(existsSync(join(dir, 'answer-me-with-html/scripts/am.mjs')));
+  } finally {
+    rmSync(profile, { recursive: true, force: true });
   }
 });

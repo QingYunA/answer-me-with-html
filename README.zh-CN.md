@@ -98,6 +98,8 @@ npx skills add QingYunA/answer-me-with-html
 
 它会问你装到哪个 Agent。安装器来自 [vercel-labs/skills](https://github.com/vercel-labs/skills)，支持 70 多种 Agent。
 
+DeepSeek Harness（`dsh`）用户：`dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html`。
+
 <details>
 <summary>手动安装</summary>
 

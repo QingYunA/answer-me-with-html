@@ -11,8 +11,14 @@
     "bin",
     "src",
     "skills",
-    "examples"
+    "examples",
+    "cordis.patch.yml"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "engines": {
     "node": ">=20"
   },

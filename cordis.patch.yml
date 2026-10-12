@@ -1,0 +1,19 @@
+# DeepSeek Harness (DSH) bundle patch for answer-me-with-html.
+#
+# package.json points `dsh.bundle.patch` here, so
+# `dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html`
+# registers the skill. The single `insert` row mounts a dedicated
+# @deepseek-ai/dsh-skill-filesystem provider whose only root is this package's
+# bundled `skills/` directory.
+#
+# `bundledSkillDir` is resolved from the installed npm identity, anchored at the
+# DSH profile (the loader's `baseUrl`), and never built by joining a relative
+# path onto `baseUrl`, which would resolve against whatever cwd DSH started in.
+# test/install.test.js evaluates this exact expression.
+- insert:
+    - id: answer-me-with-html-skill
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: answer-me-with-html
+        includeDefaultRoots: false
+        bundledSkillDir: !!js process.getBuiltinModule('node:path').join(process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:module').createRequire(baseUrl).resolve('answer-me-with-html/package.json')), 'skills')

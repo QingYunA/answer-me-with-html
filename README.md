@@ -99,6 +99,8 @@ npx skills add QingYunA/answer-me-with-html
 
 It asks which agents to install into. The installer, [vercel-labs/skills](https://github.com/vercel-labs/skills), supports more than 70 agents.
 
+For DeepSeek Harness (`dsh`): `dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html`.
+
 <details>
 <summary>Manual install</summary>
 

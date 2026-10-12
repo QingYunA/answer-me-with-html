@@ -68,6 +68,16 @@ You know which agent you are. Use the name that `npx -y skills add --help` docum
 
 This installs the skill only. It works the same way, but there are no slash commands. Settings are changed with `/answer-me-with-html config` (note the space), or `am config` in a terminal. Codex and Cursor have their own plugin systems, but this repository does not ship a plugin for them yet. Do not try to install one.
 
+### DeepSeek Harness (DSH)
+
+If you are running in DeepSeek Harness, install it as a DSH plugin. Use the profile you run in (`web` is the shipped one):
+
+```bash
+dsh plugin --profile <profile> add github:QingYunA/answer-me-with-html
+```
+
+`dsh plugin add` needs `pnpm` on your `PATH`. The package declares a `dsh.bundle` patch (`cordis.patch.yml`), which mounts its `skills/` directory as a skill provider named `answer-me-with-html`. Nothing is copied into `~/.dsh/skills`. The skill is available in the next DSH session of that profile. If the output says "declares no dsh.bundle", the install did not register the skill: report it.
+
 ## Step 4: Check that it works
 
 For a skill install:
@@ -80,6 +90,8 @@ node "$dir/scripts/am.mjs" --version
 Claude Code keeps the skill in `~/.claude/skills`; most other agents read `~/.agents/skills`. The first line finds whichever exists. Then use the skill to make a page that explains the TCP three-way handshake, with `--no-open` so no browser window pops up.
 
 For a plugin install, the skill loads after the reload. Run `claude plugin list` and check that it is enabled. Do not wait for the reload.
+
+For a DSH install, check that `dsh plugin add` printed no "declares no dsh.bundle" warning. The skill appears in the next session of that profile.
 
 If a check fails, see Troubleshooting, try the fix once, and report what happened.
 
