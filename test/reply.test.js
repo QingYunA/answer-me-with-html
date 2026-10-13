@@ -7,6 +7,7 @@ import { lintDoc } from '../src/lint/ste.js';
 import { parseDoc } from '../src/parse.js';
 import { RUNTIME_JS } from '../src/assets.js';
 import en from '../src/languages/en.js';
+import { LANGUAGES } from '../src/languages/registry.js';
 
 const draft = (fence, body) => `---\ntitle: Cache\nlang: en\n---\n## A Panel\n${fence}\n${body}\n\`\`\`\n`;
 const ASK = 'Which cache do we use?\n* Redis | keeps data after a restart\n- Memcached';
@@ -83,6 +84,23 @@ test('reply: every page has a Reply button that carries its labels', () => {
   assert.equal(ui.done, en.ui.done);
   assert.ok(RUNTIME_JS.includes('function replyText('));
   assert.ok(!/^export /m.test(RUNTIME_JS));
+});
+
+test('reply: every page carries the drawn reply view and the bar at the bottom', () => {
+  const { html } = renderDoc('## A\nText.\n');
+  assert.ok(RUNTIME_JS.includes('function replyViewHtml('));
+  assert.match(html, /am-reply-bar/);
+  assert.match(html, /am-reply-view/);
+  assert.match(html, /am-reply-raw/);
+  assert.match(html, /am-remark-change/);
+});
+
+test('reply: every language labels the raw fold, the preview button and the bar counts', () => {
+  for (const { id, ui: labels } of LANGUAGES) {
+    assert.equal(typeof labels.reply.raw, 'string', `${id} raw`);
+    assert.equal(typeof labels.reply.preview, 'string', `${id} preview`);
+    for (const kind of ['answered', 'comments', 'remarks']) assert.ok(labels.reply.count[kind].includes('{n}'), `${id} count.${kind}`);
+  }
 });
 
 const ui = en.ui.reply;

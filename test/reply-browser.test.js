@@ -98,19 +98,29 @@ after(async () => {
 test('reply: picks and comments become one reply, and both survive a reload', { skip: SKIP }, async () => {
   await load();
   assert.equal(await evaluate('document.querySelectorAll(".am-comment-btn").length'), 4);
+  const bar = () => evaluate(`({ hidden: document.querySelector('.am-reply-bar').hidden, text: document.querySelector('.am-reply-bar-count').textContent })`);
+  assert.equal((await bar()).hidden, true);
+  await evaluate('document.querySelector("input[value=Memcached]").click()');
+  assert.deepEqual(await bar(), { hidden: false, text: 'Answered: 1' });
   const reply = await evaluate(`(() => {
-    const mem = document.querySelector('input[value="Memcached"]');
-    mem.checked = true;
-    mem.dispatchEvent(new Event('change', { bubbles: true }));
     document.querySelector('input[value="Yes"]').click();
     document.querySelector('#panel-C .am-comment-btn').click();
     const box = document.querySelector('#panel-C .am-comment textarea');
     box.value = 'Make the TTL a setting.';
     box.dispatchEvent(new Event('input'));
     document.querySelector('[data-am="reply"]').click();
-    return { open: document.querySelector('dialog.am-reply').open, text: document.querySelector('dialog.am-reply textarea').value };
+    const sheet = document.querySelector('dialog.am-reply');
+    return {
+      open: sheet.open,
+      text: sheet.querySelector('textarea').value,
+      heading: sheet.querySelector('.am-reply-view .am-rv-h1')?.textContent,
+      rawOpen: sheet.querySelector('details.am-reply-raw').open,
+    };
   })()`);
+  assert.deepEqual(await bar(), { hidden: false, text: 'Answered: 2 · Comments: 1' });
   assert.equal(reply.open, true);
+  assert.equal(reply.heading, 'Re: Cache for the session store');
+  assert.equal(reply.rawOpen, false);
   assert.match(reply.text, /^# Re: Cache for the session store\n/);
   assert.match(reply.text, /1\. \[A\] Which cache do we use\?\n {3}→ \*\*Memcached\*\* _\(was: Redis\)_/);
   assert.match(reply.text, /2\. \[B\] Which events do we log\?\n {3}→ \*\*Retry\*\* _\(not answered; suggestion kept\)_/);

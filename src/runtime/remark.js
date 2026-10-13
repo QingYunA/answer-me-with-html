@@ -70,6 +70,8 @@
     } catch {
       // Storage may be off (private window, a sandboxed page); marks then last until the page closes.
     }
+    // The reply bar (reply.js) shows the number of marks.
+    document.dispatchEvent(new Event('am-remark-change'));
   };
 
   const chip = (el, mark) => {

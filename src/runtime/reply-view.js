@@ -1,8 +1,7 @@
-// Right-to-left pages only: src/render.js adds this script after the page script when the page reads right to left.
-// The Reply sheet holds the reply as Markdown in a textarea, and a textarea gives the whole text one direction. Lines that start
-// with markup or Latin letters ("# Re: ...", "1. [E] ...", "- **A · ...**") then come out reordered for a Hebrew reader.
-// This script shows the reply drawn instead: headings, bold answers and quoted comments, each line in its own direction.
-// The textarea stays in the sheet as what Copy copies, so the copied text does not change.
+// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers
+// and quoted comments instead of raw "# Re: ...", "1. [E] ..." and "- **A · ...**" lines. Each line gets its own direction, so a
+// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.
+// The raw Markdown stays in the sheet under a fold, so the copied text does not change.
 // A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the
 // import (src/runtime/compose.js).
 import { RTL_LETTER } from './rtl-letter.js';
@@ -42,20 +41,4 @@ export function replyViewHtml(text) {
       return `<div dir="${dir}">${inline(line)}</div>`;
     })
     .join('');
-}
-
-if (typeof document !== 'undefined') {
-  const button = document.querySelector('[data-am="reply"]');
-  const sheet = document.querySelector('dialog.am-reply');
-  const source = sheet?.querySelector('textarea');
-  if (button && source) {
-    const view = Object.assign(document.createElement('div'), { className: 'am-reply-view', tabIndex: 0 });
-    source.before(view);
-    sheet.classList.add('am-reply--view');
-    // Runs after the page script's own handler, which has just filled the textarea.
-    button.addEventListener('click', () => {
-      view.innerHTML = replyViewHtml(source.value);
-      view.scrollTop = 0;
-    });
-  }
 }

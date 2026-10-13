@@ -23,10 +23,12 @@ export default {
     update: { button: '新版本 {version}', current: '目前 {current}。產生此頁時偵測到新版本。', whatsNew: '這次更新：', run: '在終端機執行：', agent: '或者告訴 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新內容' },
     reply: {
       button: '回覆', comment: '評論', commentHint: '對這個面板的意見', title: '你的回覆',
-      hint: '複製後貼到對話裡。', copy: '複製回覆', close: '關閉', suggested: '建議',
+      hint: '複製後貼回和 Agent 的對話，它會按你的選擇和意見繼續。', copy: '複製回覆', close: '關閉', suggested: '建議',
       empty: '先選擇選項，或在面板上寫評論。', decisions: '決定', comments: '評論',
       confirmed: '確認了建議', untouched: '未作答，保留建議', was: '原為',
       typed: '以 ">" 開頭的行是讀者輸入的文字。',
+      raw: '查看將複製的文字', preview: '預覽',
+      count: { answered: '已作答 {n} 項', comments: '評論 {n} 則', remarks: '標註 {n} 處' },
     },
     toc: '目錄', flow: '流程圖', sequence: '時序圖', er: '實體關聯圖', colon: '：', sep: '、',
     expand: '展開查看圖表', close: '關閉', diagram: '圖表檢視',

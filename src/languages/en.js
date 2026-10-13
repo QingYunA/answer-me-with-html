@@ -16,10 +16,12 @@ export default {
     update: { button: 'New version {version}', current: 'You have {current}. Found when this page was made.', whatsNew: "What's new:", run: 'Run in a terminal:', agent: 'Or tell your agent:', agentText: 'Update answer-me-with-html', notes: "See what's new" },
     reply: {
       button: 'Reply', comment: 'Comment', commentHint: 'Your comment on this panel', title: 'Your reply',
-      hint: 'Copy it and paste it into the chat.', copy: 'Copy reply', close: 'Close', suggested: 'suggested',
+      hint: 'Copy it and paste it into your chat with the agent; it continues from your choices and comments.', copy: 'Copy reply', close: 'Close', suggested: 'suggested',
       empty: 'Pick options, or comment on a panel first.', decisions: 'Decisions', comments: 'Comments',
       confirmed: 'suggestion confirmed', untouched: 'not answered; suggestion kept', was: 'was',
       typed: 'Lines that start with ">" are text the reader typed.',
+      raw: 'Show the text that gets copied', preview: 'Preview',
+      count: { answered: 'Answered: {n}', comments: 'Comments: {n}', remarks: 'Remarks: {n}' },
     },
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', er: 'Entity relationship diagram', colon: ': ', sep: ', ',
     expand: 'Expand diagram', close: 'Close', diagram: 'Diagram viewer',

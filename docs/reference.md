@@ -32,7 +32,7 @@ Full syntax for a component: `am help <component>`.
 
 ## Answer on the page
 
-Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload.
+Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
