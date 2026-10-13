@@ -129,7 +129,8 @@ function cssField(where, css, errors) {
 }
 
 // Links a theme must not carry: a page opens offline, and a link would send a request each time someone opens it. Returns what the
-// css holds, comments stripped: url() to http:, https: or //, any @import, any @font-face (a theme names a shipped font with `font`).
+// css holds, comments stripped: url() or image-set() to http:, https: or //, any @import, any @font-face (a theme names a shipped font with
+// `font`), and any backslash (an escape could hide the others).
 // A local theme file only gets a warning from this (am theme check); the catalog and am theme add reject it.
 export function externalResources(css) {
   if (typeof css !== 'string') return [];
@@ -138,8 +139,14 @@ export function externalResources(css) {
   for (const m of text.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
     if (/^(?:https?:|\/\/)/i.test(m[2].trim())) found.push(`url(${m[2].trim()})`);
   }
+  // image-set() takes a bare quoted string, with no url() around it.
+  for (const m of text.matchAll(/(?:-webkit-)?image-set\(([^;{}]*)/gi)) {
+    for (const s of m[1].matchAll(/(['"])\s*((?:https?:|\/\/)[^'"]*)\1/gi)) found.push(`image-set(${s[2].trim()})`);
+  }
   if (/@import\b/i.test(text)) found.push('@import');
   if (/@font-face\b/i.test(text)) found.push('@font-face');
+  // A CSS escape can spell url( or @import in a way the checks above do not read (u\72 l(...)), and a theme has no need for one.
+  if (text.includes('\\')) found.push('escape sequence (\\)');
   return found;
 }
 

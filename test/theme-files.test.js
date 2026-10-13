@@ -112,6 +112,27 @@ test('externalResources: finds http and protocol-relative urls, @import and @fon
   assert.deepEqual(externalResources('@font-face { font-family: X; src: local(X) }'), ['@font-face']);
 });
 
+test('externalResources: finds a link inside image-set() and -webkit-image-set(), which needs no url()', () => {
+  assert.deepEqual(externalResources('& .am-head { background: image-set("https://x.example/a.png" 1x) }'), ['image-set(https://x.example/a.png)']);
+  assert.deepEqual(externalResources("& .am-head { background: -webkit-image-set('//x.example/a.png' 1x, 'b.png' 2x) }"), ['image-set(//x.example/a.png)']);
+  assert.deepEqual(externalResources('& .am-head { background: IMAGE-SET( "http://x.example/a.png" 1x ) }'), ['image-set(http://x.example/a.png)']);
+  assert.deepEqual(externalResources('& .am-head { background: image-set("a.png" 1x, "b.png" 2x) }'), []);
+});
+
+test('externalResources: reports any backslash, because an escape can spell url( where no check reads it', () => {
+  const escape = 'escape sequence (\\)';
+  assert.deepEqual(externalResources('& .am-head { background: u\\72 l(https://x.example/a.png) }'), [escape]);
+  assert.deepEqual(externalResources('& .am-head { background: \\75 rl(https://x.example/a.png) }'), [escape]);
+  assert.deepEqual(externalResources('@\\69 mport "a.css";'), [escape]);
+  assert.deepEqual(externalResources('/* a \\ in a comment */ & .am-head { color: red }'), []);
+});
+
+test('externalResources: a relative url() and a data url are still allowed', () => {
+  assert.deepEqual(externalResources('& .am-head { background: url(img.png) }'), []);
+  assert.deepEqual(externalResources('& .am-head { background: url("./img.png") }'), []);
+  assert.deepEqual(externalResources('& .am-head { background: url(data:image/svg+xml;utf8,<svg/>) }'), []);
+});
+
 test('externalResources: ignores data urls, local references, comments and non-strings', () => {
   assert.deepEqual(externalResources('& .am-head { background: url(data:image/png;base64,AAAA); }'), []);
   assert.deepEqual(externalResources('& .am-head { background: url(#frag); mask: url(x.svg) }'), []);
@@ -150,7 +171,8 @@ test('am help theme: describes font, requires, the selector list and the externa
   assert.match(out, /^- font \(optional\)/m);
   assert.match(out, /^- requires \(optional\)/m);
   for (const selector of THEME_SELECTORS) assert.ok(out.includes(selector), `help names ${selector}`);
-  assert.match(out, /no url\(\) to http\(s\)/);
+  assert.match(out, /no url\(\) or image-set\(\) to http\(s\)/);
+  assert.match(out, /no backslash escapes/);
 });
 
 test('selectors: every class in THEME_SELECTORS exists in base.css', () => {
