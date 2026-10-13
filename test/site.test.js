@@ -124,8 +124,17 @@ test('site build: both pages carry the visit counter for the site domain only', 
   }
 });
 
-test('site build: sitemap.xml lists both pages and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
+test('site build: sitemap.xml lists both pages with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
   const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
   for (const page of ['https://answer-me-with-html.com/', 'https://answer-me-with-html.com/zh/']) assert.ok(sitemap.includes(`<loc>${page}</loc>`), page);
+  const urls = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
+  assert.equal(urls.length, 2);
+  for (const url of urls) {
+    assert.deepEqual(url.match(/<xhtml:link [^>]*\/>/g), [
+      '<xhtml:link rel="alternate" hreflang="en" href="https://answer-me-with-html.com/"/>',
+      '<xhtml:link rel="alternate" hreflang="zh-CN" href="https://answer-me-with-html.com/zh/"/>',
+      '<xhtml:link rel="alternate" hreflang="x-default" href="https://answer-me-with-html.com/"/>',
+    ]);
+  }
   assert.match(read(join(ROOT, 'site/dist/robots.txt')), /^Sitemap: https:\/\/answer-me-with-html\.com\/sitemap\.xml$/m);
 });
