@@ -128,6 +128,7 @@ if (replyBtn) {
   copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(text.value);
+      document.dispatchEvent(new Event('am-reply-copied'));
     } catch {
       text.select();
       document.execCommand('copy');

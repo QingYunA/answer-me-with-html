@@ -1,6 +1,6 @@
 ---
 description: View or change Answer me with HTML settings — auto-open browser, default theme, light/dark, STE strictness, video voice, update notices
-argument-hint: "[open|theme|mode|style|voice|update_check <value>] | reset [key]"
+argument-hint: "[open|theme|mode|style|voice|update_check|close_after_reply <value>] | reset [key]"
 allowed-tools: Bash(node *)
 ---
 

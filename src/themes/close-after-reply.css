@@ -1,0 +1,11 @@
+/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the
+   window in the top layer and stays hidden unless open. */
+.am-closing { display: none; }
+.am-closing:popover-open {
+  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);
+  padding: 10px 14px; font-size: 13px; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+@media print {
+  .am-closing { display: none !important; }
+}

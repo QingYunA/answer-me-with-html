@@ -257,9 +257,12 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
 | `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
+| `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
 
 配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
+
+`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面只在标签页关闭前保留你的作答，所以开启后作答会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
 
 ## 少一点主动
 
