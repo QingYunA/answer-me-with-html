@@ -45,7 +45,9 @@ const NUMERIC_KEYS = new Set(['cols', 'span']);
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
-const PANEL_ID = /^([A-Z][0-9]?)\s+(.+)$/;
+// A leading capital is an ID only when the title after it does not start with a lowercase letter: "## A miss goes…" and
+// "## I think…" are sentences, not ID + title (#208). The lookahead also rejects a space, so \s+ cannot backtrack past it.
+const PANEL_ID = /^([A-Z][0-9]?)\s+(?![\s\p{Ll}])(.+)$/u;
 const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
