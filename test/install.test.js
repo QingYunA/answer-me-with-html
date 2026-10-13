@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, mkdtempSync, mkdirSync, symlinkSync, realpathSync, cpSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -60,6 +60,17 @@ test('install: package.json declares the DSH bundle patch, and the patch ships i
   assert.equal(patch, './cordis.patch.yml');
   assert.ok(existsSync(join(ROOT, patch)), `missing ${patch}`);
   assert.ok(pkg.files.includes(patch.replace(/^\.\//, '')), 'cordis.patch.yml must be listed in "files"');
+});
+
+// dsh-plugin-hub 1.6.6 and older resolve the entry as exports["."], then main, then index.js, and block a git install that lacks it (#218).
+test('install: the package entry ships in the package and has no side effects on import', async () => {
+  const pkg = json('package.json');
+  assert.equal(pkg.exports?.['.'], undefined, 'exports would hide answer-me-with-html/package.json from cordis.patch.yml');
+  const entry = (pkg.main ?? 'index.js').replace(/^\.\//, '');
+  assert.equal(entry, 'index.js');
+  assert.ok(existsSync(join(ROOT, entry)), `missing ${entry}`);
+  assert.ok(pkg.files.includes(entry), `${entry} must be listed in "files"`);
+  assert.deepEqual(Object.keys(await import(pathToFileURL(join(ROOT, entry)).href)), []);
 });
 
 // DSH's plugin page reads the icon and locale/<language>.json from the installed package; a bad file makes it reject the package's metadata.
