@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { composeRuntime, composeRtlRuntime, unexport } from '../src/runtime/compose.js';
 import { composeMathCss } from '../src/themes/math-css.js';
+import { composeFontCss, FONT_NAMES } from '../src/themes/font-css.js';
 
 // Normalize to LF so the bundle does not depend on the checkout's line-ending settings.
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n?/g, '\n');
@@ -21,6 +22,7 @@ export const inlineAssets = {
         `export const DELTA_CSS = ${JSON.stringify(read('../src/themes/delta.css'))};`,
         `export const RTL_CSS = ${JSON.stringify(read('../src/themes/rtl.css'))};`,
         `export const MATH_CSS = ${JSON.stringify(composeMathCss(read('../src/themes/math.css')))};`,
+        `export const FONT_CSS = ${JSON.stringify(Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)])))};`,
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
         `export const UPDATE_CSS = ${JSON.stringify(read('../src/themes/update.css'))};`,
         `export const UPDATE_JS = ${JSON.stringify(read('../src/runtime/update.js'))};`,

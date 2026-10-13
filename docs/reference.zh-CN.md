@@ -206,8 +206,20 @@ AM_EOF
 - 亮色和暗色都要写全所有颜色变量。`am help theme` 会列出这些变量，并给出完整格式。
 - 字体只能写本机已安装的字体。系统会自动加上默认字体作为回退，没装这些字体的读者也能正常阅读。
 - `css` 里每条选择器都以 `&` 开头。`&` 代表主题的根节点，这样这些规则只在这个主题下生效。
+- `font`（可选）写本工具自带的字体名。用这个主题生成的页面会内嵌该字体，不需要联网，其他主题的页面也不会变大。目前只有 `bangers`（[Bangers](https://github.com/googlefonts/bangers)，SIL OFL 1.1）；在 `css` 里使用它的字体族，例如 `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`。不认识这个字段的旧版本会忽略它，显示回退字体。视频页面不内嵌这个字体。
+- `requires`（可选）写主题支持的最低版本，格式 `x.y.z`。版本更低时，这个主题会被跳过，并提示 `needs Answer me with HTML x.y.z or newer`；不认识这个字段的旧版本会忽略它。
+- 文件要自成一体：不要写指向 `http:`、`https:` 或 `//` 的 `url()`，不要 `@import`，也不要 `@font-face`。外链会在每次打开页面时发出请求，而页面要能离线使用。`am theme check` 会对这些情况给出警告，已有的主题仍然可用；以后的主题目录会拒收它们。
 - 每个页面都内嵌了内置主题和它自己的主题，所以换一台电脑也能打开。
-- `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，并生成两页包含全部组件的样张。
+- `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，对外部资源给出警告，并生成两页包含全部组件的样张。
+
+`css` 可以选中的类名保持稳定：以后的版本会保留其中每一个，也不会再新增必填的颜色变量。
+
+| 部分 | 类名 |
+| :--- | :--- |
+| 页面头部 | `.am-head`、`.am-head h1`、`.am-head-meta`、`.am-intro` |
+| 面板 | `.am-panel`、`.am-panel--bare`、`.am-panel-head`、`.am-panel-head h2`、`.am-panel-id`、`.am-panel-meta`、`.am-panel-body` |
+| 内容 | `.am-md`、`.am-callout`、`.am-callout--ok`、`.am-callout--warn`、`.am-callout--err`、`.am-callout-title`、`.am-kv` |
+| 绘图框 | `.am-frame`、`.am-ruler` |
 
 ## 在远程机器上打开页面
 

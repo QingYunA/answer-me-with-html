@@ -12,7 +12,9 @@ import { resolveLanguage } from './language.js';
 import { COMPONENTS } from './components/index.js';
 import { themeNames, getTheme, loadThemes } from './themes/registry.js';
 import { readThemeFile } from './themes/user.js';
-import { checkColors, COLOR_TOKENS } from './themes/check.js';
+import { checkColors, externalResourceWarnings, COLOR_TOKENS } from './themes/check.js';
+import { FONT_NAMES } from './themes/font-list.js';
+import { THEME_SELECTORS } from './themes/selectors.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
@@ -370,14 +372,21 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - label: the name on the page's theme button: a string, or an object with ${languageIds().join(' / ')} strings.
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(' ')}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
-- Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.
+- Fonts: name installed fonts only; the default font stack is added as the fallback.
+- font (optional): a font this tool ships, embedded in a page rendered with the theme: ${FONT_NAMES.join(' | ')}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
+  An older version ignores the field and shows the fallback font.
+- requires (optional): the oldest version of this tool the theme supports, as x.y.z. A newer requirement makes this tool skip the theme.
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
+  Target these classes (they stay stable): ${THEME_SELECTORS.join(' ')}.
+  Keep the file self-contained: no url() to http(s) or //, no @import, no @font-face. A link would send a request each time a page opens.
+  am theme check warns about them; a theme catalog will reject them.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
 - Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1).
+- Warns about external resources in css and video.css (url() to http(s) or //, @import, @font-face).
 - Exits with 1 when there is an error. Without errors it renders two specimen pages (light, dark) with every component.`;
 
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
@@ -791,10 +800,11 @@ function cmdTheme(action, target, opts, ctx) {
   }
   const tokens = theme?.tokens ?? theme?.video?.tokens;
   const colors = tokens ? checkColors({ tokens }) : { errors: [], warnings: [] };
+  const warnings = [...colors.warnings, ...externalResourceWarnings(theme)];
   const all = [...errors, ...colors.errors];
   all.forEach((e) => print(`✗ ${e}`));
-  colors.warnings.forEach((w) => print(`! ${w}`));
-  print(`${name}: ${all.length} error${all.length === 1 ? '' : 's'}, ${colors.warnings.length} warning${colors.warnings.length === 1 ? '' : 's'}`);
+  warnings.forEach((w) => print(`! ${w}`));
+  print(`${name}: ${all.length} error${all.length === 1 ? '' : 's'}, ${warnings.length} warning${warnings.length === 1 ? '' : 's'}`);
   if (all.length) return 1;
   if (!theme.scope.includes('page')) return 0;
 

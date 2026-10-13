@@ -206,8 +206,20 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 - Light and dark must each set every color variable. `am help theme` lists them and shows the whole format.
 - Name installed fonts only. The default fonts are added as the fallback, so a reader without your fonts still gets readable text.
 - In `css`, start every selector with `&`. It stands for the theme's root, so the rules apply only under this theme.
+- `font` (optional) names a font this tool ships. A page rendered with the theme embeds it, so it needs no network and the other pages do not grow. The only value for now is `bangers` ([Bangers](https://github.com/googlefonts/bangers), SIL OFL 1.1); use the family in `css`, for example `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`. A version that does not know the field ignores it and shows the fallback font. Video pages do not embed the font.
+- `requires` (optional) is the oldest version of this tool the theme supports, as `x.y.z`. On an older version the theme is skipped with `needs Answer me with HTML x.y.z or newer`; a version that does not know the field ignores it.
+- Keep the file self-contained: no `url()` to `http:`, `https:` or `//`, no `@import` and no `@font-face`. A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. A future theme catalog will reject them.
 - Each page carries the built-in themes plus its own theme, so it still opens on any machine.
-- `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, and renders two specimen pages with every component.
+- `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, warns about external resources, and renders two specimen pages with every component.
+
+The classes your `css` may target stay stable: a later version keeps every one of them, and never adds a required color variable.
+
+| Part | Classes |
+| :--- | :--- |
+| Page head | `.am-head`, `.am-head h1`, `.am-head-meta`, `.am-intro` |
+| Panel | `.am-panel`, `.am-panel--bare`, `.am-panel-head`, `.am-panel-head h2`, `.am-panel-id`, `.am-panel-meta`, `.am-panel-body` |
+| Content | `.am-md`, `.am-callout`, `.am-callout--ok`, `.am-callout--warn`, `.am-callout--err`, `.am-callout-title`, `.am-kv` |
+| Drawing frame | `.am-frame`, `.am-ruler` |
 
 ## Opening pages from a remote machine
 

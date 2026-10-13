@@ -1,6 +1,11 @@
 // User theme files: turn the JSON into a theme definition (normalizeTheme), and check its colors (checkColors).
 // normalizeTheme reports problems that make a theme unusable; checkColors reports problems a reader would see.
+// A theme file may grow new optional fields (font, requires); a CLI that does not know a field ignores it, because
+// normalizeTheme reads only the fields it names. Keep it that way: never reject a field only because it is unknown.
 import { parseColor, contrast } from './color.js';
+import { FONT_NAMES } from './font-list.js';
+import { VERSION } from '../assets.js';
+import { newer } from '../version.js';
 import { SANS, MONO } from './fonts.js';
 import blueprint from './blueprint.js';
 import { languageIds } from '../languages/registry.js';
@@ -56,6 +61,8 @@ export function normalizeTheme(name, data, builtinNames = []) {
   }
 
   const label = labelField(data.label, name, errors);
+  const font = fontField(data.font, errors);
+  requiresField(data.requires, errors);
   // Missing layout tokens come from blueprint; a theme's own fonts keep the default stack as the fallback.
   const fonts = {};
   if (common['--font-sans']) fonts['--font-sans'] = `${common['--font-sans']}, ${SANS}`;
@@ -67,11 +74,29 @@ export function normalizeTheme(name, data, builtinNames = []) {
     scope: ['page', 'video'],
     user: true,
     ownFont: Boolean(common['--font-sans']),
+    font,
     tokens: { common: { ...blueprint.tokens.common, ...common, ...fonts }, light, dark },
     css,
     video,
   };
   return { theme, errors };
+}
+
+// font: the name of a font the CLI ships (font-css.js); a page rendered with the theme embeds it. An older CLI ignores the field.
+function fontField(font, errors) {
+  if (font === undefined) return undefined;
+  if (typeof font !== 'string' || !FONT_NAMES.includes(font)) {
+    errors.push(`font must be one of: ${FONT_NAMES.join(', ')}`);
+    return undefined;
+  }
+  return font;
+}
+
+// requires: the oldest CLI version the theme supports, as x.y.z.
+function requiresField(requires, errors) {
+  if (requires === undefined) return;
+  if (typeof requires !== 'string' || !/^\d+\.\d+\.\d+$/.test(requires)) errors.push('requires must be a version in x.y.z format');
+  else if (newer(requires, VERSION)) errors.push(`needs Answer me with HTML ${requires} or newer`);
 }
 
 function labelField(label, name, errors) {
@@ -101,6 +126,27 @@ function cssField(where, css, errors) {
     if (bad !== undefined) errors.push(`${where}: selector "${bad}" must start with & (the theme's root)`);
   }
   return css;
+}
+
+// Links a theme must not carry: a page opens offline, and a link would send a request each time someone opens it. Returns what the
+// css holds, comments stripped: url() to http:, https: or //, any @import, any @font-face (a theme names a shipped font with `font`).
+// A local theme file only gets a warning from this (am theme check); the catalog and am theme add reject it.
+export function externalResources(css) {
+  if (typeof css !== 'string') return [];
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const found = [];
+  for (const m of text.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
+    if (/^(?:https?:|\/\/)/i.test(m[2].trim())) found.push(`url(${m[2].trim()})`);
+  }
+  if (/@import\b/i.test(text)) found.push('@import');
+  if (/@font-face\b/i.test(text)) found.push('@font-face');
+  return found;
+}
+
+// Warnings for a theme definition's css and video.css.
+export function externalResourceWarnings(theme) {
+  return [['css', theme?.css], ['video.css', theme?.video?.css]].flatMap(([where, css]) =>
+    externalResources(css).map((r) => `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
 }
 
 // Pairs read as text need 4.5:1; status colors on their tint are badges and need at least 3:1 (4.5:1 gives a warning only).

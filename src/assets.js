@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { composeRuntime, composeRtlRuntime, unexport } from './runtime/compose.js';
 import { composeMathCss } from './themes/math-css.js';
+import { composeFontCss, FONT_NAMES } from './themes/font-css.js';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -14,6 +15,8 @@ export const DIFF_CSS = read('./themes/diff.css');
 export const DELTA_CSS = read('./themes/delta.css');
 export const RTL_CSS = read('./themes/rtl.css');
 export const MATH_CSS = composeMathCss(read('./themes/math.css'));
+// A theme's own font face, by the name its `font` field gives (src/themes/font-css.js).
+export const FONT_CSS = Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)]));
 export const DELTA_JS = read('./runtime/delta.js');
 export const UPDATE_CSS = read('./themes/update.css');
 export const UPDATE_JS = read('./runtime/update.js');
