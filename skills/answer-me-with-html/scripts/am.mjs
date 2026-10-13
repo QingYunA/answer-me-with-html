@@ -8136,6 +8136,9 @@ var THEME_SELECTORS = Object.freeze([
   ".am-callout--err",
   ".am-callout-title",
   ".am-kv",
+  // The panel comment button (inside the panel head) and its "has a comment" state, so it stays visible on a dark or coloured head.
+  ".am-comment-btn",
+  ".am-comment-btn--on",
   // The drawing frame and its rulers (blueprint).
   ".am-frame",
   ".am-ruler"

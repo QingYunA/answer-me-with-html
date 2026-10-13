@@ -10,7 +10,7 @@ import b3 from './3b1b.js';
 import { readUserThemes, readThemeFile } from './user.js';
 
 const ALL = Object.freeze([blueprint, shadcn, paper, b3]);
-const BUILTIN_NAMES = ALL.map((t) => t.name);
+export const BUILTIN_NAMES = ALL.map((t) => t.name);
 
 export const themes = (scope) => ALL.filter((t) => t.scope.includes(scope));
 export const themeNames = (scope) => themes(scope).map((t) => t.name);
@@ -51,6 +51,9 @@ function themeSet(user = [], broken = new Map()) {
 }
 
 export const BUILTIN = themeSet();
+
+// The built-in themes plus theme definitions that are already normalized (normalizeTheme): for a caller with no themes folder, such as the website's browser engine.
+export const withThemes = (user) => themeSet(user);
 
 // extra: a theme file outside the home (am theme check <file>); it joins the set even when the home has a theme of that name.
 export function loadThemes(home, { extra } = {}) {

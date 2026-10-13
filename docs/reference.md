@@ -208,7 +208,7 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 - In `css`, start every selector with `&`. It stands for the theme's root, so the rules apply only under this theme.
 - `font` (optional) names a font this tool ships. A page rendered with the theme embeds it, so it needs no network and the other pages do not grow. The only value for now is `bangers` ([Bangers](https://github.com/googlefonts/bangers), SIL OFL 1.1); use the family in `css`, for example `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`. A version that does not know the field ignores it and shows the fallback font. Video pages do not embed the font.
 - `requires` (optional) is the oldest version of this tool the theme supports, as `x.y.z`. On an older version the theme is skipped with `needs Answer me with HTML x.y.z or newer`; a version that does not know the field ignores it.
-- Keep the file self-contained: no `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face` and no backslash escapes (they can hide a link from the check). A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. A future theme catalog will reject them.
+- Keep the file self-contained: no `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face` and no backslash escapes (they can hide a link from the check). A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. The theme catalog rejects them.
 - Each page carries the built-in themes plus its own theme, so it still opens on any machine.
 - `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, warns about external resources, and renders two specimen pages with every component.
 
@@ -220,6 +220,11 @@ The classes your `css` may target stay stable: a later version keeps every one o
 | Panel | `.am-panel`, `.am-panel--bare`, `.am-panel-head`, `.am-panel-head h2`, `.am-panel-id`, `.am-panel-meta`, `.am-panel-body` |
 | Content | `.am-md`, `.am-callout`, `.am-callout--ok`, `.am-callout--warn`, `.am-callout--err`, `.am-callout-title`, `.am-kv` |
 | Drawing frame | `.am-frame`, `.am-ruler` |
+| Comment button | `.am-comment-btn`, `.am-comment-btn--on` |
+
+### Theme catalog
+
+[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
 
 ## Opening pages from a remote machine
 

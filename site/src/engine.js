@@ -4,7 +4,8 @@
 import { renderDoc, RenderError, LintError } from '../../src/render.js';
 import { ParseError } from '../../src/parse.js';
 import { ComponentError } from '../../src/components/index.js';
-import { BUILTIN } from '../../src/themes/registry.js';
+import { BUILTIN, BUILTIN_NAMES, withThemes } from '../../src/themes/registry.js';
+import { normalizeTheme } from '../../src/themes/check.js';
 import { CONFIG_KEYS } from '../../src/config.js';
 import { lintDoc } from '../../src/lint/ste.js';
 import { resolveLanguage } from '../../src/language.js';
@@ -15,6 +16,10 @@ export const VERSION = PACKAGE_VERSION;
 
 // Page themes a draft or the theme picker can name ('auto' not included).
 export const THEMES = Object.freeze([...BUILTIN.names('page')]);
+
+// A theme file (the parsed JSON of themes/<name>.json) as a theme definition render() accepts in `extra`, read the way the CLI reads it
+// from the themes folder. Returns { theme, errors }; use the theme only when errors is empty.
+export const themeFromFile = (name, data) => normalizeTheme(name, data, BUILTIN_NAMES);
 
 // The settings a fresh install renders with, as the CLI reads them from an empty config.
 const DEFAULTS = Object.freeze(Object.fromEntries(['theme', 'mode', 'style'].map((k) => [k, CONFIG_KEYS[k].default])));
@@ -32,13 +37,14 @@ const now = () => (globalThis.performance ?? Date).now();
 // render() is synchronous, so a caller awaits this first: it loads Temml (the separate temml.js, fetched once) when the draft may hold math.
 export const prepare = (source) => loadMath(source);
 
+// extra: theme definitions from themeFromFile, added to the built-in ones for this render (the CLI adds the themes folder the same way).
 // Returns { ok: true, html, warnings, stats, meta, ms } or { ok: false, error: { name, message, line, component, example }, ms }.
 // Draft errors are returned; anything else (a bug) is thrown.
-export function render(source, overrides = {}) {
+export function render(source, overrides = {}, { extra = [] } = {}) {
   const started = now();
   const picked = Object.fromEntries(OVERRIDE_KEYS.map((k) => [k, overrides?.[k] === '' ? undefined : overrides?.[k]]));
   try {
-    const { html, warnings, stats, meta } = renderDoc(String(source), picked, DEFAULTS, { baseDir: ROOT, codeDir: ROOT });
+    const { html, warnings, stats, meta } = renderDoc(String(source), picked, DEFAULTS, { baseDir: ROOT, codeDir: ROOT, ...(extra.length && { themes: withThemes(extra) }) });
     return { ok: true, html, warnings, stats, meta, ms: now() - started };
   } catch (err) {
     if (!EXPECTED.some((E) => err instanceof E)) throw err;

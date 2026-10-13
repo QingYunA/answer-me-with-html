@@ -1,10 +1,8 @@
 // Everything on the site that runs the real renderer (engine.js): the hero draft → page demo, the measured sizes,
 // the playground, the component gallery, the theme comparison and the STE writing check.
 import { copyText, track } from './main.js';
+import { UI, BASE, siteMode, whenNear, engine, presets, pick, renderDraft, HIDE_CHROME, framed, frameListeners, scaleToBox } from './live.js';
 
-const root = document.documentElement;
-const UI = JSON.parse(document.getElementById('site-ui').textContent);
-const BASE = root.dataset.base || '';
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
@@ -12,42 +10,7 @@ const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const kb = (n) => (n / 1024).toFixed(1);
 const fmtMs = (ms) => (ms < 10 ? ms.toFixed(1) : String(Math.round(ms)));
-const siteMode = () => (root.dataset.mode === 'dark' ? 'dark' : 'light');
 const toast = (text) => dispatchEvent(new CustomEvent('site:toast', { detail: text }));
-const whenNear = (el, fn, margin = '400px') => {
-  if (!el) return;
-  if (!('IntersectionObserver' in window)) { fn(); return; }
-  const io = new IntersectionObserver((entries) => {
-    if (entries.some((e) => e.isIntersecting)) { io.disconnect(); fn(); }
-  }, { rootMargin: `${margin} 0px` });
-  io.observe(el);
-};
-
-// ── Engine and presets, each loaded once ──
-let enginePromise = null;
-const engine = () => (enginePromise ??= import('./engine.js'));
-let presetsPromise = null;
-const presets = () => (presetsPromise ??= fetch(`${BASE}presets/index.json`).then((r) => {
-  if (!r.ok) throw new Error(`presets/index.json: HTTP ${r.status}`);
-  return r.json();
-}));
-// The Chinese page uses a <name>.zh variant when there is one.
-const pick = (all, key) => (UI.lang === 'zh' && all[`${key}.zh`]) || all[key] || '';
-
-// render() never throws for draft errors; a bug in the renderer becomes an error result too.
-async function renderDraft(source, overrides) {
-  const { render, prepare } = await engine();
-  try {
-    await prepare(source);
-    return render(source, overrides);
-  } catch (err) {
-    return { ok: false, ms: 0, error: { name: 'Error', message: String(err?.message || err) } };
-  }
-}
-
-// ── Frames: rendered pages go into sandboxed srcdoc iframes. A small script reports the page height and scroll. ──
-// Scaled previews hide the page's own toolbar and scrollbars, so the page fills its frame edge to edge.
-const HIDE_CHROME = '.am-toolbar,.am-colophon{display:none!important}html{scrollbar-width:none}::-webkit-scrollbar{display:none}';
 
 // ── Writing-check messages: the CLI writes them in English; the ui dictionary may give a translation. ──
 // Each pattern reads the dynamic parts out of one message format of src/lint/ste.js; a message that matches none stays as it is.
@@ -73,30 +36,6 @@ function localizeWarning(w) {
   }
   return { ...w, message, suggestion };
 }
-function framed(html, { id, css = '', scroll = 0 }) {
-  const reporter = `<script>(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +
-    'function s(){parent.postMessage({amFrame:id,h:Math.ceil(document.documentElement.scrollHeight),y:scrollY},"*")}' +
-    'addEventListener("load",function(){if(y)scrollTo(0,y);s();setTimeout(s,300)});' +
-    'addEventListener("scroll",function(){clearTimeout(window.__t);window.__t=setTimeout(s,120)},{passive:true});' +
-    'if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement)})()</script>';
-  const style = css ? `<style>${css}</style>` : '';
-  return html.replace('</head>', `${style}</head>`).replace(/<\/body>\s*<\/html>\s*$/, `${reporter}</body></html>`);
-}
-const frameListeners = new Map();
-addEventListener('message', (e) => {
-  const data = e.data;
-  if (!data || typeof data.amFrame !== 'string') return;
-  const fn = frameListeners.get(data.amFrame);
-  if (fn) fn(data, e.source);
-});
-
-// Scale a fixed-width iframe to the width of its box.
-function scaleToBox(frame, box, width) {
-  const set = () => frame.style.setProperty('--s', String(box.clientWidth / width));
-  set();
-  if ('ResizeObserver' in window) new ResizeObserver(set).observe(box);
-}
-
 // ── Light draft highlighting for the hero editor ──
 function highlight(src) {
   let fence = false;

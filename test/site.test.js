@@ -1,6 +1,7 @@
 // The website's browser engine (site/build.mjs → assets/engine.js) is the real renderer: it must render what the CLI renders.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
@@ -99,10 +100,11 @@ test('site build: fills built-in keys first and reports unknown ones', () => {
   assert.deepEqual(missing, ['nope']);
 });
 
-const BUILT = { skip: !existsSync(join(ROOT, 'site/dist/index.html')) };
+const BUILT = { skip: !existsSync(join(ROOT, 'site/dist/themes/index.json')) };
+const PAGES = ['index.html', 'zh/index.html', 'themes/index.html', 'zh/themes/index.html'];
 
 test('site build: the built pages load no script or style from another site, except the visit counter', BUILT, () => {
-  for (const page of ['index.html', 'zh/index.html']) {
+  for (const page of PAGES) {
     const html = read(join(ROOT, 'site/dist', page));
     // canonical and hreflang links name the site's own address and load nothing, so only links that fetch count.
     const loaders = [...html.matchAll(/<script\b[^>]*>|<link\b[^>]*\brel=["']?(?:stylesheet|modulepreload|preload|icon)\b[^>]*>/gi)].map((m) => m[0]);
@@ -113,7 +115,7 @@ test('site build: the built pages load no script or style from another site, exc
 });
 
 test('site build: both pages carry the visit counter for the site domain only', BUILT, () => {
-  for (const page of ['index.html', 'zh/index.html']) {
+  for (const page of PAGES) {
     const html = read(join(ROOT, 'site/dist', page));
     const tags = html.match(/<script\b[^>]*\bsrc="https:\/\/stats\.[^>]*>/g) ?? [];
     assert.equal(tags.length, 1, page);
@@ -124,17 +126,79 @@ test('site build: both pages carry the visit counter for the site domain only', 
   }
 });
 
-test('site build: sitemap.xml lists both pages with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
+test('site build: sitemap.xml lists every page with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
   const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
-  for (const page of ['https://answer-me-with-html.com/', 'https://answer-me-with-html.com/zh/']) assert.ok(sitemap.includes(`<loc>${page}</loc>`), page);
   const urls = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urls.length, 2);
-  for (const url of urls) {
-    assert.deepEqual(url.match(/<xhtml:link [^>]*\/>/g), [
-      '<xhtml:link rel="alternate" hreflang="en" href="https://answer-me-with-html.com/"/>',
-      '<xhtml:link rel="alternate" hreflang="zh-CN" href="https://answer-me-with-html.com/zh/"/>',
-      '<xhtml:link rel="alternate" hreflang="x-default" href="https://answer-me-with-html.com/"/>',
-    ]);
+  assert.equal(urls.length, 4);
+  const site = 'https://answer-me-with-html.com/';
+  for (const [en, zh] of [['', 'zh/'], ['themes/', 'zh/themes/']]) {
+    for (const page of [en, zh]) {
+      const url = urls.find((u) => u.includes(`<loc>${site}${page}</loc>`));
+      assert.ok(url, page);
+      assert.deepEqual(url.match(/<xhtml:link [^>]*\/>/g), [
+        `<xhtml:link rel="alternate" hreflang="en" href="${site}${en}"/>`,
+        `<xhtml:link rel="alternate" hreflang="zh-CN" href="${site}${zh}"/>`,
+        `<xhtml:link rel="alternate" hreflang="x-default" href="${site}${en}"/>`,
+      ]);
+    }
   }
   assert.match(read(join(ROOT, 'site/dist/robots.txt')), /^Sitemap: https:\/\/answer-me-with-html\.com\/sitemap\.xml$/m);
+});
+
+test('site engine: render accepts an extra theme from a theme file, and the page carries it with its font', () => {
+  const file = JSON.parse(read(join(ROOT, 'marketplace/themes/comic.json')));
+  const { theme, errors } = engine.themeFromFile('comic', file);
+  assert.deepEqual(errors, []);
+  const source = read(join(ROOT, 'examples/tcp.en.md'));
+  const r = engine.render(source, { theme: 'comic', mode: 'dark' }, { extra: [theme] });
+  assert.equal(r.ok, true, r.error?.message);
+  assert.match(r.html, /html\[data-theme="comic"\]/);
+  assert.equal(r.html.match(/@font-face \{\s*font-family: "Bangers"/g)?.length, 1);
+  assert.equal(engine.render(source, { theme: 'comic' }).ok, false, 'without the extra theme the name is unknown');
+  assert.equal(engine.render(source, { theme: 'blueprint' }, { extra: [theme] }).ok, true);
+  assert.ok(engine.themeFromFile('blueprint', file).errors.length, 'a built-in name cannot be a catalog theme');
+});
+
+test('site build: themes/<name>.json are byte-identical copies, and themes/index.json describes them', BUILT, () => {
+  const names = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
+  const index = JSON.parse(read(join(ROOT, 'site/dist/themes/index.json')));
+  assert.equal(index.schema, 1);
+  assert.deepEqual(index.themes.map((t) => t.name), names, 'sorted by name');
+  for (const t of index.themes) {
+    const source = readFileSync(join(ROOT, 'marketplace/themes', `${t.name}.json`));
+    const published = readFileSync(join(ROOT, 'site/dist/themes', `${t.name}.json`));
+    assert.ok(source.equals(published), `${t.name}: the published file is the source file`);
+    assert.equal(t.sha256, createHash('sha256').update(published).digest('hex'), t.name);
+    assert.equal(t.size, published.length, t.name);
+    assert.equal(t.url, `https://answer-me-with-html.com/themes/${t.name}.json`);
+    const data = JSON.parse(source.toString('utf8'));
+    assert.deepEqual([t.version, t.author, t.license, t.font, t.requires], [data.version, data.author, data.license, data.font, data.requires]);
+    assert.deepEqual(t.label, data.label);
+    assert.deepEqual(t.description, data.description);
+    assert.deepEqual(Object.keys(t), ['name', 'version', 'label', 'description', 'author', 'license', ...(t.font ? ['font'] : []), ...(t.requires ? ['requires'] : []), 'size', 'sha256', 'url']);
+  }
+  assert.ok(!/\d{4}-\d\d-\d\dT/.test(read(join(ROOT, 'site/dist/themes/index.json'))), 'no timestamps');
+});
+
+test('site build: each gallery page has a card per catalog theme with its install commands, and no am theme command yet', BUILT, () => {
+  const names = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
+  for (const page of ['themes/index.html', 'zh/themes/index.html']) {
+    const html = read(join(ROOT, 'site/dist', page));
+    for (const name of names) {
+      const url = `https://answer-me-with-html.com/themes/${name}.json`;
+      assert.ok(html.includes(`<article class="tcard" id="${name}"`), `${page}: card ${name}`);
+      assert.ok(html.includes(`curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`), `${page}: curl ${name}`);
+      assert.ok(html.includes(`Invoke-WebRequest ${url} -OutFile`), `${page}: PowerShell ${name}`);
+      assert.ok(html.includes(`save ${url} as ~/.answer-me-with-html/themes/${name}.json`) || html.includes(`把 ${url} 保存为`), `${page}: agent prompt ${name}`);
+    }
+    assert.doesNotMatch(html, /am theme add/);
+    assert.match(html, /0\.4\.10/);
+  }
+  assert.match(read(join(ROOT, 'site/dist/index.html')), /href="\.\/?themes\/"|href="themes\/"/, 'the home page links the gallery');
+  assert.match(read(join(ROOT, 'site/dist/zh/index.html')), /href="\.\.\/themes\/"/, 'the Chinese home page links the gallery');
+});
+
+test('site build: the gallery pages point at each other as the other language', BUILT, () => {
+  assert.match(read(join(ROOT, 'site/dist/themes/index.html')), /class="tool lang-switch" href="\.\.\/zh\/themes\/"/);
+  assert.match(read(join(ROOT, 'site/dist/zh/themes/index.html')), /class="tool lang-switch" href="\.\.\/\.\.\/themes\/"/);
 });
