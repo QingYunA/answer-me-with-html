@@ -1,6 +1,6 @@
 // Everything on the site that runs the real renderer (engine.js): the hero draft → page demo, the measured sizes,
 // the playground, the component gallery, the theme comparison and the STE writing check.
-import { copyText } from './main.js';
+import { copyText, track } from './main.js';
 
 const root = document.documentElement;
 const UI = JSON.parse(document.getElementById('site-ui').textContent);
@@ -153,8 +153,8 @@ const hero = {
     this.status = $('.demo-status', el);
     this.frame = $('.demo-frame:not(.demo-frame--static)', el);
     scaleToBox(this.frame, $('.demo-page', el), 1280);
-    $('#demo-replay')?.addEventListener('click', () => this.replay());
-    $('#demo-edit')?.addEventListener('click', () => playground.loadPreset('tcp'));
+    $('#demo-replay')?.addEventListener('click', () => { track('hero-replay'); this.replay(); });
+    $('#demo-edit')?.addEventListener('click', () => { track('hero-edit'); playground.loadPreset('tcp'); });
     addEventListener('site:mode', () => { if (this.phase === 'hold') this.refreshPage(); });
     // Off screen or in a hidden tab, the run stops; it starts clean when the demo is back in view.
     if ('IntersectionObserver' in window) {
@@ -505,7 +505,7 @@ const playground = {
     });
     ta.addEventListener('blur', () => { escaped = false; });
     for (const tab of $$('[data-preset]', this.el)) {
-      tab.addEventListener('click', () => this.loadPreset(tab.dataset.preset, false));
+      tab.addEventListener('click', () => { track('playground-preset', { preset: tab.dataset.preset }); this.loadPreset(tab.dataset.preset, false); });
       tab.addEventListener('keydown', (e) => {
         const tabs = $$('[data-preset]', this.el);
         const i = tabs.indexOf(tab);
@@ -517,15 +517,20 @@ const playground = {
         next.click();
       });
     }
-    $('#pg-theme').addEventListener('change', () => this.renderNow());
-    $('#pg-mode').addEventListener('change', () => this.renderNow());
+    for (const id of ['#pg-theme', '#pg-mode']) {
+      $(id).addEventListener('change', () => {
+        track('playground-theme', { theme: $('#pg-theme').value, mode: $('#pg-mode').value });
+        this.renderNow();
+      });
+    }
     addEventListener('site:mode', () => { if ($('#pg-mode').value === 'auto' && this.all) this.renderNow(); });
-    $('#pg-break').addEventListener('click', () => this.breakIt());
+    $('#pg-break').addEventListener('click', () => { track('playground-break'); this.breakIt(); });
     $('#err-undo').addEventListener('click', () => this.undo());
     $('#pg-copy').addEventListener('click', async (e) => {
+      track('playground-copy');
       dispatchEvent(new CustomEvent('site:copied', { detail: { button: e.currentTarget, ok: await copyText(ta.value) } }));
     });
-    $('#pg-download').addEventListener('click', () => this.download());
+    $('#pg-download').addEventListener('click', () => { track('playground-download'); this.download(); });
   },
   loadPreset(key, scroll = true) {
     if (!this.all) return;
@@ -700,7 +705,10 @@ const gallery = {
   start() {
     const cards = $$('#cards .card[data-comp]');
     for (const card of cards) {
-      $('.card-btn', card).addEventListener('click', () => playground.loadPreset(`components/${card.dataset.comp}`));
+      $('.card-btn', card).addEventListener('click', () => {
+        track('component-open', { component: card.dataset.comp });
+        playground.loadPreset(`components/${card.dataset.comp}`);
+      });
       whenNear(card, () => this.render(card), '200px');
     }
     addEventListener('site:mode', () => cards.filter((c) => c.dataset.mode).forEach((c) => this.render(c)));
@@ -767,6 +775,7 @@ const themes = {
   choose(group, button) {
     this.mark(group, button.dataset.v);
     if (group === '#th-theme') this.theme = button.dataset.v; else this.mode = button.dataset.v;
+    track('themes-switch', { theme: this.theme, mode: this.mode });
     this.render();
   },
   async render() {
@@ -844,7 +853,7 @@ const ste = {
     let t = 0;
     this.input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => this.check(), 120); });
     $('#ste-reset').addEventListener('click', () => { this.input.value = this.sample; this.check(); });
-    $('#ste-fix').addEventListener('click', () => this.fix());
+    $('#ste-fix').addEventListener('click', () => { track('ste-fix'); this.fix(); });
     this.check();
   },
   async check() {

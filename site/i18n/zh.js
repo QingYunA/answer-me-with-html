@@ -359,7 +359,7 @@ export default {
   f_source: '源码',
   f_community: '社区',
   f_drawn: '本站',
-  f_drawn_v: '用它自己的 blueprint 主题画成。没有框架、外部字体和统计脚本',
+  f_drawn_v: '用它自己的 blueprint 主题画成。没有框架，没有外部字体。只用 Umami 做匿名的访问和点击统计，不用 cookie。',
 
   ui_json: JSON.stringify(ui).replace(/</g, '\\u003c'),
 };

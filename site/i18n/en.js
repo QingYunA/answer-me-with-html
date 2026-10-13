@@ -337,7 +337,7 @@ export default {
   f_source: 'Source',
   f_community: 'Community',
   f_drawn: 'Drawn with',
-  f_drawn_v: 'its own blueprint theme. No frameworks, no web fonts, no trackers',
+  f_drawn_v: 'its own blueprint theme. No frameworks, no web fonts. Anonymous visit and click counts with Umami, no cookies.',
 
   ui_json: JSON.stringify(ui).replace(/</g, '\\u003c'),
 };

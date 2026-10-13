@@ -20,6 +20,11 @@ const SRC = join(SITE, 'src');
 const REPO = 'QingYunA/answer-me-with-html';
 // Where the site is published (GitHub Pages with a custom domain). Absolute URLs in the pages (canonical, hreflang, share images) start here.
 const SITE_URL = 'https://answer-me-with-html.com/';
+// The visit counter is served from a subdomain of the site, so the analytics server behind it stays private.
+// Cloudflare proxies the subdomain and only lets the tracker and its event endpoint through.
+// data-domains in the tag (see site/template.html) keeps local previews from counting.
+export const STATS_SCRIPT = 'https://stats.answer-me-with-html.com/script.js';
+export const STATS_WEBSITE_ID = '6cfdb29e-3e32-432f-8371-a2aee22393ad';
 
 // The page's own browser files, copied to assets/ without changes.
 const FRONT_FILES = ['main.js', 'playground.js', 'style.css'];
@@ -203,7 +208,7 @@ async function writePages(dist, version) {
   if (!starCount) warn('could not read the GitHub star count; {{STARS}} is empty');
   const pages = PAGES.map((p) => {
     const base = '../'.repeat(p.out.split('/').length - 1);
-    const builtins = { LANG: p.htmlLang, VERSION: version, BASE: base, ALT_HREF: p.alt, STARS: starCount, SITE_URL, CANONICAL: SITE_URL + p.path };
+    const builtins = { LANG: p.htmlLang, VERSION: version, BASE: base, ALT_HREF: p.alt, STARS: starCount, SITE_URL, CANONICAL: SITE_URL + p.path, STATS_SCRIPT, STATS_WEBSITE_ID };
     const { html, missing } = fillTemplate(template, dicts[p.lang], builtins);
     if (missing.length) problems.push(`site/template.html uses keys site/i18n/${p.lang}.js does not define: ${missing.join(', ')}`);
     return { ...p, html };

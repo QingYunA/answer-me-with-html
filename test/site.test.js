@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { bundleEngine, fillTemplate } from '../site/build.mjs';
+import { bundleEngine, fillTemplate, STATS_SCRIPT, STATS_WEBSITE_ID } from '../site/build.mjs';
 import { renderDoc } from '../src/render.js';
 import { CONFIG_KEYS } from '../src/config.js';
 
@@ -99,12 +99,27 @@ test('site build: fills built-in keys first and reports unknown ones', () => {
   assert.deepEqual(missing, ['nope']);
 });
 
-test('site build: the built pages load no script or style from another site', { skip: !existsSync(join(ROOT, 'site/dist/index.html')) }, () => {
+const BUILT = { skip: !existsSync(join(ROOT, 'site/dist/index.html')) };
+
+test('site build: the built pages load no script or style from another site, except the visit counter', BUILT, () => {
   for (const page of ['index.html', 'zh/index.html']) {
     const html = read(join(ROOT, 'site/dist', page));
     // canonical and hreflang links name the site's own address and load nothing, so only links that fetch count.
     const loaders = [...html.matchAll(/<script\b[^>]*>|<link\b[^>]*\brel=["']?(?:stylesheet|modulepreload|preload|icon)\b[^>]*>/gi)].map((m) => m[0]);
     const external = loaders.filter((tag) => /\s(?:src|href)=["']?(?:https?:)?\/\//i.test(tag));
-    assert.deepEqual(external, [], page);
+    assert.equal(external.length, 1, `${page}: ${external.join(' ')}`);
+    assert.ok(external[0].startsWith('<script') && external[0].includes(`src="${STATS_SCRIPT}"`), `${page}: ${external[0]}`);
+  }
+});
+
+test('site build: both pages carry the visit counter for the site domain only', BUILT, () => {
+  for (const page of ['index.html', 'zh/index.html']) {
+    const html = read(join(ROOT, 'site/dist', page));
+    const tags = html.match(/<script\b[^>]*\bsrc="https:\/\/stats\.[^>]*>/g) ?? [];
+    assert.equal(tags.length, 1, page);
+    assert.match(tags[0], /\sdefer\b/);
+    assert.ok(tags[0].includes(`src="${STATS_SCRIPT}"`), page);
+    assert.ok(tags[0].includes(`data-website-id="${STATS_WEBSITE_ID}"`), page);
+    assert.ok(tags[0].includes('data-domains="answer-me-with-html.com"'), page);
   }
 });
