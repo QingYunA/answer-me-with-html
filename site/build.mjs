@@ -146,6 +146,15 @@ function copyImages(dist) {
   for (const name of IMAGES) copyFileSync(join(ROOT, 'docs/images', name), join(dist, 'images', name));
 }
 
+// sitemap.xml lists both language pages, each naming the other as its alternate (as the hreflang links in <head> do).
+// robots.txt points at it and keeps the prerendered examples, which only appear inside the page's frames, out of search.
+function writeSearchFiles(dist) {
+  const alternates = PAGES.map((p) => `    <xhtml:link rel="alternate" hreflang="${p.htmlLang}" href="${SITE_URL}${p.path}"/>`).join('\n');
+  const urls = PAGES.map((p) => `  <url>\n    <loc>${SITE_URL}${p.path}</loc>\n${alternates}\n  </url>`).join('\n');
+  writeFileSync(join(dist, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`);
+  writeFileSync(join(dist, 'robots.txt'), `User-agent: *\nDisallow: /prerender/\n\nSitemap: ${SITE_URL}sitemap.xml\n`);
+}
+
 // The stargazer count, or '' when it cannot be read (offline, rate-limited); the build never fails on it.
 async function stars() {
   try {
@@ -237,6 +246,8 @@ async function main() {
   copyImages(dist);
   await writePages(dist, version);
   console.log(`✓ index.html, zh/index.html → ${relative(ROOT, dist)}/`);
+  writeSearchFiles(dist);
+  console.log('✓ sitemap.xml, robots.txt');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

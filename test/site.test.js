@@ -123,3 +123,9 @@ test('site build: both pages carry the visit counter for the site domain only', 
     assert.ok(tags[0].includes('data-domains="answer-me-with-html.com"'), page);
   }
 });
+
+test('site build: sitemap.xml lists both pages and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
+  const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
+  for (const page of ['https://answer-me-with-html.com/', 'https://answer-me-with-html.com/zh/']) assert.ok(sitemap.includes(`<loc>${page}</loc>`), page);
+  assert.match(read(join(ROOT, 'site/dist/robots.txt')), /^Sitemap: https:\/\/answer-me-with-html\.com\/sitemap\.xml$/m);
+});
