@@ -173,7 +173,7 @@ Change settings with a slash command. There are no config files to edit by hand.
 | Any agent | `/answer-me-with-html config open off`, or just say "stop opening the browser" |
 | Terminal | `am config` to view, `am config set open off` to change, `am config reset` to restore defaults |
 
-The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `update_check` and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
+The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `update_check`, `close_after_reply` (close the tab after the reply is copied) and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
 
 ## Always-on mode (recommended)
 

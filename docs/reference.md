@@ -257,9 +257,12 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
 | `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
+| `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
+
+`close_after_reply` applies to pages made while it is on. Pages that `am serve` sends keep your answers only until the tab closes, so with this setting on the answers go with the tab; the clipboard still holds the reply. A browser refuses to close a tab after a link in the page has moved it (for example a contents link), and then the page says that you can close the tab yourself.
 
 ## Less proactive
 

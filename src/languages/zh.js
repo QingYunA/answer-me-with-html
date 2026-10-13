@@ -25,6 +25,7 @@ export default {
       raw: '查看将复制的文本', preview: '预览',
       count: { answered: '已作答 {n} 项', comments: '评论 {n} 条', remarks: '标注 {n} 处' },
     },
+    closeAfter: { closing: '{n} 秒后关闭此标签页', keep: '保持打开', closeFailed: '回复已复制，现在可以关闭此标签页。' },
     toc: '目录', flow: '流程图', sequence: '时序图', er: '实体关系图', colon: '：', sep: '、',
     expand: '展开查看图表', close: '关闭', diagram: '图表查看',
     delta: { added: '新增', removed: '删除', changed: '修改', view: '视图', before: '改前', changes: '变更', after: '改后' },

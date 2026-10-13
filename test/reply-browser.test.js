@@ -51,6 +51,7 @@ let chrome;
 let cdp;
 let session;
 let file;
+let closingFile;
 
 const send = (method, params) => cdp.send(method, params, session);
 const evaluate = async (expression) => {
@@ -58,9 +59,9 @@ const evaluate = async (expression) => {
   if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
   return r.result.value;
 };
-const load = async () => {
+const load = async (page = file) => {
   const loaded = cdp.once('Page.loadEventFired');
-  await send('Page.navigate', { url: pathToFileURL(file).href });
+  await send('Page.navigate', { url: pathToFileURL(page).href });
   await loaded;
 };
 
@@ -72,6 +73,12 @@ before(async () => {
   execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'd.md'), '-o', file, '--no-open'], {
     env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
   });
+  // The same draft, made while close_after_reply is on.
+  const closingHome = join(tmp, 'closing-home');
+  const am = (...args) => execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), ...args], { env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: closingHome }, stdio: 'pipe' });
+  am('config', 'set', 'close_after_reply', 'on');
+  closingFile = join(tmp, 'closing.html');
+  am('render', join(tmp, 'd.md'), '-o', closingFile, '--no-open');
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -134,4 +141,63 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
     open: !document.querySelector('#panel-C .am-comment').hidden,
   })`);
   assert.deepEqual(after, { memcached: true, comment: 'Make the TTL a setting.', open: true });
+});
+
+// Opens the page made with close_after_reply on, stubs the clipboard and window.close, opens Reply and clicks Copy.
+const copyReply = async ({ clipboardFails = false } = {}) => {
+  await load(closingFile);
+  await evaluate(`(() => {
+    window.__closed = 0;
+    window.close = () => { window.__closed += 1; };
+    navigator.clipboard.writeText = ${clipboardFails ? '() => Promise.reject(new Error("denied"))' : '() => Promise.resolve()'};
+    document.querySelector('input[value="Yes"]').click();
+    document.querySelector('[data-am="reply"]').click();
+    document.querySelector('dialog.am-reply [data-act="copy"]').click();
+  })()`);
+};
+const until = async (expression, ms = 5000) => {
+  for (const start = Date.now(); Date.now() - start < ms;) {
+    if (await evaluate(expression)) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return false;
+};
+const SHEET_OPEN = 'document.querySelector("dialog.am-reply").open';
+const NOTE_OPEN = 'document.querySelector(".am-closing")?.matches(":popover-open") ?? false';
+const NOTE_TEXT = 'document.querySelector(".am-closing span").textContent';
+
+test('close after reply: a copied reply closes the sheet, counts down and closes the tab, then says so when the browser refuses', { skip: SKIP }, async () => {
+  await copyReply();
+  assert.equal(await until(NOTE_OPEN), true, 'the countdown popover opens');
+  assert.equal(await evaluate(SHEET_OPEN), false, 'the reply sheet is closed');
+  assert.match(await evaluate(NOTE_TEXT), /^Closing this tab in [123]s$/);
+  assert.equal(await evaluate('window.__closed'), 0);
+  assert.equal(await until('window.__closed === 1', 5000), true, 'window.close runs after the countdown');
+  assert.equal(await until(`${NOTE_TEXT} === "Reply copied. You can close this tab now."`, 2000), true, 'a tab that stays open says it can be closed');
+  assert.equal(await evaluate(NOTE_OPEN), true);
+  await evaluate('document.querySelector(".am-closing button").click()');
+  assert.equal(await evaluate(NOTE_OPEN), false, 'the button dismisses the message');
+});
+
+test('close after reply: Keep open cancels the countdown', { skip: SKIP }, async () => {
+  await copyReply();
+  assert.equal(await until(NOTE_OPEN), true);
+  await evaluate('document.querySelector(".am-closing button").click()');
+  assert.equal(await evaluate(NOTE_OPEN), false);
+  await new Promise((r) => setTimeout(r, 3600));
+  assert.equal(await evaluate('window.__closed'), 0, 'window.close never runs');
+  assert.equal(await evaluate(NOTE_OPEN), false);
+});
+
+test('close after reply: a clipboard that refuses starts no countdown and keeps the sheet open', { skip: SKIP }, async () => {
+  await copyReply({ clipboardFails: true });
+  await new Promise((r) => setTimeout(r, 1500));
+  assert.equal(await evaluate(NOTE_OPEN), false);
+  assert.equal(await evaluate(SHEET_OPEN), true);
+  assert.equal(await evaluate('window.__closed'), 0);
+});
+
+test('close after reply: a page made without the setting never shows the countdown', { skip: SKIP }, async () => {
+  await load();
+  assert.equal(await evaluate('document.querySelector(".am-closing")'), null);
 });

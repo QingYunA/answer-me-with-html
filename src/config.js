@@ -20,6 +20,7 @@ export const CONFIG_KEYS = Object.freeze({
   mode: { type: 'enum', choices: CHOICES.mode, default: 'auto', label: 'Default light/dark mode' },
   style: { type: 'enum', choices: CHOICES.style, default: '80', label: 'STE writing-check strictness' },
   update_check: { type: 'bool', default: true, label: 'Check for a new version once a week in the background and tell you (never updates by itself)' },
+  close_after_reply: { type: 'bool', default: false, label: 'Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)' },
   voice: { type: 'enum', choices: VOICES, default: 'auto', label: 'Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)' },
 });
 

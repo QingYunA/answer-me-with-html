@@ -131,6 +131,8 @@ if (replyBtn) {
   const copyText = async (str, btn) => {
     try {
       await navigator.clipboard.writeText(str);
+      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.
+      document.dispatchEvent(new Event('am-reply-copied'));
     } catch {
       const tmp = Object.assign(document.createElement('textarea'), { value: str });
       tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';

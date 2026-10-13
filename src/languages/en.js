@@ -23,6 +23,7 @@ export default {
       raw: 'Show the text that gets copied', preview: 'Preview',
       count: { answered: 'Answered: {n}', comments: 'Comments: {n}', remarks: 'Remarks: {n}' },
     },
+    closeAfter: { closing: 'Closing this tab in {n}s', keep: 'Keep open', closeFailed: 'Reply copied. You can close this tab now.' },
     toc: 'Contents', flow: 'Flowchart', sequence: 'Sequence diagram', er: 'Entity relationship diagram', colon: ': ', sep: ', ',
     expand: 'Expand diagram', close: 'Close', diagram: 'Diagram viewer',
     delta: { added: 'added', removed: 'removed', changed: 'changed', view: 'View', before: 'Before', changes: 'Changes', after: 'After' },

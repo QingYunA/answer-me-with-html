@@ -30,6 +30,7 @@ export default {
       raw: '查看將複製的文字', preview: '預覽',
       count: { answered: '已作答 {n} 項', comments: '評論 {n} 則', remarks: '標註 {n} 處' },
     },
+    closeAfter: { closing: '{n} 秒後關閉此分頁', keep: '保持開啟', closeFailed: '回覆已複製，現在可以關閉此分頁。' },
     toc: '目錄', flow: '流程圖', sequence: '時序圖', er: '實體關聯圖', colon: '：', sep: '、',
     expand: '展開查看圖表', close: '關閉', diagram: '圖表檢視',
     delta: { added: '新增', removed: '刪除', changed: '修改', view: '檢視', before: '改前', changes: '變更', after: '改後' },

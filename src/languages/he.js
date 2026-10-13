@@ -29,6 +29,7 @@ export default {
       raw: 'הצגת הטקסט שיועתק', preview: 'תצוגה מקדימה',
       count: { answered: 'נענו: {n}', comments: 'הערות: {n}', remarks: 'סימונים: {n}' },
     },
+    closeAfter: { closing: 'הלשונית תיסגר בעוד {n} שניות', keep: 'להשאיר פתוחה', closeFailed: 'התגובה הועתקה. אפשר לסגור את הלשונית.' },
     toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', er: 'תרשים ישויות וקשרים', colon: ': ', sep: ', ',
     expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים',
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
