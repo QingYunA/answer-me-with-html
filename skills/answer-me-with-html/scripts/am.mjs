@@ -603,7 +603,7 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
   }
 })();
 `;
-var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps. It is read once and cleared, so the next page in this tab never sees it.\n  const SCROLL = /^am-scroll:(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) {\n    window.name = '';\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[1]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    let until = 0;\n    const stop = () => { until = 0; };\n    const hold = () => {\n      if (Date.now() > until) return READER.forEach((type) => removeEventListener(type, stop, true));\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n  });\n})();\n";
+var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n  });\n})();\n";
 var VIDEO_CSS = `/* Video player: the 1920\xD71080 stage scales to the window. All colors come from theme variables.
    Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
 html[data-video] {
@@ -9371,6 +9371,9 @@ function pageLink({ port, secret, baseUrl }, dir, file) {
   const origin = baseUrl ?? `http://${HOST}:${port}`;
   return `${origin}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
 }
+function eventLink({ secret }, file) {
+  return `/${EVENTS}/${pageToken(secret, "pages", file)}/${encodeURIComponent(file)}`;
+}
 function validFileName(name) {
   return typeof name === "string" && name.length > 0 && name.endsWith(".html") && !/[/\\\0]/.test(name) && !name.includes("..");
 }
@@ -9447,10 +9450,8 @@ async function resolvePage(home, dir, file) {
   }
 }
 function withLiveReload(html, eventPath) {
-  const lang = /<html\b[^>]*?\slang="([^"]*)"/.exec(html)?.[1];
-  const { ui } = resolveLanguage({ declared: lang });
-  const data = JSON.stringify({ url: eventPath, ui: ui.live }).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  const script = `<script data-live="${data}">
+  const { ui } = resolveLanguage({ declared: readPage(html).lang });
+  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">
 ${LIVE_JS}</script>
 `;
   const at3 = html.lastIndexOf("</body>");
@@ -9463,6 +9464,10 @@ function liveStreams(home) {
   let timer = null;
   let running = false;
   let again = false;
+  let opening = 0;
+  const stopIfIdle = () => {
+    if (streams.size === 0 && opening === 0) stopWatching();
+  };
   const version = async (file) => {
     try {
       const s = await stat(await resolvePage(home, "pages", file));
@@ -9507,17 +9512,26 @@ function liveStreams(home) {
     } catch {
       return;
     }
-    watcher.on("error", () => {
-      watcher?.close();
-      watcher = null;
-    });
+    watcher.on("error", stopWatching);
   };
+  function stopWatching() {
+    clearTimeout(timer);
+    timer = null;
+    watcher?.close();
+    watcher = null;
+  }
   return {
     // The headers go out only after the page's version is recorded, so a change right after the stream opens is not missed.
     async open(file, res, headers) {
       startWatching();
-      const now = await version(file);
-      if (res.destroyed) return;
+      opening += 1;
+      let now;
+      try {
+        now = await version(file);
+      } finally {
+        opening -= 1;
+      }
+      if (res.destroyed) return stopIfIdle();
       if (!streams.has(file)) {
         streams.set(file, /* @__PURE__ */ new Set());
         seen.set(file, now);
@@ -9530,14 +9544,13 @@ function liveStreams(home) {
           streams.delete(file);
           seen.delete(file);
         }
+        stopIfIdle();
       });
       res.writeHead(200, headers);
       res.write(": open\n\n");
     },
     close() {
-      clearTimeout(timer);
-      watcher?.close();
-      watcher = null;
+      stopWatching();
       for (const open of streams.values()) for (const res of open) res.end();
       streams.clear();
     }
@@ -9581,7 +9594,7 @@ function handler(home, secret, allowedHosts, live) {
       if (!real) return notFound(req, res);
       const html = await readFile(real);
       const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString("utf8") : withoutUpdateNotice(html.toString("utf8"));
-      const body = dir === "pages" ? withLiveReload(page, `/${EVENTS}/${token}/${raw}`) : page;
+      const body = dir === "pages" ? withLiveReload(page, eventLink({ secret }, file)) : page;
       return reply(req, res, 200, "text/html; charset=utf-8", body);
     } catch {
       return notFound(req, res);
@@ -10155,8 +10168,10 @@ function outputPath(dir, title, opts, { env, io }) {
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
-  if (resolve4(file).startsWith(home + sep3)) ensureHome(home);
+  const path = resolve4(file);
+  if (path.startsWith(home + sep3)) ensureHome(home);
   mkdirSync3(dirname3(file), { recursive: true });
+  if (!path.startsWith(join9(home, "pages") + sep3)) return writeFileSync6(file, html);
   const tmp = join9(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
   try {
     writeFileSync6(tmp, html);

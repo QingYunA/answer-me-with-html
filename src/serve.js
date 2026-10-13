@@ -15,6 +15,8 @@ import { join, resolve, dirname, basename, sep } from 'node:path';
 import { ensureHome } from './home.js';
 import { withoutUpdateNotice } from './render.js';
 import { resolveLanguage } from './language.js';
+import { readPage } from './page.js';
+import { esc } from './svg/text.js';
 import { LIVE_JS } from './assets.js';
 
 export const DEFAULT_PORT = 8765;
@@ -115,6 +117,12 @@ export function pageToken(secret, dir, file) {
 export function pageLink({ port, secret, baseUrl }, dir, file) {
   const origin = baseUrl ?? `http://${HOST}:${port}`;
   return `${origin}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
+}
+
+// The event stream of a page in pages/, as a path on the server that serves the page (the page may be opened through a LAN or public
+// address, so the stream goes to the same origin). It carries the token of the page link.
+export function eventLink({ secret }, file) {
+  return `/${EVENTS}/${pageToken(secret, 'pages', file)}/${encodeURIComponent(file)}`;
 }
 
 // A servable file name: one path segment, no traversal, .html only.
@@ -218,16 +226,16 @@ async function resolvePage(home, dir, file) {
 // The page as served: the reload script goes in before </body>, with the event link and the labels in the page language.
 // The file on disk is not changed, and a page opened from file:// has no script.
 export function withLiveReload(html, eventPath) {
-  const lang = /<html\b[^>]*?\slang="([^"]*)"/.exec(html)?.[1];
-  const { ui } = resolveLanguage({ declared: lang });
-  const data = JSON.stringify({ url: eventPath, ui: ui.live }).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const script = `<script data-live="${data}">\n${LIVE_JS}</script>\n`;
+  const { ui } = resolveLanguage({ declared: readPage(html).lang });
+  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">\n${LIVE_JS}</script>\n`;
   const at = html.lastIndexOf('</body>');
   return at === -1 ? html + script : html.slice(0, at) + script + html.slice(at);
 }
 
 // The open event streams, by page file. One watcher on pages/ serves all of them. After a burst of file events settles, each page with
 // a stream is compared with what it was; a page that changed gets one "changed" event on its own streams, and other pages get nothing.
+// The watcher runs only while a stream is open or opening: the last stream to close closes it and the next stream opens a new one, so
+// a pages/ folder that was removed and made again is watched again (on Linux the old watcher can go quiet there without an error).
 function liveStreams(home) {
   const streams = new Map(); // file -> Set of responses
   const seen = new Map(); // file -> the page's version when it was last compared
@@ -235,6 +243,10 @@ function liveStreams(home) {
   let timer = null;
   let running = false;
   let again = false;
+  let opening = 0; // streams between startWatching() and being added to streams
+  const stopIfIdle = () => {
+    if (streams.size === 0 && opening === 0) stopWatching();
+  };
   // null when the page is gone, or in the middle of a replace: the next file event compares it again.
   const version = async (file) => {
     try {
@@ -283,17 +295,26 @@ function liveStreams(home) {
     } catch {
       return;
     }
-    watcher.on('error', () => {
-      watcher?.close();
-      watcher = null;
-    });
+    watcher.on('error', stopWatching);
   };
+  function stopWatching() {
+    clearTimeout(timer);
+    timer = null;
+    watcher?.close();
+    watcher = null;
+  }
   return {
     // The headers go out only after the page's version is recorded, so a change right after the stream opens is not missed.
     async open(file, res, headers) {
       startWatching();
-      const now = await version(file);
-      if (res.destroyed) return;
+      opening += 1;
+      let now;
+      try {
+        now = await version(file);
+      } finally {
+        opening -= 1;
+      }
+      if (res.destroyed) return stopIfIdle();
       if (!streams.has(file)) {
         streams.set(file, new Set());
         seen.set(file, now);
@@ -306,14 +327,13 @@ function liveStreams(home) {
           streams.delete(file);
           seen.delete(file);
         }
+        stopIfIdle();
       });
       res.writeHead(200, headers);
       res.write(': open\n\n'); // sends the headers now, so the browser sees the stream open
     },
     close() {
-      clearTimeout(timer);
-      watcher?.close();
-      watcher = null;
+      stopWatching();
       for (const open of streams.values()) for (const res of open) res.end();
       streams.clear();
     },
@@ -328,6 +348,8 @@ async function openEvents(req, res, home, file, live) {
     return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
   }
   const { origin, 'sec-fetch-dest': dest } = req.headers;
+  // A request with neither header (curl, an old browser) passes, as on the page route: whoever holds the token can already fetch the
+  // page itself, and the stream carries less than the page.
   if ((origin !== undefined && origin !== 'null') || (dest !== undefined && dest !== 'empty')) return notFound(req, res);
   if (!(await resolvePage(home, 'pages', file))) return notFound(req, res);
   return live.open(file, res, { ...HEADERS, 'Content-Type': 'text/event-stream; charset=utf-8', 'Access-Control-Allow-Origin': 'null' });
@@ -365,7 +387,7 @@ function handler(home, secret, allowedHosts, live) {
       // The new-version button is for the person who made the page: a reader through a LAN or public address gets the page without it.
       const html = await readFile(real);
       const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString('utf8') : withoutUpdateNotice(html.toString('utf8'));
-      const body = dir === 'pages' ? withLiveReload(page, `/${EVENTS}/${token}/${raw}`) : page;
+      const body = dir === 'pages' ? withLiveReload(page, eventLink({ secret }, file)) : page;
       return reply(req, res, 200, 'text/html; charset=utf-8', body);
     } catch {
       return notFound(req, res);

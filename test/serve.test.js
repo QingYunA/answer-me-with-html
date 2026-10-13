@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, statSync, existsSync, rmSync, readFileSync, renameSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, statSync, existsSync, rmSync, readFileSync, renameSync, readdirSync, linkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -11,8 +11,9 @@ import { uptime } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { clean } from '../src/housekeeping.js';
-import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX, withLiveReload } from '../src/serve.js';
+import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX, withLiveReload, eventLink } from '../src/serve.js';
 import { renderDoc } from '../src/render.js';
+import { unescapeHtml } from '../src/page.js';
 
 // Windows has no POSIX file modes (Node reports 0o666) and cannot deliver SIGINT to a child process.
 const isWin = process.platform === 'win32';
@@ -54,7 +55,7 @@ function get(path, { method = 'GET', host, headers = {} } = {}) {
 }
 
 const urlOf = (dir, file, secret = srv.secret) => `/${dir === 'pages' ? 'p' : 'v'}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
-const eventsOf = (file, secret = srv.secret) => `/e/${pageToken(secret, 'pages', file)}/${encodeURIComponent(file)}`;
+const eventsOf = (file, secret = srv.secret) => eventLink({ secret }, file);
 
 test('serve token: deterministic, 22 chars, differs by secret, directory and file', () => {
   const t = pageToken('s1', 'pages', 'a.html');
@@ -405,7 +406,8 @@ test('serve events: a wrong token, another page token, another origin or destina
     [eventsOf('missing.html')],
     [good, { Origin: 'https://evil.example', 'Sec-Fetch-Dest': 'empty' }],
     [good, { Origin: 'null', 'Sec-Fetch-Dest': 'document' }],
-    [good, { Origin: 'null', 'Sec-Fetch-Dest': 'script' }],
+    [good, { Origin: 'null', 'Sec-Fetch-Dest': 'script' }], // a sandboxed page's script fetch
+    [good, { Origin: 'https://render.example', 'Sec-Fetch-Dest': 'empty' }], // an EventSource from a real origin
   ];
   for (const [path, headers = SANDBOXED] of bad) {
     const r = await get(path, { headers });
@@ -422,6 +424,17 @@ test('serve events: a wrong token, another page token, another origin or destina
     assert.equal(s.headers['access-control-allow-origin'], 'null');
     assert.equal(s.headers['cache-control'], 'no-store');
     assert.doesNotMatch(s.text, /<h1>/, 'the stream never carries the page');
+  } finally {
+    s.close();
+  }
+});
+
+test('serve events: a request with neither Origin nor Sec-Fetch-Dest opens the stream, like the page route', async () => {
+  writeFileSync(join(home, 'pages', 'ev-plain.html'), '<h1>P</h1>');
+  const s = await openStream(eventsOf('ev-plain.html'), { headers: {} });
+  try {
+    assert.equal(s.status, 200);
+    assert.equal(s.headers['content-type'], 'text/event-stream; charset=utf-8');
   } finally {
     s.close();
   }
@@ -461,10 +474,39 @@ test('serve events: the reload script is added only to served pages, never to th
   assert.equal(r.status, 200);
   assert.equal(r.body, withLiveReload(page, eventsOf('he.html')));
   assert.equal(r.body.replace(/<script data-live="[^"]*">\n[^]*?<\/script>\n(?=<\/body>)/, ''), page, 'only the script is added');
-  const data = JSON.parse(r.body.match(/<script data-live="([^"]*)">/)[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&'));
+  const data = JSON.parse(unescapeHtml(r.body.match(/<script data-live="([^"]*)">/)[1]));
   assert.deepEqual(data, { url: eventsOf('he.html'), ui: { updated: 'הדף עודכן', reload: 'רענון' } }, 'labels in the page language');
   assert.equal(readFileSync(join(home, 'pages', 'he.html'), 'utf8'), page, 'the file on disk is unchanged');
   assert.doesNotMatch((await get(urlOf('videos', 'v.html'))).body, /data-live=/);
+});
+
+test('serve events: the watcher closes with the last stream, and a pages/ folder made again is watched again', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-rewatch-'));
+  let server;
+  try {
+    mkdirSync(join(dir, 'pages'));
+    writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R1</h1>');
+    server = await startServer({ home: dir, port: 0 });
+    const path = eventLink(server, 'r.html');
+    const first = await openStream(path, { server });
+    assert.equal(first.status, 200);
+    first.close();
+    await quiet(); // the server sees the close and drops its watcher
+    rmSync(join(dir, 'pages'), { recursive: true, force: true });
+    mkdirSync(join(dir, 'pages'));
+    writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R2</h1>');
+    const next = await openStream(path, { server });
+    try {
+      assert.equal(next.status, 200);
+      writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R3, changed</h1>');
+      await until(() => changes(next) === 1, 'an event from the new watcher');
+    } finally {
+      next.close();
+    }
+  } finally {
+    await server?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('am render: writes the page through a temp file and leaves no temp file behind', async () => {
@@ -480,13 +522,30 @@ test('am render: writes the page through a temp file and leaves no temp file beh
   }
 });
 
+test('am render -o: a page outside pages/ is written in place, so a hard link to it sees the new page', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-inplace-'));
+  const out = mkdtempSync(join(tmpdir(), 'am-serve-inplace-out-'));
+  try {
+    writeFileSync(join(out, 'o.html'), 'OLD');
+    linkSync(join(out, 'o.html'), join(out, 'o-link.html'));
+    await render({ AM_HOME: dir }, ['-o', join(out, 'o.html')]);
+    const page = readFileSync(join(out, 'o.html'), 'utf8');
+    assert.match(page, /A one/);
+    assert.equal(readFileSync(join(out, 'o-link.html'), 'utf8'), page, 'a rename would have left the link on the old file');
+    assert.deepEqual(readdirSync(out).sort(), ['o-link.html', 'o.html'], 'no temp file');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 test('serve events: shutting the server down ends every open stream', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'am-serve-events-'));
   try {
     mkdirSync(join(dir, 'pages'));
     writeFileSync(join(dir, 'pages', 'x.html'), '<h1>X</h1>');
     const server = await startServer({ home: dir, port: 0 });
-    const path = `/e/${pageToken(server.secret, 'pages', 'x.html')}/x.html`;
+    const path = eventLink(server, 'x.html');
     const streams = [await openStream(path, { server }), await openStream(path, { server })];
     assert.deepEqual(streams.map((s) => s.status), [200, 200]);
     await server.close(); // resolves only when no connection is left open

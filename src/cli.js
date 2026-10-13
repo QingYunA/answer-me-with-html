@@ -548,11 +548,14 @@ function outputPath(dir, title, opts, { env, io }) {
 }
 
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
-// The page is written to a temp file and renamed over the old one, so am serve (src/serve.js) never reloads a half-written page.
+// A page in pages/ is written to a temp file and renamed over the old one, so am serve (src/serve.js) never reloads a half-written
+// page. Elsewhere it is written in place: a rename would replace a symlink with a plain file and drop the file's mode and hard links.
 function writePage(file, html, env) {
   const home = resolve(amHome(env));
-  if (resolve(file).startsWith(home + sep)) ensureHome(home);
+  const path = resolve(file);
+  if (path.startsWith(home + sep)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
+  if (!path.startsWith(join(home, 'pages') + sep)) return writeFileSync(file, html);
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
   try {
     writeFileSync(tmp, html);

@@ -6,11 +6,12 @@
   const { url, ui } = JSON.parse(document.currentScript.dataset.live);
   if (!window.EventSource) return;
   // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,
-  // so the position goes in window.name, which a reload keeps. It is read once and cleared, so the next page in this tab never sees it.
-  const SCROLL = /^am-scroll:(\d+)$/;
+  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without
+  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.
+  const SCROLL = /^am-scroll:(.*):(\d+)$/;
   const saved = SCROLL.exec(window.name);
-  if (saved) {
-    window.name = '';
+  if (saved) window.name = '';
+  if (saved && saved[1] === location.pathname) {
     // Otherwise the browser's own restore runs after load and puts the page back at the top.
     try {
       history.scrollRestoration = 'manual';
@@ -19,18 +20,30 @@
     }
     // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.
     // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.
-    const y = Number(saved[1]);
+    const y = Number(saved[2]);
     const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];
+    const root = document.documentElement;
     let until = 0;
+    let height = 0; // the page height at the last frame
     const stop = () => { until = 0; };
+    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height
+    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.
+    const moved = () => {
+      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();
+    };
     const hold = () => {
-      if (Date.now() > until) return READER.forEach((type) => removeEventListener(type, stop, true));
+      if (Date.now() > until) {
+        READER.forEach((type) => removeEventListener(type, stop, true));
+        return removeEventListener('scroll', moved);
+      }
       if (Math.abs(scrollY - y) > 1) scrollTo(0, y);
+      height = root.scrollHeight;
       requestAnimationFrame(hold);
     };
     addEventListener('load', () => {
       until = Date.now() + 1000;
       READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));
+      addEventListener('scroll', moved, { passive: true });
       hold();
     }, { once: true });
   }
@@ -44,13 +57,15 @@
   const hasInput = () => input || Boolean(window.__amRemarkData?.().length);
 
   const reload = () => {
-    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${Math.round(scrollY)}`;
+    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;
     location.reload();
   };
   let notice = null;
   new EventSource(url).addEventListener('changed', () => {
     if (!hasInput()) return reload();
     if (notice) return;
+    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and
+    // rtl.css were built without it.
     notice = document.createElement('div');
     notice.setAttribute('role', 'status');
     notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'
