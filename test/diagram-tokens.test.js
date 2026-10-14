@@ -55,6 +55,16 @@ test('base.css: the radius defaults equal the attributes the components write, s
   assert.match(html, /<rect class="am-note"[^>]* rx="2"/);
 });
 
+test('base.css: tree boxes take the node tokens, the root and highlighted boxes and the highlighted timeline dot take the highlight tokens', () => {
+  const rule = (selector) => BASE_CSS.match(new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'm'))?.[1] ?? '';
+  const box = BASE_CSS.match(/\.am-tree-box \{([^}]*)\}/)[1];
+  for (const token of ['--node-width', '--node-stroke', '--node-fill', '--node-radius', '--node-text', '--node-shadow']) assert.match(box, new RegExp(`var\\(${token}, `), `a tree box reads ${token}`);
+  assert.match(rule('.am-tree-box--root'), /background: var\(--hi-fill, var\(--accent-bg\)\)/, 'the root box keeps its accent tint by default');
+  assert.match(rule('.am-tree-box--hi'), /background: var\(--hi-fill, var\(--node-fill, var\(--paper\)\)\)/, 'a highlighted box looks like any other by default');
+  assert.match(rule('.am-tree-box--root, .am-tree-box--hi'), /border-color: var\(--hi-stroke, .*; color: var\(--hi-text, /);
+  assert.match(rule('.am-tl-item--hi .am-tl-dot'), /background: var\(--hi-stroke, var\(--accent\)\); border-color: var\(--hi-stroke, var\(--accent\)\)/);
+});
+
 test('markup: node and actor labels carry their own class, so a theme never needs a structural selector', () => {
   const { html } = renderDoc('## A\n```flow\nA -> *B: go\n```\n```sequence\nA -> B: x\n== phase ==\n```\n```er\n*User\n  id PK\n  name string\n```\n', { theme: 'blueprint' });
   assert.match(html, /<text [^>]*class="am-node-text"[^>]*>A<\/text>/);
