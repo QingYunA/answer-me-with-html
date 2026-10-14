@@ -222,6 +222,26 @@ The classes your `css` may target stay stable: a later version keeps every one o
 | Drawing frame | `.am-frame`, `.am-ruler` |
 | Comment button | `.am-comment-btn`, `.am-comment-btn--on` |
 
+### Diagram tokens
+
+A theme restyles what is inside a diagram (flow, sequence, er, and the boxes of a tree) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+
+| Part | Tokens | Default |
+| :--- | :--- | :--- |
+| Node (flow, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
+| Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
+| Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |
+| Sequence note | `--note-fill`, `--note-stroke`, `--note-width`, `--note-radius` | `--warn-bg`, `--warn`, 1, 2px |
+| Group box (flow) | `--cluster-fill`, `--cluster-stroke` | `--fill`, `--line-2` |
+| Lifeline | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`, `--edge-width`, `--node-radius`, `--note-width` and `--note-radius` take a number or a `px` or `em` value (a bare number means px). `--node-radius` also rounds actors and does not change the pill and diamond shapes. `--node-shadow` is `none` or one or more `drop-shadow(...)`, for example `drop-shadow(3px 3px 0 #111111)`, and also casts the shadow of actors. Any other value is an error, and the theme is skipped.
+- Colors are any CSS color. In light and dark mode `am theme check` reads these pairs and needs 4.5:1, only when the theme sets one side: `--node-text` on `--node-fill`, `--hi-text` on `--hi-fill`, `--actor-text` on `--actor-fill`, `--ink` on `--note-fill`, and `--edge-label` on `--paper`. Dark mode keeps the light value of a token it does not set, so set both.
+- A token value goes through the same external-resource check as `css`: no `url()` or `image-set()` to `http:`, `https:` or `//`, and no backslash. `am theme check` warns; the catalog and `am theme add` reject.
+- There is no token for the font family, size, weight or letter spacing in a diagram. The CLI measures diagram text for the sans font, so a different font would overflow its box.
+- The corner radius needs Safari 17.4 or newer; an older Safari draws the default radius.
+
 ### Theme catalog
 
 [answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).

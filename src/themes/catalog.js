@@ -15,7 +15,7 @@ import { VERSION } from '../assets.js';
 import { ensureHome } from '../home.js';
 import { readState, writeState } from '../state.js';
 import { newer } from '../version.js';
-import { NAME, normalizeTheme, checkColors, externalResources } from './check.js';
+import { NAME, normalizeTheme, checkColors, themeLinks } from './check.js';
 import { BUILTIN_NAMES } from './registry.js';
 
 export const CATALOG = Object.freeze({
@@ -166,8 +166,8 @@ function vet(name, bytes) {
   if (errors.length) throw new CatalogError(plural(errors.length, 'the file is not a valid theme'));
   const colors = checkColors(theme).errors;
   if (colors.length) throw new CatalogError(plural(colors.length, 'the colors fail the contrast check'));
-  const links = [...externalResources(theme.css), ...externalResources(theme.video?.css)];
-  if (links.length) throw new CatalogError(plural(links.length, 'the css loads external resources or uses a backslash escape'));
+  const links = themeLinks(theme);
+  if (links.length) throw new CatalogError(plural(links.length, 'the css or a token value loads external resources or uses a backslash escape'));
   return bytes;
 }
 

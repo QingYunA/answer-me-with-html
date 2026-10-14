@@ -222,6 +222,26 @@ AM_EOF
 | 绘图框 | `.am-frame`、`.am-ruler` |
 | 评论按钮 | `.am-comment-btn`、`.am-comment-btn--on` |
 
+### 图表变量
+
+主题可以用变量（而不是选择器）改变图表内部的样子：flow、sequence、er，以及 tree 的方框。把它们写进 `tokens`，所有图表都会跟着变。这些变量全部可选：一个都不写的主题，图表和以前完全一样；旧版本会忽略它们。
+
+| 部分 | 变量 | 默认值 |
+| :--- | :--- | :--- |
+| 节点（flow、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（tree 方框：`--radius`）、无、`--ink` |
+| 高亮节点（`*`） | `--hi-fill`、`--hi-stroke`、`--hi-text` | `--accent-bg`、`--accent`、`--accent` |
+| 连线与消息 | `--edge-color`、`--edge-width`、`--edge-label` | `--ink-2`、1.3、`--accent` |
+| 时序图参与者（含 `== 分隔 ==` 的框） | `--actor-fill`、`--actor-stroke`、`--actor-text` | `--node-fill`、`--node-stroke`、`--node-text` |
+| 时序图备注 | `--note-fill`、`--note-stroke`、`--note-width`、`--note-radius` | `--warn-bg`、`--warn`、1、2px |
+| 分组框（flow） | `--cluster-fill`、`--cluster-stroke` | `--fill`、`--line-2` |
+| 生命线 | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`、`--edge-width`、`--node-radius`、`--note-width`、`--note-radius` 写数字或 `px`、`em` 值（单独的数字按 px 算）。`--node-radius` 也会圆角化参与者，不改变胶囊形和菱形。`--node-shadow` 写 `none` 或一个以上的 `drop-shadow(...)`，例如 `drop-shadow(3px 3px 0 #111111)`，参与者也会带这个阴影。其他写法算错误，主题会被跳过。
+- 颜色可以是任何 CSS 颜色。亮色和暗色下，`am theme check` 会读下面这些配对，要求 4.5:1，而且只在主题设置了其中一边时才检查：`--node-fill` 上的 `--node-text`、`--hi-fill` 上的 `--hi-text`、`--actor-fill` 上的 `--actor-text`、`--note-fill` 上的 `--ink`、`--paper` 上的 `--edge-label`。暗色模式里没写的变量沿用亮色的值，所以两边都写。
+- 变量的值和 `css` 一样要过外部资源检查：不要指向 `http:`、`https:` 或 `//` 的 `url()`、`image-set()`，也不要反斜杠。`am theme check` 会警告；主题库和 `am theme add` 会拒收。
+- 图表里的字体族、字号、字重和字距没有变量。CLI 按无衬线字体测量图表文字，换字体会让文字溢出方框。
+- 圆角需要 Safari 17.4 或更新版本；更旧的 Safari 画默认圆角。
+
 ### 主题库
 
 [answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题加进主题库，见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。

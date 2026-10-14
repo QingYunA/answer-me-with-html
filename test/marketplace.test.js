@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderDoc } from '../src/render.js';
 import { loadThemes, BUILTIN_NAMES } from '../src/themes/registry.js';
-import { normalizeTheme, checkColors, externalResources, NAME } from '../src/themes/check.js';
+import { normalizeTheme, checkColors, themeLinks, DIAGRAM_TOKENS, NAME } from '../src/themes/check.js';
 import { THEME_SELECTORS } from '../src/themes/selectors.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -51,10 +51,18 @@ for (const file of FILES) {
     assert.deepEqual(checkColors(theme).errors, []);
   });
 
-  test(`catalog ${name}: no link or embedded font in css or video.css`, () => {
+  test(`catalog ${name}: no link or embedded font in css, video.css or a token value`, () => {
+    const { theme } = normalizeTheme(name, parse(file), BUILTIN_NAMES);
+    assert.deepEqual(themeLinks(theme), []);
+  });
+
+  test(`catalog ${name}: styles its diagrams with tokens, in light and dark, and never with selectors`, () => {
     const data = parse(file);
-    assert.deepEqual(externalResources(data.css), [], 'css');
-    assert.deepEqual(externalResources(data.video?.css), [], 'video.css');
+    const set = (mode) => ({ ...data.tokens.common, ...data.tokens[mode] });
+    for (const mode of ['light', 'dark']) {
+      assert.ok(DIAGRAM_TOKENS.filter((k) => set(mode)[k] !== undefined).length >= 8, `${mode} sets at least 8 diagram tokens`);
+    }
+    assert.doesNotMatch(data.css ?? '', /\.am-(diagram|node|edge|arrow|cluster|lifeline|actor|note|step)|\bsvg\b|data-key/, 'css does not reach into a diagram');
   });
 
   test(`catalog ${name}: carries its catalog metadata`, () => {

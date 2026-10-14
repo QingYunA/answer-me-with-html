@@ -426,9 +426,9 @@ test('er: a marked field row has a band, a sign at the start of the row, and dat
   assert.equal((html.match(/<rect class="am-er-band" data-delta="(added|removed|changed)"/g) || []).length, 3);
   assert.match(html, /<text class="am-er-sign" data-delta="changed" x="[\d.]+" y="[\d.]+" dominant-baseline="central">~<\/text>/);
   assert.match(html, /<text class="am-er-sign" data-delta="removed"[^>]*>−<\/text>/);
-  assert.match(html, /<text class="am-er-field" data-delta="added" style="font-size:12px"[^>]*>[^<]*phone string[^<]*<\/text>/);
+  assert.match(html, /<text class="am-er-field am-node-text" data-delta="added" style="font-size:12px"[^>]*>[^<]*phone string[^<]*<\/text>/);
   assert.match(html, /<text class="am-er-key am-cluster-label" data-delta="changed"[^>]*>UK<\/text>/);
-  assert.match(html, /<text class="am-er-field" style="font-size:12px"[^>]*>id<\/text><text class="am-er-key am-cluster-label"[^>]*>PK<\/text>/, 'the unmarked row has no data-delta');
+  assert.match(html, /<text class="am-er-field am-node-text" style="font-size:12px"[^>]*>id<\/text><text class="am-er-key am-cluster-label"[^>]*>PK<\/text>/, 'the unmarked row has no data-delta');
   assert.equal((html.match(/class="am-er-sign"/g) || []).length, 3);
 });
 
@@ -453,7 +453,7 @@ test('er: the sign sits at the start of the row, which is the right on a right-t
   const [lx, lw] = box(ltr);
   const [rx, rw] = box(rtl);
   const sign = (html) => at(html, /class="am-er-sign"[^>]* x="([\d.]+)"/);
-  const name = (html) => at(html, /class="am-er-field"[^>]* x="([\d.]+)"[^>]*>[^<]*phone/);
+  const name = (html) => at(html, /class="am-er-field am-node-text"[^>]* x="([\d.]+)"[^>]*>[^<]*phone/);
   assert.ok(sign(ltr) < name(ltr) && sign(ltr) < lx + lw / 2, 'left to right: sign first, on the left');
   assert.ok(sign(rtl) > name(rtl) && sign(rtl) > rx + rw / 2, 'right to left: sign first, on the right');
   assert.ok(Math.abs(sign(rtl) - (rx + rw - 11)) < 0.2);

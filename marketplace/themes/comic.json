@@ -6,7 +6,7 @@
     "ja": "コミック",
     "he": "קומיקס"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Answer me with HTML",
   "license": "MIT",
   "description": {
@@ -20,7 +20,17 @@
       "--bw": "3px",
       "--head-font": "\"Bangers\", \"Avenir Next Condensed\", Impact, \"Arial Narrow\", var(--font-sans)",
       "--shadow": "6px 6px 0 var(--line)",
-      "--comic-yellow": "#ffe600"
+      "--comic-yellow": "#ffe600",
+      "--node-width": "3px",
+      "--node-radius": "0px",
+      "--node-shadow": "drop-shadow(3px 3px 0 var(--line))",
+      "--edge-width": "2",
+      "--note-width": "2px",
+      "--note-radius": "0px",
+      "--edge-color": "var(--line)",
+      "--note-stroke": "var(--line)",
+      "--cluster-stroke": "var(--line)",
+      "--lifeline-color": "var(--line)"
     },
     "light": {
       "--bg": "#ffffff",
@@ -43,7 +53,15 @@
       "--head-fg": "#111111",
       "--comic-title-bg": "linear-gradient(transparent 58%, var(--comic-yellow) 58%, var(--comic-yellow) 92%, transparent 92%)",
       "--comic-title-fg": "var(--ink)",
-      "--comic-title-pad": "0"
+      "--comic-title-pad": "0",
+      "--hi-fill": "#ffe600",
+      "--hi-stroke": "#111111",
+      "--hi-text": "#111111",
+      "--actor-fill": "#ffe600",
+      "--actor-stroke": "#111111",
+      "--actor-text": "#111111",
+      "--note-fill": "#ffe600",
+      "--edge-label": "#111111"
     },
     "dark": {
       "--bg": "#111114",
@@ -66,7 +84,15 @@
       "--head-fg": "#111111",
       "--comic-title-bg": "linear-gradient(var(--comic-yellow), var(--comic-yellow))",
       "--comic-title-fg": "#111111",
-      "--comic-title-pad": "0 0.25em"
+      "--comic-title-pad": "0 0.25em",
+      "--hi-fill": "#ffe600",
+      "--hi-stroke": "#f2f2f2",
+      "--hi-text": "#111111",
+      "--actor-fill": "#ffe600",
+      "--actor-stroke": "#f2f2f2",
+      "--actor-text": "#111111",
+      "--note-fill": "#4d4200",
+      "--edge-label": "#f2f2f2"
     }
   },
   "css": "& .am-head h1 { font-family: var(--head-font); font-weight: 800; font-size: 34px; letter-spacing: 0.01em; text-transform: uppercase; }\n& .am-panel-head h2 { font-family: var(--head-font); font-weight: 800; font-size: 16px; letter-spacing: 0.03em; text-transform: uppercase; }\n& .am-panel-id { font-family: var(--head-font); font-weight: 800; }\n@media (max-width: 760px) {\n  & .am-head h1 { font-size: 27px; }\n}\n& .am-head h1 {\n  display: inline; background: var(--comic-title-bg); color: var(--comic-title-fg); padding: var(--comic-title-pad);\n  -webkit-box-decoration-break: clone; box-decoration-break: clone;\n}"

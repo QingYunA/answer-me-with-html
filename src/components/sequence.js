@@ -145,7 +145,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
       const w = Math.max(...s.lines.map((l) => measure(l, 12))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y + 10)}" x2="${f(width - MARGIN)}" y2="${f(y + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y)}" width="${f(w)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ' font-size="12"', dir));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ' class="am-actor-text" font-size="12"', dir));
       y += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k}">${body.slice(start).join('')}</g>`);
@@ -156,7 +156,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
     const x = X(xs[i]);
     return `<line class="am-lifeline" x1="${f(x)}" y1="${TOP + ACTOR_H}" x2="${f(x)}" y2="${f(height - 4)}"/>`
       + `<g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>`
-      + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' font-weight="600"', dir)}</g>`;
+      + `${textLines([p], x, TOP + ACTOR_H / 2, LH, ' class="am-actor-text" font-weight="600"', dir)}</g>`;
   });
   return `${svgOpen(width, height, diagramLabel(ui, 'sequence', ps), dir)}${arrowDefs(id)}${actors.join('')}${body.join('')}</svg>`;
 }

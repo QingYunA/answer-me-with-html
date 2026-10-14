@@ -6,7 +6,7 @@
     "ja": "マンガ",
     "he": "מנגה"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Answer me with HTML",
   "license": "MIT",
   "description": {
@@ -19,7 +19,16 @@
       "--radius": "0px",
       "--bw": "3px",
       "--head-font": "\"Bangers\", \"Avenir Next Condensed\", Impact, \"Arial Narrow\", var(--font-sans)",
-      "--shadow": "6px 6px 0 var(--line)"
+      "--shadow": "6px 6px 0 var(--line)",
+      "--node-width": "2.5px",
+      "--node-shadow": "drop-shadow(4px 4px 0 var(--line))",
+      "--edge-width": "2",
+      "--note-width": "2px",
+      "--note-radius": "12px",
+      "--edge-color": "var(--line)",
+      "--note-stroke": "var(--line)",
+      "--cluster-stroke": "var(--line)",
+      "--lifeline-color": "var(--line)"
     },
     "light": {
       "--bg": "#ffffff",
@@ -39,7 +48,14 @@
       "--warn": "#855400",
       "--warn-bg": "#fff3c7",
       "--head-bg": "#111111",
-      "--head-fg": "#ffffff"
+      "--head-fg": "#ffffff",
+      "--hi-fill": "#111111",
+      "--hi-stroke": "#111111",
+      "--hi-text": "#ffffff",
+      "--actor-fill": "#111111",
+      "--actor-stroke": "#111111",
+      "--actor-text": "#ffffff",
+      "--note-fill": "#ffffff"
     },
     "dark": {
       "--bg": "#111114",
@@ -59,7 +75,14 @@
       "--warn": "#ffd24d",
       "--warn-bg": "#3b3014",
       "--head-bg": "#f2f2f2",
-      "--head-fg": "#111111"
+      "--head-fg": "#111111",
+      "--hi-fill": "#f2f2f2",
+      "--hi-stroke": "#f2f2f2",
+      "--hi-text": "#111111",
+      "--actor-fill": "#f2f2f2",
+      "--actor-stroke": "#f2f2f2",
+      "--actor-text": "#111111",
+      "--note-fill": "#18181d"
     }
   },
   "css": "& .am-head h1 { font-family: var(--head-font); font-weight: 800; font-size: 34px; letter-spacing: 0.01em; text-transform: uppercase; }\n& .am-panel-head h2 { font-family: var(--head-font); font-weight: 800; font-size: 16px; letter-spacing: 0.03em; text-transform: uppercase; }\n& .am-panel-id { font-family: var(--head-font); font-weight: 800; }\n@media (max-width: 760px) {\n  & .am-head h1 { font-size: 27px; }\n}\n& .am-panel-head { background-color: var(--head-bg); color: var(--head-fg); background-image: radial-gradient(color-mix(in srgb, var(--head-fg) 22%, transparent) 1px, transparent 1.3px); background-size: 5px 5px; }\n& .am-panel-id { background: var(--head-fg); color: var(--head-bg); }\n& .am-panel-meta { color: var(--head-fg); }\n& .am-panel-head .am-comment-btn { color: var(--head-fg); }\n& .am-panel:hover .am-panel-head .am-comment-btn { border-color: color-mix(in srgb, var(--head-fg) 55%, transparent); }\n& .am-panel-head .am-comment-btn:hover, & .am-panel-head .am-comment-btn:focus-visible, & .am-panel-head .am-comment-btn[aria-expanded=\"true\"], & .am-panel-head .am-comment-btn.am-comment-btn--on { color: var(--head-fg); border-color: var(--head-fg); }"
