@@ -12,6 +12,7 @@ import { resolveLanguage } from './language.js';
 import { COMPONENTS } from './components/index.js';
 import { themeNames, getTheme, loadThemes } from './themes/registry.js';
 import { readThemeFile } from './themes/user.js';
+import { cmdThemeMarket, THEME_MARKET_USAGE } from './theme-market.js';
 import { checkColors, externalResourceWarnings, COLOR_TOKENS } from './themes/check.js';
 import { FONT_NAMES } from './themes/font-list.js';
 import { THEME_SELECTORS } from './themes/selectors.js';
@@ -49,6 +50,8 @@ Usage:
   am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
+  am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
+  am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
   am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
@@ -232,6 +235,9 @@ export async function main(argv, io = {}) {
         'public-url': { type: 'string' },
         all: { type: 'boolean' },
         'dry-run': { type: 'boolean' },
+        use: { type: 'boolean' },
+        force: { type: 'boolean' },
+        remote: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
@@ -353,7 +359,19 @@ Usage:
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
 
-const THEME_HELP = `Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
+const THEME_HELP = `Install a ready-made theme from the catalog at answer-me-with-html.com/themes/
+
+am theme add <name> [--use] [--force]
+- Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+- A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
+- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an http(s) URL of an index.json).
+am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
+am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
+am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again
+- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.6.0 or newer; before that, save the file by hand (see the catalog page).
+
+Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
 
 The file name is the theme name: themes/notes.json is theme "notes" (lowercase letters, digits and -; not a built-in name).
 Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am config set theme notes. The draft does not change.
@@ -379,7 +397,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
   Target these classes (they stay stable): ${THEME_SELECTORS.join(' ')}.
   Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
-  am theme check warns about them; a theme catalog will reject them.
+  am theme check warns about them; the catalog and am theme add reject them.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
@@ -780,9 +798,10 @@ function specimenDraft(name, mode) {
 }
 
 function cmdTheme(action, target, opts, ctx) {
+  if (['add', 'list', 'update', 'remove'].includes(action)) return cmdThemeMarket(action, target, opts, ctx);
   const { print, fail, env, io } = ctx;
   if (action !== 'check' || !target) {
-    fail('✗ Usage: am theme check <name|file.json>');
+    fail(`✗ Usage: am theme check <name|file.json> | ${THEME_MARKET_USAGE}`);
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);

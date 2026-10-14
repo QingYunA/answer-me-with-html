@@ -208,7 +208,7 @@ AM_EOF
 - `css` 里每条选择器都以 `&` 开头。`&` 代表主题的根节点，这样这些规则只在这个主题下生效。
 - `font`（可选）写本工具自带的字体名。用这个主题生成的页面会内嵌该字体，不需要联网，其他主题的页面也不会变大。目前只有 `bangers`（[Bangers](https://github.com/googlefonts/bangers)，SIL OFL 1.1）；在 `css` 里使用它的字体族，例如 `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`。不认识这个字段的旧版本会忽略它，显示回退字体。视频页面不内嵌这个字体。
 - `requires`（可选）写主题支持的最低版本，格式 `x.y.z`。版本更低时，这个主题会被跳过，并提示 `needs Answer me with HTML x.y.z or newer`；不认识这个字段的旧版本会忽略它。
-- 文件要自成一体：不要写指向 `http:`、`https:` 或 `//` 的 `url()` 或 `image-set()`，不要 `@import`，不要 `@font-face`，也不要用反斜杠转义（转义可以绕过检查）。外链会在每次打开页面时发出请求，而页面要能离线使用。`am theme check` 会对这些情况给出警告，已有的主题仍然可用；主题库会拒收它们。
+- 文件要自成一体：不要写指向 `http:`、`https:` 或 `//` 的 `url()` 或 `image-set()`，不要 `@import`，不要 `@font-face`，也不要用反斜杠转义（转义可以绕过检查）。外链会在每次打开页面时发出请求，而页面要能离线使用。`am theme check` 会对这些情况给出警告，已有的主题仍然可用；主题库和 `am theme add` 会拒收它们。
 - 每个页面都内嵌了内置主题和它自己的主题，所以换一台电脑也能打开。
 - `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，对外部资源给出警告，并生成两页包含全部组件的样张。
 
@@ -225,6 +225,26 @@ AM_EOF
 ### 主题库
 
 [answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题加进主题库，见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+
+
+#### 安装主题：`am theme add`
+
+```bash
+am theme add comic --use       # 下载、检查并保存主题，同时设为默认主题
+am theme list [--remote]       # 内置主题，以及你的主题（带版本和来源）
+am theme update [name]         # 更新来自主题库的主题
+am theme remove <name>         # 删除一个主题文件
+```
+
+- `am theme add <name>` 读取主题库清单（`https://answer-me-with-html.com/themes/index.json`，或环境变量 `AM_CATALOG_URL` 指向的地址），从同一个地址下载 `themes/<name>.json`，并按清单核对大小和 sha256。随后做主题库 CI 的同一套检查：是有效的主题文件、没有对比度错误、没有外部资源。文件先写入临时文件再改名保存到 `~/.answer-me-with-html/themes/<name>.json`，中途中断不会留下半个文件。只接受主题库里的名字，不接受网址或路径。`requires` 高于当前版本的主题会被拒绝，并说明需要哪个版本。网络请求 8 秒超时。
+- `--use` 同时设为默认主题，等同 `am config set theme <name>`，不会再问别的。
+- 同名文件如果不是主题库给的那份，永远不会被覆盖，因为它可能是你自己的主题：命令会停下并提示 `--force`。完全相同的文件会提示已经安装。如果文件仍然和主题库给的一模一样，新版本会直接替换，不需要 `--force`。
+- 每个主题的来源记在数据目录的 `state.json` 里（`catalogThemes`：名字、已安装文件的版本和 sha256）。主题文件夹里只放主题文件。没有记录的文件算你自己的（`local`）。
+- `am theme list` 不联网。安装后被你改过的文件显示为 `catalog, edited`。加 `--remote` 会再读取主题库，标出有更新的主题和你还没有的主题。
+- `am theme update` 更新每个来自主题库且安装后没改过的主题；你改过的文件会被跳过并给出提示（`am theme add <name> --force` 可替换）。`am theme update <name>` 只更新一个。
+- `am theme remove <name>` 删除文件和它的记录（内置主题不能删）。如果它是默认主题，默认值会回到 `auto`。已经生成的页面外观不变，因为页面自带主题。
+- 输出里只有主题名和版本号。主题库里的标签和描述是给网站看的，命令不会打印，所以主题库里的文字进不了 agent 的上下文。
+- 0.6.0 之前的版本没有 `am theme add`：按主题库页面上的方式手动保存文件（`curl` 或 PowerShell）。
 
 ## 在远程机器上打开页面
 

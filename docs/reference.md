@@ -208,7 +208,7 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 - In `css`, start every selector with `&`. It stands for the theme's root, so the rules apply only under this theme.
 - `font` (optional) names a font this tool ships. A page rendered with the theme embeds it, so it needs no network and the other pages do not grow. The only value for now is `bangers` ([Bangers](https://github.com/googlefonts/bangers), SIL OFL 1.1); use the family in `css`, for example `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`. A version that does not know the field ignores it and shows the fallback font. Video pages do not embed the font.
 - `requires` (optional) is the oldest version of this tool the theme supports, as `x.y.z`. On an older version the theme is skipped with `needs Answer me with HTML x.y.z or newer`; a version that does not know the field ignores it.
-- Keep the file self-contained: no `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face` and no backslash escapes (they can hide a link from the check). A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. The theme catalog rejects them.
+- Keep the file self-contained: no `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face` and no backslash escapes (they can hide a link from the check). A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. The theme catalog and `am theme add` reject them.
 - Each page carries the built-in themes plus its own theme, so it still opens on any machine.
 - `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, warns about external resources, and renders two specimen pages with every component.
 
@@ -225,6 +225,26 @@ The classes your `css` may target stay stable: a later version keeps every one o
 ### Theme catalog
 
 [answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
+
+
+#### Install a theme: `am theme add`
+
+```bash
+am theme add comic --use       # download, check and save the theme, and make it the default
+am theme list [--remote]       # built-in themes, then yours with version and source
+am theme update [name]         # update themes that came from the catalog
+am theme remove <name>         # delete a theme file
+```
+
+- `am theme add <name>` reads the catalog index (`https://answer-me-with-html.com/themes/index.json`, or the URL in the `AM_CATALOG_URL` environment variable), downloads `themes/<name>.json` from the same address, and checks its size and sha256 against the index. It then runs the checks of the catalog CI: a valid theme file, no contrast error, no external resource. It saves the file to `~/.answer-me-with-html/themes/<name>.json` through a temporary file, so an interrupted run leaves no half file. Only catalog names work, not URLs or paths. A theme that `requires` a newer version is refused with the version it needs. Network calls time out after 8 seconds.
+- `--use` also sets the default theme, the same as `am config set theme <name>`. It asks nothing else.
+- A file with that name that is not the catalog's is never overwritten, because it may be your own theme: the command stops and suggests `--force`. The identical file is reported as already installed. A file that is still exactly what the catalog gave you is replaced by a newer version without `--force`.
+- Where each theme came from is recorded in `state.json` in the data folder (`catalogThemes`: name, version and sha256 of the installed file). The themes folder holds theme files only. Without a record, a file counts as your own (`local`).
+- `am theme list` needs no network. A file you changed after installing shows as `catalog, edited`. `--remote` also reads the catalog and marks themes with an update and themes you do not have.
+- `am theme update` replaces each theme that came from the catalog and is unchanged since the install; a file you edited is skipped with a note (`am theme add <name> --force` replaces it). `am theme update <name>` does one theme.
+- `am theme remove <name>` deletes the file and its record (never a built-in theme). If it was the default theme, the default goes back to `auto`. Pages already made keep their look, because a page carries its own theme.
+- The output prints theme names and versions only. Labels and descriptions from the catalog are for the website and are never printed, so the text of a catalog cannot reach an agent through the command.
+- Versions before 0.6.0 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
 
 ## Opening pages from a remote machine
 

@@ -128,6 +128,8 @@ function cssField(where, css, errors) {
   return css;
 }
 
+const ESCAPE = 'escape sequence (\\)';
+
 // Links a theme must not carry: a page opens offline, and a link would send a request each time someone opens it. Returns what the
 // css holds, comments stripped: url() or image-set() to http:, https: or //, any @import, any @font-face (a theme names a shipped font with
 // `font`), and any backslash (an escape could hide the others).
@@ -146,14 +148,16 @@ export function externalResources(css) {
   if (/@import\b/i.test(text)) found.push('@import');
   if (/@font-face\b/i.test(text)) found.push('@font-face');
   // A CSS escape can spell url( or @import in a way the checks above do not read (u\72 l(...)), and a theme has no need for one.
-  if (text.includes('\\')) found.push('escape sequence (\\)');
+  if (text.includes('\\')) found.push(ESCAPE);
   return found;
 }
 
 // Warnings for a theme definition's css and video.css.
 export function externalResourceWarnings(theme) {
   return [['css', theme?.css], ['video.css', theme?.video?.css]].flatMap(([where, css]) =>
-    externalResources(css).map((r) => `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
+    externalResources(css).map((r) => (r === ESCAPE
+      ? `${where}: ${r} can hide a link from this check; a theme has no need for one (write the value plainly)`
+      : `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`)));
 }
 
 // Pairs read as text need 4.5:1; status colors on their tint are badges and need at least 3:1 (4.5:1 gives a warning only).

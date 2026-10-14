@@ -50,10 +50,11 @@ export function catalogIndex(entries, siteUrl) {
   return `${JSON.stringify({ schema: 1, themes }, null, 2)}\n`;
 }
 
-// The install commands of one theme. `am theme add` is not here yet.
+// The install commands of one theme: `am theme add` (0.6.0 and newer), an agent prompt that names it and the manual save for older versions.
 export function installTexts(name, siteUrl, dict) {
   const url = `${siteUrl}themes/${name}.json`;
   return {
+    command: `am theme add ${name} --use`,
     agent: fill(dict.c_agent_prompt, { name, url }),
     unix: `curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`,
     windows: `New-Item -ItemType Directory -Force "$HOME\\.answer-me-with-html\\themes" | Out-Null\nInvoke-WebRequest ${url} -OutFile "$HOME\\.answer-me-with-html\\themes\\${name}.json"`,
@@ -75,9 +76,9 @@ function card(entry, dict, lang, siteUrl) {
     ...(font ? [[dict.c_font, esc(font)]] : []),
   ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('\n          ');
   // One tab and one panel for each way to install. Without JavaScript every panel shows, each under its own label.
-  const ways = [['agent', dict.c_ask], ['curl', dict.c_unix], ['powershell', dict.c_windows]];
+  const ways = [['command', dict.c_cmd], ['agent', dict.c_ask], ['curl', dict.c_unix], ['powershell', dict.c_windows]];
   const tabs = ways.map(([method, label], i) => `<button type="button" role="tab" id="${name}-t-${method}" aria-controls="${name}-p-${method}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-method="${method}" data-copy-label="${esc(fill(dict.c_copy_aria, { what: label, name }))}">${esc(label)}</button>`).join('\n          ');
-  const text = { agent: install.agent, curl: install.unix, powershell: install.windows };
+  const text = { command: install.command, agent: install.agent, curl: install.unix, powershell: install.windows };
   const panels = ways.map(([method, label]) => `<div class="tpanel tpanel--${method}" role="tabpanel" id="${name}-p-${method}" aria-labelledby="${name}-t-${method}"><p class="tcard-step">${esc(label)}</p><pre>${esc(text[method])}</pre></div>`).join('\n          ');
   const note = fill(data.font ? dict.c_note_font : dict.c_note, { font });
   return `<article class="tcard" id="${name}" data-theme="${name}" data-file="${esc(`themes/${name}.json`)}" aria-labelledby="${name}-title">

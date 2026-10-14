@@ -180,7 +180,7 @@ test('site build: themes/<name>.json are byte-identical copies, and themes/index
   assert.ok(!/\d{4}-\d\d-\d\dT/.test(read(join(ROOT, 'site/dist/themes/index.json'))), 'no timestamps');
 });
 
-test('site build: each gallery page has a card per catalog theme with its install commands, and no am theme command yet', BUILT, () => {
+test('site build: each gallery page has a card per catalog theme with its install commands, `am theme add` first', BUILT, () => {
   const names = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
   for (const page of ['themes/index.html', 'zh/themes/index.html']) {
     const html = read(join(ROOT, 'site/dist', page));
@@ -189,18 +189,20 @@ test('site build: each gallery page has a card per catalog theme with its instal
       assert.ok(html.includes(`<article class="tcard" id="${name}"`), `${page}: card ${name}`);
       assert.ok(html.includes(`curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`), `${page}: curl ${name}`);
       assert.ok(html.includes(`Invoke-WebRequest ${url} -OutFile`), `${page}: PowerShell ${name}`);
-      assert.ok(html.includes(`save ${url} as ~/.answer-me-with-html/themes/${name}.json`) || html.includes(`把 ${url} 保存为`), `${page}: agent prompt ${name}`);
+      assert.ok(html.includes(`<pre>am theme add ${name} --use</pre>`), `${page}: command ${name}`);
+      assert.ok(html.includes(`run am theme add ${name} --use. On a version before 0.6.0, save ${url} as ~/.answer-me-with-html/themes/${name}.json instead.`)
+        || html.includes(`运行 am theme add ${name} --use。如果版本低于 0.6.0，改为把 ${url} 保存为 ~/.answer-me-with-html/themes/${name}.json。`), `${page}: agent prompt ${name}`);
     }
-    assert.doesNotMatch(html, /am theme add/);
     assert.match(html, /0\.4\.10/);
+    assert.match(html, /Command \(0\.6\.0\+\)|命令（0\.6\.0\+）/);
     assert.match(html, /0\.6\.0/);
     assert.doesNotMatch(html, /web fonts|外部字体|网页字体/);
     assert.equal(html.match(/role="tablist"/g)?.length, names.length, `${page}: one tab strip per card`);
-    assert.equal(html.match(/role="tab"/g)?.length, names.length * 3, `${page}: three tabs per card`);
-    assert.equal(html.match(/role="tabpanel"/g)?.length, names.length * 3, `${page}: three panels per card`);
+    assert.equal(html.match(/role="tab"/g)?.length, names.length * 4, `${page}: four tabs per card`);
+    assert.equal(html.match(/role="tabpanel"/g)?.length, names.length * 4, `${page}: four panels per card`);
     assert.equal(html.match(/aria-selected="true"/g)?.length, names.length, `${page}: one selected tab per card`);
     assert.equal(html.match(/class="tcopy-btn"/g)?.length, names.length, `${page}: one Copy button per card`);
-    assert.match(html, new RegExp(`id="${names[0]}-t-agent"[^>]*aria-selected="true"`), `${page}: the agent tab is selected first`);
+    assert.match(html, new RegExp(`id="${names[0]}-t-command"[^>]*aria-selected="true"`), `${page}: the command tab is selected first`);
   }
   assert.match(read(join(ROOT, 'site/dist/index.html')), /href="\.\/?themes\/"|href="themes\/"/, 'the home page links the gallery');
   assert.match(read(join(ROOT, 'site/dist/zh/index.html')), /href="\.\.\/themes\/"/, 'the Chinese home page links the gallery');

@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, mkdirSync as mkdirSync3, existsSync as existsSync6, rmSync as rmSync6 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.2";
@@ -749,7 +749,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join9, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
+import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -1603,6 +1603,7 @@ function cssField(where, css, errors) {
   }
   return css;
 }
+var ESCAPE = "escape sequence (\\)";
 function externalResources(css) {
   if (typeof css !== "string") return [];
   const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -1615,11 +1616,11 @@ function externalResources(css) {
   }
   if (/@import\b/i.test(text)) found.push("@import");
   if (/@font-face\b/i.test(text)) found.push("@font-face");
-  if (text.includes("\\")) found.push("escape sequence (\\)");
+  if (text.includes("\\")) found.push(ESCAPE);
   return found;
 }
 function externalResourceWarnings(theme) {
-  return [["css", theme?.css], ["video.css", theme?.video?.css]].flatMap(([where, css]) => externalResources(css).map((r) => `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
+  return [["css", theme?.css], ["video.css", theme?.video?.css]].flatMap(([where, css]) => externalResources(css).map((r) => r === ESCAPE ? `${where}: ${r} can hide a link from this check; a theme has no need for one (write the value plainly)` : `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
 }
 var TEXT_PAIRS = [["--ink", "--paper"], ["--ink", "--bg"], ["--ink-2", "--paper"], ["--ink-2", "--bg"], ["--head-fg", "--head-bg"], ["--accent", "--paper"]];
 var BADGE_PAIRS = [["--accent", "--accent-bg"], ["--ok", "--ok-bg"], ["--err", "--err-bg"], ["--warn", "--warn-bg"]];
@@ -1687,22 +1688,22 @@ function pickTheme({ scope, template, visuals }) {
 }
 function themeSet(user = [], broken = /* @__PURE__ */ new Map()) {
   const all = [...ALL, ...user];
-  const list = (scope) => all.filter((t) => t.scope.includes(scope));
-  const names = (scope) => list(scope).map((t) => t.name);
+  const list2 = (scope) => all.filter((t) => t.scope.includes(scope));
+  const names2 = (scope) => list2(scope).map((t) => t.name);
   const unusable = [...broken].filter(([name]) => !BUILTIN_NAMES.includes(name));
   return Object.freeze({
-    list,
-    names,
+    list: list2,
+    names: names2,
     get: (name) => all.find((t) => t.name === name),
     // Names a draft or flag may give: usable themes plus broken ones, so the error can say what is wrong with the file.
-    choices: (scope) => [AUTO, ...names(scope), ...unusable.map(([name]) => name)],
+    choices: (scope) => [AUTO, ...names2(scope), ...unusable.map(([name]) => name)],
     // Why a name cannot be used, or null.
     problem(name, scope) {
       if (name === AUTO) return null;
-      if (names(scope).includes(name)) return null;
+      if (names2(scope).includes(name)) return null;
       const bad = unusable.find(([n]) => n === name);
       if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
-      return `Theme "${name}" is not installed. Choose one of: ${names(scope).join(" | ")}`;
+      return `Theme "${name}" is not installed. Choose one of: ${names2(scope).join(" | ")}`;
     },
     // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
     embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
@@ -3341,7 +3342,7 @@ function esc(str) {
 }
 
 // src/raw-html.js
-var words2 = (list) => new Set(list.split(" "));
+var words2 = (list2) => new Set(list2.split(" "));
 var NEVER = words2("title textarea style xmp iframe noembed noframes script plaintext link meta base object embed frame frameset template html head body noscript svg math");
 var PHRASING = words2("a abbr b bdi bdo br cite code data del dfn em i img ins kbd mark q rp rt ruby s samp small span strong sub sup time u var wbr");
 var BLOCK = words2("address area article aside audio blockquote button canvas caption col colgroup datalist dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr input label legend li main map menu meter nav ol optgroup option output p picture pre progress search section select slot source summary table tbody td tfoot th thead tr track ul video acronym big center font strike tt");
@@ -4197,9 +4198,9 @@ function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top2 + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`).join("");
 }
 var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", er: "Entity relationship diagram", colon: ": ", sep: ", " };
-function diagramLabel(ui, kind2, names) {
+function diagramLabel(ui, kind2, names2) {
   const u = { ...EN_LABELS, ...ui };
-  return `${u[kind2]}${u.colon}${names.join(u.sep)}`;
+  return `${u[kind2]}${u.colon}${names2.join(u.sep)}`;
 }
 function svgOpen(width, height, label, dir = "ltr") {
   const w = Math.ceil(width);
@@ -4236,23 +4237,23 @@ var RE = {
 };
 function parseSequence(text) {
   const participants = [];
-  const add = (p) => {
+  const add2 = (p) => {
     if (!participants.includes(p)) participants.push(p);
   };
   const steps = [];
   for (const { text: t, line } of contentLines(text)) {
     let m;
     if (m = t.match(RE.participants)) {
-      m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add);
+      m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add2);
     } else if (m = t.match(RE.note)) {
       const over2 = m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-      over2.forEach(add);
+      over2.forEach(add2);
       steps.push({ kind: "note", over: over2, text: m[2].trim(), line });
     } else if (m = t.match(RE.divider)) {
       steps.push({ kind: "divider", text: m[1], line });
     } else if (m = t.match(RE.msg)) {
-      add(m[1]);
-      add(m[3]);
+      add2(m[1]);
+      add2(m[3]);
       steps.push({ kind: "msg", from: m[1], to: m[3], dashed: m[2] === "-->", label: (m[4] ?? "").trim(), line });
     } else {
       throw new ComponentError(`sequence cannot parse "${t}". Write a message as A -> B: label (--> is a dashed return) and a note as note A: text`, line);
@@ -6818,8 +6819,8 @@ function erLineOf(mermaid) {
   return `${from} ${MERMAID_CARDS[left]}--${MERMAID_CARDS[right]} ${to}${text ? `: ${text}` : ""}`;
 }
 function relationships({ entities, written }) {
-  const ends = (...names) => {
-    const states = names.map((name) => entities.get(name).state);
+  const ends = (...names2) => {
+    const states = names2.map((name) => entities.get(name).state);
     return ["removed", "added"].find((s) => states.includes(s));
   };
   const withState = (rel, state) => state ? { ...rel, state } : rel;
@@ -7118,9 +7119,9 @@ ${head}<div class="am-panel-body">${panel.html}</div>
 var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "cols", "title", "subtitle", "lang"]);
 function headHtml(meta, introHtml, language = {}) {
   const extras = Object.entries(meta).filter(([k2, v]) => !RESERVED.has(k2) && v !== "");
-  const names = language.metaKeys ?? {};
+  const names2 = language.metaKeys ?? {};
   const value = (v) => language.dir === "rtl" ? `<bdi${hasRtl(v) ? ' dir="rtl"' : ""}>${esc(v)}</bdi>` : esc(v);
-  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k2, v]) => `<span><b>${esc(names[k2.toLowerCase()] ?? k2)}</b>${value(v)}</span>`).join("")}</div>` : "";
+  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k2, v]) => `<span><b>${esc(names2[k2.toLowerCase()] ?? k2)}</b>${value(v)}</span>`).join("")}</div>` : "";
   const sub = meta.subtitle ? `<p class="am-sub">${esc(meta.subtitle)}</p>` : "";
   const intro = introHtml ? `<div class="am-intro am-md">${introHtml}</div>` : "";
   return `<header class="am-head"><h1>${esc(meta.title || "Untitled")}</h1>${sub}${metaRow}${intro}</header>`;
@@ -7213,19 +7214,19 @@ var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
 var languageFontCss = () => fontLanguages().map((l3) => block(langSelector(l3, "html", "[data-theme][data-mode]"), { "--font-sans": l3.fonts.sans }));
 var ownLanguageFont = (t) => fontLanguages().map((l3) => block(langSelector(l3, "html", `[data-theme="${t.name}"][data-mode]`), { "--font-sans": t.tokens.common["--font-sans"] }));
-function pageCss(list = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, update = false, closeAfter = false, theme } = {}) {
-  const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  const fontFace = FONT_CSS[list.find((t) => t.name === theme)?.font];
-  const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, BASE_CSS, ...math2 ? [MATH_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
+function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, update: update2 = false, closeAfter = false, theme } = {}) {
+  const decorations = list2.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
+  const fontFace = FONT_CSS[list2.find((t) => t.name === theme)?.font];
+  const ownFonts = list2.filter((t) => t.ownFont).flatMap(ownLanguageFont);
+  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, BASE_CSS, ...math2 ? [MATH_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
 }
-function videoCss(list = themes("video"), { diff = false, delta = false, rtl = false } = {}) {
-  const parts = list.filter((t) => t.video).flatMap((t) => [
+function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = false } = {}) {
+  const parts = list2.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : "",
     t.video.css ? scoped(t.video.css, videoSel(t)) : "",
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : ""
   ]).filter(Boolean);
-  return [pageCss(list.filter((t) => t.scope.includes("page")), { diff, delta, rtl }), VIDEO_CSS, ...parts].join("\n\n");
+  return [pageCss(list2.filter((t) => t.scope.includes("page")), { diff, delta, rtl }), VIDEO_CSS, ...parts].join("\n\n");
 }
 
 // src/lint/wordlist.en.js
@@ -7397,10 +7398,10 @@ function lintMarkdown(text, startLine, out, family) {
       cells.forEach((c) => checkUnit(clean(c.replace(/^(ok|warn|✓|✔|⚠)(\s|$)/, "")), line, "descriptive", out, family));
       return;
     }
-    const list = t.match(/^(?:([-*+])|(\d+)[.)])\s+(.*)$/);
-    if (list) {
+    const list2 = t.match(/^(?:([-*+])|(\d+)[.)])\s+(.*)$/);
+    if (list2) {
       flush();
-      checkUnit(clean(list[3]), line, list[2] ? "procedural" : "descriptive", out, family);
+      checkUnit(clean(list2[3]), line, list2[2] ? "procedural" : "descriptive", out, family);
       return;
     }
     const body = clean(t.replace(/^>\s*/, ""));
@@ -7917,7 +7918,7 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
-function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update, closeAfter = false } = {}) {
+function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update: update2, closeAfter = false } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -7937,7 +7938,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const page = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui, language });
   const body = language.dir === "rtl" ? isolateLtrRuns(page) : page;
-  const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update, closeAfter });
+  const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update: update2, closeAfter });
   return { html, warnings, stats, meta: doc2.meta, language };
 }
 function hasVisuals({ intro, panels }) {
@@ -8031,15 +8032,15 @@ function colophon(language) {
   return `<p class="am-colophon">${label} ${link} ${VERSION} \xB7 ${time} \xB7 ${star}</p>`;
 }
 var withColophon = (body, language) => body.replace('<header class="am-head">', (head) => `${head}${colophon(language)}`);
-function updateNotice(ui, update, labelKey) {
-  if (!update) return { button: "", popover: "" };
+function updateNotice(ui, update2, labelKey) {
+  if (!update2) return { button: "", popover: "" };
   const t = ui.update;
-  const lines = update.highlights?.[labelKey] ?? update.highlights?.en;
+  const lines = update2.highlights?.[labelKey] ?? update2.highlights?.en;
   const notes = lines ? `<p class="am-update-label">${esc(t.whatsNew)}</p>
 <ul class="am-update-notes">${lines.map((l3) => `<li>${esc(l3).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul>
 ` : "";
-  const plain = t.button.replace("{version}", update.latest);
-  const fill2 = (s) => esc(s).replace("{version}", `<bdi>${esc(update.latest)}</bdi>`).replace("{current}", `<bdi>${esc(update.current)}</bdi>`);
+  const plain = t.button.replace("{version}", update2.latest);
+  const fill2 = (s) => esc(s).replace("{version}", `<bdi>${esc(update2.latest)}</bdi>`).replace("{current}", `<bdi>${esc(update2.current)}</bdi>`);
   const row = (text, code) => `<div class="am-update-row">${code ? `<code dir="ltr">${esc(text)}</code>` : `<span>${esc(text)}</span>`}<button class="am-btn" type="button" data-am="copy-text" data-text="${esc(text)}" data-done="${esc(ui.done)}">${esc(ui.copyCode)}</button></div>`;
   return {
     button: `<button class="am-btn am-btn--update" type="button" data-am="update" popovertarget="am-update" aria-label="${esc(plain)}" hidden>\u25CF <span class="am-update-text">${fill2(t.button)}</span></button>
@@ -8048,7 +8049,7 @@ function updateNotice(ui, update, labelKey) {
 <p class="am-update-title">${fill2(t.button)}</p>
 <p>${fill2(t.current)}</p>
 ${notes}<p class="am-update-label">${esc(t.run)}</p>
-${row(update.command, true)}
+${row(update2.command, true)}
 <p class="am-update-label">${esc(t.agent)}</p>
 ${row(t.agentText, false)}
 <a href="https://github.com/QingYunA/answer-me-with-html/releases" target="_blank" rel="noopener">${esc(t.notes)}</a>
@@ -8080,9 +8081,9 @@ function lightboxShell(ui, hasDiagrams) {
 `;
 }
 var CLOSE_AFTER_SECONDS = 3;
-function shell({ meta, language, body, source, embedded, update, closeAfter }) {
+function shell({ meta, language, body, source, embedded, update: update2, closeAfter }) {
   const { ui, labelKey } = language;
-  const notice = updateNotice(ui, update, labelKey);
+  const notice = updateNotice(ui, update2, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
   return `<!doctype html>
@@ -8093,7 +8094,7 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), update: Boolean(update), closeAfter, theme: meta.theme })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), update: Boolean(update2), closeAfter, theme: meta.theme })}
 </style>
 </head>
 <body>
@@ -8107,10 +8108,498 @@ ${pick("mode", ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 ${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}</script>
+${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}</script>
 </body>
 </html>
 `;
+}
+
+// src/theme-market.js
+import { join as join6 } from "node:path";
+
+// src/config.js
+import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
+import { join as join3, dirname } from "node:path";
+
+// src/home.js
+import { mkdirSync, existsSync as existsSync2, statSync as statSync3, chmodSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+var defaultHome = () => join2(homedir2(), ".answer-me-with-html");
+function ensureHome(home) {
+  const fresh = !existsSync2(home);
+  mkdirSync(home, { recursive: true, mode: 448 });
+  if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
+  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+}
+
+// src/config.js
+var ConfigError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ConfigError";
+  }
+};
+var CONFIG_KEYS = Object.freeze({
+  open: { type: "bool", default: true, label: "Open the page in the browser after it is made" },
+  theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
+  mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
+  style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
+  update_check: { type: "bool", default: true, label: "Check for a new version once a week in the background and tell you (never updates by itself)" },
+  close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
+});
+var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
+var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
+function amHome(env = process.env) {
+  return env.AM_HOME || defaultHome();
+}
+function configPath(env = process.env) {
+  return join3(amHome(env), "config.json");
+}
+var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
+function configChoices(key, themes2) {
+  return key === "theme" ? [AUTO, ...themes2.names("page")] : CONFIG_KEYS[key].choices;
+}
+function coerce2(key, raw, themes2) {
+  const spec = CONFIG_KEYS[key];
+  if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
+  if (spec.type === "bool") {
+    if (typeof raw === "boolean") return raw;
+    const v2 = String(raw).trim().toLowerCase();
+    if (TRUE.has(v2)) return true;
+    if (FALSE.has(v2)) return false;
+    throw new ConfigError(`${key} accepts only on / off`);
+  }
+  const v = String(raw).trim();
+  const choices = configChoices(key, themes2);
+  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
+  return v;
+}
+function readStored(env) {
+  const file = configPath(env);
+  if (!existsSync3(file)) return { stored: {} };
+  try {
+    const data = JSON.parse(readFileSync4(file, "utf8"));
+    return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
+  } catch (e) {
+    return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
+  }
+}
+function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
+  const { stored, warning } = readStored(env);
+  const values = defaults();
+  const warnings = [warning];
+  for (const [k2, v] of Object.entries(stored)) {
+    if (!CONFIG_KEYS[k2]) continue;
+    try {
+      values[k2] = coerce2(k2, v, themes2);
+    } catch {
+      if (k2 === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
+    }
+  }
+  return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
+}
+function writeStored(stored, env) {
+  const file = configPath(env);
+  if (!Object.keys(stored).length) {
+    rmSync(file, { force: true });
+    return;
+  }
+  ensureHome(dirname(file));
+  writeFileSync(file, `${JSON.stringify(stored, null, 2)}
+`);
+}
+function setConfig(key, raw, env = process.env, themes2 = loadThemes(amHome(env))) {
+  const value = coerce2(key, raw, themes2);
+  const { stored } = readStored(env);
+  writeStored({ ...stored, [key]: value }, env);
+  return value;
+}
+function resetConfig(key, env = process.env) {
+  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "", null);
+  const { stored } = readStored(env);
+  const next = key === void 0 ? {} : Object.fromEntries(Object.entries(stored).filter(([k2]) => k2 !== key));
+  writeStored(next, env);
+}
+
+// src/themes/catalog.js
+import { createHash } from "node:crypto";
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join5 } from "node:path";
+
+// src/state.js
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, renameSync } from "node:fs";
+import { join as join4 } from "node:path";
+var DAY = 24 * 60 * 60 * 1e3;
+var statePath = (home) => join4(home, "state.json");
+function readState(home) {
+  try {
+    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
+function writeState(home, patch) {
+  const next = { ...readState(home), ...patch };
+  ensureHome(home);
+  const tmp = `${statePath(home)}.${process.pid}.tmp`;
+  writeFileSync2(tmp, `${JSON.stringify(next, null, 2)}
+`);
+  renameSync(tmp, statePath(home));
+  return next;
+}
+
+// src/themes/catalog.js
+var CATALOG = Object.freeze({
+  url: "https://answer-me-with-html.com/themes/index.json",
+  timeoutMs: 8e3,
+  maxIndexBytes: 256 * 1024,
+  maxThemeBytes: 16 * 1024,
+  // the catalog limit (CONTRIBUTING.md)
+  maxThemes: 200,
+  maxNameLength: 40
+});
+var XYZ = /^\d+\.\d+\.\d+$/;
+var SHA256 = /^[0-9a-f]{64}$/;
+var CatalogError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CatalogError";
+  }
+};
+var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+var themesDir = (home) => join5(home, "themes");
+var themeFile = (home, name) => join5(themesDir(home), `${name}.json`);
+function catalogUrl(env = process.env) {
+  const url = env.AM_CATALOG_URL || CATALOG.url;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
+  }
+  if (!/^https?:$/.test(parsed.protocol)) throw new CatalogError(`AM_CATALOG_URL must be an http(s) URL: ${url}`);
+  return parsed.href;
+}
+function reasonOf(e, timeoutMs) {
+  if (e instanceof CatalogError) return e.message;
+  if (e?.name === "TimeoutError" || e?.name === "AbortError") return `no answer within ${Math.round(timeoutMs / 100) / 10} s`;
+  const code = e?.cause?.code ?? e?.code;
+  return typeof code === "string" && /^[A-Z0-9_]{3,30}$/.test(code) ? `network error ${code}` : "network error";
+}
+async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.timeoutMs } = {}) {
+  try {
+    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) throw new CatalogError(`HTTP ${Number.isInteger(res.status) ? res.status : "?"}`);
+    const declared = Number(res.headers?.get?.("content-length"));
+    if (declared > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of res.body) {
+      total += chunk.length;
+      if (total > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  } catch (e) {
+    throw new CatalogError(reasonOf(e, timeoutMs));
+  }
+}
+function entryFrom(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const { name, version, requires, size, sha256: hash } = raw;
+  if (typeof name !== "string" || !NAME.test(name) || name.length > CATALOG.maxNameLength || BUILTIN_NAMES.includes(name)) return null;
+  if (typeof version !== "string" || !XYZ.test(version)) return null;
+  if (requires !== void 0 && (typeof requires !== "string" || !XYZ.test(requires))) return null;
+  if (!Number.isInteger(size) || size <= 0 || size > CATALOG.maxThemeBytes) return null;
+  if (typeof hash !== "string" || !SHA256.test(hash)) return null;
+  return { name, version, size, sha256: hash, ...requires && { requires } };
+}
+async function fetchIndex(env = process.env, net = {}) {
+  const url = catalogUrl(env);
+  let text;
+  try {
+    text = (await download(url, CATALOG.maxIndexBytes, net)).toString("utf8");
+  } catch (e) {
+    throw new CatalogError(`Cannot read the theme catalog at ${url}: ${e.message}`);
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new CatalogError(`The theme catalog at ${url} is not valid JSON`);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.schema !== 1 || !Array.isArray(data.themes)) {
+    const newerFormat = Number.isInteger(data?.schema) && data.schema > 1;
+    throw new CatalogError(newerFormat ? `The theme catalog uses format ${data.schema}, which this version cannot read; update Answer me with HTML` : `The theme catalog at ${url} is not in a format this version reads`);
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const themes2 = data.themes.slice(0, CATALOG.maxThemes).map(entryFrom).filter((e) => e && !seen.has(e.name) && seen.add(e.name));
+  return { url, themes: themes2.sort((a, b) => a.name < b.name ? -1 : 1) };
+}
+var fileUrl = (index, name) => new URL(`${name}.json`, index.url).href;
+var needsNewer = (entry) => Boolean(entry.requires && newer(entry.requires, VERSION));
+function vet(name, bytes) {
+  let data;
+  try {
+    data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw new CatalogError("the file is not valid JSON");
+  }
+  const { theme, errors } = normalizeTheme(name, data, BUILTIN_NAMES);
+  const plural = (n, what) => `${what} (${n} problem${n === 1 ? "" : "s"})`;
+  if (errors.length) throw new CatalogError(plural(errors.length, "the file is not a valid theme"));
+  const colors = checkColors(theme).errors;
+  if (colors.length) throw new CatalogError(plural(colors.length, "the colors fail the contrast check"));
+  const links = [...externalResources(theme.css), ...externalResources(theme.video?.css)];
+  if (links.length) throw new CatalogError(plural(links.length, "the css loads external resources or uses a backslash escape"));
+  return bytes;
+}
+async function fetchTheme(index, entry, net = {}) {
+  let bytes;
+  try {
+    bytes = await download(fileUrl(index, entry.name), entry.size, net);
+  } catch (e) {
+    throw new CatalogError(`cannot download it: ${e.message}`);
+  }
+  if (bytes.length !== entry.size) throw new CatalogError(`the file is ${bytes.length} bytes but the catalog says ${entry.size}`);
+  if (sha256(bytes) !== entry.sha256) throw new CatalogError("the file does not match the sha256 in the catalog");
+  return vet(entry.name, bytes);
+}
+function readInstalled(home) {
+  const raw = readState(home).catalogThemes;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter(([name, r]) => NAME.test(name) && typeof r?.version === "string" && typeof r?.sha256 === "string"));
+}
+function record(home, name, entry) {
+  writeState(home, { catalogThemes: { ...readInstalled(home), [name]: { version: entry.version, sha256: entry.sha256 } } });
+}
+function forget(home, name) {
+  const { [name]: _gone, ...rest } = readInstalled(home);
+  writeState(home, { catalogThemes: rest });
+}
+function readInstalledFile(home, name) {
+  try {
+    return readFileSync6(themeFile(home, name));
+  } catch {
+    return null;
+  }
+}
+function isUnchanged(home, name, installed = readInstalled(home)) {
+  const bytes = readInstalledFile(home, name);
+  return Boolean(bytes && installed[name] && sha256(bytes) === installed[name].sha256);
+}
+function writeAtomic(home, name, bytes) {
+  ensureHome(home);
+  mkdirSync2(themesDir(home), { recursive: true });
+  const tmp = `${themeFile(home, name)}.${process.pid}.tmp`;
+  try {
+    writeFileSync3(tmp, bytes);
+    renameSync2(tmp, themeFile(home, name));
+  } catch (e) {
+    rmSync2(tmp, { force: true });
+    throw e;
+  }
+}
+function install(home, entry, bytes, { force = false } = {}) {
+  const installed = readInstalled(home);
+  const existing = readInstalledFile(home, entry.name);
+  let status = "installed";
+  if (existing) {
+    if (existing.equals(bytes)) status = "same";
+    else if (isUnchanged(home, entry.name, installed)) status = "updated";
+    else if (force) status = "replaced";
+    else return { status: "conflict", previous: installed[entry.name]?.version };
+  }
+  if (status !== "same") writeAtomic(home, entry.name, bytes);
+  record(home, entry.name, entry);
+  return { status, previous: installed[entry.name]?.version };
+}
+function remove(home, name) {
+  rmSync2(themeFile(home, name), { force: true });
+  if (readInstalled(home)[name]) forget(home, name);
+}
+
+// src/theme-market.js
+var THEME_MARKET_USAGE = "am theme add <name> [--use] [--force] | list [--remote] | update [name] | remove <name>";
+async function cmdThemeMarket(action, target, opts, ctx) {
+  const net = { timeoutMs: ctx.io?.catalogTimeoutMs };
+  if (net.timeoutMs === void 0) delete net.timeoutMs;
+  if (action === "add") return add(target, opts, ctx, net);
+  if (action === "list") return list(opts, ctx, net);
+  if (action === "update") return update(target, ctx, net);
+  return removeTheme(target, ctx);
+}
+var usage = (fail, text) => (fail(`\u2717 Usage: ${text}`), 2);
+var names = (index) => index.themes.map((t) => t.name).join(" | ") || "(none)";
+async function add(name, opts, { print, fail, env }, net) {
+  if (!name) return usage(fail, "am theme add <name> [--use] [--force]");
+  if (!NAME.test(name)) {
+    fail(`\u2717 "${name}" is not a catalog theme name (lowercase letters, digits and -). am theme add takes names from the catalog only, not URLs or paths`);
+    return 2;
+  }
+  const home = amHome(env);
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  const entry = index.themes.find((t) => t.name === name);
+  if (!entry) {
+    fail(`\u2717 No catalog theme named "${name}". Available: ${names(index)}`);
+    return 2;
+  }
+  if (needsNewer(entry)) {
+    fail(`\u2717 ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION})`);
+    return 1;
+  }
+  let bytes;
+  try {
+    bytes = await fetchTheme(index, entry, net);
+  } catch (e) {
+    return netFail(e, fail, `${name}: `);
+  }
+  const path = themeFile(home, name);
+  const { status, previous } = install(home, entry, bytes, { force: opts.force });
+  if (status === "conflict") {
+    fail(`\u2717 ${path} already exists and differs from the catalog version of ${name}; it may be your own theme. Nothing was changed. To replace it: am theme add ${name} --force`);
+    return 1;
+  }
+  const done = {
+    installed: `\u2713 Installed ${name} ${entry.version}: ${path}`,
+    same: `\u2713 ${name} ${entry.version} is already installed: ${path}`,
+    updated: `\u2713 Updated ${name} ${previous ?? "?"} \u2192 ${entry.version}: ${path}`,
+    replaced: `\u2713 Replaced ${name} with the catalog version ${entry.version}: ${path}`
+  }[status];
+  print(done);
+  if (opts.use) {
+    try {
+      print(`\u2713 theme = ${setConfig("theme", name, env, loadThemes(home))}`);
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      fail(`\u2717 ${e.message}`);
+      return 1;
+    }
+  } else if (status !== "same") {
+    print(`  Use it: theme: ${name} in a draft, --theme ${name}, or am config set theme ${name}`);
+  }
+  return 0;
+}
+function netFail(e, fail, prefix = "") {
+  if (!(e instanceof CatalogError)) throw e;
+  fail(`\u2717 ${prefix}${e.message}`);
+  return 1;
+}
+function sourceOf(home, name, installed) {
+  if (!installed[name]) return { source: "local", version: "-" };
+  return { source: isUnchanged(home, name, installed) ? "catalog" : "catalog, edited", version: installed[name].version };
+}
+async function list(opts, { print, fail, env }, net) {
+  const home = amHome(env);
+  print("Built-in themes:");
+  for (const t of BUILTIN.list("page")) print(`  ${t.name.padEnd(11)}${t.summary}`);
+  const { themes: usable, broken } = readUserThemes(home, BUILTIN_NAMES);
+  const installed = readInstalled(home);
+  const rows = [...usable.map((t) => t.name), ...broken.keys()].sort();
+  print(`
+Installed themes (${themesDir(home)}):`);
+  if (!rows.length) print("  none. Install one with: am theme add <name>   (list the catalog: am theme list --remote)");
+  for (const name of rows) {
+    const { source, version } = sourceOf(home, name, installed);
+    const bad = broken.get(name);
+    print(`  ${name.padEnd(11)}${version.padEnd(8)}${source}${bad ? `  \u2717 skipped: ${bad.reason}` : ""}`);
+  }
+  if (!opts.remote) return 0;
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  print(`
+Catalog (${index.url}):`);
+  for (const t of index.themes) {
+    const mine = installed[t.name];
+    const here = readInstalledFile(home, t.name) !== null;
+    let state;
+    if (needsNewer(t)) state = `needs Answer me with HTML ${t.requires} or newer`;
+    else if (!here) state = `not installed: am theme add ${t.name}`;
+    else if (!mine) state = `a file of this name is installed that is not from the catalog; to replace it: am theme add ${t.name} --force`;
+    else if (mine.sha256 !== t.sha256 && !newer(mine.version, t.version)) state = `update available (installed ${mine.version}): am theme update ${t.name}`;
+    else state = "installed";
+    print(`  ${t.name.padEnd(11)}${t.version.padEnd(8)}${state}`);
+  }
+  return 0;
+}
+async function update(target, { print, fail, env }, net) {
+  const home = amHome(env);
+  const installed = readInstalled(home);
+  if (target !== void 0 && !NAME.test(target)) return usage(fail, "am theme update [name]");
+  if (target !== void 0 && !installed[target]) {
+    if (readInstalledFile(home, target)) fail(`\u2717 ${target} was not installed from the catalog. To replace it with the catalog version: am theme add ${target} --force`);
+    else fail(`\u2717 No theme named "${target}" is installed from the catalog`);
+    return 2;
+  }
+  const todo = Object.keys(installed).filter((n) => target === void 0 || n === target).sort();
+  if (!todo.length) {
+    print("No themes installed from the catalog. Install one with: am theme add <name>");
+    return 0;
+  }
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  let failed = false;
+  for (const name of todo) {
+    const mine = installed[name];
+    if (readInstalledFile(home, name) === null) {
+      print(`! ${name}: the file is gone from ${themesDir(home)}; reinstall it with: am theme add ${name}`);
+    } else if (!isUnchanged(home, name, installed)) {
+      print(`! ${name} skipped: the file changed since it was installed. To replace it with the catalog version: am theme add ${name} --force`);
+    } else {
+      const entry = index.themes.find((t) => t.name === name);
+      if (!entry) print(`! ${name}: no longer in the catalog; kept ${mine.version}`);
+      else if (entry.sha256 === mine.sha256 || newer(mine.version, entry.version)) print(`\u2713 ${name} is up to date (${mine.version})`);
+      else if (needsNewer(entry)) print(`! ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION}); kept ${mine.version}`);
+      else {
+        try {
+          const bytes = await fetchTheme(index, entry, net);
+          install(home, entry, bytes);
+          print(`\u2713 Updated ${name} ${mine.version} \u2192 ${entry.version}`);
+        } catch (e) {
+          failed = true;
+          netFail(e, fail, `${name}: `);
+        }
+      }
+    }
+  }
+  return failed ? 1 : 0;
+}
+function removeTheme(name, { print, fail, env }) {
+  if (!name) return usage(fail, "am theme remove <name>");
+  if (BUILTIN_NAMES.includes(name)) {
+    fail(`\u2717 "${name}" is a built-in theme and cannot be removed`);
+    return 2;
+  }
+  const home = amHome(env);
+  if (!NAME.test(name) || readInstalledFile(home, name) === null) {
+    fail(`\u2717 No theme named "${name}" in ${themesDir(home)}`);
+    return 2;
+  }
+  const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name;
+  remove(home, name);
+  print(`\u2713 Removed ${join6(themesDir(home), `${name}.json`)}`);
+  if (wasDefault) {
+    resetConfig("theme", env);
+    print(`! ${name} was the default theme; the default is auto again`);
+  }
+  print("  Pages already made keep their look: a page carries its own theme.");
+  return 0;
 }
 
 // src/themes/selectors.js
@@ -8229,10 +8718,10 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync as readFileSync4, writeFileSync, existsSync as existsSync2, rmSync, mkdtempSync, renameSync } from "node:fs";
+import { createHash as createHash2 } from "node:crypto";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync3 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join as join2 } from "node:path";
+import { join as join7 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -8390,7 +8879,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
       synth: (text, { voice } = {}) => withTemp(async (file) => {
         await run("say", [...voice ? ["-v", voice] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
-        return readWav(readFileSync4(file));
+        return readWav(readFileSync7(file));
       })
     };
   }
@@ -8406,7 +8895,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
       synth: (text, { voice } = {}) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", voice ?? "en-us", "-w", file, "-f", textFile(file, text)]);
-        return readWav(readFileSync4(file));
+        return readWav(readFileSync7(file));
       })
     };
   }
@@ -8473,15 +8962,15 @@ function run(cmd, args) {
 }
 function textFile(wavFile, text) {
   const p = `${wavFile}.txt`;
-  writeFileSync(p, text);
+  writeFileSync4(p, text);
   return p;
 }
 async function withTemp(fn3) {
-  const dir = mkdtempSync(join2(tmpdir(), "am-tts-"));
+  const dir = mkdtempSync(join7(tmpdir(), "am-tts-"));
   try {
-    return await fn3(join2(dir, "out.wav"));
+    return await fn3(join7(dir, "out.wav"));
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync3(dir, { recursive: true, force: true });
   }
 }
 function readWav(buf) {
@@ -8517,7 +9006,7 @@ function resample(input) {
   return out;
 }
 async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
-  if (cacheDir) mkdirSync(cacheDir, { recursive: true });
+  if (cacheDir) mkdirSync3(cacheDir, { recursive: true });
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
@@ -8532,7 +9021,7 @@ async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
       const key = `${provider.id}${voice ? `:${voice}` : ""}${language ? `
 ${language}` : ""}
 ${texts[i]}`;
-      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(key).digest("hex")}.pcm`);
+      const file = cacheDir && join7(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
@@ -8546,15 +9035,15 @@ ${texts[i]}`;
   return results;
 }
 function readCache(file) {
-  if (!existsSync2(file)) return null;
-  const buf = readFileSync4(file);
+  if (!existsSync4(file)) return null;
+  const buf = readFileSync7(file);
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync(tmp, file);
+  writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
+  renameSync3(tmp, file);
 }
 function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
@@ -8735,9 +9224,9 @@ ${VIDEO_JS}</script>
 
 // src/video/export.js
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync3, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4, writeFileSync as writeFileSync5 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join3 } from "node:path";
+import { join as join8 } from "node:path";
 import { pathToFileURL } from "node:url";
 var ExportError = class extends Error {
 };
@@ -8765,17 +9254,17 @@ var CHROME_PATHS = {
 function findChrome(env = process.env, platform = process.platform) {
   const custom = env.AM_CHROME || env.CHROME_PATH;
   if (custom) return custom;
-  const list = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
-  return list.find((p) => p.includes("/") || p.includes("\\") ? existsSync3(p) : hasCommand(p)) ?? null;
+  const list2 = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
+  return list2.find((p) => p.includes("/") || p.includes("\\") ? existsSync5(p) : hasCommand(p)) ?? null;
 }
 async function openPlayer(htmlFile, { env, startTimeoutMs }) {
   const chromePath = findChrome(env);
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join3(tmpdir2(), "am-export-"));
+  const tmp = mkdtempSync2(join8(tmpdir2(), "am-export-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
-    `--user-data-dir=${join3(tmp, "profile")}`,
+    `--user-data-dir=${join8(tmp, "profile")}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--hide-scrollbars",
@@ -8800,7 +9289,7 @@ async function openPlayer(htmlFile, { env, startTimeoutMs }) {
       chrome.kill();
     });
     try {
-      rmSync2(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+      rmSync4(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
     } catch {
     }
   };
@@ -8834,8 +9323,8 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
     const { info, evaluate, screenshot, tmp } = player;
-    const wavFile = wav2 ? join3(tmp, "voice.wav") : null;
-    if (wav2) writeFileSync2(wavFile, wav2);
+    const wavFile = wav2 ? join8(tmp, "voice.wav") : null;
+    if (wav2) writeFileSync5(wavFile, wav2);
     const ffmpeg = spawn2("ffmpeg", [
       "-y",
       "-loglevel",
@@ -8925,7 +9414,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
       const slice = await evaluate(`window.__amvEnc.bytes(${at3}, ${Math.min(WEBM_SLICE, size - at3)})`);
       Buffer.from(slice, "base64").copy(file, at3);
     }
-    writeFileSync2(webmFile, file);
+    writeFileSync5(webmFile, file);
     return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
   } finally {
     await player.close();
@@ -8997,45 +9486,8 @@ function connect(url) {
 }
 
 // src/housekeeping.js
-import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync3 } from "node:fs";
-import { join as join6 } from "node:path";
-
-// src/state.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, renameSync as renameSync2 } from "node:fs";
-import { join as join5 } from "node:path";
-
-// src/home.js
-import { mkdirSync as mkdirSync2, existsSync as existsSync4, statSync as statSync3, chmodSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join4 } from "node:path";
-var defaultHome = () => join4(homedir2(), ".answer-me-with-html");
-function ensureHome(home) {
-  const fresh = !existsSync4(home);
-  mkdirSync2(home, { recursive: true, mode: 448 });
-  if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
-  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
-}
-
-// src/state.js
-var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join5(home, "state.json");
-function readState(home) {
-  try {
-    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
-    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
-  } catch {
-    return {};
-  }
-}
-function writeState(home, patch) {
-  const next = { ...readState(home), ...patch };
-  ensureHome(home);
-  const tmp = `${statePath(home)}.${process.pid}.tmp`;
-  writeFileSync3(tmp, `${JSON.stringify(next, null, 2)}
-`);
-  renameSync2(tmp, statePath(home));
-  return next;
-}
+import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 
 // src/update.js
 import { spawn as spawn3 } from "node:child_process";
@@ -9152,7 +9604,7 @@ function walk(dir) {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join6(dir, e.name);
+    const p = join9(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
       const s = lstatSync(p);
@@ -9163,9 +9615,9 @@ function walk(dir) {
   });
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
-function usage(home) {
+function usage2(home) {
   const parts = Object.fromEntries(DIRS3.map((d) => {
-    const files = walk(join6(home, d));
+    const files = walk(join9(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
@@ -9173,11 +9625,11 @@ function usage(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join6(home, d)).filter((f2) => all || f2.mtime < cutoff)),
-    ...walk(join6(home, "cache"))
+    ...["pages", "videos"].flatMap((d) => walk(join9(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...walk(join9(home, "cache"))
   ];
   if (!dryRun) {
-    for (const f2 of victims) rmSync3(f2.path, { force: true });
+    for (const f2 of victims) rmSync5(f2.path, { force: true });
     writeState(home, { lastClean: now, lastCleanHint: null });
   }
   return { files: victims.length, bytes: sum(victims) };
@@ -9199,7 +9651,7 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
   let state = readState(home);
   if (!state.firstSeen) state = writeState(home, { firstSeen: now });
   const hints = [];
-  const c = cleanHint(state, usage(home), now);
+  const c = cleanHint(state, usage2(home), now);
   if (c) {
     hints.push(c);
     state = writeState(home, { lastCleanHint: now });
@@ -9211,98 +9663,6 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
   }
   if (background && scriptPath && shouldCheckUpdate(state, env, config, now)) spawnUpdateCheck(home, scriptPath);
   return hints;
-}
-
-// src/config.js
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, rmSync as rmSync4, existsSync as existsSync5 } from "node:fs";
-import { join as join7, dirname } from "node:path";
-var ConfigError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ConfigError";
-  }
-};
-var CONFIG_KEYS = Object.freeze({
-  open: { type: "bool", default: true, label: "Open the page in the browser after it is made" },
-  theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
-  mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
-  style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
-  update_check: { type: "bool", default: true, label: "Check for a new version once a week in the background and tell you (never updates by itself)" },
-  close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
-  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
-});
-var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
-var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
-function amHome(env = process.env) {
-  return env.AM_HOME || defaultHome();
-}
-function configPath(env = process.env) {
-  return join7(amHome(env), "config.json");
-}
-var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
-function configChoices(key, themes2) {
-  return key === "theme" ? [AUTO, ...themes2.names("page")] : CONFIG_KEYS[key].choices;
-}
-function coerce2(key, raw, themes2) {
-  const spec = CONFIG_KEYS[key];
-  if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
-  if (spec.type === "bool") {
-    if (typeof raw === "boolean") return raw;
-    const v2 = String(raw).trim().toLowerCase();
-    if (TRUE.has(v2)) return true;
-    if (FALSE.has(v2)) return false;
-    throw new ConfigError(`${key} accepts only on / off`);
-  }
-  const v = String(raw).trim();
-  const choices = configChoices(key, themes2);
-  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
-  return v;
-}
-function readStored(env) {
-  const file = configPath(env);
-  if (!existsSync5(file)) return { stored: {} };
-  try {
-    const data = JSON.parse(readFileSync6(file, "utf8"));
-    return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
-  } catch (e) {
-    return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
-  }
-}
-function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
-  const { stored, warning } = readStored(env);
-  const values = defaults();
-  const warnings = [warning];
-  for (const [k2, v] of Object.entries(stored)) {
-    if (!CONFIG_KEYS[k2]) continue;
-    try {
-      values[k2] = coerce2(k2, v, themes2);
-    } catch {
-      if (k2 === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
-    }
-  }
-  return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
-}
-function writeStored(stored, env) {
-  const file = configPath(env);
-  if (!Object.keys(stored).length) {
-    rmSync4(file, { force: true });
-    return;
-  }
-  ensureHome(dirname(file));
-  writeFileSync4(file, `${JSON.stringify(stored, null, 2)}
-`);
-}
-function setConfig(key, raw, env = process.env, themes2 = loadThemes(amHome(env))) {
-  const value = coerce2(key, raw, themes2);
-  const { stored } = readStored(env);
-  writeStored({ ...stored, [key]: value }, env);
-  return value;
-}
-function resetConfig(key, env = process.env) {
-  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "", null);
-  const { stored } = readStored(env);
-  const next = key === void 0 ? {} : Object.fromEntries(Object.entries(stored).filter(([k2]) => k2 !== key));
-  writeStored(next, env);
 }
 
 // src/math-load.js
@@ -9371,9 +9731,9 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, rmSync as rmSync6 } from "node:fs";
 import { lstat, realpath, readFile } from "node:fs/promises";
-import { join as join8, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
+import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -9434,7 +9794,7 @@ var ServeError = class extends Error {
     this.name = "ServeError";
   }
 };
-var infoPath = (home) => join8(home, "serve.json");
+var infoPath = (home) => join10(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -9463,7 +9823,7 @@ var BOOT_SLACK_MS = 5e3;
 var bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1e3 - BOOT_SLACK_MS;
 function readServeInfo(home) {
   try {
-    const info = JSON.parse(readFileSync7(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync8(infoPath(home), "utf8"));
     const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
     const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
     return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
@@ -9487,17 +9847,17 @@ function writeInfo(home, info) {
   ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   try {
-    rmSync5(tmp, { force: true });
-    writeFileSync5(tmp, `${JSON.stringify(info)}
+    rmSync6(tmp, { force: true });
+    writeFileSync6(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
-    renameSync3(tmp, infoPath(home));
+    renameSync4(tmp, infoPath(home));
   } finally {
-    rmSync5(tmp, { force: true });
+    rmSync6(tmp, { force: true });
   }
 }
 function removeInfo(home, secret) {
   try {
-    if (JSON.parse(readFileSync7(infoPath(home), "utf8")).secret === secret) rmSync5(infoPath(home), { force: true });
+    if (JSON.parse(readFileSync8(infoPath(home), "utf8")).secret === secret) rmSync6(infoPath(home), { force: true });
   } catch {
   }
 }
@@ -9508,8 +9868,8 @@ function reply(req, res, status, type, body = "") {
 var notFound = (req, res) => reply(req, res, 404, "text/plain; charset=utf-8", "Not found\n");
 async function resolvePage(home, dir, file) {
   try {
-    const root = await realpath(join8(home, dir));
-    const path = join8(root, file);
+    const root = await realpath(join10(home, dir));
+    const path = join10(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
     return real.startsWith(root + sep2) ? real : null;
@@ -9643,6 +10003,8 @@ Usage:
   am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
+  am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
+  am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
   am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
@@ -9820,6 +10182,9 @@ async function main(argv, io = {}) {
         "public-url": { type: "string" },
         all: { type: "boolean" },
         "dry-run": { type: "boolean" },
+        use: { type: "boolean" },
+        force: { type: "boolean" },
+        remote: { type: "boolean" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" }
       }
@@ -9873,7 +10238,7 @@ async function withSource(arg, io, fail, fn3) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync8(resolve4(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync9(resolve4(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -9900,7 +10265,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join9(amHome(ctx.env), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -9914,7 +10279,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   }
   const file = outputPath("pages", result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  if (replaced && replaced !== resolve4(file)) rmSync6(replaced, { force: true });
+  if (replaced && replaced !== resolve4(file)) rmSync7(replaced, { force: true });
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
   return finish(file, held ? { ...opts, "no-open": true } : opts, config, ctx);
@@ -9938,7 +10303,19 @@ Usage:
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
-var THEME_HELP = `Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
+var THEME_HELP = `Install a ready-made theme from the catalog at answer-me-with-html.com/themes/
+
+am theme add <name> [--use] [--force]
+- Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+- A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
+- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an http(s) URL of an index.json).
+am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
+am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
+am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again
+- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.6.0 or newer; before that, save the file by hand (see the catalog page).
+
+Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
 
 The file name is the theme name: themes/notes.json is theme "notes" (lowercase letters, digits and -; not a built-in name).
 Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am config set theme notes. The draft does not change.
@@ -9964,7 +10341,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
   Target these classes (they stay stable): ${THEME_SELECTORS.join(" ")}.
   Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
-  am theme check warns about them; a theme catalog will reject them.
+  am theme check warns about them; the catalog and am theme add reject them.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
@@ -9987,7 +10364,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const file = resolve4(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync8(file, "utf8");
+    html = readFileSync9(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -10001,7 +10378,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync8(resolve4(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync9(resolve4(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -10077,7 +10454,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
   if (provider) ensureHome(amHome(env));
   const result = await renderVideo(src, {
     provider,
-    cacheDir: join9(amHome(env), "cache", "tts"),
+    cacheDir: join11(amHome(env), "cache", "tts"),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -10117,13 +10494,13 @@ function themeWarnings({ fail, themes: themes2 }) {
 }
 function outputPath(dir, title, opts, { env, io }) {
   if (opts.out) return resolve4(io.cwd ?? process.cwd(), opts.out);
-  return join9(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
   if (resolve4(file).startsWith(home + sep3)) ensureHome(home);
-  mkdirSync3(dirname3(file), { recursive: true });
-  writeFileSync6(file, html);
+  mkdirSync4(dirname3(file), { recursive: true });
+  writeFileSync7(file, html);
 }
 function emit(result, file, { print, env }, note2 = "") {
   writePage(file, result.html, env);
@@ -10196,7 +10573,7 @@ function cmdClean(opts, { print, fail, env }) {
   }
   const days = opts.days === void 0 ? CLEAN.days : Number(opts.days);
   const home = amHome(env);
-  const before = usage(home);
+  const before = usage2(home);
   const dry = Boolean(opts["dry-run"]);
   const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry });
   const scope = opts.all ? "all pages and videos" : `pages and videos older than ${count(days, "day")}`;
@@ -10320,13 +10697,14 @@ ${[...sections, table].join("\n\n")}
 `;
 }
 function cmdTheme(action, target, opts, ctx) {
+  if (["add", "list", "update", "remove"].includes(action)) return cmdThemeMarket(action, target, opts, ctx);
   const { print, fail, env, io } = ctx;
   if (action !== "check" || !target) {
-    fail("\u2717 Usage: am theme check <name|file.json>");
+    fail(`\u2717 Usage: am theme check <name|file.json> | ${THEME_MARKET_USAGE}`);
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join9(amHome(env), "themes", `${target}.json`);
+  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join11(amHome(env), "themes", `${target}.json`);
   const name = isFile ? basename4(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
