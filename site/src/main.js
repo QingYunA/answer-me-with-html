@@ -1,6 +1,6 @@
 // Site chrome and motion: color mode, language choice, sheet rulers, nav state, draw-on lines, count-ups,
-// the hero crosshair, copy buttons, install tabs, the figure lightbox. The playground (or, on the theme gallery, the previews)
-// loads later from playground.js or catalog.js.
+// the hero crosshair, copy buttons, install tabs, the figure lightbox. The page's own script loads later:
+// playground.js (home), catalog.js (theme wall) or theme.js (one theme's page).
 const root = document.documentElement;
 const UI = JSON.parse(document.getElementById('site-ui')?.textContent || '{}');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -286,7 +286,7 @@ if (video) {
   } else load();
 }
 
-// ── The playground and the live demos (on the theme gallery: the live previews) load once the page is idle ──
+// ── The playground and the live demos (on the theme pages: the wall's hover and the theme page's controls) load once the page is idle ──
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 300));
 // If the scripts cannot load, the hero shows the page the build prerendered.
 function heroFallback() {
@@ -299,7 +299,7 @@ function heroFallback() {
   $('.demo-status', demo).textContent = UI.fallback;
   $('.demo-note', demo).innerHTML = UI.fallbackNote;
 }
-const pageScript = root.dataset.page === 'catalog' ? './catalog.js' : './playground.js';
+const pageScript = { catalog: './catalog.js', theme: './theme.js' }[root.dataset.page] ?? './playground.js';
 idle(() => import(pageScript).catch((err) => {
   console.error(`${pageScript} failed to load`, err);
   heroFallback();

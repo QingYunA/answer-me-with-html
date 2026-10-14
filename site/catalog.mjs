@@ -1,6 +1,6 @@
 // The theme catalog on the website: marketplace/themes/<name>.json is published unchanged as /themes/<name>.json,
-// /themes/index.json lists every theme, and /themes/ (and /zh/themes/) shows a card for each one.
-// Build time only (site/build.mjs). The live previews are drawn in the browser by site/src/catalog.js.
+// /themes/index.json lists every theme, /themes/ (and /zh/themes/) is a wall with a card for each one, and every theme has its own page,
+// /themes/<name>/ (and /zh/themes/<name>/). Build time only (site/build.mjs); site/src/catalog.js and site/src/theme.js make the pages interactive.
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -51,72 +51,76 @@ export function catalogIndex(entries, siteUrl) {
 }
 
 // The install commands of one theme: `am theme add` (0.6.0 and newer), an agent prompt that names it and the manual save for older versions.
-export function installTexts(name, siteUrl, dict) {
+function installTexts(name, siteUrl, dict) {
   const url = `${siteUrl}themes/${name}.json`;
   return {
     command: `am theme add ${name} --use`,
-    agent: fill(dict.c_agent_prompt, { name, url }),
+    agent: fill(dict.th_agent_prompt, { name, url }),
     unix: `curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`,
     windows: `New-Item -ItemType Directory -Force "$HOME\\.answer-me-with-html\\themes" | Out-Null\nInvoke-WebRequest ${url} -OutFile "$HOME\\.answer-me-with-html\\themes\\${name}.json"`,
   };
 }
 
-// One card: the title and facts, the live preview (filled in by catalog.js) and the install block.
-function card(entry, dict, lang, siteUrl) {
-  const { name, data, size } = entry;
-  const label = data.label[lang] ?? data.label.en;
-  const description = data.description[lang] ?? data.description.en;
-  const install = installTexts(name, siteUrl, dict);
-  const font = data.font ? FONT_LABELS[data.font] ?? data.font : '';
-  const facts = [
-    [dict.c_version, `<span class="mono">${esc(data.version)}</span>`],
-    [dict.c_author, esc(data.author)],
-    [dict.c_license, esc(data.license)],
-    [dict.c_size, `<span class="mono">${(size / 1024).toFixed(1)} KB</span>`],
-    ...(font ? [[dict.c_font, esc(font)]] : []),
-  ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('\n          ');
-  // One tab and one panel for each way to install. Without JavaScript every panel shows, each under its own label.
-  const ways = [['command', dict.c_cmd], ['agent', dict.c_ask], ['curl', dict.c_unix], ['powershell', dict.c_windows]];
-  const tabs = ways.map(([method, label], i) => `<button type="button" role="tab" id="${name}-t-${method}" aria-controls="${name}-p-${method}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-method="${method}" data-copy-label="${esc(fill(dict.c_copy_aria, { what: label, name }))}">${esc(label)}</button>`).join('\n          ');
-  const text = { command: install.command, agent: install.agent, curl: install.unix, powershell: install.windows };
-  const panels = ways.map(([method, label]) => `<div class="tpanel tpanel--${method}" role="tabpanel" id="${name}-p-${method}" aria-labelledby="${name}-t-${method}"><p class="tcard-step">${esc(label)}</p><pre>${esc(text[method])}</pre></div>`).join('\n          ');
-  const note = fill(data.font ? dict.c_note_font : dict.c_note, { font });
-  return `<article class="tcard" id="${name}" data-theme="${name}" data-file="${esc(`themes/${name}.json`)}" aria-labelledby="${name}-title">
-    <header class="tcard-head">
-      <h2 id="${name}-title">${esc(label)}</h2>
-      <code class="tcard-name">${name}</code>
-    </header>
-    <p class="tcard-desc">${esc(description)}</p>
-    <div class="tcard-body">
-      <div class="tcard-view">
-        <div class="tcard-bar">
-          <div class="seg-tabs" role="radiogroup" aria-label="${esc(dict.c_mode_label)}">
-            <button type="button" role="radio" aria-checked="true" data-v="light">${esc(dict.pg_mode_light)}</button>
-            <button type="button" role="radio" aria-checked="false" data-v="dark">${esc(dict.pg_mode_dark)}</button>
-          </div>
-          <span class="tcard-ms mono" aria-live="polite"></span>
-        </div>
-        <div class="tcard-box" data-frame-title="${esc(fill(dict.c_frame_title, { label }))}">
-          <span class="tcard-wait mono">${esc(dict.c_rendering)}</span>
-          <noscript><span class="tcard-wait mono">${esc(dict.c_nojs)}</span></noscript>
-        </div>
+const labelOf = (data, lang) => data.label[lang] ?? data.label.en;
+const descriptionOf = (data, lang) => data.description[lang] ?? data.description.en;
+const fontOf = (data) => (data.font ? FONT_LABELS[data.font] ?? data.font : '');
+
+// One card of the wall: the pre-rendered sample page in a small frame, and the name, description and tags.
+// The title is the card's link; its ::after covers the whole card (an <a> may not contain a frame). The frame is for looking only.
+// Paths are relative: the wall and the theme's folder (<name>/) sit in the same directory in both languages.
+function wallCard(entry, dict, lang) {
+  const { name, data } = entry;
+  const label = labelOf(data, lang);
+  const font = fontOf(data);
+  const tags = [...(font ? [`${dict.th_font}: ${font}`] : []), ...(data.requires ? [`${dict.th_requires} ${data.requires}+`] : [])];
+  const tagList = tags.length ? `\n        <ul class="ttags mono">${tags.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
+  return `<li class="twall-item">
+    <article class="tcard" data-theme="${name}">
+      <div class="tthumb"><iframe src="${name}/preview.html" title="${esc(label)}" loading="lazy" tabindex="-1" aria-hidden="true" scrolling="no"></iframe></div>
+      <div class="tcard-text">
+        <h2 class="tcard-title"><a class="tcard-link" href="${name}/">${esc(label)}</a></h2>
+        <code class="tcard-name">${name}</code>
+        <p class="tcard-desc">${esc(descriptionOf(data, lang))}</p>${tagList}
       </div>
-      <div class="tcard-install">
-        <h3 class="minor">${esc(dict.c_install)}</h3>
-        <div class="seg-tabs tcard-tabs" role="tablist" aria-label="${esc(dict.c_install_tabs)}">
-          ${tabs}
-        </div>
-        <div class="copybox">
-          ${panels}
-          <button type="button" class="tcopy-btn" data-done="${esc(dict.copied)}">${esc(dict.copy)}</button>
-        </div>
-        <p class="fine">${esc(note)}</p>
-        <dl class="tcard-facts mono">
-          ${facts}
-        </dl>
-      </div>
-    </div>
-  </article>`;
+    </article>
+  </li>`;
 }
 
-export const cardsHtml = (entries, dict, lang, siteUrl) => entries.map((e) => card(e, dict, lang, siteUrl)).join('\n  ');
+export const wallHtml = (entries, dict, lang) => `<ul class="twall">\n  ${entries.map((e) => wallCard(e, dict, lang)).join('\n  ')}\n  </ul>`;
+
+// What site/template-theme.html needs for one theme and language, as values for {{KEY}}: all of it is escaped for HTML already.
+export function detailValues(entry, dict, lang, siteUrl) {
+  const { name, data, size } = entry;
+  const label = labelOf(data, lang);
+  const description = descriptionOf(data, lang);
+  const font = fontOf(data);
+  const install = installTexts(name, siteUrl, dict);
+  const facts = [
+    [dict.th_version, `<span class="mono">${esc(data.version)}</span>`],
+    [dict.th_author, esc(data.author)],
+    [dict.th_license, esc(data.license)],
+    [dict.th_size, `<span class="mono">${(size / 1024).toFixed(1)} KB</span>`],
+    ...(font ? [[dict.th_font, esc(font)]] : []),
+    ...(data.requires ? [[dict.th_requires, `<span class="mono">${esc(data.requires)}+</span>`]] : []),
+  ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('\n      ');
+  const copyAria = (what) => esc(fill(dict.th_copy_aria, { what, name }));
+  return {
+    THEME_NAME: name,
+    THEME_FILE: `themes/${name}.json`,
+    THEME_LABEL: esc(label),
+    THEME_DESC: esc(description),
+    THEME_FACTS: facts,
+    META_TITLE: esc(fill(dict.th_page_title, { label })),
+    META_DESC: esc(fill(dict.th_page_desc, { desc: description })),
+    FRAME_TITLE: esc(fill(dict.th_frame_title, { label, sample: dict.pre_tcp })),
+    AGENT_TEXT: esc(install.agent),
+    CMD_TEXT: esc(install.command),
+    CURL_TEXT: esc(install.unix),
+    PS_TEXT: esc(install.windows),
+    CMD_ARIA: copyAria(dict.th_cmd),
+    CURL_ARIA: copyAria(dict.th_unix),
+    PS_ARIA: copyAria(dict.th_windows),
+    OLDER_D: fill(dict.th_older_d, { name }),
+    NOTE: esc(fill(font ? dict.th_note_font : dict.th_note, { font })),
+  };
+}

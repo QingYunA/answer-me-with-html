@@ -1,4 +1,4 @@
-// What the pages that run the real renderer share (playground.js on the home page, catalog.js on the theme gallery):
+// What the pages that run the real renderer share (playground.js on the home page, theme.js on a theme page):
 // the engine and the preset drafts, each loaded once, and the sandboxed iframes that show a rendered page.
 const root = document.documentElement;
 export const UI = JSON.parse(document.getElementById('site-ui').textContent);
@@ -39,7 +39,7 @@ export async function renderDraft(source, overrides, options) {
 
 // ── Frames: rendered pages go into sandboxed srcdoc iframes. A small script reports the page height and scroll. ──
 // Scaled previews hide the page's own toolbar and scrollbars, so the page fills its frame edge to edge.
-export const HIDE_CHROME = '.am-toolbar,.am-colophon{display:none!important}html{scrollbar-width:none}::-webkit-scrollbar{display:none}';
+export { HIDE_CHROME } from './chrome.js';
 
 export function framed(html, { id, css = '', scroll = 0 }) {
   const reporter = `<script>(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +

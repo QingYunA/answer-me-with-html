@@ -101,7 +101,10 @@ test('site build: fills built-in keys first and reports unknown ones', () => {
 });
 
 const BUILT = { skip: !existsSync(join(ROOT, 'site/dist/themes/index.json')) };
-const PAGES = ['index.html', 'zh/index.html', 'themes/index.html', 'zh/themes/index.html'];
+const SITE_URL = 'https://answer-me-with-html.com/';
+const NAMES = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
+const DETAIL = NAMES.flatMap((name) => [`themes/${name}/index.html`, `zh/themes/${name}/index.html`]);
+const PAGES = ['index.html', 'zh/index.html', 'themes/index.html', 'zh/themes/index.html', ...DETAIL];
 
 test('site build: the built pages load no script or style from another site, except the visit counter', BUILT, () => {
   for (const page of PAGES) {
@@ -129,16 +132,16 @@ test('site build: both pages carry the visit counter for the site domain only', 
 test('site build: sitemap.xml lists every page with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
   const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
   const urls = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urls.length, 4);
-  const site = 'https://answer-me-with-html.com/';
-  for (const [en, zh] of [['', 'zh/'], ['themes/', 'zh/themes/']]) {
+  assert.equal(urls.length, 4 + NAMES.length * 2);
+  const pairs = [['', 'zh/'], ['themes/', 'zh/themes/'], ...NAMES.map((n) => [`themes/${n}/`, `zh/themes/${n}/`])];
+  for (const [en, zh] of pairs) {
     for (const page of [en, zh]) {
-      const url = urls.find((u) => u.includes(`<loc>${site}${page}</loc>`));
+      const url = urls.find((u) => u.includes(`<loc>${SITE_URL}${page}</loc>`));
       assert.ok(url, page);
       assert.deepEqual(url.match(/<xhtml:link [^>]*\/>/g), [
-        `<xhtml:link rel="alternate" hreflang="en" href="${site}${en}"/>`,
-        `<xhtml:link rel="alternate" hreflang="zh-CN" href="${site}${zh}"/>`,
-        `<xhtml:link rel="alternate" hreflang="x-default" href="${site}${en}"/>`,
+        `<xhtml:link rel="alternate" hreflang="en" href="${SITE_URL}${en}"/>`,
+        `<xhtml:link rel="alternate" hreflang="zh-CN" href="${SITE_URL}${zh}"/>`,
+        `<xhtml:link rel="alternate" hreflang="x-default" href="${SITE_URL}${en}"/>`,
       ]);
     }
   }
@@ -180,32 +183,74 @@ test('site build: themes/<name>.json are byte-identical copies, and themes/index
   assert.ok(!/\d{4}-\d\d-\d\dT/.test(read(join(ROOT, 'site/dist/themes/index.json'))), 'no timestamps');
 });
 
-test('site build: each gallery page has a card per catalog theme with its install commands, `am theme add` first', BUILT, () => {
-  const names = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
+test('site build: the wall has one link card per catalog theme, with a pre-rendered thumbnail and no renderer', BUILT, () => {
   for (const page of ['themes/index.html', 'zh/themes/index.html']) {
     const html = read(join(ROOT, 'site/dist', page));
-    for (const name of names) {
-      const url = `https://answer-me-with-html.com/themes/${name}.json`;
-      assert.ok(html.includes(`<article class="tcard" id="${name}"`), `${page}: card ${name}`);
-      assert.ok(html.includes(`curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`), `${page}: curl ${name}`);
-      assert.ok(html.includes(`Invoke-WebRequest ${url} -OutFile`), `${page}: PowerShell ${name}`);
-      assert.ok(html.includes(`<pre>am theme add ${name} --use</pre>`), `${page}: command ${name}`);
-      assert.ok(html.includes(`run am theme add ${name} --use. On a version before 0.6.0, save ${url} as ~/.answer-me-with-html/themes/${name}.json instead.`)
-        || html.includes(`运行 am theme add ${name} --use。如果版本低于 0.6.0，改为把 ${url} 保存为 ~/.answer-me-with-html/themes/${name}.json。`), `${page}: agent prompt ${name}`);
+    assert.equal(html.match(/<article class="tcard"/g)?.length, NAMES.length, `${page}: one card per theme`);
+    for (const name of NAMES) {
+      assert.match(html, new RegExp(`<a class="tcard-link" href="${name}/">`), `${page}: link to ${name}`);
+      assert.match(html, new RegExp(`<iframe src="${name}/preview\\.html"[^>]*loading="lazy"[^>]*tabindex="-1"[^>]*aria-hidden="true"`), `${page}: thumbnail of ${name}`);
     }
-    assert.match(html, /0\.4\.10/);
-    assert.match(html, /Command \(0\.6\.0\+\)|命令（0\.6\.0\+）/);
-    assert.match(html, /0\.6\.0/);
-    assert.doesNotMatch(html, /web fonts|外部字体|网页字体/);
-    assert.equal(html.match(/role="tablist"/g)?.length, names.length, `${page}: one tab strip per card`);
-    assert.equal(html.match(/role="tab"/g)?.length, names.length * 4, `${page}: four tabs per card`);
-    assert.equal(html.match(/role="tabpanel"/g)?.length, names.length * 4, `${page}: four panels per card`);
-    assert.equal(html.match(/aria-selected="true"/g)?.length, names.length, `${page}: one selected tab per card`);
-    assert.equal(html.match(/class="tcopy-btn"/g)?.length, names.length, `${page}: one Copy button per card`);
-    assert.match(html, new RegExp(`id="${names[0]}-t-command"[^>]*aria-selected="true"`), `${page}: the command tab is selected first`);
+    assert.ok(!html.includes('engine.js'), `${page}: the wall does not mention the renderer`);
+    assert.ok(!/role="tab(list|panel)?"|tcopy-btn|<pre/.test(html), `${page}: no install UI on the wall`);
+    assert.match(html, /Font: Bangers|字体: Bangers/);
+    assert.match(html, /data-page="catalog"/);
   }
-  assert.match(read(join(ROOT, 'site/dist/index.html')), /href="\.\/?themes\/"|href="themes\/"/, 'the home page links the gallery');
-  assert.match(read(join(ROOT, 'site/dist/zh/index.html')), /href="\.\.\/themes\/"/, 'the Chinese home page links the gallery');
+  assert.match(read(join(ROOT, 'site/dist/index.html')), /href="\.\/?themes\/"|href="themes\/"/, 'the home page links the wall');
+  assert.match(read(join(ROOT, 'site/dist/zh/index.html')), /href="\.\.\/themes\/"/, 'the Chinese home page links the wall');
+  assert.doesNotMatch(read(join(ROOT, 'site/dist/index.html')), /am theme add needs/, 'the home page keeps its own component notes');
+});
+
+test('site build: every theme has a page in both languages with its install actions', BUILT, () => {
+  for (const name of NAMES) {
+    const url = `${SITE_URL}themes/${name}.json`;
+    for (const [lang, page, canonical] of [['en', `themes/${name}/index.html`, `themes/${name}/`], ['zh', `zh/themes/${name}/index.html`, `zh/themes/${name}/`]]) {
+      const html = read(join(ROOT, 'site/dist', page));
+      assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}${canonical}">`), `${page}: canonical`);
+      assert.ok(html.includes(`<link rel="alternate" hreflang="en" href="${SITE_URL}themes/${name}/">`), `${page}: hreflang en`);
+      assert.ok(html.includes(`<link rel="alternate" hreflang="zh-CN" href="${SITE_URL}zh/themes/${name}/">`), `${page}: hreflang zh-CN`);
+      assert.ok(html.includes(`<link rel="alternate" hreflang="x-default" href="${SITE_URL}themes/${name}/">`), `${page}: hreflang x-default`);
+      assert.ok(html.includes(`<meta property="og:url" content="${SITE_URL}${canonical}">`), `${page}: og:url`);
+      assert.match(html, new RegExp(`<title>[^<]*${lang === 'en' ? 'theme' : '主题'} — Answer me with HTML</title>`), `${page}: title`);
+      assert.match(html, /<a class="tback mono" href="\.\.\/">/, `${page}: back link`);
+      assert.match(html, /data-page="theme"/);
+      assert.ok(html.includes('<iframe src="preview.html"'), `${page}: the pre-rendered preview is in the page`);
+      assert.ok(!html.includes('engine.js'), `${page}: the engine loads only on request`);
+      assert.equal(html.match(/class="btn btn-primary tinstall-agent"/g)?.length, 1, `${page}: one primary button`);
+      assert.match(html, /data-method="agent"[^>]*>(Copy for your agent|复制给你的 agent)</);
+      assert.ok(html.includes(`<pre id="t-cmd">am theme add ${name} --use</pre>`), `${page}: command`);
+      assert.match(html, /Command \(0\.6\.0\+\)|命令（0\.6\.0\+）/);
+      assert.ok(html.includes(`run am theme add ${name} --use. On a version before 0.6.0, save ${url} as ~/.answer-me-with-html/themes/${name}.json instead.`)
+        || html.includes(`运行 am theme add ${name} --use。如果版本低于 0.6.0，改为把 ${url} 保存为 ~/.answer-me-with-html/themes/${name}.json。`), `${page}: agent text`);
+      const details = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/g) ?? [];
+      assert.equal(details.length, 1, `${page}: one <details>`);
+      assert.ok(!/<details\b[^>]*\bopen\b/.test(details[0]), `${page}: closed by default`);
+      assert.ok(details[0].includes(`curl -fsSL ${url} -o ~/.answer-me-with-html/themes/${name}.json --create-dirs`), `${page}: curl inside`);
+      assert.ok(details[0].includes(`Invoke-WebRequest ${url} -OutFile`), `${page}: PowerShell inside`);
+      assert.match(details[0], /Older versions \(manual install\)|旧版本（手动安装）/);
+      assert.ok(!html.slice(0, html.indexOf('<details')).includes('curl -fsSL'), `${page}: curl only in the details`);
+      assert.doesNotMatch(html, /role="tab(list|panel)?"/, `${page}: no install tabs`);
+      assert.match(html, /0\.4\.10/);
+      assert.doesNotMatch(html, /web fonts|外部字体|网页字体/);
+      assert.match(html, /data-version="[^"]+"/);
+    }
+    assert.match(read(join(ROOT, 'site/dist', `themes/${name}/index.html`)), /class="tool lang-switch" href="\.\.\/\.\.\/zh\/themes\/[a-z0-9-]+\/"/);
+    assert.match(read(join(ROOT, 'site/dist', `zh/themes/${name}/index.html`)), /class="tool lang-switch" href="\.\.\/\.\.\/\.\.\/themes\/[a-z0-9-]+\/"/);
+  }
+});
+
+test('site build: each theme has a pre-rendered preview in both languages, with its font embedded once', BUILT, () => {
+  for (const name of NAMES) {
+    const font = JSON.parse(read(join(ROOT, 'marketplace/themes', `${name}.json`))).font;
+    for (const [page, lang] of [[`themes/${name}/preview.html`, 'en'], [`zh/themes/${name}/preview.html`, 'zh']]) {
+      const html = read(join(ROOT, 'site/dist', page));
+      assert.ok(isPage(html), page);
+      assert.ok(html.includes(`data-theme="${name}"`), `${page}: rendered in the theme`);
+      assert.match(html, /data-mode="light"/, page);
+      assert.match(html, lang === 'en' ? /three-way handshake/i : /三次握手/, `${page}: the TCP sample`);
+      if (font === 'bangers') assert.equal(html.match(/@font-face \{\s*font-family: "Bangers"/g)?.length, 1, `${page}: Bangers embedded once`);
+    }
+  }
 });
 
 test('site build: the gallery pages point at each other as the other language', BUILT, () => {

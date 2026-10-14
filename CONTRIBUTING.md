@@ -33,7 +33,7 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 ## Theme catalog
 
-The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a gallery, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). A page that does not use a catalog theme does not carry it.
+The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a wall of themes, a page for each theme, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). A page that does not use a catalog theme does not carry it.
 
 To submit a theme, open a PR that adds `marketplace/themes/<name>.json`. **A catalog theme PR needs no issue first.** One theme per PR is easiest to review.
 
@@ -43,7 +43,7 @@ To submit a theme, open a PR that adds `marketplace/themes/<name>.json`. **A cat
 - `css` targets only the classes in `THEME_SELECTORS` (`src/themes/selectors.js`). If your theme needs a class that is not there, add it to the list in the same PR, with the reason.
 - Set `requires` only when the theme fails on an older version. A version that does not know a field ignores it, so a theme that uses `font` still works on 0.4.10 and newer; it shows system fonts there.
 - Every color token in light and dark, and the contrast that `am theme check` asks for.
-- `test/marketplace.test.js` checks every file: JSON, name, `normalizeTheme`, colors, links, size, metadata, selectors, and a render of `examples/tcp.en.md` with the font embedded once. `npm test` must pass. `npm run site` builds the gallery; open `/themes/` to see your theme drawn in light and dark.
+- `test/marketplace.test.js` checks every file: JSON, name, `normalizeTheme`, colors, links, size, metadata, selectors, and a render of `examples/tcp.en.md` with the font embedded once. `npm test` must pass. `npm run site` builds the website; open `/themes/` to see your theme on the wall and on its own page, in light and dark.
 - **A catalog name is reserved forever.** A name that was in the catalog is never given to a built-in theme or to another theme, even after the theme is removed.
 
 ## Refreshing the demo video

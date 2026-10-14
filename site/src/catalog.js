@@ -1,143 +1,22 @@
-// The theme gallery (/themes/): each card draws the sample draft with the real engine and the card's theme file,
-// in light or dark, when it comes into view. The cards, install commands and facts are already in the page (site/catalog.mjs).
-import { copyText, track } from './main.js';
-import { UI, BASE, siteMode, whenNear, engine, presets, pick, renderDraft, HIDE_CHROME, framed, scaleToBox } from './live.js';
+// The theme wall (/themes/): each card shows the sample page the build already rendered in the theme, in a small frame.
+// Hover or focus on a card shows the frame in dark; leaving it shows light again. This page loads no renderer.
+import { track } from './main.js';
 
-// The sample draft is the preset the hero uses. The preview page is drawn this wide and scaled down to the card;
-// on a phone it is drawn at the width of a phone, so the text stays readable.
-const SAMPLE = 'tcp';
-const previewSize = (box) => (box.clientWidth < 520 ? { w: 480, h: 760 } : { w: 900, h: 780 });
-const $ = (sel, el = document) => el.querySelector(sel);
-const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
-const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
-const fmtMs = (ms) => (ms < 10 ? ms.toFixed(1) : String(Math.round(ms)));
-
-// Each theme file is fetched once and read the way the CLI reads it from the themes folder.
-const themeFiles = new Map();
-function loadTheme(name, file) {
-  if (!themeFiles.has(name)) {
-    themeFiles.set(name, (async () => {
-      const [{ themeFromFile }, res] = await Promise.all([engine(), fetch(`${BASE}${file}`)]);
-      if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
-      const { theme, errors } = themeFromFile(name, await res.json());
-      if (errors.length) throw new Error(`${file}: ${errors.join('; ')}`);
-      return theme;
-    })());
-  }
-  return themeFiles.get(name);
-}
-
-// The page also ends in a toolbar and a colophon; a preview shows only the page itself.
-const PREVIEW_CSS = `${HIDE_CHROME}html,body{overflow:hidden!important}`;
-
-async function render(card) {
-  const { theme: name, file } = card.dataset;
-  const box = $('.tcard-box', card);
-  const mode = card.dataset.mode;
-  try {
-    const theme = await loadTheme(name, file);
-    const res = await renderDraft(pick(await presets(), SAMPLE), { theme: name, mode }, { extra: [theme] });
-    if (!res.ok) throw new Error(res.error.message);
-    let frame = $('iframe', box);
-    if (!frame) {
-      frame = document.createElement('iframe');
-      frame.setAttribute('sandbox', 'allow-scripts');
-      frame.setAttribute('tabindex', '-1');
-      frame.title = box.dataset.frameTitle;
-      const { w, h } = previewSize(box);
-      frame.style.width = `${w}px`;
-      box.style.aspectRatio = `${w} / ${h}`;
-      box.append(frame);
-      scaleToBox(frame, box, w);
-    }
-    frame.classList.add('is-swapping');
-    frame.onload = () => {
-      frame.classList.remove('is-swapping');
-      box.classList.add('is-ready');
-    };
-    frame.srcdoc = framed(res.html, { id: `theme-${name}`, css: PREVIEW_CSS });
-    $('.tcard-ms', card).textContent = fill(UI.ms, { n: fmtMs(res.ms) });
-  } catch (err) {
-    console.error(`preview of ${name} failed`, err);
-    $('.tcard-wait', box).textContent = UI.catFailed;
-    box.classList.add('is-failed');
-  }
-}
-
-function setMode(card, mode) {
-  card.dataset.mode = mode;
-  for (const b of $$('[role="radio"]', card)) {
-    const on = b.dataset.v === mode;
-    b.setAttribute('aria-checked', String(on));
-    b.tabIndex = on ? 0 : -1;
-  }
-}
-
-function wireMode(card) {
-  const buttons = $$('[role="radio"]', card);
-  const choose = (button) => {
-    if (button.dataset.v === card.dataset.mode) return;
-    setMode(card, button.dataset.v);
-    track('theme-preview', { theme: card.dataset.theme, mode: button.dataset.v });
-    render(card);
+for (const card of document.querySelectorAll('.tcard')) {
+  const frame = card.querySelector('iframe');
+  const link = card.querySelector('.tcard-link');
+  let mode = 'light';
+  // The frame is a page of this site, so its root can be reached. A frame that has not loaded yet (it loads lazily) takes the mode when it does.
+  const apply = () => {
+    try { frame.contentDocument?.documentElement.setAttribute('data-mode', mode); } catch { /* another origin (a file:// preview): leave it */ }
   };
-  buttons.forEach((b, i) => {
-    b.addEventListener('click', () => choose(b));
-    b.addEventListener('keydown', (e) => {
-      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-      if (!step) return;
-      e.preventDefault();
-      const next = buttons[(i + step + buttons.length) % buttons.length];
-      next.focus();
-      choose(next);
-    });
-  });
+  const show = (next) => { mode = next; apply(); };
+  frame.addEventListener('load', apply);
+  card.addEventListener('pointerenter', () => show('dark'));
+  card.addEventListener('pointerleave', () => show('light'));
+  link.addEventListener('focus', () => show('dark'));
+  link.addEventListener('blur', () => show('light'));
+  const open = () => track('theme-open', { theme: card.dataset.theme });
+  link.addEventListener('click', open);
+  link.addEventListener('auxclick', (e) => { if (e.button === 1) open(); });
 }
-
-// The install block: a tab for each way to install, one panel shown, and one Copy button for the panel in view.
-function wireInstall(card) {
-  const tabs = $$('[role="tab"]', card);
-  const copy = $('.tcopy-btn', card);
-  const select = (tab) => {
-    for (const t of tabs) {
-      const on = t === tab;
-      t.setAttribute('aria-selected', String(on));
-      t.tabIndex = on ? 0 : -1;
-      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
-    }
-    copy.dataset.method = tab.dataset.method;
-    copy.setAttribute('aria-label', tab.dataset.copyLabel);
-  };
-  tabs.forEach((t, i) => {
-    t.addEventListener('click', () => select(t));
-    t.addEventListener('keydown', (e) => {
-      const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
-      if (step === undefined) return;
-      e.preventDefault();
-      const next = tabs[(i + step + tabs.length) % tabs.length];
-      select(next);
-      next.focus();
-    });
-  });
-  select(tabs[0]);
-  copy.addEventListener('click', async () => {
-    track('theme-copy', { theme: card.dataset.theme, method: copy.dataset.method });
-    const text = $('.tpanel:not([hidden]) pre', card).textContent;
-    dispatchEvent(new CustomEvent('site:copied', { detail: { button: copy, ok: await copyText(text) } }));
-  });
-}
-
-const cards = $$('.tcard');
-for (const card of cards) {
-  setMode(card, siteMode());
-  wireMode(card);
-  wireInstall(card);
-  whenNear(card, () => render(card), '300px');
-}
-// The site's own light or dark switch moves every card that already shows a preview.
-addEventListener('site:mode', (e) => {
-  for (const card of cards) {
-    setMode(card, e.detail);
-    if ($('iframe', card)) render(card);
-  }
-});
