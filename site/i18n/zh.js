@@ -373,13 +373,14 @@ export default {
   c_frame_title: '「{label}」主题下的 TCP 页面',
   c_rendering: '渲染中…',
   c_nojs: '开启 JavaScript 才能看到实时预览。',
+  c_install_tabs: '安装方式',
   c_install: '安装',
   c_ask: '让 agent 代装',
   c_unix: 'macOS 和 Linux',
   c_windows: 'Windows PowerShell',
   c_agent_prompt: '为 Answer me with HTML 安装 "{name}" 主题：把 {url} 保存为 ~/.answer-me-with-html/themes/{name}.json，然后用 theme: {name} 使用它。',
   c_note: '需要 Answer me with HTML 0.4.10 或更新版本。',
-  c_note_font: '需要 Answer me with HTML 0.4.10 或更新版本。下个版本发布之前的版本会显示系统字体，而不是 {font}。',
+  c_note_font: '需要 Answer me with HTML 0.4.10 或更新版本。0.6.0 之前的版本显示系统字体，不显示 {font}。',
   c_copy_aria: '复制：{what}（{name}）',
 
   f_why_k: '为什么做这个',
@@ -387,7 +388,7 @@ export default {
   f_source: '源码',
   f_community: '社区',
   f_drawn: '本站',
-  f_drawn_v: '用它自己的 blueprint 主题画成。没有框架，没有外部字体。只用 Umami 做匿名的访问和点击统计，不用 cookie。',
+  f_drawn_v: '用它自己的 blueprint 主题画成。没有框架，不下载字体。只用 Umami 做匿名的访问和点击统计，不用 cookie。',
 
   ui_json: JSON.stringify(ui).replace(/</g, '\\u003c'),
 };

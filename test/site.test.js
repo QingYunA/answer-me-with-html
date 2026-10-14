@@ -193,6 +193,14 @@ test('site build: each gallery page has a card per catalog theme with its instal
     }
     assert.doesNotMatch(html, /am theme add/);
     assert.match(html, /0\.4\.10/);
+    assert.match(html, /0\.6\.0/);
+    assert.doesNotMatch(html, /web fonts|外部字体|网页字体/);
+    assert.equal(html.match(/role="tablist"/g)?.length, names.length, `${page}: one tab strip per card`);
+    assert.equal(html.match(/role="tab"/g)?.length, names.length * 3, `${page}: three tabs per card`);
+    assert.equal(html.match(/role="tabpanel"/g)?.length, names.length * 3, `${page}: three panels per card`);
+    assert.equal(html.match(/aria-selected="true"/g)?.length, names.length, `${page}: one selected tab per card`);
+    assert.equal(html.match(/class="tcopy-btn"/g)?.length, names.length, `${page}: one Copy button per card`);
+    assert.match(html, new RegExp(`id="${names[0]}-t-agent"[^>]*aria-selected="true"`), `${page}: the agent tab is selected first`);
   }
   assert.match(read(join(ROOT, 'site/dist/index.html')), /href="\.\/?themes\/"|href="themes\/"/, 'the home page links the gallery');
   assert.match(read(join(ROOT, 'site/dist/zh/index.html')), /href="\.\.\/themes\/"/, 'the Chinese home page links the gallery');

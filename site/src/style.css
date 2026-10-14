@@ -555,9 +555,16 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .tcard-box.is-ready .tcard-wait { display: none; }
 .tcard-box.is-failed .tcard-wait { color: var(--err); }
 .tcard-install .minor { margin-top: 0; }
-.tcard-step { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
-.tcard-install .minor + .tcard-step { margin-top: 0; }
+.tcard-tabs { width: 100%; margin-bottom: 12px; }
+.tcard-tabs > button { flex: 1 1 auto; padding-inline: 8px; font-size: 13px; }
 .tcard-install .copybox pre { font-size: 12.5px; }
+.tpanel + .tpanel { border-top: 1px solid var(--line-2); }
+.tpanel[hidden] { display: none; }
+.tpanel--agent pre { font-family: var(--sans); font-size: 14px; border-left: 4px solid var(--accent); }
+.tcard-step { margin: 0; padding: 10px 16px 0; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+/* With JavaScript the tabs name each panel; without it every panel shows under its own label and there is nothing to copy with. */
+.js .tcard-step { display: none; }
+html:not(.js) .tcard-tabs, html:not(.js) .tcopy-btn { display: none; }
 .tcard-facts { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line-2); }
 .tcard-facts dt { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
 .tcard-facts dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
@@ -668,6 +675,8 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
   .ste-list .m { grid-column: 2; }
   .copybox pre { padding-right: 16px; padding-top: 48px; }
   .themes-box { height: auto; aspect-ratio: 1180 / 1000; }
+  .tcard-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tcard-tabs > button { font-size: 12px; padding: 8px 4px; white-space: normal; line-height: 1.3; }
   .seg-col { flex-direction: column; width: 100%; }
   .seg-col > button { border-right: 0; border-bottom: 1px solid var(--line-2); }
   .seg-col > button:last-child { border-bottom: 0; }

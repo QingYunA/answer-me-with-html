@@ -94,21 +94,44 @@ function wireMode(card) {
   });
 }
 
-function wireCopy(card) {
-  for (const btn of $$('.tcopy-btn', card)) {
-    btn.addEventListener('click', async () => {
-      track('theme-copy', { theme: card.dataset.theme, method: btn.dataset.method });
-      const ok = await copyText(btn.parentElement.querySelector('pre').textContent);
-      dispatchEvent(new CustomEvent('site:copied', { detail: { button: btn, ok } }));
+// The install block: a tab for each way to install, one panel shown, and one Copy button for the panel in view.
+function wireInstall(card) {
+  const tabs = $$('[role="tab"]', card);
+  const copy = $('.tcopy-btn', card);
+  const select = (tab) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    }
+    copy.dataset.method = tab.dataset.method;
+    copy.setAttribute('aria-label', tab.dataset.copyLabel);
+  };
+  tabs.forEach((t, i) => {
+    t.addEventListener('click', () => select(t));
+    t.addEventListener('keydown', (e) => {
+      const step = { ArrowRight: 1, ArrowLeft: -1, Home: -i, End: tabs.length - 1 - i }[e.key];
+      if (step === undefined) return;
+      e.preventDefault();
+      const next = tabs[(i + step + tabs.length) % tabs.length];
+      select(next);
+      next.focus();
     });
-  }
+  });
+  select(tabs[0]);
+  copy.addEventListener('click', async () => {
+    track('theme-copy', { theme: card.dataset.theme, method: copy.dataset.method });
+    const text = $('.tpanel:not([hidden]) pre', card).textContent;
+    dispatchEvent(new CustomEvent('site:copied', { detail: { button: copy, ok: await copyText(text) } }));
+  });
 }
 
 const cards = $$('.tcard');
 for (const card of cards) {
   setMode(card, siteMode());
   wireMode(card);
-  wireCopy(card);
+  wireInstall(card);
   whenNear(card, () => render(card), '300px');
 }
 // The site's own light or dark switch moves every card that already shows a preview.

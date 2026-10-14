@@ -351,13 +351,14 @@ export default {
   c_frame_title: 'The TCP page in the {label} theme',
   c_rendering: 'Rendering…',
   c_nojs: 'Turn on JavaScript to see the live preview.',
+  c_install_tabs: 'Ways to install',
   c_install: 'Install',
   c_ask: 'Ask your agent',
   c_unix: 'macOS and Linux',
   c_windows: 'Windows PowerShell',
   c_agent_prompt: 'Install the "{name}" theme for Answer me with HTML: save {url} as ~/.answer-me-with-html/themes/{name}.json, then use it with theme: {name}.',
   c_note: 'Needs Answer me with HTML 0.4.10 or newer.',
-  c_note_font: 'Needs Answer me with HTML 0.4.10 or newer. Versions before the next release show system fonts instead of {font}.',
+  c_note_font: 'Needs Answer me with HTML 0.4.10 or newer. Versions before 0.6.0 show system fonts instead of {font}.',
   c_copy_aria: 'Copy: {what} ({name})',
 
   f_why_k: 'Why this exists',
@@ -365,7 +366,7 @@ export default {
   f_source: 'Source',
   f_community: 'Community',
   f_drawn: 'Drawn with',
-  f_drawn_v: 'its own blueprint theme. No frameworks, no web fonts. Anonymous visit and click counts with Umami, no cookies.',
+  f_drawn_v: 'its own blueprint theme. No frameworks, no font downloads. Anonymous visit and click counts with Umami, no cookies.',
 
   ui_json: JSON.stringify(ui).replace(/</g, '\\u003c'),
 };

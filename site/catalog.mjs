@@ -50,9 +50,6 @@ export function catalogIndex(entries, siteUrl) {
   return `${JSON.stringify({ schema: 1, themes }, null, 2)}\n`;
 }
 
-const copyBox = (what, text, dict, name, method) =>
-  `<div class="copybox${method === 'agent' ? ' prompt small' : ''}"><pre>${esc(text)}</pre><button type="button" class="tcopy-btn" data-method="${method}" data-done="${esc(dict.copied)}" aria-label="${esc(fill(dict.c_copy_aria, { what, name }))}">${esc(dict.copy)}</button></div>`;
-
 // The install commands of one theme. `am theme add` is not here yet.
 export function installTexts(name, siteUrl, dict) {
   const url = `${siteUrl}themes/${name}.json`;
@@ -77,6 +74,11 @@ function card(entry, dict, lang, siteUrl) {
     [dict.c_size, `<span class="mono">${(size / 1024).toFixed(1)} KB</span>`],
     ...(font ? [[dict.c_font, esc(font)]] : []),
   ].map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join('\n          ');
+  // One tab and one panel for each way to install. Without JavaScript every panel shows, each under its own label.
+  const ways = [['agent', dict.c_ask], ['curl', dict.c_unix], ['powershell', dict.c_windows]];
+  const tabs = ways.map(([method, label], i) => `<button type="button" role="tab" id="${name}-t-${method}" aria-controls="${name}-p-${method}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-method="${method}" data-copy-label="${esc(fill(dict.c_copy_aria, { what: label, name }))}">${esc(label)}</button>`).join('\n          ');
+  const text = { agent: install.agent, curl: install.unix, powershell: install.windows };
+  const panels = ways.map(([method, label]) => `<div class="tpanel tpanel--${method}" role="tabpanel" id="${name}-p-${method}" aria-labelledby="${name}-t-${method}"><p class="tcard-step">${esc(label)}</p><pre>${esc(text[method])}</pre></div>`).join('\n          ');
   const note = fill(data.font ? dict.c_note_font : dict.c_note, { font });
   return `<article class="tcard" id="${name}" data-theme="${name}" data-file="${esc(`themes/${name}.json`)}" aria-labelledby="${name}-title">
     <header class="tcard-head">
@@ -100,12 +102,13 @@ function card(entry, dict, lang, siteUrl) {
       </div>
       <div class="tcard-install">
         <h3 class="minor">${esc(dict.c_install)}</h3>
-        <p class="tcard-step">${esc(dict.c_ask)}</p>
-        ${copyBox(dict.c_ask, install.agent, dict, name, 'agent')}
-        <p class="tcard-step">${esc(dict.c_unix)}</p>
-        ${copyBox(dict.c_unix, install.unix, dict, name, 'curl')}
-        <p class="tcard-step">${esc(dict.c_windows)}</p>
-        ${copyBox(dict.c_windows, install.windows, dict, name, 'powershell')}
+        <div class="seg-tabs tcard-tabs" role="tablist" aria-label="${esc(dict.c_install_tabs)}">
+          ${tabs}
+        </div>
+        <div class="copybox">
+          ${panels}
+          <button type="button" class="tcopy-btn" data-done="${esc(dict.copied)}">${esc(dict.copy)}</button>
+        </div>
         <p class="fine">${esc(note)}</p>
         <dl class="tcard-facts mono">
           ${facts}
