@@ -242,3 +242,33 @@ test('reply: a copy the fallback accepts still says Copied ✓ and leaves nothin
   assert.equal(await evaluate(COPY_LABEL), 'Copied ✓');
   assert.equal((await evaluate(STUCK)).stuck, false, 'the temporary textarea is removed');
 });
+
+// The fallback for real, not stubbed: the click runs as a user gesture so execCommand may copy, and the test reads the clipboard
+// itself, because execCommand can report success while it copies nothing. Seeds the clipboard first, so a copy that did not
+// happen leaves the seed.
+const copyForReal = async (opener) => {
+  await cdp.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  await load();
+  const r = await send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
+    await navigator.clipboard.writeText('SEED');
+    const read = navigator.clipboard.readText.bind(navigator.clipboard);
+    navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
+    document.querySelector('input[value="Memcached"]').click();
+    const btn = (${opener})();
+    btn.click();
+    await new Promise((r) => setTimeout(r, 100));
+    return { label: btn.textContent, clipboard: (await read()).slice(0, 5) };
+  })()` });
+  if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
+  return r.result.value;
+};
+
+test('reply: with the clipboard API refused, the bottom bar still puts the reply on the clipboard', { skip: SKIP }, async () => {
+  const r = await copyForReal(`() => document.querySelector('.am-reply-bar .am-btn--reply')`);
+  assert.deepEqual(r, { label: 'Copied ✓', clipboard: '# Re:' });
+});
+
+test('reply: with the clipboard API refused, the sheet still puts the reply on the clipboard', { skip: SKIP }, async () => {
+  const r = await copyForReal(`() => { document.querySelector('[data-am="reply"]').click(); return document.querySelector('dialog.am-reply [data-act="copy"]'); }`);
+  assert.deepEqual(r, { label: 'Copied ✓', clipboard: '# Re:' });
+});

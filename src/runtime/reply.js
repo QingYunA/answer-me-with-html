@@ -142,9 +142,10 @@ if (replyBtn) {
     } catch {
       const tmp = Object.assign(document.createElement('textarea'), { value: str });
       tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';
-      // Inside the sheet, not in the body: while a modal dialog is open the rest of the document cannot take focus, so a textarea
+      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea
       // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.
-      sheet.append(tmp);
+      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.
+      (sheet.open ? sheet : document.body).append(tmp);
       tmp.select();
       let copied = false;
       try {
