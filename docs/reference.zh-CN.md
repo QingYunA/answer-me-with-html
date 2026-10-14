@@ -236,7 +236,7 @@ am theme update [name]         # 更新来自主题库的主题
 am theme remove <name>         # 删除一个主题文件
 ```
 
-- `am theme add <name>` 读取主题库清单（`https://answer-me-with-html.com/themes/index.json`，或环境变量 `AM_CATALOG_URL` 指向的地址：只接受 https，或指向 `localhost`、`127.0.0.1`、`[::1]` 的 http，因为明文 http 下清单和文件可以被一起替换，sha256 就起不到作用；重定向到其他地址会被拒绝），从同一个地址下载 `themes/<name>.json`，并按清单核对大小和 sha256。随后做主题库 CI 的同一套检查：是有效的主题文件、没有对比度错误、没有外部资源。文件先写入临时文件再改名保存到 `~/.answer-me-with-html/themes/<name>.json`，中途中断不会留下半个文件。只接受主题库里的名字，不接受网址或路径。`requires` 高于当前版本的主题会被拒绝，并说明需要哪个版本。网络请求 8 秒超时。
+- `am theme add <name>` 读取主题库清单（`https://answer-me-with-html.com/themes/index.json`，或环境变量 `AM_CATALOG_URL` 指向的地址：只接受 https，或指向 `localhost`、`127.0.0.1`、`[::1]` 的 http，因为明文 http 下清单和文件可以被一起替换，sha256 就起不到作用；重定向到不符合这条规则的地址会被拒绝），从同一个地址下载 `themes/<name>.json`，并按清单核对大小和 sha256。随后做主题库 CI 的同一套检查：是有效的主题文件、没有对比度错误、没有外部资源。文件先写入临时文件再改名保存到 `~/.answer-me-with-html/themes/<name>.json`，中途中断不会留下半个文件。只接受主题库里的名字，不接受网址或路径。`requires` 高于当前版本的主题会被拒绝，并说明需要哪个版本。网络请求 8 秒超时。
 - `--use` 同时设为默认主题，等同 `am config set theme <name>`，不会再问别的。
 - 同名文件如果不是主题库给的那份，永远不会被覆盖，因为它可能是你自己的主题：命令会停下并提示 `--force`。完全相同的文件会提示已经安装。如果文件仍然和主题库给的一模一样，新版本会直接替换，不需要 `--force`。
 - 每个主题的来源记在数据目录的 `state.json` 里（`catalogThemes`：名字、已安装文件的版本和 sha256）。主题文件夹里只放主题文件。没有记录的文件算你自己的（`local`）。
