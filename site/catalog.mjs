@@ -50,7 +50,7 @@ export function catalogIndex(entries, siteUrl) {
   return `${JSON.stringify({ schema: 1, themes }, null, 2)}\n`;
 }
 
-// The install commands of one theme: `am theme add` (0.6.0 and newer), an agent prompt that names it and the manual save for older versions.
+// The install commands of one theme: `am theme add` (0.5.3 and newer), an agent prompt that names it and the manual save for older versions.
 function installTexts(name, siteUrl, dict) {
   const url = `${siteUrl}themes/${name}.json`;
   return {

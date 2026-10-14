@@ -264,7 +264,7 @@ am theme remove <name>         # delete a theme file
 - `am theme update` replaces each theme that came from the catalog and is unchanged since the install; a file you edited is skipped with a note (`am theme add <name> --force` replaces it). `am theme update <name>` does one theme.
 - `am theme remove <name>` deletes the file and its record (never a built-in theme). If it was the default theme, the default goes back to `auto`. Pages already made keep their look, because a page carries its own theme.
 - The output prints theme names and versions only. Labels and descriptions from the catalog are for the website and are never printed, so the text of a catalog cannot reach an agent through the command.
-- Versions before 0.6.0 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
+- Versions before 0.5.3 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
 
 ## Opening pages from a remote machine
 

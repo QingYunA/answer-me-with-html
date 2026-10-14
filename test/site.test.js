@@ -220,8 +220,8 @@ test('site build: every theme has a page in both languages with its install acti
       assert.match(html, /data-method="agent"[^>]*>(Copy for your agent|复制给你的 agent)</);
       assert.ok(html.includes(`<pre id="t-cmd">am theme add ${name} --use</pre>`), `${page}: command`);
       assert.match(html, /Command \(0\.6\.0\+\)|命令（0\.6\.0\+）/);
-      assert.ok(html.includes(`run am theme add ${name} --use. On a version before 0.6.0, save ${url} as ~/.answer-me-with-html/themes/${name}.json instead.`)
-        || html.includes(`运行 am theme add ${name} --use。如果版本低于 0.6.0，改为把 ${url} 保存为 ~/.answer-me-with-html/themes/${name}.json。`), `${page}: agent text`);
+      assert.ok(html.includes(`run am theme add ${name} --use. On a version before 0.5.3, save ${url} as ~/.answer-me-with-html/themes/${name}.json instead.`)
+        || html.includes(`运行 am theme add ${name} --use。如果版本低于 0.5.3，改为把 ${url} 保存为 ~/.answer-me-with-html/themes/${name}.json。`), `${page}: agent text`);
       const details = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/g) ?? [];
       assert.equal(details.length, 1, `${page}: one <details>`);
       assert.ok(!/<details\b[^>]*\bopen\b/.test(details[0]), `${page}: closed by default`);

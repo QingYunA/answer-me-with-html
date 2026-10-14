@@ -369,7 +369,7 @@ am theme add <name> [--use] [--force]
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
 am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
 am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again
-- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.6.0 or newer; before that, save the file by hand (see the catalog page).
+- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.5.3 or newer; before that, save the file by hand (see the catalog page).
 
 Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
 

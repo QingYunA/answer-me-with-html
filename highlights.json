@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.5.3",
   "en": [
     "Theme catalog: `am theme add comic --use` installs a theme from the website",
     "Themes can restyle diagrams: nodes, edges, notes, highlights and shadows",
