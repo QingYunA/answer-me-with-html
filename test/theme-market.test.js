@@ -53,6 +53,16 @@ const defaultIndex = () => ({
 before(async () => {
   server = createServer((req, res) => {
     served.push(req.url);
+    if (req.url.startsWith('/redirect/')) {
+      // /redirect/insecure/... goes to an http address that does not exist (a request to it would fail with ENOTFOUND, not with our message);
+      // /redirect/local/... goes to the real files on this server; /redirect/loop/... never ends.
+      const [, , kind, ...rest] = req.url.split('/');
+      // /redirect/filebad/ serves a good index, but every theme file there redirects to the insecure address.
+      if (kind === 'filebad' && rest[0] === 'index.json') return res.end(JSON.stringify(defaultIndex()));
+      res.statusCode = 302;
+      res.setHeader('location', { insecure: `http://example.invalid/themes/${rest.join('/')}`, filebad: `http://example.invalid/themes/${rest.join('/')}`, local: `/themes/${rest.join('/')}`, loop: req.url }[kind]);
+      return res.end();
+    }
     const name = req.url.replace(/^\/themes\//, '').replace(/\.json$/, '');
     if (req.url === '/themes/index.json') {
       res.setHeader('content-type', 'application/json');
@@ -212,6 +222,36 @@ test('AM_CATALOG_URL: https is accepted, http only for loopback hosts, everythin
   bad('file:///tmp/index.json');
   assert.throws(() => catalogUrl({ AM_CATALOG_URL: 'not a url' }), /is not a URL/);
   assert.equal(catalogUrl({}), 'https://answer-me-with-html.com/themes/index.json');
+});
+
+test('theme add: a redirect to an address that is not https is refused before any request goes there; one on this machine is followed', async () => {
+  reset();
+  const home = newHome();
+  const root = base.replace('/themes/', '');
+  const at = (kind) => ({ AM_CATALOG_URL: `${root}/redirect/${kind}/index.json` });
+
+  const insecure = await run(home, ['theme', 'add', 'comic'], { env: at('insecure') });
+  assert.equal(insecure.code, 1);
+  assert.match(insecure.err, /✗ Cannot read the theme catalog at .*: the server redirected to an address that is not https$/m);
+  assert.doesNotMatch(insecure.all, /example\.invalid/, 'the redirect target is not printed');
+  assert.doesNotMatch(insecure.all, /ENOTFOUND|network error/, 'no request was sent to the target');
+
+  const loop = await run(home, ['theme', 'add', 'comic'], { env: at('loop') });
+  assert.match(loop.err, /too many redirects/);
+  assert.equal(served.filter((u) => u.startsWith('/redirect/loop/')).length, 4, 'the first request and 3 redirects');
+
+  // A redirect to a loopback http address is followed, for the index and for the theme file.
+  const ok = await run(home, ['theme', 'add', 'comic'], { env: at('local') });
+  assert.equal(ok.code, 0, ok.all);
+  assert.deepEqual(readFileSync(join(themeDir(home), 'comic.json')), files.comic);
+
+  // A theme file that redirects to an insecure address is refused the same way, and nothing is written.
+  const other = newHome();
+  const bad = await run(other, ['theme', 'add', 'comic'], { env: at('filebad') });
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /✗ comic: cannot download it: the server redirected to an address that is not https$/m);
+  assert.doesNotMatch(bad.all, /example\.invalid|ENOTFOUND/);
+  assert.ok(!existsSync(themeDir(other)));
 });
 
 test('theme add: schema 2, malformed JSON and a bad index are refused', async () => {

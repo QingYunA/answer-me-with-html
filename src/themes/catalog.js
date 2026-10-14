@@ -25,6 +25,7 @@ export const CATALOG = Object.freeze({
   maxThemeBytes: 16 * 1024, // the catalog limit (CONTRIBUTING.md)
   maxThemes: 200,
   maxNameLength: 40,
+  maxRedirects: 3,
 });
 
 const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
@@ -51,12 +52,13 @@ export function catalogUrl(env = process.env) {
   } catch {
     throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
   }
-  // Over plain http the index and the theme file can both be swapped in transit, so the sha256 check would prove nothing:
-  // https only, and http for this machine (tests and local mirrors).
-  const local = parsed.protocol === 'http:' && LOOPBACK.includes(parsed.hostname);
-  if (parsed.protocol !== 'https:' && !local) throw new CatalogError('AM_CATALOG_URL must be an https URL (http only for localhost)');
+  if (!isSecure(parsed)) throw new CatalogError('AM_CATALOG_URL must be an https URL (http only for localhost)');
   return parsed.href;
 }
+
+// Over plain http the index and the theme file can both be swapped in transit, so the sha256 check would prove nothing:
+// https only, and http for this machine (tests and local mirrors). Applies to AM_CATALOG_URL and to every redirect.
+const isSecure = (url) => url.protocol === 'https:' || (url.protocol === 'http:' && LOOPBACK.includes(url.hostname));
 
 // A short reason for a failed request, from the error and never from the response.
 function reasonOf(e, timeoutMs) {
@@ -66,10 +68,31 @@ function reasonOf(e, timeoutMs) {
   return typeof code === 'string' && /^[A-Z0-9_]{3,30}$/.test(code) ? `network error ${code}` : 'network error';
 }
 
+// A redirect is followed here, not by fetch: fetch would send the request to an http address before we could look at it, so each
+// Location is checked first (isSecure) and a request is never sent to an address that fails. The target is not printed.
+async function get(url, signal, fetchImpl) {
+  let current = url;
+  for (let hops = 0; ; hops += 1) {
+    const res = await fetchImpl(current, { signal, redirect: 'manual' });
+    const location = res.status >= 300 && res.status < 400 ? res.headers?.get?.('location') : null;
+    if (!location) return res;
+    await res.body?.cancel?.();
+    if (hops >= CATALOG.maxRedirects) throw new CatalogError('too many redirects');
+    let next;
+    try {
+      next = new URL(location, current);
+    } catch {
+      throw new CatalogError('the server sent a redirect this version cannot follow');
+    }
+    if (!isSecure(next)) throw new CatalogError('the server redirected to an address that is not https');
+    current = next.href;
+  }
+}
+
 // One GET with a timeout (it covers the body) and a size cap. Returns a Buffer.
 async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.timeoutMs } = {}) {
   try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+    const res = await get(url, AbortSignal.timeout(timeoutMs), fetchImpl);
     if (!res.ok) throw new CatalogError(`HTTP ${Number.isInteger(res.status) ? res.status : '?'}`);
     const declared = Number(res.headers?.get?.('content-length'));
     if (declared > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);

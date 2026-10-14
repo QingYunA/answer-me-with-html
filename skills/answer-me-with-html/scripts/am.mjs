@@ -8259,7 +8259,8 @@ var CATALOG = Object.freeze({
   maxThemeBytes: 16 * 1024,
   // the catalog limit (CONTRIBUTING.md)
   maxThemes: 200,
-  maxNameLength: 40
+  maxNameLength: 40,
+  maxRedirects: 3
 });
 var LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
 var XYZ = /^\d+\.\d+\.\d+$/;
@@ -8281,19 +8282,37 @@ function catalogUrl(env = process.env) {
   } catch {
     throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
   }
-  const local = parsed.protocol === "http:" && LOOPBACK.includes(parsed.hostname);
-  if (parsed.protocol !== "https:" && !local) throw new CatalogError("AM_CATALOG_URL must be an https URL (http only for localhost)");
+  if (!isSecure(parsed)) throw new CatalogError("AM_CATALOG_URL must be an https URL (http only for localhost)");
   return parsed.href;
 }
+var isSecure = (url) => url.protocol === "https:" || url.protocol === "http:" && LOOPBACK.includes(url.hostname);
 function reasonOf(e, timeoutMs) {
   if (e instanceof CatalogError) return e.message;
   if (e?.name === "TimeoutError" || e?.name === "AbortError") return `no answer within ${Math.round(timeoutMs / 100) / 10} s`;
   const code = e?.cause?.code ?? e?.code;
   return typeof code === "string" && /^[A-Z0-9_]{3,30}$/.test(code) ? `network error ${code}` : "network error";
 }
+async function get(url, signal, fetchImpl) {
+  let current = url;
+  for (let hops = 0; ; hops += 1) {
+    const res = await fetchImpl(current, { signal, redirect: "manual" });
+    const location = res.status >= 300 && res.status < 400 ? res.headers?.get?.("location") : null;
+    if (!location) return res;
+    await res.body?.cancel?.();
+    if (hops >= CATALOG.maxRedirects) throw new CatalogError("too many redirects");
+    let next;
+    try {
+      next = new URL(location, current);
+    } catch {
+      throw new CatalogError("the server sent a redirect this version cannot follow");
+    }
+    if (!isSecure(next)) throw new CatalogError("the server redirected to an address that is not https");
+    current = next.href;
+  }
+}
 async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.timeoutMs } = {}) {
   try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+    const res = await get(url, AbortSignal.timeout(timeoutMs), fetchImpl);
     if (!res.ok) throw new CatalogError(`HTTP ${Number.isInteger(res.status) ? res.status : "?"}`);
     const declared = Number(res.headers?.get?.("content-length"));
     if (declared > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);
