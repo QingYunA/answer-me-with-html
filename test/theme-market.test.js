@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { main } from '../src/cli.js';
 import { externalResourceWarnings } from '../src/themes/check.js';
 import { renderDoc } from '../src/render.js';
+import { catalogUrl } from '../src/themes/catalog.js';
 import { withThemes } from '../src/themes/registry.js';
 import { normalizeTheme } from '../src/themes/check.js';
 
@@ -193,8 +194,24 @@ test('theme add: network failures print a short reason', async () => {
   const notFound = await run(home, ['theme', 'add', 'comic'], { env: { AM_CATALOG_URL: `${base}missing.json` } });
   assert.match(notFound.err, /: HTTP 404/);
   const notUrl = await run(home, ['theme', 'add', 'comic'], { env: { AM_CATALOG_URL: 'ftp://x/y' } });
-  assert.match(notUrl.err, /AM_CATALOG_URL must be an http\(s\) URL/);
+  assert.match(notUrl.err, /AM_CATALOG_URL must be an https URL \(http only for localhost\)/);
   assert.ok(!existsSync(themeDir(home)));
+});
+
+test('AM_CATALOG_URL: https is accepted, http only for loopback hosts, everything else is refused', () => {
+  const ok = (url) => assert.equal(catalogUrl({ AM_CATALOG_URL: url }), new URL(url).href, url);
+  const bad = (url) => assert.throws(() => catalogUrl({ AM_CATALOG_URL: url }), /AM_CATALOG_URL must be an https URL \(http only for localhost\)/, url);
+  ok('https://example.com/themes/index.json');
+  ok('http://localhost:8080/themes/index.json');
+  ok('http://127.0.0.1:8080/themes/index.json');
+  ok('http://[::1]:8080/themes/index.json');
+  bad('http://example.com/themes/index.json');
+  bad('http://localhost.example.com/themes/index.json');
+  bad('http://127.0.0.1.example.com/themes/index.json');
+  bad('ftp://localhost/themes/index.json');
+  bad('file:///tmp/index.json');
+  assert.throws(() => catalogUrl({ AM_CATALOG_URL: 'not a url' }), /is not a URL/);
+  assert.equal(catalogUrl({}), 'https://answer-me-with-html.com/themes/index.json');
 });
 
 test('theme add: schema 2, malformed JSON and a bad index are refused', async () => {

@@ -365,7 +365,7 @@ am theme add <name> [--use] [--force]
 - Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
   Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
 - A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
-- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an http(s) URL of an index.json).
+- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
 am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
 am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again

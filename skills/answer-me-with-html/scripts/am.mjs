@@ -8261,6 +8261,7 @@ var CATALOG = Object.freeze({
   maxThemes: 200,
   maxNameLength: 40
 });
+var LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
 var XYZ = /^\d+\.\d+\.\d+$/;
 var SHA256 = /^[0-9a-f]{64}$/;
 var CatalogError = class extends Error {
@@ -8280,7 +8281,8 @@ function catalogUrl(env = process.env) {
   } catch {
     throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
   }
-  if (!/^https?:$/.test(parsed.protocol)) throw new CatalogError(`AM_CATALOG_URL must be an http(s) URL: ${url}`);
+  const local = parsed.protocol === "http:" && LOOPBACK.includes(parsed.hostname);
+  if (parsed.protocol !== "https:" && !local) throw new CatalogError("AM_CATALOG_URL must be an https URL (http only for localhost)");
   return parsed.href;
 }
 function reasonOf(e, timeoutMs) {
@@ -10309,7 +10311,7 @@ am theme add <name> [--use] [--force]
 - Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
   Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
 - A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
-- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an http(s) URL of an index.json).
+- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
 am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
 am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again

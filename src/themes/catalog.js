@@ -27,6 +27,7 @@ export const CATALOG = Object.freeze({
   maxNameLength: 40,
 });
 
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
 const XYZ = /^\d+\.\d+\.\d+$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 
@@ -50,7 +51,10 @@ export function catalogUrl(env = process.env) {
   } catch {
     throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
   }
-  if (!/^https?:$/.test(parsed.protocol)) throw new CatalogError(`AM_CATALOG_URL must be an http(s) URL: ${url}`);
+  // Over plain http the index and the theme file can both be swapped in transit, so the sha256 check would prove nothing:
+  // https only, and http for this machine (tests and local mirrors).
+  const local = parsed.protocol === 'http:' && LOOPBACK.includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !local) throw new CatalogError('AM_CATALOG_URL must be an https URL (http only for localhost)');
   return parsed.href;
 }
 
