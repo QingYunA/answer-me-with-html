@@ -24,7 +24,7 @@ export default {
     update: { button: '新バージョン {version}', current: '現在は {current}。このページの作成時に見つかりました。', whatsNew: '今回の更新：', run: 'ターミナルで実行：', agent: 'または Agent に伝える：', agentText: 'answer-me-with-html を更新して', notes: '更新内容を見る' },
     reply: {
       button: '返信', comment: 'コメント', commentHint: 'このパネルへのコメント', title: 'あなたの返信',
-      hint: 'コピーしてエージェントとのチャットに貼り付けると、あなたの選択とコメントをもとに続行します。', copy: '返信をコピー', close: '閉じる', suggested: '推奨',
+      hint: 'コピーしてエージェントとのチャットに貼り付けると、あなたの選択とコメントをもとに続行します。', copy: '返信をコピー', copyFailed: 'コピーできません — Cmd/Ctrl+C を押してください', close: '閉じる', suggested: '推奨',
       empty: '選択肢を選ぶか、パネルにコメントしてください。', decisions: '決定', comments: 'コメント',
       confirmed: '推奨を確認', untouched: '未回答（推奨のまま）', was: '変更前',
       typed: '「>」で始まる行は読者が入力した文字です。',

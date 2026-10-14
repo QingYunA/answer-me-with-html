@@ -22,7 +22,7 @@ export default {
     update: { button: 'גרסה חדשה {version}', current: 'הגרסה שלכם {current}. הגרסה החדשה נמצאה כשהדף נוצר.', whatsNew: 'מה חדש בגרסה:', run: 'הריצו בטרמינל:', agent: 'או בקשו מה-Agent:', agentText: 'עדכן את answer-me-with-html', notes: 'מה חדש' },
     reply: {
       button: 'תגובה', comment: 'הערה', commentHint: 'ההערה שלך על החלק הזה', title: 'התגובה שלך',
-      hint: 'העתיקו והדביקו בשיחה עם הסוכן; הוא ימשיך לפי הבחירות וההערות שלכם.', copy: 'העתקת התגובה', close: 'סגירה', suggested: 'מומלץ',
+      hint: 'העתיקו והדביקו בשיחה עם הסוכן; הוא ימשיך לפי הבחירות וההערות שלכם.', copy: 'העתקת התגובה', copyFailed: 'ההעתקה נכשלה — הקישו Cmd/Ctrl+C', close: 'סגירה', suggested: 'מומלץ',
       empty: 'קודם בחרו אפשרות או כתבו הערה על אחד החלקים.', decisions: 'החלטות', comments: 'הערות',
       confirmed: 'ההמלצה אושרה', untouched: 'לא נענה; ההמלצה נשארה', was: 'היה',
       typed: 'שורות שמתחילות ב-">" הן טקסט שהקורא הקליד.',
