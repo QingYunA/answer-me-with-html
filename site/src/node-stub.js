@@ -14,6 +14,7 @@ function notFound(path) {
 export function readFileSync(path) { throw notFound(path); }
 export function statSync(path) { throw notFound(path); }
 export function lstatSync(path) { throw notFound(path); }
+export function realpathSync(path) { throw notFound(path); }
 export function readdirSync(path) { throw notFound(path); }
 export function existsSync() { return false; }
 export function writeFileSync(path) { throw notFound(path); }

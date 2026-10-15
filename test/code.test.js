@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, renameSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, renameSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderDoc, RenderError } from '../src/render.js';
@@ -213,4 +213,109 @@ test('cli render: a long code block is listed as a code warning after the summar
   const r = await run(['render', '-', '-o', 'out/long.html'], draft('```ts src=src/app.ts'));
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /code 1 warning \(trim the block and run again, or keep it if every line matters\):\n  L5 \[code-length\] the block has 41 lines/);
+});
+
+// Symlinks: the checks run on the real file, not the name written in the draft.
+const canSymlink = (() => {
+  const probe = mkdtempSync(join(tmpdir(), 'am-code-probe-'));
+  try {
+    symlinkSync(probe, join(probe, 'l'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+})();
+const skipLinks = canSymlink ? false : 'cannot create symlinks here (Windows needs privileges)';
+
+function linkedProject() {
+  const root = mkdtempSync(join(tmpdir(), 'am-code-links-'));
+  const project = join(root, 'project');
+  mkdirSync(join(project, 'src'), { recursive: true });
+  writeFileSync(join(root, 'outside.ts'), 'export const outside = 1;\n');
+  writeFileSync(join(project, '.env'), 'TOKEN=abc\n');
+  writeFileSync(join(project, 'src', 'real.ts'), 'export const real = 1;\n');
+  return { root, project };
+}
+
+const errorIn = (codeDir, fence) => {
+  try {
+    renderDoc(draft(fence), {}, {}, { codeDir });
+  } catch (err) {
+    return err;
+  }
+  return null;
+};
+
+test('code: a symlink to a file that holds secrets is refused, whatever its own name is', { skip: skipLinks }, () => {
+  const { root, project } = linkedProject();
+  try {
+    mkdirSync(join(project, '.ssh'));
+    writeFileSync(join(project, '.ssh', 'notes'), 'Host x\n');
+    symlinkSync('.env', join(project, 'config.ts'));
+    symlinkSync('.ssh/notes', join(project, 'notes.ts'));
+    for (const src of ['config.ts', 'notes.ts']) {
+      const err = errorIn(project, `\`\`\`ts src=${src}`);
+      assert.ok(err instanceof RenderError, src);
+      assert.match(err.message, /holds keys or passwords by convention/, src);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('code: a symlink to a file outside the folder is refused, also through a linked folder', { skip: skipLinks }, () => {
+  const { root, project } = linkedProject();
+  try {
+    symlinkSync('../outside.ts', join(project, 'link.ts'));
+    symlinkSync(root, join(project, 'up'), 'dir');
+    for (const src of ['link.ts', 'up/outside.ts']) {
+      const err = errorIn(project, `\`\`\`ts src=${src}`);
+      assert.ok(err instanceof RenderError, src);
+      assert.match(err.message, /outside the current folder/, src);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('code: a symlink that stays inside the folder and points at a normal file still works, also from a linked folder', { skip: skipLinks }, () => {
+  const { root, project } = linkedProject();
+  try {
+    symlinkSync('src/real.ts', join(project, 'alias.ts'));
+    const linkedBase = join(root, 'base-link');
+    symlinkSync(project, linkedBase, 'dir');
+    for (const codeDir of [project, linkedBase]) {
+      const { html } = renderDoc(draft('```ts src=alias.ts'), {}, {}, { codeDir });
+      assert.match(html, /export const real = 1;/);
+      assert.match(html, /data-am-src="alias.ts"/);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('code: a dangling symlink is "not found", like a missing file', { skip: skipLinks }, () => {
+  const { root, project } = linkedProject();
+  try {
+    symlinkSync('nowhere.ts', join(project, 'dangling.ts'));
+    assert.match(errorIn(project, '```ts src=dangling.ts').message, /is not found/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('code: credentials in a URL keep a file out of a page; URLs without a password do not', () => {
+  const secret = ['postgres://admin:hunter2pass@db.internal/prod', 'redis://:topsecret@cache:6379', 'https://user:p%40ss@example.com/x'];
+  const fine = ['https://user@host/path', 'https://host/path', 'postgres://host/db', 'http://localhost:3000/a@b', 'ssh://git@github.com/o/r.git', 'postgres://${USER}:${PASS}@host/db'];
+  for (const [i, line] of secret.entries()) {
+    writeFileSync(join(dir, `url-secret-${i}.ts`), `const url = '${line}';\n`);
+    assert.match(errorOf(draft(`\`\`\`ts src=url-secret-${i}.ts`)).message, /looks like it holds a key or a token/, line);
+    assert.match(errorOf(draft('```ts', `const url = '${line}';`)).message, /the block looks like it holds a key/, line);
+  }
+  for (const [i, line] of fine.entries()) {
+    writeFileSync(join(dir, `url-fine-${i}.ts`), `const url = '${line}';\n`);
+    assert.doesNotThrow(() => render(draft(`\`\`\`ts src=url-fine-${i}.ts`)), line);
+  }
 });
