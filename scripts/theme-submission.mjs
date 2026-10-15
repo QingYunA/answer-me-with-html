@@ -32,10 +32,15 @@ const section = (body, label) => {
 // so a fence-like line inside the answer does not cut the theme short.
 const unfence = (value) => value.match(/^(`{3,})[^\n]*\n([\s\S]*)\n\1[ \t]*$/)?.[2] ?? value;
 
-// { name, text } from the body of a submission issue. An unknown format gives empty strings, which then fail the checks.
+// { name, text, licensed } from the body of a submission issue. An unknown format gives empty strings, which then fail the checks.
+// licensed: the License box is ticked. The form requires it, but the author can untick it by editing the issue.
 export function parseIssue(body) {
   const text = String(body ?? '').replace(/\r\n?/g, '\n');
-  return { name: section(text, 'Theme name'), text: unfence(section(text, 'Theme JSON')).trim() };
+  return {
+    name: section(text, 'Theme name'),
+    text: unfence(section(text, 'Theme JSON')).trim(),
+    licensed: /^- \[[xX]\] /m.test(section(text, 'License')),
+  };
 }
 
 // The bytes that go into marketplace/themes/: the same data, laid out one way for every theme.
@@ -43,14 +48,16 @@ export const catalogFile = (text) => `${JSON.stringify(JSON.parse(text), null, 2
 
 // { name, text, problems }. The rules run on the bytes that would be committed, so the 16 KB limit is the limit of the file.
 export function checkSubmission(body, existingNames = []) {
-  const { name, text } = parseIssue(body);
+  const { name, text, licensed } = parseIssue(body);
   let file = text;
   try {
     file = catalogFile(text);
   } catch {
     // Not JSON: the rules report it.
   }
-  return { name, text, problems: catalogProblems(name, file, { existing: existingNames }) };
+  const problems = catalogProblems(name, file, { existing: existingNames });
+  if (!licensed) problems.push({ field: 'agreement', message: 'Tick the License box: you made this theme and license it under the license in the file.' });
+  return { name, text, problems };
 }
 
 // Text from the issue, safe inside a code fence and in a comment: no backtick (it could close the fence), no @ (it could mention a person), one short line.

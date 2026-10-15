@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { catalogProblems, MAX_BYTES } from '../src/themes/catalog-rules.js';
+import { catalogProblems, MAX_BYTES, MAX_NAME } from '../src/themes/catalog-rules.js';
 
 const read = (name) => readFileSync(fileURLToPath(new URL(`../marketplace/themes/${name}.json`, import.meta.url)), 'utf8');
 const COMIC = read('comic');
@@ -23,6 +23,11 @@ const dropDiagramTokens = (group) => {
 
 test('catalogProblems: every file of the catalog passes', () => {
   for (const name of ['comic', 'manga', 'pop']) assert.deepEqual(catalogProblems(name, read(name)), [], name);
+});
+
+test('catalogProblems: a name has at most MAX_NAME characters', () => {
+  assert.deepEqual(catalogProblems('a'.repeat(MAX_NAME), read('comic')), []);
+  assert.deepEqual(catalogProblems('a'.repeat(MAX_NAME + 1), read('comic')).map((p) => p.field), ['name']);
 });
 
 test('catalogProblems: each problem is a field and a plain sentence', () => {

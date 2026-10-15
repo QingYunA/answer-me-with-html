@@ -7,6 +7,8 @@ import { BUILTIN_NAMES } from './registry.js';
 import { THEME_SELECTORS } from './selectors.js';
 
 export const MAX_BYTES = 16 * 1024;
+// The name is a file name, a branch name and a word people type: keep it short.
+export const MAX_NAME = 40;
 const MIN_DIAGRAM_TOKENS = 8;
 const KNOWN_CLASSES = new Set(THEME_SELECTORS.flatMap((s) => s.match(/\.[a-z][a-z0-9_-]*/gi)));
 // Diagrams are styled with tokens only: a catalog theme does not reach into the SVG.
@@ -46,6 +48,7 @@ function nameProblems(name, existing) {
   if (typeof name !== 'string' || !NAME.test(name)) {
     return [{ field: 'name', message: 'The name must use lowercase letters, digits and -, and start with a letter or a digit.' }];
   }
+  if (name.length > MAX_NAME) return [{ field: 'name', message: `The name has ${name.length} characters; use at most ${MAX_NAME}.` }];
   if (BUILTIN_NAMES.includes(name)) return [{ field: 'name', message: `"${name}" is the name of a built-in theme. Pick another name.` }];
   if (name === 'index') return [{ field: 'name', message: 'The name "index" is taken by the catalog list. Pick another name.' }];
   if (existing.some((e) => String(e).toLowerCase() === name.toLowerCase())) return [{ field: 'name', message: `The catalog already has a theme named "${name}". Pick another name.` }];

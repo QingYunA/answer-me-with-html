@@ -113,12 +113,13 @@ jobs:
           [[ "$USER_ID" =~ ^[0-9]+$ ]]
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git switch -c "theme/$NAME"
+          git switch -c "theme/issue-$NUMBER"
           node scripts/theme-submission.mjs write
           git add -- "marketplace/themes/$NAME.json"
           git commit -m "feat(catalog): add the $NAME theme" -m "Co-authored-by: $LOGIN <$USER_ID+$LOGIN@users.noreply.github.com>"
-          # Only this branch is ever force-pushed: approving the same issue again rebuilds it from main.
-          git push --force origin "theme/$NAME"
+          # One branch per issue, so two issues that ask for the same name never overwrite each other. Only this branch is ever
+          # force-pushed: approving the same issue again rebuilds it from main.
+          git push --force origin "theme/issue-$NUMBER"
       - name: Open the pull request
         if: steps.check.outputs.ok == 'true'
         id: pr
@@ -127,19 +128,17 @@ jobs:
           LOGIN: ${{ github.event.issue.user.login }}
         run: |
           set -euo pipefail
-          url=$(gh pr list --repo "$REPO" --head "theme/$NAME" --state open --json url --jq '.[0].url // empty')
+          url=$(gh pr list --repo "$REPO" --head "theme/issue-$NUMBER" --state open --json url --jq '.[0].url // empty')
           if [ -z "$url" ]; then
             body=$(printf 'Adds the `%s` theme to the catalog.\n\nIt came from a website submission by @%s. The catalog checks passed on the issue before this PR was opened.\n\nCloses #%s\n' "$NAME" "$LOGIN" "$NUMBER")
-            url=$(gh pr create --repo "$REPO" --base main --head "theme/$NAME" --title "feat(catalog): add the $NAME theme" --body "$body")
+            url=$(gh pr create --repo "$REPO" --base main --head "theme/issue-$NUMBER" --title "feat(catalog): add the $NAME theme" --body "$body")
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
       # A PR opened with GITHUB_TOKEN starts no workflows, but workflow_dispatch does. The required checks (test, coverage)
       # attach to the head commit of the branch, so they count for the PR.
       - name: Start CI on the branch
         if: steps.check.outputs.ok == 'true'
-        env:
-          NAME: ${{ steps.check.outputs.name }}
-        run: gh workflow run ci.yml --repo "$REPO" --ref "theme/$NAME"
+        run: gh workflow run ci.yml --repo "$REPO" --ref "theme/issue-$NUMBER"
       - name: Tell the issue
         if: steps.check.outputs.ok == 'true'
         env:

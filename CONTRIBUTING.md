@@ -55,7 +55,7 @@ Whichever way you submit, the theme must follow these rules:
 ### Approving a submission
 
 1. Read the issue. The bot comment must say that the theme passes the checks. Read the theme itself, `css` most of all: it goes into other people's pages.
-2. Add the label `theme-approved`. `.github/workflows/theme-submission.yml` checks the theme again, creates the branch `theme/<name>` with the file and the author as `Co-authored-by`, opens the PR with `Closes #<issue>`, and starts `ci.yml` on the branch. A PR opened by the Action starts no workflows of its own, so the Action starts CI by hand and the required checks attach to the PR.
+2. Add the label `theme-approved`. `.github/workflows/theme-submission.yml` checks the theme again, creates the branch `theme/issue-<number>` with the file and the author as `Co-authored-by`, opens the PR with `Closes #<issue>`, and starts `ci.yml` on the branch. A PR opened by the Action starts no workflows of its own, so the Action starts CI by hand and the required checks attach to the PR.
 3. Review the PR and merge it as usual. The PR holds the file as the Action wrote it; the Action uses the issue text from the moment the label was added, so read the file in the PR, not the issue.
 4. When the check fails at step 2, the Action comments and takes the label off. Add it again after the author fixes the issue. Adding it again rebuilds the branch from `main`.
 

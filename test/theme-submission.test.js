@@ -16,11 +16,16 @@ const tmp = () => mkdtempSync(join(tmpdir(), 'am-submission-'));
 const compact = (text = COMIC) => JSON.stringify(JSON.parse(text));
 
 // The body GitHub makes from .github/ISSUE_TEMPLATE/theme.yml.
-const issue = ({ name = 'comic-two', json = COMIC, fence = true } = {}) => [
+const issue = ({ name = 'comic-two', json = COMIC, fence = true, ticked = true } = {}) => [
   '### Theme name', '', name, '',
   '### Theme JSON', '', fence ? `\`\`\`json\n${json}\n\`\`\`` : json, '',
-  '### License', '', '- [x] I made this theme, and I license it under the license in the file.',
+  '### License', '', `- [${ticked ? 'X' : ' '}] I made this theme, and I license it under the license in the file.`,
 ].join('\n');
+
+test('checkSubmission: the License box must stay ticked', () => {
+  assert.equal(parseIssue(issue()).licensed, true);
+  assert.deepEqual(checkSubmission(issue({ ticked: false }), []).problems.map((p) => p.field), ['agreement']);
+});
 
 test('parseIssue: reads the name and the JSON of an issue form', () => {
   const { name, text } = parseIssue(issue());
@@ -48,11 +53,11 @@ test('parseIssue: accepts CRLF line breaks and extra whitespace', () => {
 });
 
 test('parseIssue: "_No response_", missing sections and other text give empty values', () => {
-  assert.deepEqual(parseIssue('### Theme name\n\n_No response_\n\n### Theme JSON\n\n_No response_\n'), { name: '', text: '' });
-  assert.deepEqual(parseIssue('### Theme name\n\nx\n'), { name: 'x', text: '' });
-  assert.deepEqual(parseIssue('Please add my theme!'), { name: '', text: '' });
-  assert.deepEqual(parseIssue(null), { name: '', text: '' });
-  assert.deepEqual(parseIssue(undefined), { name: '', text: '' });
+  assert.deepEqual(parseIssue('### Theme name\n\n_No response_\n\n### Theme JSON\n\n_No response_\n'), { name: '', text: '', licensed: false });
+  assert.deepEqual(parseIssue('### Theme name\n\nx\n'), { name: 'x', text: '', licensed: false });
+  assert.deepEqual(parseIssue('Please add my theme!'), { name: '', text: '', licensed: false });
+  assert.deepEqual(parseIssue(null), { name: '', text: '', licensed: false });
+  assert.deepEqual(parseIssue(undefined), { name: '', text: '', licensed: false });
 });
 
 test('checkSubmission: a catalog file under a new name passes', () => {
