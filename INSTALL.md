@@ -33,7 +33,7 @@ node --version
 
 You need v20 or newer. If it is, go to Step 2.
 
-If it is older or missing, ask me once whether to install the Node.js LTS with the command for my system:
+If it is older or missing, show me the exact command for my system below and ask me once whether to run it. For nvm, also tell me that it adds lines to my shell profile.
 
 | System | Command |
 | :--- | :--- |
