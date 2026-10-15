@@ -8,7 +8,7 @@
   try {
     if (d.lang === 'en' && !localStorage.getItem('am-site-lang') && /^zh/i.test(navigator.language || '')) {
       localStorage.setItem('am-site-lang', 'zh');
-      location.replace('{{ALT_HREF}}' + location.hash);
+      location.replace('{{ALT_HREF}}' + location.search + location.hash);
     }
   } catch (e) {}
 })();

@@ -30,6 +30,9 @@ export const themeFromFile = (name, data) => normalizeTheme(name, data, BUILTIN_
 // The same function checks marketplace/themes/ in the tests and the issues submitted on GitHub.
 export { catalogProblems };
 
+// What the theme editor page (site/src/editor.js) needs besides the renderer: starting points, the check, the submit link, the issue loader.
+export * from './editor-model.js';
+
 // The settings a fresh install renders with, as the CLI reads them from an empty config.
 const DEFAULTS = Object.freeze(Object.fromEntries(['theme', 'mode', 'style'].map((k) => [k, CONFIG_KEYS[k].default])));
 

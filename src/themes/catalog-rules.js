@@ -51,6 +51,7 @@ function nameProblems(name, existing) {
   if (name.length > MAX_NAME) return [{ field: 'name', message: `The name has ${name.length} characters; use at most ${MAX_NAME}.` }];
   if (BUILTIN_NAMES.includes(name)) return [{ field: 'name', message: `"${name}" is the name of a built-in theme. Pick another name.` }];
   if (name === 'index') return [{ field: 'name', message: 'The name "index" is taken by the catalog list. Pick another name.' }];
+  if (name === 'new') return [{ field: 'name', message: 'The name "new" is taken by the theme editor page. Pick another name.' }];
   if (existing.some((e) => String(e).toLowerCase() === name.toLowerCase())) return [{ field: 'name', message: `The catalog already has a theme named "${name}". Pick another name.` }];
   return [];
 }

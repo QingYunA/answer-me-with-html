@@ -51,7 +51,7 @@ test('catalogProblems: the name uses lowercase letters, digits and -', () => {
 });
 
 test('catalogProblems: a built-in name and index are taken', () => {
-  for (const name of ['blueprint', 'shadcn', 'paper', 'index']) assert.deepEqual(fields(name, COMIC), ['name'], name);
+  for (const name of ['blueprint', 'shadcn', 'paper', 'index', 'new']) assert.deepEqual(fields(name, COMIC), ['name'], name);
 });
 
 test('catalogProblems: a name already in the catalog is taken, whatever its case', () => {

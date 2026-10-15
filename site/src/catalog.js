@@ -20,3 +20,5 @@ for (const card of document.querySelectorAll('.tcard')) {
   link.addEventListener('click', open);
   link.addEventListener('auxclick', (e) => { if (e.button === 1) open(); });
 }
+
+document.getElementById('submit-theme')?.addEventListener('click', () => track('editor-open', { from: 'wall' }));

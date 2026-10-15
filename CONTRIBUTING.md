@@ -37,14 +37,14 @@ The catalog is the set of theme files in `marketplace/themes/`. The website publ
 
 There are three ways to submit a theme. **A catalog theme needs no accepted issue first.** A maintainer reviews every theme before it goes in.
 
-- **The website editor** at [answer-me-with-html.com/themes/new/](https://answer-me-with-html.com/themes/new/) is the main way (it lands soon). You start from a theme, change it, see it live and check it as you edit. It then opens the issue form below with your theme filled in.
-- **The issue form** works now. Open [Submit a theme](https://github.com/QingYunA/answer-me-with-html/issues/new?template=theme.yml), type the name and paste the theme file. A bot checks the theme and comments with what to fix. Edit the issue and it checks again.
+- **The website editor** at [answer-me-with-html.com/themes/new/](https://answer-me-with-html.com/themes/new/) is the main way. You start from a built-in or catalog theme (or upload a file), change it in a form or as JSON, see it live in light and dark, and check it with the catalog rules as you edit. Submit opens the issue form below with your theme filled in; Download gives you the file for a PR.
+- **The issue form** is what the editor fills in. Open [Submit a theme](https://github.com/QingYunA/answer-me-with-html/issues/new?template=theme.yml), type the name and paste the theme file. A bot checks the theme and comments with what to fix. Edit the issue and it checks again.
 - **A PR** adds `marketplace/themes/<name>.json`. One theme per PR is easiest to review.
 
 Whichever way you submit, the theme must follow these rules:
 
 - The file is a theme file ([docs/reference.md](docs/reference.md#your-own-theme)) plus the catalog fields `version` (`x.y.z`), `author`, `license`, and `description` (`{ "en": "one short sentence", "zh": "..." }`). `label` should have `en` and `zh`. The catalog fields are for the website; the CLI ignores them when it renders.
-- The file name is the theme name: lowercase letters, digits and `-`, and not the name of a built-in theme or `index`.
+- The file name is the theme name: lowercase letters, digits and `-`, and not the name of a built-in theme, `index` or `new`.
 - At most 16 KB. No `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face`, no backslash. A theme names a font the CLI ships with `font` (only `bangers` for now); it does not bring its own.
 - `css` targets only the classes in `THEME_SELECTORS` (`src/themes/selectors.js`). If your theme needs a class that is not there, add it to the list in the same PR, with the reason.
 - Set `requires` only when the theme fails on an older version. A version that does not know a field ignores it, so a theme that uses `font` still works on 0.4.10 and newer; it shows system fonts there.
@@ -54,7 +54,7 @@ Whichever way you submit, the theme must follow these rules:
 
 ### Approving a submission
 
-1. Read the issue. The bot comment must say that the theme passes the checks. Read the theme itself, `css` most of all: it goes into other people's pages.
+1. Read the issue. The bot comment must say that the theme passes the checks, and ends with a "See it rendered" link: `answer-me-with-html.com/themes/new/?issue=<number>` loads the theme of the issue into the editor (it reads the issue through the public GitHub API, 60 requests an hour without signing in), so you see it in light and dark on the sample pages. Read the theme itself, `css` most of all: it goes into other people's pages.
 2. Add the label `theme-approved`. `.github/workflows/theme-submission.yml` checks the theme again, creates the branch `theme/issue-<number>` with the file and the author as `Co-authored-by`, opens the PR with `Closes #<issue>`, and starts `ci.yml` on the branch. A PR opened by the Action starts no workflows of its own, so the Action starts CI by hand and the required checks attach to the PR.
 3. Review the PR and merge it as usual. The PR holds the file as the Action wrote it; the Action uses the issue text from the moment the label was added, so read the file in the PR, not the issue.
 4. When the check fails at step 2, the Action comments and takes the label off. Add it again after the author fixes the issue. Adding it again rebuilds the branch from `main`.

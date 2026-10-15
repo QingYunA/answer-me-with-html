@@ -1,6 +1,6 @@
 // Site chrome and motion: color mode, language choice, sheet rulers, nav state, draw-on lines, count-ups,
 // the hero crosshair, copy buttons, install tabs, the figure lightbox. The page's own script loads later:
-// playground.js (home), catalog.js (theme wall) or theme.js (one theme's page).
+// playground.js (home), catalog.js (theme wall), theme.js (one theme's page) or editor.js (the theme editor).
 const root = document.documentElement;
 const UI = JSON.parse(document.getElementById('site-ui')?.textContent || '{}');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -47,7 +47,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
 $('.lang-switch')?.addEventListener('click', (e) => {
   track('lang-switch', { to: e.currentTarget.dataset.lang });
   try { localStorage.setItem('am-site-lang', e.currentTarget.dataset.lang); } catch { /* no storage */ }
-  e.currentTarget.href = e.currentTarget.getAttribute('href') + location.hash;
+  e.currentTarget.href = e.currentTarget.getAttribute('href') + location.search + location.hash;
 });
 
 // ── Home and the logo go to the very top of the page (an anchor jump would stop below the sticky bar's padding) ──
@@ -299,7 +299,7 @@ function heroFallback() {
   $('.demo-status', demo).textContent = UI.fallback;
   $('.demo-note', demo).innerHTML = UI.fallbackNote;
 }
-const pageScript = { catalog: './catalog.js', theme: './theme.js' }[root.dataset.page] ?? './playground.js';
+const pageScript = { catalog: './catalog.js', theme: './theme.js', editor: './editor.js' }[root.dataset.page] ?? './playground.js';
 idle(() => import(pageScript).catch((err) => {
   console.error(`${pageScript} failed to load`, err);
   heroFallback();

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="{{LANG}}" data-base="{{BASE}}" data-version="{{VERSION}}" data-page="editor">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ed_meta_title}}</title>
+<meta name="description" content="{{ed_meta_desc}}">
+<link rel="canonical" href="{{CANONICAL}}">
+<link rel="alternate" hreflang="en" href="{{SITE_URL}}themes/new/">
+<link rel="alternate" hreflang="zh-CN" href="{{SITE_URL}}zh/themes/new/">
+<link rel="alternate" hreflang="x-default" href="{{SITE_URL}}themes/new/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Answer me with HTML">
+<meta property="og:title" content="{{ed_meta_title}}">
+<meta property="og:description" content="{{ed_meta_desc}}">
+<meta property="og:url" content="{{CANONICAL}}">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ed_meta_title}}">
+<meta name="twitter:description" content="{{ed_meta_desc}}">
+<meta name="twitter:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#081322" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="{{BASE}}favicon.svg" type="image/svg+xml">
+<script defer src="{{STATS_SCRIPT}}" data-website-id="{{STATS_WEBSITE_ID}}" data-domains="answer-me-with-html.com"></script>
+{{PARTIAL_BOOT}}
+<link rel="stylesheet" href="{{BASE}}assets/style.css">
+<link rel="modulepreload" href="{{BASE}}assets/main.js">
+<script type="module" src="{{BASE}}assets/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{skip}}</a>
+
+<header class="topbar">
+  <div class="topbar-in">
+{{PARTIAL_BRAND}}
+    <nav class="nav" aria-label="{{nav_label}}">
+      <a href="{{BASE}}">{{nav_home}}</a>
+      <a href="{{BASE}}#playground">{{nav_playground}}</a>
+      <a href="{{BASE}}#install">{{nav_install}}</a>
+      <a href="{{BASE}}themes/" aria-current="true">{{nav_catalog}}</a>
+    </nav>
+{{PARTIAL_TOOLS}}
+  </div>
+</header>
+
+<main id="main">
+
+<section class="sheet" aria-labelledby="e-title">
+  <a class="tback mono" href="{{BACK_HREF}}">← {{th_back}}</a>
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">T</span>
+    <h1 id="e-title">{{ed_title}}</h1>
+  </header>
+  <p class="sheet-lede">{{ed_lede}}</p>
+  <noscript><p class="fine">{{ed_nojs}}</p></noscript>
+
+  <div class="ed" id="ed">
+    <div class="ed-start">
+      <div class="ed-field">
+        <label for="ed-from">{{ed_from}}</label>
+        <select id="ed-from" class="ed-input" disabled><option>{{ed_loading}}</option></select>
+      </div>
+      <div class="ed-upload">
+        <button type="button" class="btn btn-sm" id="ed-file-btn">{{ed_upload}}</button>
+        <input type="file" id="ed-file" accept=".json,application/json" hidden>
+      </div>
+      <p class="fine ed-drop-note">{{ed_drop}}</p>
+    </div>
+    <p class="ed-banner" id="ed-banner" role="status" hidden></p>
+
+    <div class="ed-grid">
+      <form class="ed-form" id="ed-form" autocomplete="off" novalidate onsubmit="return false"></form>
+
+      <aside class="ed-side" aria-label="{{ed_side}}">
+        <div class="tview" id="ed-view" data-frame-title="{{ed_frame_title}}">
+          <div class="tview-bar">
+            <div class="seg-tabs" role="radiogroup" aria-label="{{th_sample_label}}" data-group="sample">
+              <button type="button" role="radio" aria-checked="true" tabindex="0" data-v="tcp">{{pre_tcp}}</button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="cache">{{pre_cache}}</button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="history">{{pre_history}}</button>
+            </div>
+            <div class="seg-tabs" role="radiogroup" aria-label="{{th_mode_label}}" data-group="mode">
+              <button type="button" role="radio" aria-checked="true" tabindex="0" data-v="light">{{pg_mode_light}}</button>
+              <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="dark">{{pg_mode_dark}}</button>
+            </div>
+          </div>
+          <div class="tview-box ed-box">
+            <iframe title="{{ed_frame_title}}"></iframe>
+          </div>
+          <p class="tview-status mono" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="ed-check">
+          <h2 class="minor">{{ed_check}}</h2>
+          <div id="ed-problems" class="ed-problems" aria-live="polite" aria-atomic="true"></div>
+        </div>
+
+        <div class="ed-send">
+          <p class="ed-send-note">{{ed_submit_note}}</p>
+          <div class="ed-actions">
+            <button type="button" class="btn btn-primary" id="ed-submit" disabled aria-describedby="ed-submit-state">{{ed_submit}}</button>
+            <button type="button" class="btn" id="ed-download">{{ed_download}}</button>
+          </div>
+          <p class="fine" id="ed-submit-state" role="status" aria-live="polite"></p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+</main>
+
+{{PARTIAL_FOOTER}}
+
+<div class="toast mono" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="site-ui">{{ui_json}}</script>
+</body>
+</html>
