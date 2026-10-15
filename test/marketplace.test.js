@@ -46,7 +46,7 @@ for (const file of FILES) {
     assert.deepEqual(themes.warnings, []);
     assert.ok(themes.get(name), `${name} is loaded`);
     const { html } = renderDoc(readFileSync(join(ROOT, 'examples/tcp.en.md'), 'utf8'), { theme: name }, {}, { themes });
-    const expectedBangersFaces = parse(file).font === 'bangers' ? 1 : 0;
+    const expectedBangersFaces = JSON.parse(readFileSync(join(DIR, file), 'utf8')).font === 'bangers' ? 1 : 0;
     assert.equal((html.match(BANGERS_FACE) ?? []).length, expectedBangersFaces);
     assert.ok(html.includes(`html[data-theme="${name}"]`));
     // The page's own Content-Security-Policy is the one http-equiv it may carry.
