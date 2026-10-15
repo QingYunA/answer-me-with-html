@@ -244,7 +244,7 @@ A theme restyles what is inside a diagram (flow, sequence, er, and the boxes of 
 
 ### Theme catalog
 
-[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
+[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To submit a theme to the catalog (an issue form, the website editor or a PR), see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
 
 
 #### Install a theme: `am theme add`
