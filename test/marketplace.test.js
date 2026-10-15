@@ -30,7 +30,9 @@ before(() => {
 after(() => rmSync(home, { recursive: true, force: true }));
 
 test('catalog: the first themes are there', () => {
-  assert.deepEqual(FILES, ['comic.json', 'manga.json', 'pop.json']);
+  for (const file of ['comic.json', 'manga.json', 'pop.json']) {
+    assert.ok(FILES.includes(file), 'Missing initial catalog theme: ' + file);
+  }
 });
 
 for (const file of FILES) {
@@ -80,12 +82,13 @@ for (const file of FILES) {
     for (const cls of css.match(/\.[a-z][a-z0-9_-]*/gi) ?? []) assert.ok(KNOWN_CLASSES.has(cls), `${file} targets ${cls}, which THEME_SELECTORS does not list`);
   });
 
-  test(`catalog ${name}: renders examples/tcp.en.md from a themes folder and embeds the Bangers face once`, () => {
+  test(`catalog ${name}: renders examples/tcp.en.md from a themes folder with the requested shipped font`, () => {
     const themes = loadThemes(home);
     assert.deepEqual(themes.warnings, []);
     assert.ok(themes.get(name), `${name} is loaded`);
     const { html } = renderDoc(readFileSync(join(ROOT, 'examples/tcp.en.md'), 'utf8'), { theme: name }, {}, { themes });
-    assert.equal(html.match(BANGERS_FACE)?.length, 1);
+    const expectedBangersFaces = parse(file).font === 'bangers' ? 1 : 0;
+    assert.equal((html.match(BANGERS_FACE) ?? []).length, expectedBangersFaces);
     assert.ok(html.includes(`html[data-theme="${name}"]`));
     // The page's own Content-Security-Policy is the one http-equiv it may carry.
     assert.doesNotMatch(html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, ''), /http-equiv|@import/);
