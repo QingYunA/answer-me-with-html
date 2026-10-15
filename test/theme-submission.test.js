@@ -6,7 +6,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { MARKER, catalogFile, checkSubmission, commentBody, existingNames, parseIssue, writeSubmission } from '../scripts/theme-submission.mjs';
+import { MARKER, catalogFile, checkSubmission, commentBody, existingNames, writeSubmission } from '../scripts/theme-submission.mjs';
+import { parseIssue } from '../src/themes/submission-issue.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPT = join(ROOT, 'scripts/theme-submission.mjs');
@@ -105,7 +106,23 @@ test('commentBody: a failing theme lists the problems inside a code fence', () =
   assert.ok(body.startsWith(`${MARKER}\n`));
   assert.match(body, /does not pass the catalog checks/);
   assert.match(body, /```text\nname: The name must use lowercase letters, digits and -/);
-  assert.doesNotMatch(body, /themes\/new/, 'the editor link comes with the editor');
+  assert.doesNotMatch(body, /themes\/new/, 'no issue number, no link');
+});
+
+test('commentBody: both comments end with a link that shows the theme rendered', () => {
+  const link = '[See it rendered](https://answer-me-with-html.com/themes/new/?issue=249)\n';
+  const pass = commentBody({ ...checkSubmission(issue(), []), number: 249 });
+  assert.ok(pass.endsWith(`catalog.\n\n${link}`), pass);
+  const fail = commentBody({ ...checkSubmission(issue({ name: 'Blueprint' }), []), number: 249 });
+  assert.ok(fail.endsWith(`\n\n${link}`), fail);
+  assert.ok(fail.indexOf('```text') < fail.indexOf('See it rendered'), 'the link is outside the code fence');
+});
+
+test('commentBody: only a plain issue number goes into the link', () => {
+  for (const number of ['1) [x](https://evil.example', '0', -3, 1.5, null, undefined, '', '12 34']) {
+    assert.doesNotMatch(commentBody({ name: 'x', problems: [], number }), /See it rendered/, String(number));
+  }
+  assert.match(commentBody({ name: 'x', problems: [], number: '77' }), /themes\/new\/\?issue=77\)/);
 });
 
 test('commentBody: user text cannot close the fence or mention anyone', () => {
@@ -174,7 +191,9 @@ test('check: writes comment.md and the step outputs for a passing submission', (
     const r = run('check', issue(), cwd);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(r.output, 'name=comic-two\nok=true\n');
-    assert.match(readFileSync(join(cwd, 'comment.md'), 'utf8'), /^<!-- theme-submission -->\nThe theme `comic-two` passes/);
+    const comment = readFileSync(join(cwd, 'comment.md'), 'utf8');
+    assert.match(comment, /^<!-- theme-submission -->\nThe theme `comic-two` passes/);
+    assert.ok(comment.endsWith('[See it rendered](https://answer-me-with-html.com/themes/new/?issue=7)\n'), 'the issue number of the event is in the link');
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
