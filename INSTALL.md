@@ -2,7 +2,7 @@
 
 > This file is written for the AI agent that installs the project. A person can follow it too.
 
-I want you to install Answer me with HTML for me. Execute all the steps below autonomously. Do not ask me anything, except once in Step 1 if Node.js is missing. Decide each point yourself with the defaults here, and tell me what you did in one report at the end.
+I want you to install Answer me with HTML for me. Execute all the steps below autonomously. Do not ask me anything, except once in Step 1 if Node.js is missing or older than 20. Decide each point yourself with the defaults here, and tell me what you did in one report at the end.
 
 OBJECTIVE: the skill is installed for the agent you are running in, and `am` can render a page.
 
@@ -19,7 +19,7 @@ DONE WHEN: `node <skill dir>/scripts/am.mjs --version` prints a version number, 
 
 ## TODO
 
-- [ ] Check Node.js 20 or newer (offer to install it if missing)
+- [ ] Check Node.js 20 or newer (offer to install it if missing or older)
 - [ ] Check whether it is already installed
 - [ ] Install: plugin for Claude Code, skill for every other agent
 - [ ] Check that it works
@@ -39,7 +39,7 @@ If it is older or missing, ask me once whether to install the Node.js LTS with t
 | :--- | :--- |
 | macOS with Homebrew | `brew install node` |
 | Windows | `winget install OpenJS.NodeJS.LTS` |
-| Linux, or macOS without Homebrew | Install nvm with the command in [its README](https://github.com/nvm-sh/nvm#installing-and-updating), then `nvm install --lts` |
+| Linux, or macOS without Homebrew | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh \| bash`, then `. ~/.nvm/nvm.sh && nvm install --lts` |
 
 - I agree: run the command, then run `node --version` again. If the shell does not find the new `node`, run `. ~/.nvm/nvm.sh` first, here and before `node` in later steps (nvm), or use `"C:\Program Files\nodejs\node.exe"` (Windows). If it still fails, stop and tell me what happened.
 - I say no: stop here and tell me in one sentence, with the link https://nodejs.org/.
