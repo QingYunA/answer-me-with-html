@@ -139,6 +139,15 @@ The agent decides when a page is worth it: related concepts, multi-step flows, m
 
 Pages are saved in `~/.answer-me-with-html/pages/`. The buttons in the top-right corner switch the theme and light/dark mode, collect your reply, and copy the Markdown that produced the page.
 
+## Before/after example
+
+A plain weekly ops page, before and after `answer-me-with-html` (rendered with the `am` CLI, Paper theme, sheet layout):
+
+- Before: https://skill-fixture-before.theroost.dev
+- After: https://answer-me-with-html-after.theroost.dev
+
+Illustrative, community-contributed example; not an official demo or benchmark.
+
 ## How is this different from Archify or GenUI plugins?
 
 [Archify](https://github.com/tt-a1i/archify) makes one interactive diagram from a JSON spec. GenUI plugins such as [dsh-genui](https://github.com/omdsh-dev/dsh-genui) show components inside one chat app. This skill answers the whole question as one page: text, tables, code and diagrams, from a Markdown draft, in any agent that can run a shell command. See the [full comparison](docs/compare.md).
