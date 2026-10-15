@@ -87,7 +87,8 @@ for (const file of FILES) {
     const { html } = renderDoc(readFileSync(join(ROOT, 'examples/tcp.en.md'), 'utf8'), { theme: name }, {}, { themes });
     assert.equal(html.match(BANGERS_FACE)?.length, 1);
     assert.ok(html.includes(`html[data-theme="${name}"]`));
-    assert.doesNotMatch(html, /http-equiv|@import/);
+    // The page's own Content-Security-Policy is the one http-equiv it may carry.
+    assert.doesNotMatch(html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, ''), /http-equiv|@import/);
   });
 }
 

@@ -105,7 +105,7 @@ const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
 - Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
-- http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
+- Remote images do not load: the page blocks every remote request, so an http(s) or // URL shows nothing and the render warns about it. Save the image and use its local path. data: URIs work.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
 - Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
 

@@ -10,6 +10,7 @@ import { VERSION, VIDEO_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
 import { CHOICES, ParseError, applyOverrides } from '../parse.js';
+import { cspMeta } from '../csp.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 
 // When provider is null, only captions are produced and durations are estimated from word count. A line whose language the
@@ -126,6 +127,11 @@ function sheetFrame() {
   return `<div class="amv-sheet" aria-hidden="true">${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}</div>`;
 }
 
+// The three inline scripts, as the browser reads them: the policy pins a hash of exactly this text.
+const MUX_SCRIPT = `\n${VIDEO_MUX_JS}`;
+const EXPORT_SCRIPT = `\n${VIDEO_EXPORT_JS}`;
+const PLAYER_SCRIPT = `\n${VIDEO_JS}`;
+
 function shell({ meta, language, scenesHtml, data, wav, voice, source, embedded }) {
   const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, '\\u003c');
@@ -133,6 +139,7 @@ function shell({ meta, language, scenesHtml, data, wav, voice, source, embedded 
 ${rootTag({ lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === 'dark' ? 'dark' : 'light'), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
+${cspMeta([MUX_SCRIPT, EXPORT_SCRIPT, PLAYER_SCRIPT])}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
@@ -164,12 +171,9 @@ ${scenesHtml}
 <script type="application/json" id="amv-data">${json}</script>
 ${wav ? audioTag(wav) : ''}
 ${sourceTag(source)}
-<script>
-${VIDEO_MUX_JS}</script>
-<script>
-${VIDEO_EXPORT_JS}</script>
-<script>
-${VIDEO_JS}</script>
+<script>${MUX_SCRIPT}</script>
+<script>${EXPORT_SCRIPT}</script>
+<script>${PLAYER_SCRIPT}</script>
 </body>
 </html>
 `;

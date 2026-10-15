@@ -2885,9 +2885,9 @@ ${Z2.join(`
 `, e = e.substring(g.length + 1), a = true), !a) {
           let M2 = this.rules.other.nextBulletRegex(f2), v = this.rules.other.hrRegex(f2), Z2 = this.rules.other.fencesBeginRegex(f2), ae2 = this.rules.other.headingBeginRegex(f2), ye2 = this.rules.other.htmlBeginRegex(f2), Pe2 = this.rules.other.blockquoteBeginRegex(f2);
           for (; e; ) {
-            let K2 = e.split(`
+            let K3 = e.split(`
 `, 1)[0], H2;
-            if (g = K2, this.options.pedantic ? (g = g.replace(this.rules.other.listReplaceNesting, "  "), H2 = g) : H2 = g.replace(this.rules.other.leadingSpaceTab, (Se2) => Se2.replace(this.rules.other.tabCharGlobal, "    ")), Z2.test(g) || ae2.test(g) || ye2.test(g) || Pe2.test(g) || M2.test(g) || v.test(g)) break;
+            if (g = K3, this.options.pedantic ? (g = g.replace(this.rules.other.listReplaceNesting, "  "), H2 = g) : H2 = g.replace(this.rules.other.leadingSpaceTab, (Se2) => Se2.replace(this.rules.other.tabCharGlobal, "    ")), Z2.test(g) || ae2.test(g) || ye2.test(g) || Pe2.test(g) || M2.test(g) || v.test(g)) break;
             if (H2.search(this.rules.other.nonSpaceChar) >= f2 || !g.trim()) c += `
 ` + H2.slice(f2);
             else {
@@ -2895,8 +2895,8 @@ ${Z2.join(`
               c += `
 ` + g;
             }
-            w = !g.trim(), p += K2 + `
-`, e = e.substring(K2.length + 1), b = H2.slice(f2);
+            w = !g.trim(), p += K3 + `
+`, e = e.substring(K3.length + 1), b = H2.slice(f2);
           }
         }
         r.loose || (i ? r.loose = true : this.rules.other.doubleBlankLine.test(p) && (i = true)), r.items.push({ type: "list_item", raw: p, task: !!this.options.gfm && this.rules.other.listIsTask.test(c), loose: false, text: c, tokens: [] }), r.raw += p;
@@ -8297,6 +8297,9 @@ function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ n
     return `<img${before}data-am-src="${src}" src="${uri}"`;
   });
 }
+function remoteImages(html) {
+  return [...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) => decodeRef(m[1] ?? m[2] ?? m[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
+}
 function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
 }
@@ -8550,6 +8553,77 @@ function renderDiff(text, opts, { copyButton, long }) {
   return { html, file: null, warnings: [...diff.warnings, ...long] };
 }
 
+// src/sha256.js
+var K2 = Uint32Array.from({ length: 64 }, (_2, i) => {
+  let n = 2;
+  for (let seen = 0; ; n++) {
+    let prime = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) prime = false;
+    if (prime && seen++ === i) break;
+  }
+  return Math.floor(Math.cbrt(n) % 1 * 2 ** 32);
+});
+var rotr = (x2, n) => x2 >>> n | x2 << 32 - n;
+function sha256Base64(text) {
+  const data = new TextEncoder().encode(text);
+  const blocks = Math.ceil((data.length + 9) / 64);
+  const padded = new Uint8Array(blocks * 64);
+  padded.set(data);
+  padded[data.length] = 128;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(data.length * 8 / 2 ** 32));
+  view.setUint32(padded.length - 4, data.length * 8 >>> 0);
+  const h2 = Uint32Array.from([2, 3, 5, 7, 11, 13, 17, 19], (p) => Math.floor(Math.sqrt(p) % 1 * 2 ** 32));
+  const w = new Uint32Array(64);
+  for (let at3 = 0; at3 < padded.length; at3 += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(at3 + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ w[i - 15] >>> 3;
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ w[i - 2] >>> 10;
+      w[i] = w[i - 16] + s0 + w[i - 7] + s1 >>> 0;
+    }
+    let [a, b, c, d, e, f2, g, hh] = h2;
+    for (let i = 0; i < 64; i++) {
+      const t1 = hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + (e & f2 ^ ~e & g) + K2[i] + w[i] >>> 0;
+      const t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
+      hh = g;
+      g = f2;
+      f2 = e;
+      e = d + t1 >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = t1 + t2 >>> 0;
+    }
+    [a, b, c, d, e, f2, g, hh].forEach((v, i) => {
+      h2[i] = h2[i] + v >>> 0;
+    });
+  }
+  const out = new Uint8Array(32);
+  h2.forEach((v, i) => new DataView(out.buffer).setUint32(i * 4, v));
+  return btoa(String.fromCharCode(...out));
+}
+
+// src/csp.js
+var LIVE_SCRIPT_BODY = `
+${LIVE_JS}`;
+var scriptHash = (text) => `'sha256-${sha256Base64(text)}'`;
+function cspMeta(scripts, { live = false } = {}) {
+  const hashes = [...scripts, ...live ? [LIVE_SCRIPT_BODY] : []].map(scriptHash);
+  const policy = [
+    "default-src 'none'",
+    `script-src ${hashes.join(" ")}`,
+    "style-src 'unsafe-inline'",
+    "img-src data:",
+    "font-src data:",
+    "media-src data:",
+    "connect-src 'self'",
+    "form-action 'none'",
+    "base-uri 'none'"
+  ].join("; ");
+  return `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+}
+
 // src/render.js
 var RenderError = class extends Error {
   constructor(message, { line, component, example } = {}) {
@@ -8598,8 +8672,23 @@ function renderBlocks(blocks, ctx) {
     const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), { math: !ctx.video });
     noteHtml(b, notes.filter((n) => !n.math), ctx);
     noteMath(b, notes.filter((n) => n.math), ctx);
-    return embedImages(b, result, ctx);
+    const out = embedImages(b, result, ctx);
+    noteRemoteImages(b, out, ctx);
+    return out;
   }).join("\n");
+}
+function noteRemoteImages(block2, html, ctx) {
+  if (!ctx.stats.htmlWarnings) return;
+  const lines = block2.text.split("\n");
+  const first = block2.type === "md" ? block2.line : block2.line + 1;
+  const used = /* @__PURE__ */ new Map();
+  for (const ref of remoteImages(html)) {
+    const places = lines.flatMap((l3, i) => l3.includes(ref) || l3.includes(encodeURI(ref)) ? [i] : []);
+    const n = used.get(ref) ?? 0;
+    used.set(ref, n + 1);
+    const shown2 = ref.length > 80 ? `${ref.slice(0, 77)}...` : ref;
+    ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message: `remote image ${shown2} does not load in the page; save the image and use its local path` });
+  }
 }
 function noteHtml(block2, notes, ctx) {
   if (!notes.length || !ctx.stats.htmlWarnings) return;
@@ -8735,10 +8824,13 @@ function shell({ meta, language, body, source, embedded, update: update2, closeA
   const notice = updateNotice(ui, update2, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
+  const script = `
+${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
 <meta charset="utf-8">
+${cspMeta([script], { live: true })}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
@@ -8756,8 +8848,7 @@ ${pick("mode", ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 </div>
 ${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
-<script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}</script>
+<script>${script}</script>
 </body>
 </html>
 `;
@@ -9856,6 +9947,12 @@ function sheetFrame() {
   const letters = ["A", "B", "C", "D"];
   return `<div class="amv-sheet" aria-hidden="true">${ruler2("top", nums)}${ruler2("bottom", nums)}${ruler2("left", letters)}${ruler2("right", letters)}</div>`;
 }
+var MUX_SCRIPT = `
+${VIDEO_MUX_JS}`;
+var EXPORT_SCRIPT = `
+${VIDEO_EXPORT_JS}`;
+var PLAYER_SCRIPT = `
+${VIDEO_JS}`;
 function shell2({ meta, language, scenesHtml, data, wav: wav2, voice, source, embedded }) {
   const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
@@ -9863,6 +9960,7 @@ function shell2({ meta, language, scenesHtml, data, wav: wav2, voice, source, em
 ${rootTag({ lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
+${cspMeta([MUX_SCRIPT, EXPORT_SCRIPT, PLAYER_SCRIPT])}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
@@ -9894,12 +9992,9 @@ ${scenesHtml}
 <script type="application/json" id="amv-data">${json}</script>
 ${wav2 ? audioTag(wav2) : ""}
 ${sourceTag(source)}
-<script>
-${VIDEO_MUX_JS}</script>
-<script>
-${VIDEO_EXPORT_JS}</script>
-<script>
-${VIDEO_JS}</script>
+<script>${MUX_SCRIPT}</script>
+<script>${EXPORT_SCRIPT}</script>
+<script>${PLAYER_SCRIPT}</script>
 </body>
 </html>
 `;
@@ -10567,8 +10662,7 @@ async function resolvePage(home, dir, file) {
 }
 function withLiveReload(html, eventPath) {
   const { ui } = resolveLanguage({ declared: readPage(html).lang });
-  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">
-${LIVE_JS}</script>
+  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">${LIVE_SCRIPT_BODY}</script>
 `;
   const at3 = html.lastIndexOf("</body>");
   return at3 === -1 ? html + script : html.slice(0, at3) + script + html.slice(at3);
@@ -10866,7 +10960,7 @@ var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
 - Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
-- http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
+- Remote images do not load: the page blocks every remote request, so an http(s) or // URL shows nothing and the render warns about it. Save the image and use its local path. data: URIs work.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
 - Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
 var CODE_HELP = `Code blocks: real code from a file, or code you type

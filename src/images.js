@@ -1,6 +1,7 @@
 // Local images: a file named in the draft is embedded in the page as a data URI, so the page stays one file that opens offline.
 // The page keeps the draft's path in data-am-src. `am patch` reads it back, so an image survives a patch after the file has moved.
-// Remote URLs and data URIs are left as they are.
+// Remote URLs and data URIs are left as they are; the page's Content-Security-Policy (src/csp.js) stops a remote image from loading,
+// so remoteImages names them for a warning.
 
 import { readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -86,6 +87,13 @@ export function inlineImages(html, { baseDir = process.cwd(), known = new Map(),
     if (!uri) throw new ImageError(`Image not found: "${ref}"${isAbsolute(ref) ? '' : ` (relative paths are read from ${baseDir})`}. Use the absolute path of an existing file`, ref);
     return `<img${before}data-am-src="${src}" src="${uri}"`;
   });
+}
+
+// The remote sources (http(s) or protocol-relative) of every <img> in html, as the draft would write them. Quoted or bare, since raw html may use either.
+export function remoteImages(html) {
+  return [...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
+    .map((m) => decodeRef(m[1] ?? m[2] ?? m[3]))
+    .filter((ref) => /^(?:https?:)?\/\//i.test(ref));
 }
 
 // The images a page already embeds, for am patch.

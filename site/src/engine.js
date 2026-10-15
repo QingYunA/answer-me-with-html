@@ -11,6 +11,10 @@ import { lintDoc } from '../../src/lint/ste.js';
 import { resolveLanguage } from '../../src/language.js';
 import { VERSION as PACKAGE_VERSION } from '../../src/assets.js';
 import { loadMath } from '../../src/math-load.js';
+import { pinScript } from '../../src/csp.js';
+
+// A page the engine rendered carries a Content-Security-Policy; a preview frame that adds a script to it allows that script too (framed in live.js).
+export { pinScript };
 
 export const VERSION = PACKAGE_VERSION;
 

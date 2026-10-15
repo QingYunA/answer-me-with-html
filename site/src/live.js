@@ -16,7 +16,8 @@ export const whenNear = (el, fn, margin = '400px') => {
 
 // ── Engine and presets, each loaded once ──
 let enginePromise = null;
-export const engine = () => (enginePromise ??= import('./engine.js'));
+let loaded = null;
+export const engine = () => (enginePromise ??= import('./engine.js').then((m) => (loaded = m)));
 let presetsPromise = null;
 export const presets = () => (presetsPromise ??= fetch(`${BASE}presets/index.json`).then((r) => {
   if (!r.ok) throw new Error(`presets/index.json: HTTP ${r.status}`);
@@ -42,11 +43,14 @@ export async function renderDraft(source, overrides, options) {
 export { HIDE_CHROME } from './chrome.js';
 
 export function framed(html, { id, css = '', scroll = 0 }) {
-  const reporter = `<script>(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +
+  const body = `(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +
     'function s(){parent.postMessage({amFrame:id,h:Math.ceil(document.documentElement.scrollHeight),y:scrollY},"*")}' +
     'addEventListener("load",function(){if(y)scrollTo(0,y);s();setTimeout(s,300)});' +
     'addEventListener("scroll",function(){clearTimeout(window.__t);window.__t=setTimeout(s,120)},{passive:true});' +
-    'if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement)})()</script>';
+    'if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement)})()';
+  const reporter = `<script>${body}</script>`;
+  // The page the engine renders only runs scripts its policy lists, so the reporter is listed too.
+  if (loaded) html = loaded.pinScript(html, body);
   const style = css ? `<style>${css}</style>` : '';
   return html.replace('</head>', `${style}</head>`).replace(/<\/body>\s*<\/html>\s*$/, `${reporter}</body></html>`);
 }

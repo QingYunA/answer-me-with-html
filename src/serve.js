@@ -17,7 +17,7 @@ import { withoutUpdateNotice } from './render.js';
 import { resolveLanguage } from './language.js';
 import { readPage } from './page.js';
 import { esc } from './svg/text.js';
-import { LIVE_JS } from './assets.js';
+import { LIVE_SCRIPT_BODY } from './csp.js';
 
 export const DEFAULT_PORT = 8765;
 const HOST = '127.0.0.1';
@@ -227,7 +227,7 @@ async function resolvePage(home, dir, file) {
 // The file on disk is not changed, and a page opened from file:// has no script.
 export function withLiveReload(html, eventPath) {
   const { ui } = resolveLanguage({ declared: readPage(html).lang });
-  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">\n${LIVE_JS}</script>\n`;
+  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">${LIVE_SCRIPT_BODY}</script>\n`;
   const at = html.lastIndexOf('</body>');
   return at === -1 ? html + script : html.slice(0, at) + script + html.slice(at);
 }

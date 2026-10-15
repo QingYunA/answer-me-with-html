@@ -25,7 +25,7 @@ A -> B: label
 
 - Every `## ` heading is a panel. The letters A, B, C are optional and added for you.
 - `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. `span` is a hint: the page sizes each panel to its content, so wide tables and diagrams need no `span`. Write `span` only for a panel that must stand out. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the justified layout in a browser ignores it.
-- When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup.
+- When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup. The page carries a Content-Security-Policy, so a script or an inline event handler in the block does not run and nothing loads from the network.
 - A placeholder such as `<host>` is shown as text. Inside a sentence only text-level tags stay (`b`, `kbd`, `sup`, `a`, `span`, `br`, `img` ...), and tags that break the page (`script`, `style`, `iframe` ...) are shown as text too. Put raw markup in an `html` or `svg` block and code in backticks. The render lists every tag it changed.
 
 Full syntax for a component: `am help <component>`.
@@ -97,7 +97,7 @@ For something a diagram cannot show, such as a real screen, use an image that al
 - Put the image alone on its line. The alt text becomes its caption, so write what the picture shows. The writing check reads it.
 - Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, so the page stays one file that opens offline. A wide image scales down to its panel.
-- `http(s)` URLs and `data:` URIs are left as they are. A URL needs the network when the page is opened.
+- Remote images do not load: the page blocks every remote request, so an `http(s)` or `//` URL shows nothing, and the render warns about it. Save the image and use its local path. `data:` URIs work.
 - The page keeps the path of each image. `am patch` embeds the image again from the file, or from the page when the file has moved.
 - The tool does not generate images.
 

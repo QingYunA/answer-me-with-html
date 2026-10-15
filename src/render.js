@@ -11,10 +11,11 @@ import { esc } from './svg/text.js';
 import { VERSION, RUNTIME_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
-import { inlineImages, ImageError, IMAGE_EXAMPLE } from './images.js';
+import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 import { renderCode, CodeError } from './code.js';
 import { isolateLtrRuns } from './bidi.js';
 import { hasMath } from './math.js';
+import { cspMeta } from './csp.js';
 
 
 export class RenderError extends Error {
@@ -79,8 +80,25 @@ export function renderBlocks(blocks, ctx) {
     const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)), { math: !ctx.video });
     noteHtml(b, notes.filter((n) => !n.math), ctx);
     noteMath(b, notes.filter((n) => n.math), ctx);
-    return embedImages(b, result, ctx);
+    const out = embedImages(b, result, ctx);
+    noteRemoteImages(b, out, ctx);
+    return out;
   }).join('\n');
+}
+
+// Each remote image of one block, with the draft line that names it. The page blocks remote content (src/csp.js), so the image would be blank.
+function noteRemoteImages(block, html, ctx) {
+  if (!ctx.stats.htmlWarnings) return;
+  const lines = block.text.split('\n');
+  const first = block.type === 'md' ? block.line : block.line + 1;
+  const used = new Map();
+  for (const ref of remoteImages(html)) {
+    const places = lines.flatMap((l, i) => (l.includes(ref) || l.includes(encodeURI(ref)) ? [i] : []));
+    const n = used.get(ref) ?? 0;
+    used.set(ref, n + 1);
+    const shown = ref.length > 80 ? `${ref.slice(0, 77)}...` : ref;
+    ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message: `remote image ${shown} does not load in the page; save the image and use its local path` });
+  }
 }
 
 // The raw-HTML notes of one block, each with the draft line of its tag. The nth note about the same tag points at its nth place in the block.
@@ -253,10 +271,13 @@ function shell({ meta, language, body, source, embedded, update, closeAfter }) {
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
+  // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
+  const script = `\n${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
 <meta charset="utf-8">
+${cspMeta([script], { live: true })}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
@@ -274,8 +295,7 @@ ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 </div>
 ${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
-<script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}</script>
+<script>${script}</script>
 </body>
 </html>
 `;
