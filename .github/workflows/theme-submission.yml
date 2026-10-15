@@ -2,8 +2,8 @@ name: Theme submission
 
 # A theme submitted with the "Submit a theme" issue form (label theme-submission), see CONTRIBUTING.md, "Theme catalog".
 # - check: when the issue is opened or edited, run the catalog checks and keep one bot comment up to date.
-# - approve: when a maintainer adds the label theme-approved, check again, open a PR that adds marketplace/themes/<name>.json,
-#   and start CI on its branch.
+# - approve: when a maintainer adds the label theme-approved, check again and open a PR that adds marketplace/themes/<name>.json.
+#   CI on that PR waits until a maintainer approves the workflow run on the PR page (a PR opened with GITHUB_TOKEN needs that).
 # The issue text is untrusted. These jobs run the scripts of main, read the issue from the event file (scripts/theme-submission.mjs),
 # and pass only the issue number, the user's login and the validated theme name through env. Nothing from the issue goes into a `run:` line.
 on:
@@ -64,7 +64,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      actions: write
       issues: write
     # Never cancel an approval half way: it would leave a branch without a PR.
     concurrency:
@@ -134,13 +133,8 @@ jobs:
             url=$(gh pr create --repo "$REPO" --base main --head "theme/issue-$NUMBER" --title "feat(catalog): add the $NAME theme" --body "$body")
           fi
           echo "url=$url" >> "$GITHUB_OUTPUT"
-      # A PR opened with GITHUB_TOKEN starts no workflows, but workflow_dispatch does. The required checks (test, coverage)
-      # attach to the head commit of the branch, so they count for the PR.
-      - name: Start CI on the branch
-        if: steps.check.outputs.ok == 'true'
-        run: gh workflow run ci.yml --repo "$REPO" --ref "theme/issue-$NUMBER"
       - name: Tell the issue
         if: steps.check.outputs.ok == 'true'
         env:
           PR_URL: ${{ steps.pr.outputs.url }}
-        run: gh issue comment "$NUMBER" --repo "$REPO" --body "A maintainer approved this theme. The pull request is $PR_URL. CI is running on it."
+        run: gh issue comment "$NUMBER" --repo "$REPO" --body "A maintainer approved this theme. The pull request is $PR_URL. Its CI starts when a maintainer approves the workflow run there."
