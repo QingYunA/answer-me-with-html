@@ -6,6 +6,7 @@ import { ParseError } from '../../src/parse.js';
 import { ComponentError } from '../../src/components/index.js';
 import { BUILTIN, BUILTIN_NAMES, withThemes } from '../../src/themes/registry.js';
 import { normalizeTheme } from '../../src/themes/check.js';
+import { catalogProblems } from '../../src/themes/catalog-rules.js';
 import { CONFIG_KEYS } from '../../src/config.js';
 import { lintDoc } from '../../src/lint/ste.js';
 import { resolveLanguage } from '../../src/language.js';
@@ -24,6 +25,10 @@ export const THEMES = Object.freeze([...BUILTIN.names('page')]);
 // A theme file (the parsed JSON of themes/<name>.json) as a theme definition render() accepts in `extra`, read the way the CLI reads it
 // from the themes folder. Returns { theme, errors }; use the theme only when errors is empty.
 export const themeFromFile = (name, data) => normalizeTheme(name, data, BUILTIN_NAMES);
+
+// The catalog rules for a theme file: catalogProblems(name, text, { existing }) returns [{ field, message }], empty when the catalog would take it.
+// The same function checks marketplace/themes/ in the tests and the issues submitted on GitHub.
+export { catalogProblems };
 
 // The settings a fresh install renders with, as the CLI reads them from an empty config.
 const DEFAULTS = Object.freeze(Object.fromEntries(['theme', 'mode', 'style'].map((k) => [k, CONFIG_KEYS[k].default])));
