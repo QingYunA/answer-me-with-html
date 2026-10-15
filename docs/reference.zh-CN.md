@@ -25,7 +25,7 @@ A -> B: 标签
 
 - 每个 `## ` 开头的标题是一个面板。面板编号 A、B、C 可以不写，会自动补上。
 - `span=2` 让面板占两列，`rows=2` 让面板占两行，`bare` 会去掉面板的标题栏。`span` 只是提示：页面会按内容调整每个面板的大小，宽表格和宽图不需要写 `span`。只有想让某个面板更突出时才写 `span`。`rows` 只对普通网格生效（关闭 JavaScript、打印和窄屏时）；浏览器里的对齐排版会忽略它。
-- 组件覆盖不到的情况，可以用 ```` ```html ```` 或 ```` ```svg ```` 直接嵌入原始代码。
+- 组件覆盖不到的情况，可以用 ```` ```html ```` 或 ```` ```svg ```` 直接嵌入原始代码。页面带有内容安全策略（Content-Security-Policy），代码块里的脚本和内联事件处理器不会运行，也不会从网络加载任何内容。
 - `<host>` 这样的占位符会按文字显示。句子里只保留行内标签（`b`、`kbd`、`sup`、`a`、`span`、`br`、`img` 等），会破坏页面的标签（`script`、`style`、`iframe` 等）也按文字显示。原始标记请放进 `html` 或 `svg` 代码块，代码请放进反引号。渲染时会列出被改动的每个标签。
 
 每个组件的完整写法：`am help <组件名>`。
@@ -97,7 +97,7 @@ A -> B: 标签
 - 图片单独写一行。alt 文字会成为图注，所以要写这张图显示了什么。写作检查也会读它。
 - 请用绝对路径。相对路径从稿件文件所在的目录读取；稿件来自 stdin 时，从当前目录读取。路径里有空格也可以。
 - 支持 PNG、JPG、GIF、WebP、AVIF 和 SVG，单个文件不超过 5 MB。图片会嵌入页面，页面仍是一个能离线打开的文件。宽图会缩小到面板的宽度。
-- `http(s)` 链接和 `data:` URI 保持原样。链接在打开页面时需要联网。
+- 远程图片不会加载：页面会拦截所有远程请求，`http(s)` 或 `//` 链接只会显示空白，渲染时也会给出警告。请先把图片存成文件，再写它的本地路径。`data:` URI 可以用。
 - 页面会记住每张图片的路径。`am patch` 会重新从文件嵌入图片；文件已经移动时，就用页面里已有的那份。
 - 本工具不生成图片。
 
@@ -152,7 +152,7 @@ A -> B: 你好
 AM_EOF
 ````
 
-页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
+页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
 
 ## 语言
 
@@ -222,9 +222,29 @@ AM_EOF
 | 绘图框 | `.am-frame`、`.am-ruler` |
 | 评论按钮 | `.am-comment-btn`、`.am-comment-btn--on` |
 
+### 图表变量
+
+主题可以用变量（而不是选择器）改变图表内部的样子：flow、sequence、er，以及 tree 的方框。把它们写进 `tokens`，所有图表都会跟着变。这些变量全部可选：一个都不写的主题，图表和以前完全一样；旧版本会忽略它们。
+
+| 部分 | 变量 | 默认值 |
+| :--- | :--- | :--- |
+| 节点（flow、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（tree 方框：`--radius`）、无、`--ink` |
+| 高亮节点（`*`） | `--hi-fill`、`--hi-stroke`、`--hi-text` | `--accent-bg`、`--accent`、`--accent` |
+| 连线与消息 | `--edge-color`、`--edge-width`、`--edge-label` | `--ink-2`、1.3、`--accent` |
+| 时序图参与者（含 `== 分隔 ==` 的框） | `--actor-fill`、`--actor-stroke`、`--actor-text` | `--node-fill`、`--node-stroke`、`--node-text` |
+| 时序图备注 | `--note-fill`、`--note-stroke`、`--note-width`、`--note-radius` | `--warn-bg`、`--warn`、1、2px |
+| 分组框（flow） | `--cluster-fill`、`--cluster-stroke` | `--fill`、`--line-2` |
+| 生命线 | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`、`--edge-width`、`--node-radius`、`--note-width`、`--note-radius` 写数字或 `px`、`em` 值（单独的数字按 px 算）。`--node-radius` 也会圆角化参与者，不改变胶囊形和菱形。`--node-shadow` 写 `none` 或一个以上的 `drop-shadow(...)`，例如 `drop-shadow(3px 3px 0 #111111)`，参与者也会带这个阴影。其他写法算错误，主题会被跳过。
+- 颜色可以是任何 CSS 颜色。亮色和暗色下，`am theme check` 会读下面这些配对，要求 4.5:1，而且只在主题设置了其中一边时才检查：`--node-fill` 上的 `--node-text`、`--hi-fill` 上的 `--hi-text`、`--actor-fill` 上的 `--actor-text`、`--note-fill` 上的 `--ink`、`--paper` 上的 `--edge-label`。暗色模式里没写的变量沿用亮色的值，所以两边都写。
+- 变量的值和 `css` 一样要过外部资源检查：不要指向 `http:`、`https:` 或 `//` 的 `url()`、`image-set()`，也不要反斜杠。`am theme check` 会警告；主题库和 `am theme add` 会拒收。
+- 图表里的字体族、字号、字重和字距没有变量。CLI 按无衬线字体测量图表文字，换字体会让文字溢出方框。
+- 圆角需要 Safari 17.4 或更新版本；更旧的 Safari 画默认圆角。
+
 ### 主题库
 
-[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题加进主题库，见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想做一个主题并提交到主题库，让你的 agent 按 [/themes/make.md](https://answer-me-with-html.com/themes/make.md) 的步骤做；其他方式（网站编辑器、issue 表单或 PR）见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
 
 
 #### 安装主题：`am theme add`
@@ -244,7 +264,7 @@ am theme remove <name>         # 删除一个主题文件
 - `am theme update` 更新每个来自主题库且安装后没改过的主题；你改过的文件会被跳过并给出提示（`am theme add <name> --force` 可替换）。`am theme update <name>` 只更新一个。
 - `am theme remove <name>` 删除文件和它的记录（内置主题不能删）。如果它是默认主题，默认值会回到 `auto`。已经生成的页面外观不变，因为页面自带主题。
 - 输出里只有主题名和版本号。主题库里的标签和描述是给网站看的，命令不会打印，所以主题库里的文字进不了 agent 的上下文。
-- 0.6.0 之前的版本没有 `am theme add`：按主题库页面上的方式手动保存文件（`curl` 或 PowerShell）。
+- 0.5.3 之前的版本没有 `am theme add`：按主题库页面上的方式手动保存文件（`curl` 或 PowerShell）。
 
 ## 在远程机器上打开页面
 
@@ -266,10 +286,11 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 - 把链接当作这一页的密码：能连到这个端口、又拿到链接的人都能打开页面，包括同一台机器上的其他用户。不要把链接发给别人。
 - 给隧道单独用一个本地端口。不要复用曾经打开过其他服务或其他主机页面的端口：那些页面可能在浏览器里为这个地址留下了 service worker，之后在这个端口上打开的页面它都能看到。
 - 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、批注和标注只保留到关闭页面为止，关闭前请先复制回复。
+- 页面文件变了（比如 `am patch` 之后，或重新渲染到同一个文件），打开着的页面会自动刷新，并停在原来的滚动位置。如果你已经在页面上做了选择、写了批注或做了标注，页面不会自动刷新，而是显示「页面已更新 · 刷新」，让你先复制回复。这是服务在发送页面时加上的，文件本身不变：用 `file://` 打开的页面不会自动刷新。页面用自己链接里的令牌监听 `/e/<令牌>/<文件>`，这个连接只传「已变化」，不传页面内容。
 
 ## 更新与清理
 
-**更新**：需要手动更新，但有新版本时会提醒你。工具每周在后台向 GitHub 查询一次最新版本号和这个版本的亮点，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。过时期间生成的每个页面，工具栏最前面还会多一个「新版本」按钮，点开能看到新版本最多 3 条亮点（跟页面同一种语言）、更新命令和复制按钮。用 `am serve --lan` 或 `--public-url` 分享给别的设备时，`am serve` 会把按钮去掉；页面本身也不联网。关掉提醒：`/answer-me-with-html:config update_check off`。
+**更新**：需要手动更新，但有新版本时会提醒你。工具每天在后台向 GitHub 查询一次最新版本号和这个版本的亮点，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。过时期间生成的每个页面，工具栏最前面还会多一个「新版本」按钮，点开能看到新版本最多 3 条亮点（跟页面同一种语言）、更新命令和复制按钮。用 `am serve --lan` 或 `--public-url` 分享给别的设备时，`am serve` 会把按钮去掉；页面本身也不联网。关掉提醒：`/answer-me-with-html:config update_check off`。
 
 | 安装方式 | 更新方法 |
 | :--- | :--- |
@@ -293,7 +314,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
-| `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
+| `update_check` | `on` | 每天向 GitHub 查一次新版本并提醒你，不会自己更新 |
 | `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
 
@@ -319,7 +340,7 @@ Answer me with HTML 把其中容易用机器检查的部分做成了中英双语
 
 - **句长:** 操作步骤不超过 20 个英文词或 35 个汉字，描述性句子不超过 25 词或 45 字。每段最多 6 句。
 - **用词:** 英文换成常见词，比如 utilize 改成 use、prior to 改成 before。中文删掉虚动词，比如"进行优化"直接写"优化"。
-- **句式:** 提示英文被动语态、一句里用了三个以上的"的"，以及"赋能""闭环"这类套话。
+- **句式:** 提示英文步骤里的被动语态（描述句可以用被动）、一句里用了三个以上的"的"、"赋能""闭环"这类套话，以及"下面我来""希望对你有帮助"这类开场白和结尾。
 - **中文词表:** 错别字（登陆→登录）、含糊的量词（尽快、若干、大概、多次）、数字后的"以上 / 以下 / 以内"，以及一词多写（单击→点击、键入→输入、入参→参数）。只收几乎不会误报的词，取自[简明技术中文](https://github.com/mzopedia/simplified-technical-chinese)，一套参照 STE 方法整理的中文受控写作规范。
 - **日文:** 含假名的稿件按日文处理：页面按钮用日文，页面带 `lang="ja"`。只检查句长和段长，字数上限同中文。要强制指定，在稿件里写 `lang: ja`。
 - **其他语言:** 其他语言只检查长度：句子按词数计（中日文按字数计），段落按句数计。英文和中文的词表、被动语态规则都不会作用在它身上。

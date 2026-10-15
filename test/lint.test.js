@@ -43,9 +43,11 @@ test('banned English words get a replacement, case-insensitive, multi-word phras
   assert.deepEqual(ws.map((w) => w.suggestion), ['use', 'before']);
 });
 
-test('English passive voice heuristic', () => {
-  assert.deepEqual(rules(lint('## A\nThe valve is closed by the operator.')), ['passive']);
-  assert.deepEqual(rules(lint('## A\nThe operator closes the valve.')), []);
+test('English passive voice heuristic: steps only', () => {
+  assert.deepEqual(rules(lint('## A\n1. The valve is closed by the operator.')), ['passive']);
+  assert.deepEqual(rules(lint('## A\n1. Close the valve.')), []);
+  assert.deepEqual(rules(lint('## A\nThe valve is closed by the operator.')), [], 'descriptions may use the passive');
+  assert.deepEqual(rules(lint('## A\n- The valve is closed by the operator.')), [], 'unordered lists are descriptions');
 });
 
 test('Chinese light verbs: `进行优化` → `优化`; `进行中` is not flagged', () => {
@@ -60,6 +62,13 @@ test('Chinese chained `的` and clichés', () => {
   assert.deepEqual(rules(lint('## A\n基本的には具体的で効果的な手順を選ぶ。')), []);
   assert.deepEqual(rules(lint('## A\nこの文はとても長くて、四十五文字をこえるようにわざと言葉をたくさん足して書いた説明の文章になっている。')), ['sentence-length'], 'Japanese is still checked for sentence length');
   assert.deepEqual(rules(lint('## A\n这一步至关重要。')), ['cliche']);
+});
+
+test('Chinese opening and closing filler', () => {
+  assert.deepEqual(rules(lint('## A\n下面我来介绍缓存。')), ['cliche']);
+  assert.deepEqual(rules(lint('## A\n希望对你有帮助。')), ['cliche']);
+  assert.deepEqual(rules(lint('## A\n总的来说，缓存命中率偏低。')), ['cliche']);
+  assert.deepEqual(rules(lint('## A\n下面的表格列出结果。')), [], 'a plain "below" is not filler');
 });
 
 test('skipped: code, inline code, strikethrough, no-status rows, headings, components', () => {
@@ -142,7 +151,7 @@ test('messages: paragraph length names the count and the limit', () => {
 });
 
 test('messages: passive voice quotes the verb phrase', () => {
-  const [w] = lint('## A\nThe valve is closed by the operator.');
+  const [w] = lint('## A\n1. The valve is closed by the operator.');
   assert.deepEqual([w.message, w.suggestion], ['possible passive voice: "is closed"', 'use active voice']);
 });
 

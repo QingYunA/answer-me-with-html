@@ -1,5 +1,6 @@
 // STE controlled-writing check (only constrains the explanatory text in drafts).
-// Rules: sentence length, paragraph length, non-approved words (English and Chinese), English passive voice, Chinese light verbs / `的` chains / clichés. All are warnings; strictness comes from style.
+// The goal is text with no filler; ASD-STE100 is the idea behind it, not a standard to copy.
+// Rules: sentence length, paragraph length, non-approved words (English and Chinese), English passive voice in steps, Chinese light verbs / `的` chains / clichés and filler. All are warnings; strictness comes from style.
 // Japanese with kana gets only the sentence and paragraph length checks: Japanese `的` is a suffix (`基本的`, `具体的`), not the Chinese structural particle.
 // A language other than Chinese, English and Japanese gets only the language-neutral rules: sentence length (in words, or in characters for CJK text) and paragraph length.
 // Image captions (the alt text) are checked like any other text.
@@ -141,7 +142,8 @@ function checkUnit(text, line, kind, out, family) {
       const preview = s.length > 24 ? `${s.slice(0, 24)}…` : s;
       out.push({ line, rule: 'sentence-length', message: `${kind === 'procedural' ? 'step' : 'sentence'} has ${count} ${unit} (max ${limit}): "${preview}"` });
     }
-    if (englishRules && lang === 'en' && PASSIVE.test(s)) {
+    // ASD-STE100 allows the passive in descriptions, so only steps are checked.
+    if (englishRules && kind === 'procedural' && lang === 'en' && PASSIVE.test(s)) {
       out.push({ line, rule: 'passive', message: `possible passive voice: "${s.match(PASSIVE)[0]}"`, suggestion: 'use active voice' });
     }
   }

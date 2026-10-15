@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, statSync, existsSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, statSync, existsSync, rmSync, readFileSync, renameSync, readdirSync, linkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -11,7 +11,9 @@ import { uptime } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { clean } from '../src/housekeeping.js';
-import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX } from '../src/serve.js';
+import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX, withLiveReload, eventLink } from '../src/serve.js';
+import { renderDoc } from '../src/render.js';
+import { unescapeHtml } from '../src/page.js';
 
 // Windows has no POSIX file modes (Node reports 0o666) and cannot deliver SIGINT to a child process.
 const isWin = process.platform === 'win32';
@@ -53,6 +55,7 @@ function get(path, { method = 'GET', host, headers = {} } = {}) {
 }
 
 const urlOf = (dir, file, secret = srv.secret) => `/${dir === 'pages' ? 'p' : 'v'}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
+const eventsOf = (file, secret = srv.secret) => eventLink({ secret }, file);
 
 test('serve token: deterministic, 22 chars, differs by secret, directory and file', () => {
   const t = pageToken('s1', 'pages', 'a.html');
@@ -81,7 +84,8 @@ test('serve: a valid link returns the file with all security headers', async () 
   for (const [dir, file, body] of [['pages', 'a.html', '<h1>A</h1>'], ['pages', '中文-1.html', '<h1>中文</h1>'], ['videos', 'v.html', '<h1>V</h1>']]) {
     const r = await get(urlOf(dir, file));
     assert.equal(r.status, 200, file);
-    assert.equal(r.body, body);
+    // A page gets the reload script at serve time; a video does not.
+    assert.equal(r.body, dir === 'pages' ? withLiveReload(body, eventsOf(file)) : body);
     assert.equal(r.headers['content-type'], 'text/html; charset=utf-8');
     assert.equal(r.headers['content-security-policy'], `frame-ancestors 'none'; ${SANDBOX}`);
     assert.doesNotMatch(r.headers['content-security-policy'], /allow-same-origin/);
@@ -354,3 +358,199 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
     }
   });
 }
+
+// Auto-reload (#177): a served page listens on /e/<token>/<file> and the server says when the page file changed.
+const SANDBOXED = Object.freeze({ Origin: 'null', 'Sec-Fetch-Dest': 'empty' }); // what a sandboxed page's EventSource sends
+
+// An open event stream: status, headers, the text so far, and whether the server ended it.
+function openStream(path, { headers = SANDBOXED, method = 'GET', server = srv } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: server.port, path, method, headers }, (res) => {
+      const s = { status: res.statusCode, headers: res.headers, text: '', ended: false, close: () => req.destroy() };
+      res.setEncoding('utf8');
+      res.on('data', (c) => { s.text += c; });
+      res.on('close', () => { s.ended = true; });
+      res.on('error', () => {});
+      resolve(s);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+const changes = (s) => (s.text.match(/^event: changed$/gm) ?? []).length;
+// Poll instead of sleeping a fixed time.
+async function until(check, what, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((done) => setTimeout(done, 20));
+  }
+}
+// Long enough for the server to settle a burst of file events (SETTLE_MS in src/serve.js) and send what it would send.
+const quiet = () => new Promise((done) => setTimeout(done, 600));
+// How src/cli.js writePage replaces a page: a temp file renamed over it.
+const replacePage = (name, html) => {
+  const tmp = join(home, 'pages', `.${name}.tmp`);
+  writeFileSync(tmp, html);
+  renameSync(tmp, join(home, 'pages', name));
+};
+
+test('serve events: a wrong token, another page token, another origin or destination, and a missing page are 404', async () => {
+  writeFileSync(join(home, 'pages', 'ev.html'), '<h1>E</h1>');
+  const good = eventsOf('ev.html');
+  const bad = [
+    [good.replace(/\/e\/[^/]+\//, '/e/AAAAAAAAAAAAAAAAAAAAAA/')],
+    [`/e/${pageToken(srv.secret, 'pages', 'a.html')}/ev.html`], // the token of another page
+    [`/e/${pageToken(srv.secret, 'videos', 'v.html')}/v.html`], // a video has no stream
+    [eventsOf('ev.html', 'old-secret')],
+    [eventsOf('missing.html')],
+    [good, { Origin: 'https://evil.example', 'Sec-Fetch-Dest': 'empty' }],
+    [good, { Origin: 'null', 'Sec-Fetch-Dest': 'document' }],
+    [good, { Origin: 'null', 'Sec-Fetch-Dest': 'script' }], // a sandboxed page's script fetch
+    [good, { Origin: 'https://render.example', 'Sec-Fetch-Dest': 'empty' }], // an EventSource from a real origin
+  ];
+  for (const [path, headers = SANDBOXED] of bad) {
+    const r = await get(path, { headers });
+    assert.equal(r.status, 404, `${path} ${JSON.stringify(headers)}`);
+    assert.equal(r.headers['content-type'], 'text/plain; charset=utf-8');
+  }
+  assert.equal((await get(good, { headers: SANDBOXED, host: 'evil.example' })).status, 404, 'Host allowlist');
+  for (const method of ['HEAD', 'POST']) assert.equal((await get(good, { method, headers: SANDBOXED })).status, 405, method);
+
+  const s = await openStream(good);
+  try {
+    assert.equal(s.status, 200);
+    assert.equal(s.headers['content-type'], 'text/event-stream; charset=utf-8');
+    assert.equal(s.headers['access-control-allow-origin'], 'null');
+    assert.equal(s.headers['cache-control'], 'no-store');
+    assert.doesNotMatch(s.text, /<h1>/, 'the stream never carries the page');
+  } finally {
+    s.close();
+  }
+});
+
+test('serve events: a request with neither Origin nor Sec-Fetch-Dest opens the stream, like the page route', async () => {
+  writeFileSync(join(home, 'pages', 'ev-plain.html'), '<h1>P</h1>');
+  const s = await openStream(eventsOf('ev-plain.html'), { headers: {} });
+  try {
+    assert.equal(s.status, 200);
+    assert.equal(s.headers['content-type'], 'text/event-stream; charset=utf-8');
+  } finally {
+    s.close();
+  }
+});
+
+test('serve events: a change sends one event to that page only, and other pages get nothing', async () => {
+  writeFileSync(join(home, 'pages', 'live-a.html'), '<h1>A1</h1>');
+  writeFileSync(join(home, 'pages', 'live-b.html'), '<h1>B1</h1>');
+  const a = await openStream(eventsOf('live-a.html'));
+  const a2 = await openStream(eventsOf('live-a.html')); // a second tab of the same page
+  const b = await openStream(eventsOf('live-b.html'));
+  try {
+    assert.deepEqual([a.status, a2.status, b.status], [200, 200, 200]);
+    replacePage('live-a.html', '<h1>A2, a longer page</h1>');
+    await until(() => changes(a) === 1 && changes(a2) === 1, 'the first event');
+    await quiet();
+    assert.deepEqual([changes(a), changes(a2), changes(b)], [1, 1, 0], 'one event per change, none for the other page');
+    assert.doesNotMatch(a.text, /A2/, 'the event carries no page content');
+
+    writeFileSync(join(home, 'pages', 'live-a.html'), '<h1>A3</h1>'); // an editor saving in place
+    await until(() => changes(a) === 2, 'the second event');
+    await quiet();
+    assert.deepEqual([changes(a), changes(b)], [2, 0]);
+    writeFileSync(join(home, 'pages', 'other.html'), '<h1>O</h1>'); // a new page nobody watches
+    await quiet();
+    assert.deepEqual([changes(a), changes(b)], [2, 0]);
+  } finally {
+    for (const s of [a, a2, b]) s.close();
+  }
+});
+
+test('serve events: the reload script is added only to served pages, never to the file, a rendered page or a video', async () => {
+  const page = renderDoc('---\nlang: he\n---\n## א\nטקסט', {}, {}, {}).html;
+  assert.doesNotMatch(page, /data-live=|EventSource/, 'a rendered page (and its file:// view) has no reload script');
+  writeFileSync(join(home, 'pages', 'he.html'), page);
+  const r = await get(urlOf('pages', 'he.html'));
+  assert.equal(r.status, 200);
+  assert.equal(r.body, withLiveReload(page, eventsOf('he.html')));
+  assert.equal(r.body.replace(/<script data-live="[^"]*">\n[^]*?<\/script>\n(?=<\/body>)/, ''), page, 'only the script is added');
+  const data = JSON.parse(unescapeHtml(r.body.match(/<script data-live="([^"]*)">/)[1]));
+  assert.deepEqual(data, { url: eventsOf('he.html'), ui: { updated: 'הדף עודכן', reload: 'רענון' } }, 'labels in the page language');
+  assert.equal(readFileSync(join(home, 'pages', 'he.html'), 'utf8'), page, 'the file on disk is unchanged');
+  assert.doesNotMatch((await get(urlOf('videos', 'v.html'))).body, /data-live=/);
+});
+
+test('serve events: the watcher closes with the last stream, and a pages/ folder made again is watched again', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-rewatch-'));
+  let server;
+  try {
+    mkdirSync(join(dir, 'pages'));
+    writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R1</h1>');
+    server = await startServer({ home: dir, port: 0 });
+    const path = eventLink(server, 'r.html');
+    const first = await openStream(path, { server });
+    assert.equal(first.status, 200);
+    first.close();
+    await quiet(); // the server sees the close and drops its watcher
+    rmSync(join(dir, 'pages'), { recursive: true, force: true });
+    mkdirSync(join(dir, 'pages'));
+    writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R2</h1>');
+    const next = await openStream(path, { server });
+    try {
+      assert.equal(next.status, 200);
+      writeFileSync(join(dir, 'pages', 'r.html'), '<h1>R3, changed</h1>');
+      await until(() => changes(next) === 1, 'an event from the new watcher');
+    } finally {
+      next.close();
+    }
+  } finally {
+    await server?.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('am render: writes the page through a temp file and leaves no temp file behind', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-tmpwrite-'));
+  try {
+    await render({ AM_HOME: dir });
+    await render({ AM_HOME: dir });
+    const files = readdirSync(join(dir, 'pages'));
+    assert.ok(files.length > 0);
+    assert.ok(files.every((f) => f.endsWith('.html') && !f.startsWith('.')), files.join(', '));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('am render -o: a page outside pages/ is written in place, so a hard link to it sees the new page', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-inplace-'));
+  const out = mkdtempSync(join(tmpdir(), 'am-serve-inplace-out-'));
+  try {
+    writeFileSync(join(out, 'o.html'), 'OLD');
+    linkSync(join(out, 'o.html'), join(out, 'o-link.html'));
+    await render({ AM_HOME: dir }, ['-o', join(out, 'o.html')]);
+    const page = readFileSync(join(out, 'o.html'), 'utf8');
+    assert.match(page, /A one/);
+    assert.equal(readFileSync(join(out, 'o-link.html'), 'utf8'), page, 'a rename would have left the link on the old file');
+    assert.deepEqual(readdirSync(out).sort(), ['o-link.html', 'o.html'], 'no temp file');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('serve events: shutting the server down ends every open stream', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-serve-events-'));
+  try {
+    mkdirSync(join(dir, 'pages'));
+    writeFileSync(join(dir, 'pages', 'x.html'), '<h1>X</h1>');
+    const server = await startServer({ home: dir, port: 0 });
+    const path = eventLink(server, 'x.html');
+    const streams = [await openStream(path, { server }), await openStream(path, { server })];
+    assert.deepEqual(streams.map((s) => s.status), [200, 200]);
+    await server.close(); // resolves only when no connection is left open
+    await until(() => streams.every((s) => s.ended), 'the streams to end');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

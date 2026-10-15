@@ -1,4 +1,4 @@
-// What the pages that run the real renderer share (playground.js on the home page, catalog.js on the theme gallery):
+// What the pages that run the real renderer share (playground.js on the home page, theme.js on a theme page):
 // the engine and the preset drafts, each loaded once, and the sandboxed iframes that show a rendered page.
 const root = document.documentElement;
 export const UI = JSON.parse(document.getElementById('site-ui').textContent);
@@ -16,7 +16,8 @@ export const whenNear = (el, fn, margin = '400px') => {
 
 // ── Engine and presets, each loaded once ──
 let enginePromise = null;
-export const engine = () => (enginePromise ??= import('./engine.js'));
+let loaded = null;
+export const engine = () => (enginePromise ??= import('./engine.js').then((m) => (loaded = m)));
 let presetsPromise = null;
 export const presets = () => (presetsPromise ??= fetch(`${BASE}presets/index.json`).then((r) => {
   if (!r.ok) throw new Error(`presets/index.json: HTTP ${r.status}`);
@@ -39,14 +40,17 @@ export async function renderDraft(source, overrides, options) {
 
 // ── Frames: rendered pages go into sandboxed srcdoc iframes. A small script reports the page height and scroll. ──
 // Scaled previews hide the page's own toolbar and scrollbars, so the page fills its frame edge to edge.
-export const HIDE_CHROME = '.am-toolbar,.am-colophon{display:none!important}html{scrollbar-width:none}::-webkit-scrollbar{display:none}';
+export { HIDE_CHROME } from './chrome.js';
 
 export function framed(html, { id, css = '', scroll = 0 }) {
-  const reporter = `<script>(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +
+  const body = `(function(){var id=${JSON.stringify(id)};var y=${Math.round(scroll)};` +
     'function s(){parent.postMessage({amFrame:id,h:Math.ceil(document.documentElement.scrollHeight),y:scrollY},"*")}' +
     'addEventListener("load",function(){if(y)scrollTo(0,y);s();setTimeout(s,300)});' +
     'addEventListener("scroll",function(){clearTimeout(window.__t);window.__t=setTimeout(s,120)},{passive:true});' +
-    'if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement)})()</script>';
+    'if(window.ResizeObserver)new ResizeObserver(s).observe(document.documentElement)})()';
+  const reporter = `<script>${body}</script>`;
+  // The page the engine renders only runs scripts its policy lists, so the reporter is listed too.
+  if (loaded) html = loaded.pinScript(html, body);
   const style = css ? `<style>${css}</style>` : '';
   return html.replace('</head>', `${style}</head>`).replace(/<\/body>\s*<\/html>\s*$/, `${reporter}</body></html>`);
 }

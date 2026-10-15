@@ -1,28 +1,28 @@
 {
-  "version": "0.5.2",
+  "version": "0.5.4",
   "en": [
-    "Install as a DeepSeek Harness plugin: `dsh plugin add`",
-    "In DeepSeek Harness, open the page from a card in the sidebar",
-    "Remark mode: marks on a timeline stay when the window width changes"
+    "Make a theme with your agent, then submit it to the catalog on the website",
+    "`am serve` reloads an open page when its file changes",
+    "Pages and videos carry a strict Content-Security-Policy"
   ],
   "zh": [
-    "可以装成 DeepSeek Harness 插件：`dsh plugin add`",
-    "在 DeepSeek Harness 里，从侧边栏的卡片直接打开页面",
-    "标注模式：窗口宽度变化后，时间线上的标记不再丢失"
+    "让 agent 帮你做主题，再提交到官网主题库",
+    "`am serve` 打开的页面在文件变化时自动刷新",
+    "页面和视频带上严格的内容安全策略（CSP）"
   ],
   "zh-Hant": [
-    "可以裝成 DeepSeek Harness 外掛：`dsh plugin add`",
-    "在 DeepSeek Harness 裡，從側邊欄的卡片直接開啟頁面",
-    "標註模式：視窗寬度變化後，時間軸上的標記不再遺失"
+    "讓 agent 幫你做主題，再提交到官網主題庫",
+    "`am serve` 開啟的頁面在檔案變更時自動重新整理",
+    "頁面和影片帶上嚴格的內容安全政策（CSP）"
   ],
   "ja": [
-    "DeepSeek Harness のプラグインとしてインストール：`dsh plugin add`",
-    "DeepSeek Harness では、サイドバーのカードからページを開ける",
-    "注記モード：ウィンドウ幅が変わってもタイムラインの印が消えない"
+    "エージェントにテーマを作らせて、サイトのカタログに投稿",
+    "`am serve` で開いたページはファイルが変わると自動で再読み込み",
+    "ページと動画に厳格なコンテンツセキュリティポリシー（CSP）を付与"
   ],
   "he": [
-    "התקנה כתוסף של DeepSeek Harness: `dsh plugin add`",
-    "ב-DeepSeek Harness פותחים את הדף מכרטיס בסרגל הצד",
-    "מצב סימון: סימונים בציר זמן נשמרים כשרוחב החלון משתנה"
+    "בקשו מהסוכן ליצור ערכת עיצוב ושלחו אותה לקטלוג באתר",
+    "`am serve` טוען מחדש דף פתוח כשהקובץ שלו משתנה",
+    "דפים וסרטונים כוללים מדיניות אבטחת תוכן (CSP) מחמירה"
   ]
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="{{LANG}}" data-base="{{BASE}}" data-version="{{VERSION}}" data-page="theme">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{META_TITLE}}</title>
+<meta name="description" content="{{META_DESC}}">
+<link rel="canonical" href="{{CANONICAL}}">
+<link rel="alternate" hreflang="en" href="{{SITE_URL}}{{PATH_EN}}">
+<link rel="alternate" hreflang="zh-CN" href="{{SITE_URL}}{{PATH_ZH}}">
+<link rel="alternate" hreflang="x-default" href="{{SITE_URL}}{{PATH_EN}}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Answer me with HTML">
+<meta property="og:title" content="{{META_TITLE}}">
+<meta property="og:description" content="{{META_DESC}}">
+<meta property="og:url" content="{{CANONICAL}}">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{META_TITLE}}">
+<meta name="twitter:description" content="{{META_DESC}}">
+<meta name="twitter:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#081322" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="{{BASE}}favicon.svg" type="image/svg+xml">
+<script defer src="{{STATS_SCRIPT}}" data-website-id="{{STATS_WEBSITE_ID}}" data-domains="answer-me-with-html.com"></script>
+{{PARTIAL_BOOT}}
+<link rel="stylesheet" href="{{BASE}}assets/style.css">
+<link rel="modulepreload" href="{{BASE}}assets/main.js">
+<script type="module" src="{{BASE}}assets/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{skip}}</a>
+
+<header class="topbar">
+  <div class="topbar-in">
+{{PARTIAL_BRAND}}
+    <nav class="nav" aria-label="{{nav_label}}">
+      <a href="{{BASE}}">{{nav_home}}</a>
+      <a href="{{BASE}}#playground">{{nav_playground}}</a>
+      <a href="{{BASE}}#install">{{nav_install}}</a>
+      <a href="{{BASE}}themes/" aria-current="true">{{nav_catalog}}</a>
+    </nav>
+{{PARTIAL_TOOLS}}
+  </div>
+</header>
+
+<main id="main">
+
+<section class="sheet" aria-labelledby="t-title">
+  <a class="tback mono" href="{{BACK_HREF}}">← {{th_back}}</a>
+  <header class="sheet-head sheet-head--theme">
+    <span class="sheet-id" aria-hidden="true">T</span>
+    <h1 id="t-title">{{THEME_LABEL}}</h1>
+    <code class="tcard-name">{{THEME_NAME}}</code>
+  </header>
+  <p class="sheet-lede">{{THEME_DESC}}</p>
+  <dl class="tmeta mono">
+      {{THEME_FACTS}}
+  </dl>
+  <p class="tstart"><a class="btn btn-sm" href="../new/?from={{THEME_NAME}}" data-theme="{{THEME_NAME}}" id="start-from">{{th_start}}</a></p>
+
+  <div class="tdetail">
+    <div class="tview" data-theme="{{THEME_NAME}}" data-label="{{THEME_LABEL}}" data-file="{{THEME_FILE}}">
+      <div class="tview-bar">
+        <div class="seg-tabs" role="radiogroup" aria-label="{{th_sample_label}}" data-group="sample">
+          <button type="button" role="radio" aria-checked="true" tabindex="0" data-v="tcp">{{pre_tcp}}</button>
+          <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="cache">{{pre_cache}}</button>
+          <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="history">{{pre_history}}</button>
+        </div>
+        <div class="seg-tabs" role="radiogroup" aria-label="{{th_mode_label}}" data-group="mode">
+          <button type="button" role="radio" aria-checked="true" tabindex="0" data-v="light">{{pg_mode_light}}</button>
+          <button type="button" role="radio" aria-checked="false" tabindex="-1" data-v="dark">{{pg_mode_dark}}</button>
+        </div>
+      </div>
+      <div class="tview-box" data-frame-title="{{th_frame_title}}">
+        <iframe src="preview.html" title="{{FRAME_TITLE}}"></iframe>
+      </div>
+      <p class="tview-status mono" role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="tinstall">
+      <h2 class="minor">{{th_install}}</h2>
+      <p class="tinstall-lead">{{th_agent_lead}}</p>
+      <div class="copybox prompt"><pre id="t-agent">{{AGENT_TEXT}}</pre></div>
+      <button type="button" class="btn btn-primary tinstall-agent" data-copy="t-agent" data-method="agent" data-done="{{copied}}">{{th_copy_agent}}</button>
+
+      <p class="tstep">{{th_cmd}}</p>
+      <div class="copybox"><pre id="t-cmd">{{CMD_TEXT}}</pre><button type="button" class="tcopy-btn" data-copy="t-cmd" data-method="command" data-done="{{copied}}" aria-label="{{CMD_ARIA}}">{{copy}}</button></div>
+      <p class="fine">{{NOTE}}</p>
+
+      <details class="tolder">
+        <summary>{{th_older}}</summary>
+        <p class="tolder-d">{{OLDER_D}}</p>
+        <p class="tstep">{{th_unix}}</p>
+        <div class="copybox"><pre id="t-curl">{{CURL_TEXT}}</pre><button type="button" class="tcopy-btn" data-copy="t-curl" data-method="curl" data-done="{{copied}}" aria-label="{{CURL_ARIA}}">{{copy}}</button></div>
+        <p class="tstep">{{th_windows}}</p>
+        <div class="copybox"><pre id="t-ps">{{PS_TEXT}}</pre><button type="button" class="tcopy-btn" data-copy="t-ps" data-method="powershell" data-done="{{copied}}" aria-label="{{PS_ARIA}}">{{copy}}</button></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+{{PARTIAL_FOOTER}}
+
+<div class="toast mono" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="site-ui">{{ui_json}}</script>
+</body>
+</html>

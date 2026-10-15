@@ -54,10 +54,13 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     '.am-node--hi .am-node-shape', '.am-node--hi text', '.am-edge', '.am-arrow',
     '.am-edge-label rect', '.am-diagram .am-edge-label text', '.am-cluster',
     '.am-diagram .am-cluster-label', '.am-lifeline', '.am-actor', '.am-note',
-    '.am-diagram .am-step',
+    '.am-diagram .am-step', '.am-diagram .am-node-text', '.am-diagram .am-node--hi .am-node-text', '.am-diagram .am-actor-text',
+    '.am-diagram .am-er-key', '.am-diagram .am-node--hi .am-er-key',
   ];
   const { common, light } = getTheme('blueprint').tokens;
   const tokens = { ...common, ...light };
+  // Diagram tokens the blueprint theme does not set: the fallback is the default the diagram always had (docs/reference.md, "Diagram tokens").
+  const defaults = { '--edge-width': ['1.3'], '--note-width': ['1'], '--node-radius': ['2px', '3px'], '--note-radius': ['2px'] };
   for (const selector of selectors) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rule = html.match(new RegExp(`${escaped} \\{([^}]+)\\}`))?.[1];
@@ -66,9 +69,12 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     assert.ok(vars.length > 0);
     for (const [, value] of vars) {
       assert.match(value, /^--[\w-]+,\s*\S/, `${selector} ${value} needs a fallback`);
-      // Color and stroke-width fallbacks are copied from the blueprint light theme; update them here when its tokens change.
-      const [name, fallback] = value.split(/,\s*/);
-      if (/^[#\d]/.test(fallback)) assert.equal(fallback, tokens[name], `${selector} ${name} fallback must equal the blueprint light token`);
+    }
+    // A fallback chain such as var(--node-fill, var(--paper, #ffffff)) ends in a literal: check the literal of every chain. Color and stroke-width
+    // fallbacks are copied from the blueprint light theme; update them here when its tokens change.
+    for (const [, name, fallback] of rule.matchAll(/var\((--[\w-]+),\s*([#\d][^\s,)]*)\)/g)) {
+      if (name in tokens) assert.equal(fallback, tokens[name], `${selector} ${name} fallback must equal the blueprint light token`);
+      else assert.ok(defaults[name]?.includes(fallback), `${selector} ${name} fallback ${fallback} is not its documented default`);
     }
   }
 });

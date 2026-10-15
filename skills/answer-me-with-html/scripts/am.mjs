@@ -30,12 +30,559 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7, statSync as statSync4 } from "node:fs";
 
 // src/assets.js
-var VERSION = "0.5.2";
-var BASE_CSS = '/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  background: var(--bg); color: var(--ink);\n  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;\n  -webkit-font-smoothing: antialiased;\n}\ncode, pre, kbd { font-family: var(--font-mono); }\n\n/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-toolbar {\n  position: fixed; top: 12px; inset-inline-end: 12px; z-index: 10; display: flex; gap: 6px;\n}\n.am-btn {\n  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;\n}\n.am-btn:hover { border-color: var(--ink-3); }\n.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n/* Theme and mode lists: a label and a native select inside one button-like box */\n.am-pick {\n  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding-block: 0; padding-inline: 10px 4px;\n}\n.am-pick:hover { border-color: var(--ink-3); }\n.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-pick select {\n  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;\n}\n.am-pick option { color: var(--ink); background: var(--paper); }\n\n/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-head { margin: 0 0 20px; padding-inline-end: 300px; }\n.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }\n.am-sub { margin: 4px 0 0; color: var(--ink-2); }\n.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }\n.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-inline-end: 6px; }\n.am-intro { margin-top: 12px; max-width: 80ch; }\n\n/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }\n.am-frame { position: relative; }\n.am-grid {\n  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));\n  gap: 20px; align-items: start;\n}\n.am-ruler { display: none; }\n.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }\n.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }\n.am-ruler--top { top: 0; }\n.am-ruler--bottom { bottom: 0; }\n.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }\n.am-ruler--left { left: 0; }\n.am-ruler--right { right: 0; }\n.am-ruler--top span + span, .am-ruler--bottom span + span { border-inline-start: 1px solid var(--line); }\n.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }\n\n/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-panel {\n  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);\n  box-shadow: var(--shadow); min-width: 0; overflow: hidden;\n}\n.am-panel-head {\n  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;\n}\n.am-panel-id {\n  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;\n  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;\n}\n.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }\n.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: end; }\n.am-panel-body { padding: 14px 16px 16px; }\n.am-panel-body > * + * { margin-top: 12px; }\n\n/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-md > :first-child { margin-top: 0; }\n.am-md > :last-child { margin-bottom: 0; }\n.am-md p { margin: 0 0 8px; }\n.am-md ul, .am-md ol { margin: 0 0 8px; padding-inline-start: 20px; }\n.am-md li + li { margin-top: 3px; }\n.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }\n.am-md a { color: var(--accent); }\n.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }\n.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }\n.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }\n.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }\n.am-md th {\n  text-align: start; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;\n  padding: 6px 10px; border-bottom: 1px solid var(--line-2);\n}\n/* th { text-align: start } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */\n.am-md th[align="right"] { text-align: right; }\n.am-md th[align="center"] { text-align: center; }\n.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }\n.am-md tbody tr:nth-child(even) td { background: var(--fill); }\n.am-table-wrap { overflow-x: auto; }\n/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */\n.am-md img { max-width: 100%; max-height: 70vh; height: auto; }\n.am-figure { margin: 0; text-align: center; }\n.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }\n.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }\n.am-code {\n  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);\n  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;\n}\n/* Ask: a decision the reader makes; the suggested option starts selected */\n.am-ask { margin: 10px 0; padding: 10px 12px 8px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--fill); min-width: 0; }\n/* The question floats inside the box, so a long question wraps like text instead of riding on the border */\n.am-ask-q { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; }\n/* Two columns: the control, then the label, tag and note, which wrap under the label and never under the control */\n.am-ask-opt { clear: both; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 5px 2px; cursor: pointer; }\n.am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }\n.am-ask-tag { display: inline-block; font-size: 11px; line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }\n.am-ask-note { display: block; color: var(--ink-2); }\n/* Comment box under each panel, and the Reply sheet */\n.am-comment-btn {\n  display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;\n  border: 1px solid transparent; border-radius: var(--radius); padding: 3px; cursor: pointer;\n}\n.am-panel-meta + .am-comment-btn { margin-inline-start: 0; }\n.am-panel:hover .am-comment-btn, .am-comment-btn:focus-visible, .am-comment-btn[aria-expanded="true"] { border-color: var(--line-2); color: var(--ink-2); }\n.am-panel .am-comment-btn.am-comment-btn--on { color: var(--accent); border-color: var(--accent); }\n.am-panel--bare { position: relative; }\n.am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }\n.am-comment { padding: 0 14px 12px; }\n.am-comment textarea, .am-reply textarea {\n  width: 100%; font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 8px 10px; resize: vertical;\n}\n.am-comment textarea:focus-visible, .am-reply textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n.am-btn--reply { color: var(--paper); background: var(--ink); border-color: var(--ink); }\n.am-btn--reply:hover { opacity: .88; }\n.am-reply {\n  width: min(640px, calc(100vw - 32px)); padding: 16px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-reply::backdrop { background: rgba(0,0,0,.35); }\n.am-reply-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }\n.am-reply-head span { color: var(--ink-2); font-size: 13px; }\n.am-reply textarea { font-family: var(--font-mono); font-size: 12.5px; }\n.am-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }\n.am-reply .am-btn:disabled { opacity: .5; cursor: default; }\n/* The sheet shows the reply drawn (src/runtime/reply-view.js), each line in its own direction; the Markdown that Copy copies sits under a fold. */\n.am-reply-view {\n  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);\n  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;\n}\n.am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n.am-reply-view > div { text-align: start; unicode-bidi: isolate; }\n.am-rv-gap { height: .5em; }\n.am-rv-h1 { font-weight: 700; font-size: 15px; }\n.am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }\n.am-rv-tag {\n  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;\n  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);\n}\n.am-rv-a { padding-inline-start: 1.6em; }\n.am-rv-a em { color: var(--ink-2); }\n.am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }\n.am-reply-raw summary { margin-top: 10px; margin-bottom: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; }\n/* The bar at the bottom of the page: counts and one-click copy, so the reader need not go to the Reply button at the top. */\n.am-reply-bar {\n  position: fixed; inset-block-end: 16px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  z-index: 10; display: flex; align-items: center; gap: 10px; padding-block: 8px; padding-inline: 14px 8px; font-size: 13px;\n  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.18);\n}\n.am-reply-bar[hidden] { display: none; }\n.am-reply-bar-count { color: var(--ink-2); }\n.am-reply-bar .am-btn { flex: none; white-space: nowrap; }\nbody.am-has-reply-bar { padding-block-end: 72px; }\n@media (max-width: 480px) {\n  .am-reply-bar { inset-inline: 12px; width: auto; justify-content: space-between; }\n}\n/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */\n.am-codeblock { margin: 10px 0; min-width: 0; }\n.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }\n.am-code-head {\n  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);\n  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;\n}\n.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }\n.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }\n.am-code-lang + .am-code-copy { margin-left: 0; }\n.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }\n.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-code code { display: block; min-width: max-content; }\n.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }\n.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }\n.am-code--num .am-ln::before {\n  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);\n  user-select: none; -webkit-user-select: none;\n}\n\n/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-status { white-space: nowrap; font-weight: 500; }\n.am-status--ok { color: var(--ok); }\n.am-status--no { color: var(--err); }\n.am-status--warn { color: var(--warn); }\n.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }\n\n/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-callout {\n  border: 1px solid var(--line-2); border-inline-start: 3px solid var(--accent); background: var(--accent-bg);\n  padding: 10px 14px; border-radius: var(--radius);\n}\n.am-callout--ok { border-inline-start-color: var(--ok); background: var(--ok-bg); }\n.am-callout--warn { border-inline-start-color: var(--warn); background: var(--warn-bg); }\n.am-callout--err { border-inline-start-color: var(--err); background: var(--err-bg); }\n.am-callout-title { font-weight: 600; margin-bottom: 4px; }\n\n/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-kv {\n  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;\n  border-top: var(--bw) solid var(--line); border-inline-start: var(--bw) solid var(--line);\n}\n.am-kv-cell { border-inline-end: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }\n.am-kv-cell--wide { grid-column: 1 / -1; }\n.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }\n.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }\n.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }\n\n/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-timeline { list-style: none; margin: 0; padding: 0; }\n.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }\n.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }\n.am-timeline--h li::before {\n  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);\n}\n.am-timeline--h li:first-child::before { inset-inline-start: 50%; }\n.am-timeline--h li:last-child::before { inset-inline-end: 50%; }\n.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }\n.am-tl-dot {\n  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;\n  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);\n}\n.am-tl-item--hi .am-tl-dot { background: var(--accent); border-color: var(--accent); }\n.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }\n.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }\n.am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }\n.am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }\n.am-timeline--v li:last-child::before { display: none; }\n.am-timeline--v .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }\n.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }\n.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }\n.am-timeline--v .am-tl-text { margin-top: 2px; }\n/* .am-tl-wrap is the container (src/components/timeline.js): a horizontal timeline answers to the width it has, not to the width of the window, since a\n   sheet puts panels two or three to a row. Below 560 px (about 90 px for each of the six items a timeline has by default) its dates\n   wrap and the dots cover them, so it lays out like timeline v: line and dots at the start, text beside them. */\n.am-tl-wrap { container-type: inline-size; }\n@container (max-width: 560px) {\n  .am-timeline--h { display: block; padding-top: 0; }\n  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }\n  .am-timeline--h li::before, .am-timeline--h li:first-child::before {\n    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);\n  }\n  .am-timeline--h li:last-child::before { display: none; }\n  .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }\n  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }\n  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }\n  .am-timeline--h .am-tl-text { margin-top: 2px; }\n}\n\n/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }\n.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }\n.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }\n.am-annot-scroll { overflow-x: auto; }\n.am-annot-line {\n  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);\n  padding-bottom: calc(var(--rows, 0) * 17px + 14px);\n}\n.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }\n.am-annot-line--wrap .am-seg { white-space: nowrap; }\n.am-seg { position: relative; }\n.am-seg::after {\n  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;\n  border: 1px solid var(--accent); border-top: 0;\n}\n.am-seg-n {\n  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * 17px);\n  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;\n}\n.am-seg--err { color: var(--err); }\n.am-seg--err::after { border-color: var(--err); }\n.am-seg--err .am-seg-n { color: var(--err); }\n.am-annot-caption { font-size: 12px; color: var(--ink-2); }\n\n/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lim + .am-lim { margin-top: 14px; }\n.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }\n.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }\n.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }\n.am-lim-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--accent-bg); border-inline-end: 1px solid var(--accent); }\n.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }\n.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-inline-end-color: var(--err); }\n.am-lim.is-over .am-lim-val { color: var(--err); }\n.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }\n.am-lim-ticks span { position: absolute; transform: translateX(-50%); }\n.am-lim-ticks span:first-child { transform: none; }\n.am-lim-note { font-size: 11px; color: var(--ink-2); margin-inline-start: 6px; }\n\n/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-tree { font-size: 13px; }\n.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }\n.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-root--solo { padding-bottom: 12px; }\n.am-tree-root--solo::after { display: none; }\n.am-tree-box {\n  border: var(--bw) solid var(--line); background: var(--paper); padding: 6px 14px; text-align: center;\n  border-radius: var(--radius); font-weight: 600;\n}\n.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }\n.am-tree-box--root { background: var(--accent-bg); font-size: 15px; padding: 8px 28px; }\n.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }\n.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }\n.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }\n.am-tree-col:first-child::before { inset-inline-start: 50%; }\n.am-tree-col:last-child::before { inset-inline-end: 50%; }\n.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }\n.am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }\n.am-tree-list ul { margin-inline-start: 16px; }\n.am-tree-list li { position: relative; padding: 3px 0; padding-inline-start: 18px; }\n.am-tree-list li::before { content: ""; position: absolute; inset-inline-start: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }\n.am-tree-list li::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; border-inline-start: 1px solid var(--ink-3); }\n.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }\n.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-inline-end: 4px; }\n.am-tree code { font: 12px var(--font-mono); }\n.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }\n.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }\n\n/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-diagram { margin: 0; overflow-x: auto; text-align: center; }\n/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */\n.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }\n.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }\n.am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-node--hi .am-node-shape { fill: var(--accent-bg, #e4ecf8); stroke: var(--accent, #1d5fbf); }\n.am-node--hi text { fill: var(--accent, #1d5fbf); font-weight: 600; }\n.am-edge { fill: none; stroke: var(--ink-2, #4b5260); stroke-width: 1.3; }\n.am-edge--dashed { stroke-dasharray: 5 4; }\n.am-arrow { fill: var(--ink-2, #4b5260); }\n.am-edge-label rect { fill: var(--paper, #ffffff); }\n.am-diagram .am-edge-label text { fill: var(--accent, #1d5fbf); font-size: 11.5px; }\n.am-cluster { fill: var(--fill, #f3f5f8); stroke: var(--line-2, #d6dae1); stroke-width: 1; stroke-dasharray: 4 3; }\n.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }\n.am-lifeline { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 4 4; }\n.am-actor { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-note { fill: var(--warn-bg, #fdf3e2); stroke: var(--warn, #a8620a); stroke-width: 1; }\n.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }\n\n.am-diagram-expand {\n  /* In flow and sticky: it sits at the end edge (right on a left-to-right page) and stays in view when the diagram scrolls sideways.\n     It takes its own row above the drawing, so it never covers a node at the top-right corner of the drawing. */\n  position: sticky; inset-inline-start: calc(100% - 36px); z-index: 2;\n  display: flex; align-items: center; justify-content: center;\n  width: 28px; height: 28px; padding: 0; margin: 0 0 4px; margin-inline: auto 8px;\n  color: var(--ink-2); background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);\n  cursor: pointer; opacity: 0.72;\n  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;\n}\n.am-diagram:hover .am-diagram-expand,\n.am-diagram-expand:focus-visible { opacity: 1; }\n.am-diagram-expand:hover {\n  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);\n}\n.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lightbox {\n  position: fixed; inset: 0; z-index: 1000;\n  display: flex; flex-direction: column;\n  touch-action: none;\n}\n.am-lightbox[hidden] { display: none !important; }\n\n.am-lightbox-backdrop {\n  position: absolute; inset: 0;\n  background: rgba(0, 0, 0, 0.72);\n  backdrop-filter: blur(6px);\n  -webkit-backdrop-filter: blur(6px);\n}\n\n.am-lightbox-header {\n  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;\n  display: flex; align-items: center; justify-content: space-between;\n  z-index: 10; pointer-events: none;\n}\n.am-lightbox-title {\n  display: inline-flex; align-items: center; gap: 8px;\n  color: rgba(255, 255, 255, 0.92);\n  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;\n  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);\n  pointer-events: auto;\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;\n}\n.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }\n.am-lightbox-actions {\n  display: flex; align-items: center; gap: 8px; pointer-events: auto;\n}\n.am-lightbox-close {\n  width: 32px; height: 32px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: 50%;\n  color: var(--ink);\n  font-size: 15px; line-height: 1;\n  cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);\n  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;\n}\n.am-lightbox-close:hover {\n  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);\n}\n.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n.am-lightbox-stage {\n  position: absolute;\n  top: 54px; bottom: 20px; left: 24px; right: 24px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: max(var(--radius), 14px);\n  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);\n  overflow: hidden;\n  cursor: grab;\n  user-select: none;\n  -webkit-user-select: none;\n}\n.am-lightbox-stage.am-panning { cursor: grabbing; }\n\n.am-lightbox-canvas {\n  position: absolute; left: 0; top: 0;\n  transform-origin: 0 0;\n  will-change: transform;\n  pointer-events: none;\n}\n.am-lightbox-canvas svg {\n  max-width: none !important;\n  max-height: none !important;\n  display: block;\n  font-family: var(--font-sans, sans-serif);\n}\n\n/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }\n.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }\n.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }\n.am-toc { position: sticky; top: 24px; font-size: 13px; }\n.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }\n.am-toc a:hover { color: var(--ink); border-inline-start-color: var(--accent); }\n.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }\n\n/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n@media (max-width: 1100px) {\n  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }\n}\n@media (max-width: 760px) {\n  .am-sheet, .am-doc { padding: 56px 12px 24px; }\n  .am-head { padding-inline-end: 0; }\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }\n  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }\n  .am-toc { position: static; }\n  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }\n  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about\n     two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)\n     gives a table panel the width its columns read well at. */\n  .am-md th, .am-md td { min-width: 8em; }\n  .am-diagram svg { max-width: none; }\n  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }\n  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }\n}\n.am-colophon { margin: 0 0 8px; font: 11px var(--font-mono); color: var(--ink-3); }\n.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n\n@media print {\n  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }\n  body { background: var(--paper); }\n  .am-panel { break-inside: avoid; box-shadow: none; }\n}\n/* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one\n   (a wide table, a wide diagram): one panel per row instead. */\n@media print and (max-width: 1100px) {\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n}\n.am-panel--bare { border: 0; background: transparent; box-shadow: none; }\n.am-panel--bare > .am-panel-body { padding: 0; }\n.am-panel--bare .am-kv { background: var(--paper); }\n\n/* Remark mode: block marks with a note, collected into the Reply copy (src/runtime/remark.js). Each kind borrows a status colour of\n   the theme, so a mark reads in light and dark mode on every theme. */\n.am-btn--remark.is-on { background: var(--ink); border-color: var(--ink); color: var(--paper); }\n.am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }\n:is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="concern"] { --mark: var(--err); --mark-bg: var(--err-bg); }\n.am-mark { border-inline-start: 3px solid var(--mark); padding-inline-start: 10px; background: var(--mark-bg); border-radius: 1px; }\n/* The note chip sits inside the marked block (a table takes it as its caption, a list item puts it before its sub-list), so lists and\n   grids keep their children. */\n.am-mark-note {\n  display: block; margin-block-start: 4px; font: 12px/1.5 var(--font-sans); letter-spacing: normal; text-transform: none;\n  color: var(--ink-2); white-space: pre-wrap; caption-side: bottom; text-align: start;\n}\n.am-mark-note b { color: var(--ink); font-weight: 600; }\ncaption.am-mark-note { display: table-caption; }\n/* Table rows have their own backgrounds, so a tint on the table would show on every other row only: the bar marks a table. */\ntable.am-mark { background: none; }\n.am-remark-pop {\n  position: absolute; z-index: 40; width: min(264px, calc(100vw - 16px)); padding: 8px; display: grid; gap: 6px;\n  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14);\n}\n.am-remark-pop[hidden] { display: none; }\n.am-remark-kinds { display: flex; gap: 6px; flex-wrap: wrap; }\n.am-remark-kind { font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }\n.am-remark-kind:hover { border-color: var(--ink-3); }\n.am-remark-kind[aria-pressed="true"] { color: var(--ink); border-color: var(--mark); background: var(--mark-bg); }\n.am-remark-kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n.am-remark-pop textarea { font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }\n.am-remark-actions { display: flex; gap: 6px; }\n.am-remark-actions .am-btn:disabled { opacity: .5; cursor: default; }\n@media print { .am-remark-pop { display: none !important; } }\n';
-var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.\n  const carrier = document.querySelector('.am-toolbar');\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // The button reads its label from data-done for a moment after a copy.\n  const flash = (btn) => {\n    const original = btn.textContent;\n    btn.textContent = btn.dataset.done;\n    setTimeout(() => { btn.textContent = original; }, 1400);\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  copyBtn?.addEventListener('click', async () => {\n    const nodes = document.querySelectorAll('#am-source');\n    await copyText(nodes[nodes.length - 1]?.value ?? '');\n    flash(copyBtn);\n  });\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash(btn);\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const why = same ? (d.touched ? ui.confirmed : ui.untouched) : `${ui.was}: ${d.suggested.join(', ') || '\u2014'}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n\n  const load = () => {\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page.\n    if (state && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      if (state.touched) touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  const copyText = async (str, btn) => {\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      document.body.append(tmp);\n      tmp.select();\n      document.execCommand('copy');\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    let kind = mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    keep.addEventListener('click', () => {\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const kindBtns = KINDS.map((k) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => {\n        kind = k;\n        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));\n        keep.disabled = false;\n      });\n      return kb;\n    });\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n})();\n";
+var VERSION = "0.5.4";
+var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, kbd { font-family: var(--font-mono); }
+
+/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-toolbar {
+  position: fixed; top: 12px; inset-inline-end: 12px; z-index: 10; display: flex; gap: 6px;
+}
+.am-btn {
+  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;
+}
+.am-btn:hover { border-color: var(--ink-3); }
+.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Theme and mode lists: a label and a native select inside one button-like box */
+.am-pick {
+  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding-block: 0; padding-inline: 10px 4px;
+}
+.am-pick:hover { border-color: var(--ink-3); }
+.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-pick select {
+  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;
+}
+.am-pick option { color: var(--ink); background: var(--paper); }
+
+/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-head { margin: 0 0 20px; padding-inline-end: 300px; }
+.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }
+.am-sub { margin: 4px 0 0; color: var(--ink-2); }
+.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }
+.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-inline-end: 6px; }
+.am-intro { margin-top: 12px; max-width: 80ch; }
+
+/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }
+.am-frame { position: relative; }
+.am-grid {
+  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 20px; align-items: start;
+}
+.am-ruler { display: none; }
+.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }
+.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }
+.am-ruler--top { top: 0; }
+.am-ruler--bottom { bottom: 0; }
+.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }
+.am-ruler--left { left: 0; }
+.am-ruler--right { right: 0; }
+.am-ruler--top span + span, .am-ruler--bottom span + span { border-inline-start: 1px solid var(--line); }
+.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }
+
+/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-panel {
+  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); min-width: 0; overflow: hidden;
+}
+.am-panel-head {
+  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;
+}
+.am-panel-id {
+  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;
+  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;
+}
+.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }
+.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: end; }
+.am-panel-body { padding: 14px 16px 16px; }
+.am-panel-body > * + * { margin-top: 12px; }
+
+/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-md > :first-child { margin-top: 0; }
+.am-md > :last-child { margin-bottom: 0; }
+.am-md p { margin: 0 0 8px; }
+.am-md ul, .am-md ol { margin: 0 0 8px; padding-inline-start: 20px; }
+.am-md li + li { margin-top: 3px; }
+.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }
+.am-md a { color: var(--accent); }
+.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
+.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
+.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.am-md th {
+  text-align: start; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;
+  padding: 6px 10px; border-bottom: 1px solid var(--line-2);
+}
+/* th { text-align: start } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */
+.am-md th[align="right"] { text-align: right; }
+.am-md th[align="center"] { text-align: center; }
+.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.am-md tbody tr:nth-child(even) td { background: var(--fill); }
+.am-table-wrap { overflow-x: auto; }
+/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
+.am-md img { max-width: 100%; max-height: 70vh; height: auto; }
+.am-figure { margin: 0; text-align: center; }
+.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }
+.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }
+.am-code {
+  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);
+  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+}
+/* Ask: a decision the reader makes; the suggested option starts selected */
+.am-ask { margin: 10px 0; padding: 10px 12px 8px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--fill); min-width: 0; }
+/* The question floats inside the box, so a long question wraps like text instead of riding on the border */
+.am-ask-q { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; }
+/* Two columns: the control, then the label, tag and note, which wrap under the label and never under the control */
+.am-ask-opt { clear: both; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 5px 2px; cursor: pointer; }
+.am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
+.am-ask-tag { display: inline-block; font-size: 11px; line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.am-ask-note { display: block; color: var(--ink-2); }
+/* Comment box under each panel, and the Reply sheet */
+.am-comment-btn {
+  display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius); padding: 3px; cursor: pointer;
+}
+.am-panel-meta + .am-comment-btn { margin-inline-start: 0; }
+.am-panel:hover .am-comment-btn, .am-comment-btn:focus-visible, .am-comment-btn[aria-expanded="true"] { border-color: var(--line-2); color: var(--ink-2); }
+.am-panel .am-comment-btn.am-comment-btn--on { color: var(--accent); border-color: var(--accent); }
+.am-panel--bare { position: relative; }
+.am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }
+.am-comment { padding: 0 14px 12px; }
+.am-comment textarea, .am-reply textarea {
+  width: 100%; font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 8px 10px; resize: vertical;
+}
+.am-comment textarea:focus-visible, .am-reply textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-btn--reply { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.am-btn--reply:hover { opacity: .88; }
+.am-reply {
+  width: min(640px, calc(100vw - 32px)); padding: 16px; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.am-reply::backdrop { background: rgba(0,0,0,.35); }
+.am-reply-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
+.am-reply-head span { color: var(--ink-2); font-size: 13px; }
+.am-reply textarea { font-family: var(--font-mono); font-size: 12.5px; }
+.am-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.am-reply .am-btn:disabled { opacity: .5; cursor: default; }
+/* The sheet shows the reply drawn (src/runtime/reply-view.js), each line in its own direction; the Markdown that Copy copies sits under a fold. */
+.am-reply-view {
+  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;
+}
+.am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-reply-view > div { text-align: start; unicode-bidi: isolate; }
+.am-rv-gap { height: .5em; }
+.am-rv-h1 { font-weight: 700; font-size: 15px; }
+.am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+.am-rv-tag {
+  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;
+  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-rv-a { padding-inline-start: 1.6em; }
+.am-rv-a em { color: var(--ink-2); }
+.am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }
+.am-reply-raw summary { margin-top: 10px; margin-bottom: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+/* The bar at the bottom of the page: counts and one-click copy, so the reader need not go to the Reply button at the top. */
+.am-reply-bar {
+  position: fixed; inset-block-end: 16px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);
+  z-index: 10; display: flex; align-items: center; gap: 10px; padding-block: 8px; padding-inline: 14px 8px; font-size: 13px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.18);
+}
+.am-reply-bar[hidden] { display: none; }
+.am-reply-bar-count { color: var(--ink-2); }
+.am-reply-bar .am-btn { flex: none; white-space: nowrap; }
+body.am-has-reply-bar { padding-block-end: 72px; }
+@media (max-width: 480px) {
+  .am-reply-bar { inset-inline: 12px; width: auto; justify-content: space-between; }
+}
+/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */
+.am-codeblock { margin: 10px 0; min-width: 0; }
+.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }
+.am-code-head {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);
+  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;
+}
+.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }
+.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }
+.am-code-lang + .am-code-copy { margin-left: 0; }
+.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }
+.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-code code { display: block; min-width: max-content; }
+.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }
+.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+.am-code--num .am-ln::before {
+  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);
+  user-select: none; -webkit-user-select: none;
+}
+
+/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-status { white-space: nowrap; font-weight: 500; }
+.am-status--ok { color: var(--ok); }
+.am-status--no { color: var(--err); }
+.am-status--warn { color: var(--warn); }
+.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }
+
+/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-callout {
+  border: 1px solid var(--line-2); border-inline-start: 3px solid var(--accent); background: var(--accent-bg);
+  padding: 10px 14px; border-radius: var(--radius);
+}
+.am-callout--ok { border-inline-start-color: var(--ok); background: var(--ok-bg); }
+.am-callout--warn { border-inline-start-color: var(--warn); background: var(--warn-bg); }
+.am-callout--err { border-inline-start-color: var(--err); background: var(--err-bg); }
+.am-callout-title { font-weight: 600; margin-bottom: 4px; }
+
+/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-kv {
+  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;
+  border-top: var(--bw) solid var(--line); border-inline-start: var(--bw) solid var(--line);
+}
+.am-kv-cell { border-inline-end: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }
+.am-kv-cell--wide { grid-column: 1 / -1; }
+.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }
+.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }
+
+/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-timeline { list-style: none; margin: 0; padding: 0; }
+.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
+.am-timeline--h li::before {
+  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);
+}
+.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
+.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
+.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }
+.am-tl-dot {
+  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
+  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
+}
+.am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
+.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }
+.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+.am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
+.am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
+.am-timeline--v li:last-child::before { display: none; }
+.am-timeline--v .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
+.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
+.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }
+.am-timeline--v .am-tl-text { margin-top: 2px; }
+/* .am-tl-wrap is the container (src/components/timeline.js): a horizontal timeline answers to the width it has, not to the width of the window, since a
+   sheet puts panels two or three to a row. Below 560 px (about 90 px for each of the six items a timeline has by default) its dates
+   wrap and the dots cover them, so it lays out like timeline v: line and dots at the start, text beside them. */
+.am-tl-wrap { container-type: inline-size; }
+@container (max-width: 560px) {
+  .am-timeline--h { display: block; padding-top: 0; }
+  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
+    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  }
+  .am-timeline--h li:last-child::before { display: none; }
+  .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
+  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
+  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }
+  .am-timeline--h .am-tl-text { margin-top: 2px; }
+}
+
+/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }
+.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }
+.am-annot-scroll { overflow-x: auto; }
+.am-annot-line {
+  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);
+  padding-bottom: calc(var(--rows, 0) * 17px + 14px);
+}
+.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }
+.am-annot-line--wrap .am-seg { white-space: nowrap; }
+.am-seg { position: relative; }
+.am-seg::after {
+  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;
+  border: 1px solid var(--accent); border-top: 0;
+}
+.am-seg-n {
+  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * 17px);
+  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;
+}
+.am-seg--err { color: var(--err); }
+.am-seg--err::after { border-color: var(--err); }
+.am-seg--err .am-seg-n { color: var(--err); }
+.am-annot-caption { font-size: 12px; color: var(--ink-2); }
+
+/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-lim + .am-lim { margin-top: 14px; }
+.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }
+.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }
+.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }
+.am-lim-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--accent-bg); border-inline-end: 1px solid var(--accent); }
+.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }
+.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-inline-end-color: var(--err); }
+.am-lim.is-over .am-lim-val { color: var(--err); }
+.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }
+.am-lim-ticks span { position: absolute; transform: translateX(-50%); }
+.am-lim-ticks span:first-child { transform: none; }
+.am-lim-note { font-size: 11px; color: var(--ink-2); margin-inline-start: 6px; }
+
+/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-tree { font-size: 13px; }
+.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }
+.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+.am-tree-root--solo { padding-bottom: 12px; }
+.am-tree-root--solo::after { display: none; }
+.am-tree-box {
+  border: var(--node-width, var(--bw)) solid var(--node-stroke, var(--line)); background: var(--node-fill, var(--paper)); padding: 6px 14px; text-align: center;
+  border-radius: var(--node-radius, var(--radius)); font-weight: 600; color: var(--node-text, inherit); filter: var(--node-shadow, none);
+}
+.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }
+/* The root box and a highlighted box are emphasis: they take the highlight tokens. With none set the root box keeps its accent tint and a highlighted box looks like any other. */
+.am-tree-box--root, .am-tree-box--hi { border-color: var(--hi-stroke, var(--node-stroke, var(--line))); color: var(--hi-text, var(--node-text, inherit)); }
+.am-tree-box--root { background: var(--hi-fill, var(--accent-bg)); }
+.am-tree-box--hi { background: var(--hi-fill, var(--node-fill, var(--paper))); }
+.am-tree-box--root small, .am-tree-box--hi small { color: var(--hi-text, var(--ink-2)); }
+.am-tree-box--root { font-size: 15px; padding: 8px 28px; }
+.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }
+.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }
+.am-tree-col:first-child::before { inset-inline-start: 50%; }
+.am-tree-col:last-child::before { inset-inline-end: 50%; }
+.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
+.am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
+.am-tree-list ul { margin-inline-start: 16px; }
+.am-tree-list li { position: relative; padding: 3px 0; padding-inline-start: 18px; }
+.am-tree-list li::before { content: ""; position: absolute; inset-inline-start: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }
+.am-tree-list li::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; border-inline-start: 1px solid var(--ink-3); }
+.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }
+.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-inline-end: 4px; }
+.am-tree code { font: 12px var(--font-mono); }
+.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }
+.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }
+
+/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
+.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
+.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }
+/* Diagram tokens (docs/reference.md, "Diagram tokens"): each painted part reads an optional token and falls back to the look it always had,
+   so a theme that sets none of them draws the same diagram. Font family, size and weight are not tokens: diagram text is measured for the sans font. */
+.am-node-shape { fill: var(--node-fill, var(--paper, #ffffff)); stroke: var(--node-stroke, var(--line, #1d2026)); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); }
+/* A cylinder is two shapes (body, then cap): only the body casts the shadow. */
+.am-node-shape ~ .am-node-shape { filter: none; }
+/* The corner radius is an SVG attribute (the fallback for Safari before 17.4, which ignores a CSS rx); the default here equals the attribute. A pill and a diamond keep their shape. */
+.am-node--rect .am-node-shape, .am-node--er .am-node-shape { rx: var(--node-radius, 3px); }
+.am-node--hi .am-node-shape { fill: var(--hi-fill, var(--accent-bg, #e4ecf8)); stroke: var(--hi-stroke, var(--accent, #1d5fbf)); }
+.am-diagram .am-node-text { fill: var(--node-text, var(--ink, #16181d)); }
+.am-node--hi text { fill: var(--hi-text, var(--accent, #1d5fbf)); font-weight: 600; }
+.am-diagram .am-node--hi .am-node-text { fill: var(--hi-text, var(--accent, #1d5fbf)); }
+.am-edge { fill: none; stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
+.am-edge--dashed { stroke-dasharray: 5 4; }
+.am-arrow { fill: var(--edge-color, var(--ink-2, #4b5260)); }
+.am-edge-label rect { fill: var(--paper, #ffffff); }
+.am-diagram .am-edge-label text { fill: var(--edge-label, var(--accent, #1d5fbf)); font-size: 11.5px; }
+.am-cluster { fill: var(--cluster-fill, var(--fill, #f3f5f8)); stroke: var(--cluster-stroke, var(--line-2, #d6dae1)); stroke-width: 1; stroke-dasharray: 4 3; }
+.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }
+/* The PK / FK / UK marks of an entity follow the node text, and the highlighted text in a highlighted entity, so they stay readable on the theme's fills. */
+.am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
+.am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
+.am-lifeline { stroke: var(--lifeline-color, var(--ink-3, #8b929e)); stroke-width: 1; stroke-dasharray: 4 4; }
+/* An actor (and the box of a divider) looks like a node unless the theme sets the actor tokens. */
+.am-actor { fill: var(--actor-fill, var(--node-fill, var(--paper, #ffffff))); stroke: var(--actor-stroke, var(--node-stroke, var(--line, #1d2026))); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); rx: var(--node-radius, 2px); }
+.am-diagram .am-actor-text { fill: var(--actor-text, var(--node-text, var(--ink, #16181d))); }
+.am-note { fill: var(--note-fill, var(--warn-bg, #fdf3e2)); stroke: var(--note-stroke, var(--warn, #a8620a)); stroke-width: var(--note-width, 1); rx: var(--note-radius, 2px); }
+.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }
+
+.am-diagram-expand {
+  /* In flow and sticky: it sits at the end edge (right on a left-to-right page) and stays in view when the diagram scrolls sideways.
+     It takes its own row above the drawing, so it never covers a node at the top-right corner of the drawing. */
+  position: sticky; inset-inline-start: calc(100% - 36px); z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; margin: 0 0 4px; margin-inline: auto 8px;
+  color: var(--ink-2); background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);
+  cursor: pointer; opacity: 0.72;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+}
+.am-diagram:hover .am-diagram-expand,
+.am-diagram-expand:focus-visible { opacity: 1; }
+.am-diagram-expand:hover {
+  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);
+}
+.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column;
+  touch-action: none;
+}
+.am-lightbox[hidden] { display: none !important; }
+
+.am-lightbox-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.am-lightbox-header {
+  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  z-index: 10; pointer-events: none;
+}
+.am-lightbox-title {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;
+}
+.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }
+.am-lightbox-actions {
+  display: flex; align-items: center; gap: 8px; pointer-events: auto;
+}
+.am-lightbox-close {
+  width: 32px; height: 32px;
+  background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2);
+  border-radius: 50%;
+  color: var(--ink);
+  font-size: 15px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;
+}
+.am-lightbox-close:hover {
+  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);
+}
+.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.am-lightbox-stage {
+  position: absolute;
+  top: 54px; bottom: 20px; left: 24px; right: 24px;
+  background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2);
+  border-radius: max(var(--radius), 14px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.am-lightbox-stage.am-panning { cursor: grabbing; }
+
+.am-lightbox-canvas {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  pointer-events: none;
+}
+.am-lightbox-canvas svg {
+  max-width: none !important;
+  max-height: none !important;
+  display: block;
+  font-family: var(--font-sans, sans-serif);
+}
+
+/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
+.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+.am-toc { position: sticky; top: 24px; font-size: 13px; }
+.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }
+.am-toc a:hover { color: var(--ink); border-inline-start-color: var(--accent); }
+.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }
+
+/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+@media (max-width: 1100px) {
+  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .am-grid > .am-panel { grid-column: auto !important; }
+  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 760px) {
+  .am-sheet, .am-doc { padding: 56px 12px 24px; }
+  .am-head { padding-inline-end: 0; }
+  .am-grid { grid-template-columns: minmax(0, 1fr); }
+  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
+  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }
+  .am-toc { position: static; }
+  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
+  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about
+     two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)
+     gives a table panel the width its columns read well at. */
+  .am-md th, .am-md td { min-width: 8em; }
+  .am-diagram svg { max-width: none; }
+  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }
+  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }
+}
+.am-colophon { margin: 0 0 8px; font: 11px var(--font-mono); color: var(--ink-3); }
+.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+@media print {
+  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  body { background: var(--paper); }
+  .am-panel { break-inside: avoid; box-shadow: none; }
+}
+/* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
+   (a wide table, a wide diagram): one panel per row instead. */
+@media print and (max-width: 1100px) {
+  .am-grid { grid-template-columns: minmax(0, 1fr); }
+  .am-grid > .am-panel { grid-column: auto !important; }
+}
+.am-panel--bare { border: 0; background: transparent; box-shadow: none; }
+.am-panel--bare > .am-panel-body { padding: 0; }
+.am-panel--bare .am-kv { background: var(--paper); }
+
+/* Remark mode: block marks with a note, collected into the Reply copy (src/runtime/remark.js). Each kind borrows a status colour of
+   the theme, so a mark reads in light and dark mode on every theme. */
+.am-btn--remark.is-on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }
+:is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="concern"] { --mark: var(--err); --mark-bg: var(--err-bg); }
+.am-mark { border-inline-start: 3px solid var(--mark); padding-inline-start: 10px; background: var(--mark-bg); border-radius: 1px; }
+/* The note chip sits inside the marked block (a table takes it as its caption, a list item puts it before its sub-list), so lists and
+   grids keep their children. */
+.am-mark-note {
+  display: block; margin-block-start: 4px; font: 12px/1.5 var(--font-sans); letter-spacing: normal; text-transform: none;
+  color: var(--ink-2); white-space: pre-wrap; caption-side: bottom; text-align: start;
+}
+.am-mark-note b { color: var(--ink); font-weight: 600; }
+caption.am-mark-note { display: table-caption; }
+/* Table rows have their own backgrounds, so a tint on the table would show on every other row only: the bar marks a table. */
+table.am-mark { background: none; }
+.am-remark-pop {
+  position: absolute; z-index: 40; width: min(264px, calc(100vw - 16px)); padding: 8px; display: grid; gap: 6px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14);
+}
+.am-remark-pop[hidden] { display: none; }
+.am-remark-kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+.am-remark-kind { font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.am-remark-kind:hover { border-color: var(--ink-3); }
+.am-remark-kind[aria-pressed="true"] { color: var(--ink); border-color: var(--mark); background: var(--mark-bg); }
+.am-remark-kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-remark-pop textarea { font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }
+.am-remark-actions { display: flex; gap: 6px; }
+.am-remark-actions .am-btn:disabled { opacity: .5; cursor: default; }
+@media print { .am-remark-pop { display: none !important; } }
+`;
+var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.\n  const carrier = document.querySelector('.am-toolbar');\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is\n  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,\n  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and\n  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have).\n  const flasher = (btn) => {\n    const idle = btn.textContent;\n    let clicks = 0;\n    return () => {\n      btn.textContent = btn.dataset.done;\n      const mine = ++clicks;\n      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);\n    };\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  if (copyBtn) {\n    const flash = flasher(copyBtn);\n    copyBtn.addEventListener('click', async () => {\n      const nodes = document.querySelectorAll('#am-source');\n      await copyText(nodes[nodes.length - 1]?.value ?? '');\n      flash();\n    });\n  }\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    const flash = flasher(btn);\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash();\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const why = same ? (d.touched ? ui.confirmed : ui.untouched) : `${ui.was}: ${d.suggested.join(', ') || '\u2014'}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page.\n    if (state && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      if (state.touched) touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    let kind = mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    keep.addEventListener('click', () => {\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const kindBtns = KINDS.map((k) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => {\n        kind = k;\n        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));\n        keep.disabled = false;\n      });\n      return kb;\n    });\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n})();\n";
 var DIFF_CSS = "/* Diff block (only on pages that have one): red and green lines, a hunk row, and two gutters, old and new, drawn from data-o / data-n.\n   The hues are fixed and mixed into the theme's own --fill and --ink, so they read as green and red in every theme, light and dark. */\n.am-codeblock--diff { --diff-add: #1f9d4d; --diff-del: #d1344a; }\n.am-code-stat { display: inline-flex; gap: 6px; flex: none; font: 12px/1.3 var(--font-mono); }\n.am-code-stat-add { color: color-mix(in srgb, var(--diff-add) 75%, var(--ink)); }\n.am-code-stat-del { color: color-mix(in srgb, var(--diff-del) 75%, var(--ink)); }\n.am-code--diff .am-ln { display: flex; padding: 0 14px 0 0; }\n.am-code--diff:not(.am-code--dnum) .am-ln { padding-left: 14px; }\n.am-code--dnum .am-ln::before, .am-code--dnum .am-ln::after {\n  flex: none; box-sizing: content-box; width: 3.5ch; padding: 0 6px; text-align: right; color: var(--ink-3);\n  user-select: none; -webkit-user-select: none;\n}\n.am-code--dnum .am-ln::before { content: attr(data-o); order: -2; }\n.am-code--dnum .am-ln::after { content: attr(data-n); order: -1; margin-right: 10px; }\n.am-ln--add { background: color-mix(in srgb, var(--diff-add) 14%, var(--fill)); }\n.am-ln--del { background: color-mix(in srgb, var(--diff-del) 14%, var(--fill)); }\n.am-ln--add::before, .am-ln--add::after { background: color-mix(in srgb, var(--diff-add) 28%, var(--fill)); }\n.am-ln--del::before, .am-ln--del::after { background: color-mix(in srgb, var(--diff-del) 28%, var(--fill)); }\n.am-code--diff .am-ln--hl { box-shadow: none; }\n.am-code--diff .am-ln--hl::before { box-shadow: inset 3px 0 0 var(--accent); }\n.am-code--diff .am-ln--ctx.am-ln--hl { background: var(--accent-bg); }\n.am-code--diff .am-ln--hunk { display: block; min-height: 0; padding: 1px 14px; font-size: 11.5px; color: var(--ink-3); background: color-mix(in srgb, var(--accent) 8%, var(--fill)); }\n.am-code--dnum .am-ln--hunk::before, .am-code--dnum .am-ln--hunk::after { content: none; }\n.am-code--diff .am-ln--meta { display: none; }\n";
 var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Changes view (.am-view-changes) draws change styling: colors, strike-through, faded items
    and badges. Before and After look like a plain diagram, and the items that do not exist in the view are hidden.
@@ -521,21 +1068,27 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
   const button = document.querySelector('[data-am="update"]');
   if (!button || !Object.hasOwn(HTMLElement.prototype, 'popover')) return;
   button.hidden = false;
-  // Each copy button copies its data-text and reads data-done for a moment.
+  // Each copy button copies its data-text and reads data-done for a moment, then comes back to the label it started from. That
+  // label is read once, here: a second click inside the moment would otherwise read the copied label off the button and restore
+  // that instead, and the label would never come back. The moment starts again on each click: the timer of the previous one is
+  // left to fire and does nothing.
   for (const copy of document.querySelectorAll('[data-am="copy-text"]')) {
+    const idle = copy.textContent;
+    let clicks = 0;
     copy.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(copy.dataset.text);
       } catch {
         return;
       }
-      const label = copy.textContent;
       copy.textContent = copy.dataset.done;
-      setTimeout(() => { copy.textContent = label; }, 1400);
+      const mine = ++clicks;
+      setTimeout(() => { if (mine === clicks) copy.textContent = idle; }, 1400);
     });
   }
 })();
 `;
+var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
 var CLOSE_AFTER_CSS = "/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the\n   window in the top layer and stays hidden unless open. */\n.am-closing { display: none; }\n.am-closing:popover-open {\n  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  padding: 10px 14px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n@media print {\n  .am-closing { display: none !important; }\n}\n";
 var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src/render.js adds this script after the page script. When the reply is copied,
 // the reply sheet closes and a popover counts down to closing the tab. Browsers close only a tab no link has moved on, so a tab that
@@ -749,7 +1302,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
+import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, extname as extname3, sep as sep4 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -774,6 +1327,7 @@ var zh_default = {
     done: "\u5DF2\u590D\u5236 \u2713",
     copyCode: "\u590D\u5236",
     update: { button: "\u65B0\u7248\u672C {version}", current: "\u5F53\u524D {current}\u3002\u751F\u6210\u6B64\u9875\u65F6\u68C0\u6D4B\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u8FD9\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7EC8\u7AEF\u8FD0\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8BC9 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5185\u5BB9" },
+    live: { updated: "\u9875\u9762\u5DF2\u66F4\u65B0", reload: "\u5237\u65B0" },
     reply: {
       button: "\u56DE\u590D",
       comment: "\u8BC4\u8BBA",
@@ -781,6 +1335,7 @@ var zh_default = {
       title: "\u4F60\u7684\u56DE\u590D",
       hint: "\u590D\u5236\u540E\u7C98\u8D34\u56DE\u548C Agent \u7684\u5BF9\u8BDD\uFF0C\u5B83\u4F1A\u6309\u4F60\u7684\u9009\u62E9\u548C\u610F\u89C1\u7EE7\u7EED\u3002",
       copy: "\u590D\u5236\u56DE\u590D",
+      copyFailed: "\u590D\u5236\u5931\u8D25 \u2014 \u8BF7\u6309 Cmd/Ctrl+C",
       close: "\u5173\u95ED",
       suggested: "\u5EFA\u8BAE",
       empty: "\u5148\u9009\u62E9\u9009\u9879\uFF0C\u6216\u5728\u9762\u677F\u4E0A\u5199\u8BC4\u8BBA\u3002",
@@ -849,6 +1404,7 @@ var zh_Hant_default = {
     done: "\u5DF2\u8907\u88FD \u2713",
     copyCode: "\u8907\u88FD",
     update: { button: "\u65B0\u7248\u672C {version}", current: "\u76EE\u524D {current}\u3002\u7522\u751F\u6B64\u9801\u6642\u5075\u6E2C\u5230\u65B0\u7248\u672C\u3002", whatsNew: "\u9019\u6B21\u66F4\u65B0\uFF1A", run: "\u5728\u7D42\u7AEF\u6A5F\u57F7\u884C\uFF1A", agent: "\u6216\u8005\u544A\u8A34 Agent\uFF1A", agentText: "\u66F4\u65B0 answer-me-with-html", notes: "\u67E5\u770B\u66F4\u65B0\u5167\u5BB9" },
+    live: { updated: "\u9801\u9762\u5DF2\u66F4\u65B0", reload: "\u91CD\u65B0\u6574\u7406" },
     reply: {
       button: "\u56DE\u8986",
       comment: "\u8A55\u8AD6",
@@ -856,6 +1412,7 @@ var zh_Hant_default = {
       title: "\u4F60\u7684\u56DE\u8986",
       hint: "\u8907\u88FD\u5F8C\u8CBC\u56DE\u548C Agent \u7684\u5C0D\u8A71\uFF0C\u5B83\u6703\u6309\u4F60\u7684\u9078\u64C7\u548C\u610F\u898B\u7E7C\u7E8C\u3002",
       copy: "\u8907\u88FD\u56DE\u8986",
+      copyFailed: "\u8907\u88FD\u5931\u6557 \u2014 \u8ACB\u6309 Cmd/Ctrl+C",
       close: "\u95DC\u9589",
       suggested: "\u5EFA\u8B70",
       empty: "\u5148\u9078\u64C7\u9078\u9805\uFF0C\u6216\u5728\u9762\u677F\u4E0A\u5BEB\u8A55\u8AD6\u3002",
@@ -918,6 +1475,7 @@ var en_default = {
     done: "Copied \u2713",
     copyCode: "Copy",
     update: { button: "New version {version}", current: "You have {current}. Found when this page was made.", whatsNew: "What's new:", run: "Run in a terminal:", agent: "Or tell your agent:", agentText: "Update answer-me-with-html", notes: "See what's new" },
+    live: { updated: "Page updated", reload: "Reload" },
     reply: {
       button: "Reply",
       comment: "Comment",
@@ -925,6 +1483,7 @@ var en_default = {
       title: "Your reply",
       hint: "Copy it and paste it into your chat with the agent; it continues from your choices and comments.",
       copy: "Copy reply",
+      copyFailed: "Copy failed \u2014 press Cmd/Ctrl+C",
       close: "Close",
       suggested: "suggested",
       empty: "Pick options, or comment on a panel first.",
@@ -993,6 +1552,7 @@ var ja_default = {
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     copyCode: "\u30B3\u30D4\u30FC",
     update: { button: "\u65B0\u30D0\u30FC\u30B8\u30E7\u30F3 {version}", current: "\u73FE\u5728\u306F {current}\u3002\u3053\u306E\u30DA\u30FC\u30B8\u306E\u4F5C\u6210\u6642\u306B\u898B\u3064\u304B\u308A\u307E\u3057\u305F\u3002", whatsNew: "\u4ECA\u56DE\u306E\u66F4\u65B0\uFF1A", run: "\u30BF\u30FC\u30DF\u30CA\u30EB\u3067\u5B9F\u884C\uFF1A", agent: "\u307E\u305F\u306F Agent \u306B\u4F1D\u3048\u308B\uFF1A", agentText: "answer-me-with-html \u3092\u66F4\u65B0\u3057\u3066", notes: "\u66F4\u65B0\u5185\u5BB9\u3092\u898B\u308B" },
+    live: { updated: "\u30DA\u30FC\u30B8\u304C\u66F4\u65B0\u3055\u308C\u307E\u3057\u305F", reload: "\u518D\u8AAD\u307F\u8FBC\u307F" },
     reply: {
       button: "\u8FD4\u4FE1",
       comment: "\u30B3\u30E1\u30F3\u30C8",
@@ -1000,6 +1560,7 @@ var ja_default = {
       title: "\u3042\u306A\u305F\u306E\u8FD4\u4FE1",
       hint: "\u30B3\u30D4\u30FC\u3057\u3066\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8\u3068\u306E\u30C1\u30E3\u30C3\u30C8\u306B\u8CBC\u308A\u4ED8\u3051\u308B\u3068\u3001\u3042\u306A\u305F\u306E\u9078\u629E\u3068\u30B3\u30E1\u30F3\u30C8\u3092\u3082\u3068\u306B\u7D9A\u884C\u3057\u307E\u3059\u3002",
       copy: "\u8FD4\u4FE1\u3092\u30B3\u30D4\u30FC",
+      copyFailed: "\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093 \u2014 Cmd/Ctrl+C \u3092\u62BC\u3057\u3066\u304F\u3060\u3055\u3044",
       close: "\u9589\u3058\u308B",
       suggested: "\u63A8\u5968",
       empty: "\u9078\u629E\u80A2\u3092\u9078\u3076\u304B\u3001\u30D1\u30CD\u30EB\u306B\u30B3\u30E1\u30F3\u30C8\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
@@ -1066,6 +1627,7 @@ var he_default = {
     done: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
     copyCode: "\u05D4\u05E2\u05EA\u05E7\u05D4",
     update: { button: "\u05D2\u05E8\u05E1\u05D4 \u05D7\u05D3\u05E9\u05D4 {version}", current: "\u05D4\u05D2\u05E8\u05E1\u05D4 \u05E9\u05DC\u05DB\u05DD {current}. \u05D4\u05D2\u05E8\u05E1\u05D4 \u05D4\u05D7\u05D3\u05E9\u05D4 \u05E0\u05DE\u05E6\u05D0\u05D4 \u05DB\u05E9\u05D4\u05D3\u05E3 \u05E0\u05D5\u05E6\u05E8.", whatsNew: "\u05DE\u05D4 \u05D7\u05D3\u05E9 \u05D1\u05D2\u05E8\u05E1\u05D4:", run: "\u05D4\u05E8\u05D9\u05E6\u05D5 \u05D1\u05D8\u05E8\u05DE\u05D9\u05E0\u05DC:", agent: "\u05D0\u05D5 \u05D1\u05E7\u05E9\u05D5 \u05DE\u05D4-Agent:", agentText: "\u05E2\u05D3\u05DB\u05DF \u05D0\u05EA answer-me-with-html", notes: "\u05DE\u05D4 \u05D7\u05D3\u05E9" },
+    live: { updated: "\u05D4\u05D3\u05E3 \u05E2\u05D5\u05D3\u05DB\u05DF", reload: "\u05E8\u05E2\u05E0\u05D5\u05DF" },
     reply: {
       button: "\u05EA\u05D2\u05D5\u05D1\u05D4",
       comment: "\u05D4\u05E2\u05E8\u05D4",
@@ -1073,6 +1635,7 @@ var he_default = {
       title: "\u05D4\u05EA\u05D2\u05D5\u05D1\u05D4 \u05E9\u05DC\u05DA",
       hint: "\u05D4\u05E2\u05EA\u05D9\u05E7\u05D5 \u05D5\u05D4\u05D3\u05D1\u05D9\u05E7\u05D5 \u05D1\u05E9\u05D9\u05D7\u05D4 \u05E2\u05DD \u05D4\u05E1\u05D5\u05DB\u05DF; \u05D4\u05D5\u05D0 \u05D9\u05DE\u05E9\u05D9\u05DA \u05DC\u05E4\u05D9 \u05D4\u05D1\u05D7\u05D9\u05E8\u05D5\u05EA \u05D5\u05D4\u05D4\u05E2\u05E8\u05D5\u05EA \u05E9\u05DC\u05DB\u05DD.",
       copy: "\u05D4\u05E2\u05EA\u05E7\u05EA \u05D4\u05EA\u05D2\u05D5\u05D1\u05D4",
+      copyFailed: "\u05D4\u05D4\u05E2\u05EA\u05E7\u05D4 \u05E0\u05DB\u05E9\u05DC\u05D4 \u2014 \u05D4\u05E7\u05D9\u05E9\u05D5 Cmd/Ctrl+C",
       close: "\u05E1\u05D2\u05D9\u05E8\u05D4",
       suggested: "\u05DE\u05D5\u05DE\u05DC\u05E5",
       empty: "\u05E7\u05D5\u05D3\u05DD \u05D1\u05D7\u05E8\u05D5 \u05D0\u05E4\u05E9\u05E8\u05D5\u05EA \u05D0\u05D5 \u05DB\u05EA\u05D1\u05D5 \u05D4\u05E2\u05E8\u05D4 \u05E2\u05DC \u05D0\u05D7\u05D3 \u05D4\u05D7\u05DC\u05E7\u05D9\u05DD.",
@@ -1507,8 +2070,56 @@ var COLOR_TOKENS = Object.freeze([
   "--head-bg",
   "--head-fg"
 ]);
+var DIAGRAM_TOKENS = Object.freeze([
+  "--node-fill",
+  "--node-stroke",
+  "--node-width",
+  "--node-radius",
+  "--node-shadow",
+  "--node-text",
+  "--hi-fill",
+  "--hi-stroke",
+  "--hi-text",
+  "--edge-color",
+  "--edge-width",
+  "--edge-label",
+  "--actor-fill",
+  "--actor-stroke",
+  "--actor-text",
+  "--note-fill",
+  "--note-stroke",
+  "--note-width",
+  "--note-radius",
+  "--cluster-fill",
+  "--cluster-stroke",
+  "--lifeline-color"
+]);
+var LENGTH_TOKENS = Object.freeze(["--node-width", "--edge-width", "--node-radius", "--note-width", "--note-radius"]);
+var LENGTH = /^(?:\d+|\d*\.\d+)(?:px|em)?$/;
 var LANGS = languageIds();
 var UNSAFE_VALUE = /[;{}<]/;
+function shadowOk(value) {
+  const v = value.trim();
+  if (v === "none") return true;
+  let rest = v;
+  while (rest) {
+    if (!/^drop-shadow\(/i.test(rest)) return false;
+    let depth = 0;
+    let end = -1;
+    for (let i = "drop-shadow".length; i < rest.length && end < 0; i++) {
+      if (rest[i] === "(") depth++;
+      else if (rest[i] === ")" && --depth === 0) end = i;
+    }
+    if (end < 0 || /url\(/i.test(rest.slice(0, end))) return false;
+    rest = rest.slice(end + 1).trimStart();
+  }
+  return true;
+}
+function diagramTokenProblem(key, value) {
+  if (LENGTH_TOKENS.includes(key) && !LENGTH.test(value.trim())) return "must be a number or a px / em value, like 2 or 2.5px";
+  if (key === "--node-shadow" && !shadowOk(value)) return "must be none or one or more drop-shadow(...), with no url()";
+  return "";
+}
 function normalizeTheme(name, data, builtinNames = []) {
   const errors = [];
   if (!NAME.test(name)) errors.push(`the name "${name}" must use lowercase letters, digits and -`);
@@ -1521,11 +2132,15 @@ function normalizeTheme(name, data, builtinNames = []) {
       errors.push(`${where} must be an object of CSS variables`);
       return {};
     }
+    const out = {};
     for (const [k2, v] of Object.entries(g)) {
+      out[k2] = v;
       if (!k2.startsWith("--")) errors.push(`${where}: "${k2}" must start with --`);
       else if (typeof v !== "string" || UNSAFE_VALUE.test(v)) errors.push(`${where}: ${k2} must be a string without ; { } <`);
+      else if (diagramTokenProblem(k2, v)) errors.push(`${where}: ${k2} ${diagramTokenProblem(k2, v)}`);
+      else if (LENGTH_TOKENS.includes(k2) && /^[\d.]+$/.test(v.trim())) out[k2] = `${v.trim()}px`;
     }
-    return g;
+    return out;
   };
   const common = group("tokens.common", tokens.common);
   const light = group("tokens.light", tokens.light);
@@ -1619,11 +2234,36 @@ function externalResources(css) {
   if (text.includes("\\")) found.push(ESCAPE);
   return found;
 }
+function themeLinks(theme) {
+  const groups = (where, tokens) => ["common", "light", "dark"].flatMap((mode) => Object.entries(tokens?.[mode] ?? {}).map(([k2, v]) => ({ where: `${where}.${mode} ${k2}`, text: v })));
+  const sources = [
+    { where: "css", text: theme?.css },
+    { where: "video.css", text: theme?.video?.css },
+    ...groups("tokens", theme?.tokens),
+    ...groups("video.tokens", theme?.video?.tokens)
+  ];
+  return sources.flatMap(({ where, text }) => externalResources(text).map((found) => ({ where, found })));
+}
 function externalResourceWarnings(theme) {
-  return [["css", theme?.css], ["video.css", theme?.video?.css]].flatMap(([where, css]) => externalResources(css).map((r) => r === ESCAPE ? `${where}: ${r} can hide a link from this check; a theme has no need for one (write the value plainly)` : `${where}: ${r} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
+  return themeLinks(theme).map(({ where, found }) => found === ESCAPE ? `${where}: ${found} can hide a link from this check; a theme has no need for one (write the value plainly)` : `${where}: ${found} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`);
 }
 var TEXT_PAIRS = [["--ink", "--paper"], ["--ink", "--bg"], ["--ink-2", "--paper"], ["--ink-2", "--bg"], ["--head-fg", "--head-bg"], ["--accent", "--paper"]];
 var BADGE_PAIRS = [["--accent", "--accent-bg"], ["--ok", "--ok-bg"], ["--err", "--err-bg"], ["--warn", "--warn-bg"]];
+var DIAGRAM_PAIRS = [
+  { fg: ["--node-text", "--ink"], bg: ["--node-fill", "--paper"], when: ["--node-text", "--node-fill"] },
+  { fg: ["--hi-text", "--accent"], bg: ["--hi-fill", "--accent-bg"], when: ["--hi-text", "--hi-fill"] },
+  { fg: ["--actor-text", "--node-text", "--ink"], bg: ["--actor-fill", "--node-fill", "--paper"], when: ["--actor-text", "--actor-fill", "--node-text", "--node-fill"] },
+  { fg: ["--ink"], bg: ["--note-fill", "--warn-bg"], when: ["--note-fill"] },
+  { fg: ["--edge-label", "--accent"], bg: ["--paper"], when: ["--edge-label"] }
+];
+var VAR_REF = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^()]+))?\)$/;
+function colorOf(set, key, depth = 0) {
+  const value = set[key]?.trim();
+  if (value === void 0 || depth > 4) return null;
+  const ref = value.match(VAR_REF);
+  if (ref) return set[ref[1]] === void 0 ? ref[2] ? parseColor(ref[2].trim()) : null : colorOf(set, ref[1], depth + 1);
+  return parseColor(value);
+}
 function checkColors(theme) {
   const errors = [];
   const warnings = [];
@@ -1646,6 +2286,20 @@ function checkColors(theme) {
       const r = ratio(fg, bg);
       if (r !== null && r < 3) errors.push(say(fg, bg, r, 3));
       else if (r !== null && r < 4.5) warnings.push(say(fg, bg, r, 4.5));
+    }
+    const seen = /* @__PURE__ */ new Set();
+    for (const { fg, bg, when } of DIAGRAM_PAIRS) {
+      if (!when.some((k2) => set[k2] !== void 0)) continue;
+      const [fgKey, bgKey] = [fg, bg].map((chain) => chain.find((k2) => set[k2] !== void 0));
+      if (!fgKey || !bgKey || seen.has(`${fgKey} ${bgKey}`)) continue;
+      seen.add(`${fgKey} ${bgKey}`);
+      const [fgColor, bgColor] = [colorOf(set, fgKey), colorOf(set, bgKey)];
+      if (!fgColor || !bgColor) {
+        warnings.push(`${mode}: ${fgKey} on ${bgKey} was not checked, because a value is not a color this check reads (use hex, rgb() or hsl())`);
+        continue;
+      }
+      const r = contrast(fgColor, bgColor, colorOf(set, "--paper") ?? void 0);
+      if (r < 4.5) errors.push(say(fgKey, bgKey, r, 4.5));
     }
   }
   return { errors, warnings };
@@ -2236,9 +2890,9 @@ ${Z2.join(`
 `, e = e.substring(g.length + 1), a = true), !a) {
           let M2 = this.rules.other.nextBulletRegex(f2), v = this.rules.other.hrRegex(f2), Z2 = this.rules.other.fencesBeginRegex(f2), ae2 = this.rules.other.headingBeginRegex(f2), ye2 = this.rules.other.htmlBeginRegex(f2), Pe2 = this.rules.other.blockquoteBeginRegex(f2);
           for (; e; ) {
-            let K2 = e.split(`
+            let K3 = e.split(`
 `, 1)[0], H2;
-            if (g = K2, this.options.pedantic ? (g = g.replace(this.rules.other.listReplaceNesting, "  "), H2 = g) : H2 = g.replace(this.rules.other.leadingSpaceTab, (Se2) => Se2.replace(this.rules.other.tabCharGlobal, "    ")), Z2.test(g) || ae2.test(g) || ye2.test(g) || Pe2.test(g) || M2.test(g) || v.test(g)) break;
+            if (g = K3, this.options.pedantic ? (g = g.replace(this.rules.other.listReplaceNesting, "  "), H2 = g) : H2 = g.replace(this.rules.other.leadingSpaceTab, (Se2) => Se2.replace(this.rules.other.tabCharGlobal, "    ")), Z2.test(g) || ae2.test(g) || ye2.test(g) || Pe2.test(g) || M2.test(g) || v.test(g)) break;
             if (H2.search(this.rules.other.nonSpaceChar) >= f2 || !g.trim()) c += `
 ` + H2.slice(f2);
             else {
@@ -2246,8 +2900,8 @@ ${Z2.join(`
               c += `
 ` + g;
             }
-            w = !g.trim(), p += K2 + `
-`, e = e.substring(K2.length + 1), b = H2.slice(f2);
+            w = !g.trim(), p += K3 + `
+`, e = e.substring(K3.length + 1), b = H2.slice(f2);
           }
         }
         r.loose || (i ? r.loose = true : this.rules.other.doubleBlankLine.test(p) && (i = true)), r.items.push({ type: "list_item", raw: p, task: !!this.options.gfm && this.rules.other.listIsTask.test(c), loose: false, text: c, tokens: [] }), r.raw += p;
@@ -4356,7 +5010,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = "ltr" }) {
       const w = Math.max(...s.lines.map((l3) => measure(l3, 12))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y2 + 10)}" x2="${f(width - MARGIN)}" y2="${f(y2 + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y2)}" width="${f(w)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' font-size="12"', dir));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' class="am-actor-text" font-size="12"', dir));
       y2 += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k2}">${body.slice(start).join("")}</g>`);
@@ -4364,7 +5018,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = "ltr" }) {
   const height = y2 + 6;
   const actors = ps.map((p, i) => {
     const x2 = X3(xs[i]);
-    return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' font-weight="600"', dir)}</g>`;
+    return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' class="am-actor-text" font-weight="600"', dir)}</g>`;
   });
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
@@ -6608,7 +7262,7 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr") {
     const { x: x2, y: y2 } = g.node(key.get(n.id));
     const { width: w, height: h2, lines } = sizes.get(n.id);
     const badge = badgeSvg(n.state, ...badgePoint(n.shape, x2, y2, w, h2, rtl));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2, "", pageDir)}${badge}</g>`;
+    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
   const { width, height } = g.graph();
   const label = diagramLabel(ui, "flow", [...nodes.keys()].slice(0, 8));
@@ -6952,7 +7606,7 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const left = x2 - size.width / 2;
   const top2 = y2 - size.height / 2;
   const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
-  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
+  const head = `<text class="am-er-head am-node-text" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top2 + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top2 + PAD + HEAD_LH)}"/>`;
   const rtl = pageDir === "rtl";
   const shift = (rtl ? -1 : 1) * signWidth(entity);
@@ -6961,7 +7615,7 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
     const mark = deltaAttr(field.state);
     const marker = field.marker ? `<text class="am-er-key am-cluster-label"${mark} x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
     const band = field.state ? `<rect class="am-er-band"${mark} x="${f(left + 1)}" y="${f(cy - FIELD_LH / 2)}" width="${f(size.width - 2)}" height="${FIELD_LH}"/><text class="am-er-sign"${mark} x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(SIGN[field.state], pageDir))}</text>` : "";
-    return `${band}<text class="am-er-field"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
+    return `${band}<text class="am-er-field am-node-text"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
   }).join("");
   const badge = badgeSvg(entity.state, rtl ? left : left + size.width, top2);
   return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"${deltaAttr(entity.state)}><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}${badge}</g>`;
@@ -7290,7 +7944,17 @@ var ZH_CLICHES = Object.freeze([
   "\u4E00\u7AD9\u5F0F",
   "\u5E95\u5C42\u903B\u8F91",
   "\u9897\u7C92\u5EA6",
-  "\u65B9\u6CD5\u8BBA"
+  "\u65B9\u6CD5\u8BBA",
+  // opening and closing filler: the page starts with the answer and ends when the facts end
+  "\u4E0B\u9762\u6211\u6765",
+  "\u4E0B\u9762\u6211\u5C06",
+  "\u63A5\u4E0B\u6765\u6211\u5C06",
+  "\u8BA9\u6211\u6765",
+  "\u8BA9\u6211\u4EEC\u6765",
+  "\u603B\u7684\u6765\u8BF4",
+  "\u5E0C\u671B\u5BF9\u4F60\u6709\u5E2E\u52A9",
+  "\u5E0C\u671B\u5BF9\u60A8\u6709\u5E2E\u52A9",
+  "\u5982\u6709\u7591\u95EE"
 ]);
 var UNIT = String.raw`(?:个|次|秒|天|分钟|小时|倍|字|条|项|人|行|位|%|MB|GB|KB|TB|ms)?`;
 var ZH_WORDS = Object.freeze([
@@ -7425,7 +8089,7 @@ function checkUnit(text, line, kind2, out, family) {
       const preview2 = s.length > 24 ? `${s.slice(0, 24)}\u2026` : s;
       out.push({ line, rule: "sentence-length", message: `${kind2 === "procedural" ? "step" : "sentence"} has ${count2} ${unit} (max ${limit}): "${preview2}"` });
     }
-    if (englishRules && lang === "en" && PASSIVE.test(s)) {
+    if (englishRules && kind2 === "procedural" && lang === "en" && PASSIVE.test(s)) {
       out.push({ line, rule: "passive", message: `possible passive voice: "${s.match(PASSIVE)[0]}"`, suggestion: "use active voice" });
     }
   }
@@ -7580,81 +8244,14 @@ function resolveLanguage({ declared, previous, text = "" }) {
 }
 
 // src/images.js
-import { readFileSync as readFileSync2, statSync } from "node:fs";
+import { readFileSync as readFileSync3, realpathSync as realpathSync2, statSync as statSync2 } from "node:fs";
 import { homedir } from "node:os";
-import { extname, isAbsolute, resolve } from "node:path";
+import { extname as extname2, isAbsolute as isAbsolute2, resolve as resolve2, sep as sep2 } from "node:path";
 import { fileURLToPath } from "node:url";
-var TYPES = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".avif": "image/avif",
-  ".svg": "image/svg+xml"
-};
-var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
-var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
-var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
-var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
-var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
-var ImageError = class extends Error {
-  constructor(message, ref) {
-    super(message);
-    this.name = "ImageError";
-    this.ref = ref;
-  }
-};
-function decodeRef(src) {
-  const ref = src.replace(/&amp;/g, "&");
-  try {
-    return decodeURI(ref);
-  } catch {
-    return ref;
-  }
-}
-function localPath(ref, baseDir) {
-  if (ref.startsWith("file:")) return fileURLToPath(ref);
-  if (ref.startsWith("~/")) return resolve(homedir(), ref.slice(2));
-  return resolve(baseDir, ref);
-}
-function readImage(ref, baseDir) {
-  const path = localPath(ref, baseDir);
-  const type = TYPES[extname(path).toLowerCase()];
-  if (!type) throw new ImageError(`"${ref}" is not an image file; use ${Object.keys(TYPES).join(" ")}`, ref);
-  let size;
-  try {
-    size = statSync(path).size;
-  } catch {
-    return null;
-  }
-  if (size > MAX_IMAGE_BYTES) {
-    throw new ImageError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
-  }
-  return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
-}
-function assertNoImageText(html) {
-  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
-  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
-}
-function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
-  if (checkText) assertNoImageText(html);
-  return html.replace(IMG_SRC, (whole, before, src) => {
-    const ref = decodeRef(src);
-    if (NOT_LOCAL.test(ref)) return whole;
-    const uri = readImage(ref, baseDir) ?? known.get(ref);
-    if (!uri) throw new ImageError(`Image not found: "${ref}"${isAbsolute(ref) ? "" : ` (relative paths are read from ${baseDir})`}. Use the absolute path of an existing file`, ref);
-    return `<img${before}data-am-src="${src}" src="${uri}"`;
-  });
-}
-function readEmbeddedImages(html) {
-  return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
-}
 
 // src/code.js
-import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
-import { basename as basename2, extname as extname2, isAbsolute as isAbsolute2, relative, resolve as resolve2, sep } from "node:path";
+import { readFileSync as readFileSync2, realpathSync, statSync } from "node:fs";
+import { basename as basename2, extname, isAbsolute, relative, resolve, sep } from "node:path";
 
 // src/diff.js
 var DiffError = class extends Error {
@@ -7765,7 +8362,7 @@ var SECRET_FILE = new RegExp([
   "\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$"
 ].join("|"), "i");
 var SECRET_DIR = /* @__PURE__ */ new Set([".git", ".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"]);
-var SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
+var SECRET_TEXT = /:\/\/[^\s:@/"'`$<>{}]*:[^\s@/"'`$<>{}]+@|sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 var CodeError = class extends Error {
   constructor(message, line = 0, example = CODE_EXAMPLE) {
     super(message);
@@ -7799,28 +8396,41 @@ function parseCodeArgs(args, diff = false) {
   const text = (key) => typeof attrs[key] === "string" || typeof attrs[key] === "number" ? String(attrs[key]) : void 0;
   return { src: text("src"), lines: text("lines"), hl: text("hl"), title: text("title"), start: text("start"), file: text("file") };
 }
-function localPath2(ref, baseDir) {
-  const path = resolve2(baseDir, ref);
+function localPath(ref, baseDir) {
+  const path = resolve(baseDir, ref);
   const rel = relative(baseDir, path);
-  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute2(rel) ? null : path;
+  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
+}
+function assertNotSecret(ref, rel, via) {
+  if (SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+    throw new CodeError(`"${ref}" ${via ? "points to" : "is"} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  }
 }
 function readSlice(ref, range, baseDir) {
-  const path = localPath2(ref, baseDir);
-  if (!path) return null;
-  if (SECRET_FILE.test(basename2(path)) || relative(baseDir, path).split(sep).some((part) => SECRET_DIR.has(part))) {
-    throw new CodeError(`"${ref}" is a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  const written = localPath(ref, baseDir);
+  if (!written) return null;
+  assertNotSecret(ref, relative(baseDir, written), false);
+  let path;
+  try {
+    path = realpathSync(written);
+    const root = realpathSync(baseDir);
+    if (!localPath(path, root)) throw new CodeError(`Code file "${ref}" is a link to a file outside the current folder ${baseDir}; only files inside it are quoted`);
+    assertNotSecret(ref, relative(root, path), true);
+  } catch (err) {
+    if (err instanceof CodeError) throw err;
+    return null;
   }
   let size;
   try {
-    const stat = statSync2(path);
-    if (!stat.isFile()) throw new CodeError(`"${ref}" is not a file`);
-    size = stat.size;
+    const stat2 = statSync(path);
+    if (!stat2.isFile()) throw new CodeError(`"${ref}" is not a file`);
+    size = stat2.size;
   } catch (err) {
     if (err instanceof CodeError) throw err;
     return null;
   }
   if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
-  const buf = readFileSync3(path);
+  const buf = readFileSync2(path);
   if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
   if (SECRET_TEXT.test(buf.toString("utf8"))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
   const all = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
@@ -7849,7 +8459,7 @@ function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* 
     if (text.trim()) throw new CodeError("a block with src= takes its code from the file; leave the block empty");
     body = readSlice(opts.src, range, baseDir) ?? known.get(`${opts.src}#${opts.lines ?? ""}`);
     if (!body) {
-      const where2 = localPath2(opts.src, baseDir) ? "not found" : `outside the current folder ${baseDir}; only files inside it are quoted`;
+      const where2 = localPath(opts.src, baseDir) ? "not found" : `outside the current folder ${baseDir}; only files inside it are quoted`;
       throw new CodeError(`Code file "${opts.src}" is ${where2}`);
     }
     first = range?.from ?? 1;
@@ -7867,7 +8477,7 @@ function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* 
   const hl = opts.hl ? parseHighlight(opts.hl) : /* @__PURE__ */ new Set();
   const outside = [...hl].find((n) => n < first || n > last);
   if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not in the block (lines ${first}-${last})`);
-  const shownLang = lang || (opts.src ? extname2(opts.src).slice(1).toLowerCase() : "");
+  const shownLang = lang || (opts.src ? extname(opts.src).slice(1).toLowerCase() : "");
   const numbered = Boolean(opts.src || opts.start);
   const where = opts.src ? `${opts.src}${range ? `:${range.from === range.to ? range.from : `${range.from}-${range.to}`}` : ""}` : "";
   const title = opts.title ?? where;
@@ -7894,11 +8504,178 @@ function renderDiff(text, opts, { copyButton, long }) {
   const outside = [...hl].find((n) => !diff.newLines.has(n));
   if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not a new-side line of the diff`);
   const file = opts.file ?? diff.title;
-  const shownLang = extname2(file).slice(1).toLowerCase() || "diff";
-  const stat = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">\u2212${diff.del}</span></span>`;
-  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ""}>${esc(opts.title ?? file)}</span>${stat}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
+  const shownLang = extname(file).slice(1).toLowerCase() || "diff";
+  const stat2 = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">\u2212${diff.del}</span></span>`;
+  const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ""}>${esc(opts.title ?? file)}</span>${stat2}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
   const html = `<figure class="am-codeblock am-codeblock--diff">${head}<pre class="am-code am-code--diff${diff.numbered ? " am-code--dnum" : ""}"><code data-lang="${esc(shownLang)}">${diffRowsHtml(diff, hl)}</code></pre></figure>`;
   return { html, file: null, warnings: [...diff.warnings, ...long] };
+}
+
+// src/images.js
+var TYPES = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".svg": "image/svg+xml"
+};
+var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
+var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
+var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
+var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
+var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
+var ImageError = class extends Error {
+  constructor(message, ref) {
+    super(message);
+    this.name = "ImageError";
+    this.ref = ref;
+  }
+};
+function decodeRef(src) {
+  const ref = src.replace(/&amp;/g, "&");
+  try {
+    return decodeURI(ref);
+  } catch {
+    return ref;
+  }
+}
+function localPath2(ref, baseDir) {
+  if (ref.startsWith("file:")) return fileURLToPath(ref);
+  if (ref.startsWith("~/")) return resolve2(homedir(), ref.slice(2));
+  return resolve2(baseDir, ref);
+}
+var startsWith = (buf, text, at3 = 0) => buf.length >= at3 + text.length && buf.toString("latin1", at3, at3 + text.length) === text;
+var SVG_START = /^\uFEFF?(?:\s|<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^[>]*(?:\[[\s\S]*?\]\s*)?>)*<svg(?=[\s>/])/;
+var MAGIC = {
+  "image/png": (buf) => startsWith(buf, "\x89PNG\r\n\n"),
+  "image/jpeg": (buf) => startsWith(buf, "\xFF\xD8\xFF"),
+  "image/gif": (buf) => startsWith(buf, "GIF87a") || startsWith(buf, "GIF89a"),
+  "image/webp": (buf) => startsWith(buf, "RIFF") && startsWith(buf, "WEBP", 8),
+  "image/avif": (buf) => startsWith(buf, "ftypavif", 4) || startsWith(buf, "ftypavis", 4),
+  "image/svg+xml": (buf) => SVG_START.test(buf.toString("utf8"))
+};
+var inSecretDir = (path) => path.split(sep2).some((part) => SECRET_DIR.has(part));
+function readImage(ref, baseDir) {
+  const path = localPath2(ref, baseDir);
+  const ext = extname2(path).toLowerCase();
+  const type = TYPES[ext];
+  if (!type) throw new ImageError(`"${ref}" is not an image file; use ${Object.keys(TYPES).join(" ")}`, ref);
+  let real;
+  let stat2;
+  try {
+    real = realpathSync2(path);
+    stat2 = statSync2(real);
+  } catch {
+    return null;
+  }
+  if (inSecretDir(path) || inSecretDir(real)) {
+    throw new ImageError(`"${ref}" is in a folder that holds keys or logins (${[...SECRET_DIR].join(" ")}); it is not embedded. Copy the image somewhere else first`, ref);
+  }
+  if (!stat2.isFile()) throw new ImageError(`"${ref}" is not a file`, ref);
+  const size = stat2.size;
+  if (size > MAX_IMAGE_BYTES) {
+    throw new ImageError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
+  }
+  const buf = readFileSync3(real);
+  if (!MAGIC[type](buf)) throw new ImageError(`"${ref}" is named ${ext} but its content is not ${type === "image/svg+xml" ? "SVG" : type.slice(6).toUpperCase()} data; it is not embedded`, ref);
+  if (type === "image/svg+xml" && SECRET_TEXT.test(buf.toString("utf8"))) {
+    throw new ImageError(`"${ref}" looks like it holds a key or a token; it is not embedded`, ref);
+  }
+  return `data:${type};base64,${buf.toString("base64")}`;
+}
+function assertNoImageText(html) {
+  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
+  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
+}
+function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
+  if (checkText) assertNoImageText(html);
+  return html.replace(IMG_SRC, (whole, before, src) => {
+    const ref = decodeRef(src);
+    if (NOT_LOCAL.test(ref)) return whole;
+    const uri = readImage(ref, baseDir) ?? known.get(ref);
+    if (!uri) throw new ImageError(`Image not found: "${ref}"${isAbsolute2(ref) ? "" : ` (relative paths are read from ${baseDir})`}. Use the absolute path of an existing file`, ref);
+    return `<img${before}data-am-src="${src}" src="${uri}"`;
+  });
+}
+function remoteImages(html) {
+  return [...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) => decodeRef(m[1] ?? m[2] ?? m[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
+}
+function readEmbeddedImages(html) {
+  return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
+}
+
+// src/sha256.js
+var K2 = Uint32Array.from({ length: 64 }, (_2, i) => {
+  let n = 2;
+  for (let seen = 0; ; n++) {
+    let prime = true;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) prime = false;
+    if (prime && seen++ === i) break;
+  }
+  return Math.floor(Math.cbrt(n) % 1 * 2 ** 32);
+});
+var rotr = (x2, n) => x2 >>> n | x2 << 32 - n;
+function sha256Base64(text) {
+  const data = new TextEncoder().encode(text);
+  const blocks = Math.ceil((data.length + 9) / 64);
+  const padded = new Uint8Array(blocks * 64);
+  padded.set(data);
+  padded[data.length] = 128;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(data.length * 8 / 2 ** 32));
+  view.setUint32(padded.length - 4, data.length * 8 >>> 0);
+  const h2 = Uint32Array.from([2, 3, 5, 7, 11, 13, 17, 19], (p) => Math.floor(Math.sqrt(p) % 1 * 2 ** 32));
+  const w = new Uint32Array(64);
+  for (let at3 = 0; at3 < padded.length; at3 += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(at3 + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ w[i - 15] >>> 3;
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ w[i - 2] >>> 10;
+      w[i] = w[i - 16] + s0 + w[i - 7] + s1 >>> 0;
+    }
+    let [a, b, c, d, e, f2, g, hh] = h2;
+    for (let i = 0; i < 64; i++) {
+      const t1 = hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + (e & f2 ^ ~e & g) + K2[i] + w[i] >>> 0;
+      const t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
+      hh = g;
+      g = f2;
+      f2 = e;
+      e = d + t1 >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = t1 + t2 >>> 0;
+    }
+    [a, b, c, d, e, f2, g, hh].forEach((v, i) => {
+      h2[i] = h2[i] + v >>> 0;
+    });
+  }
+  const out = new Uint8Array(32);
+  h2.forEach((v, i) => new DataView(out.buffer).setUint32(i * 4, v));
+  return btoa(String.fromCharCode(...out));
+}
+
+// src/csp.js
+var LIVE_SCRIPT_BODY = `
+${LIVE_JS}`;
+var scriptHash = (text) => `'sha256-${sha256Base64(text)}'`;
+function cspMeta(scripts, { live = false } = {}) {
+  const hashes = [...scripts, ...live ? [LIVE_SCRIPT_BODY] : []].map(scriptHash);
+  const policy = [
+    "default-src 'none'",
+    `script-src ${hashes.join(" ")}`,
+    "style-src 'unsafe-inline'",
+    "img-src data:",
+    "font-src data:",
+    "media-src data:",
+    "connect-src 'self'",
+    "form-action 'none'",
+    "base-uri 'none'"
+  ].join("; ");
+  return `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
 }
 
 // src/render.js
@@ -7949,8 +8726,23 @@ function renderBlocks(blocks, ctx) {
     const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), { math: !ctx.video });
     noteHtml(b, notes.filter((n) => !n.math), ctx);
     noteMath(b, notes.filter((n) => n.math), ctx);
-    return embedImages(b, result, ctx);
+    const out = embedImages(b, result, ctx);
+    noteRemoteImages(b, out, ctx);
+    return out;
   }).join("\n");
+}
+function noteRemoteImages(block2, html, ctx) {
+  if (!ctx.stats.htmlWarnings) return;
+  const lines = block2.text.split("\n");
+  const first = block2.type === "md" ? block2.line : block2.line + 1;
+  const used = /* @__PURE__ */ new Map();
+  for (const ref of remoteImages(html)) {
+    const places = lines.flatMap((l3, i) => l3.includes(ref) || l3.includes(encodeURI(ref)) ? [i] : []);
+    const n = used.get(ref) ?? 0;
+    used.set(ref, n + 1);
+    const shown2 = ref.length > 80 ? `${ref.slice(0, 77)}...` : ref;
+    ctx.stats.htmlWarnings.push({ line: first + (places[Math.min(n, places.length - 1)] ?? 0), message: `remote image ${shown2} does not load in the page; save the image and use its local path` });
+  }
 }
 function noteHtml(block2, notes, ctx) {
   if (!notes.length || !ctx.stats.htmlWarnings) return;
@@ -8086,10 +8878,13 @@ function shell({ meta, language, body, source, embedded, update: update2, closeA
   const notice = updateNotice(ui, update2, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
+  const script = `
+${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
 <meta charset="utf-8">
+${cspMeta([script], { live: true })}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
@@ -8107,8 +8902,7 @@ ${pick("mode", ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 </div>
 ${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
-<script>
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}</script>
+<script>${script}</script>
 </body>
 </html>
 `;
@@ -8145,7 +8939,7 @@ var CONFIG_KEYS = Object.freeze({
   theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
   mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
   style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
-  update_check: { type: "bool", default: true, label: "Check for a new version once a week in the background and tell you (never updates by itself)" },
+  update_check: { type: "bool", default: true, label: "Check for a new version once a day in the background and tell you (never updates by itself)" },
   close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
   voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
 });
@@ -8374,8 +9168,8 @@ function vet(name, bytes) {
   if (errors.length) throw new CatalogError(plural(errors.length, "the file is not a valid theme"));
   const colors = checkColors(theme).errors;
   if (colors.length) throw new CatalogError(plural(colors.length, "the colors fail the contrast check"));
-  const links = [...externalResources(theme.css), ...externalResources(theme.video?.css)];
-  if (links.length) throw new CatalogError(plural(links.length, "the css loads external resources or uses a backslash escape"));
+  const links = themeLinks(theme);
+  if (links.length) throw new CatalogError(plural(links.length, "the css or a token value loads external resources or uses a backslash escape"));
   return bytes;
 }
 async function fetchTheme(index, entry, net = {}) {
@@ -8740,14 +9534,27 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync3 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as join7 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
+import { renameSync as renameSync3 } from "node:fs";
 function hasCommand(cmd) {
   return spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" }).status === 0;
+}
+var BUSY = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
+var sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function renameOver(from, to, { platform = process.platform, rename = renameSync3, wait = sleep } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return rename(from, to);
+    } catch (e) {
+      if (platform !== "win32" || attempt > 5 || !BUSY.has(e.code)) throw e;
+      wait(20 * attempt);
+    }
+  }
 }
 
 // src/video/tts.js
@@ -9064,7 +9871,7 @@ function readCache(file) {
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync3(tmp, file);
+  renameSync4(tmp, file);
 }
 function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
@@ -9194,6 +10001,12 @@ function sheetFrame() {
   const letters = ["A", "B", "C", "D"];
   return `<div class="amv-sheet" aria-hidden="true">${ruler2("top", nums)}${ruler2("bottom", nums)}${ruler2("left", letters)}${ruler2("right", letters)}</div>`;
 }
+var MUX_SCRIPT = `
+${VIDEO_MUX_JS}`;
+var EXPORT_SCRIPT = `
+${VIDEO_EXPORT_JS}`;
+var PLAYER_SCRIPT = `
+${VIDEO_JS}`;
 function shell2({ meta, language, scenesHtml, data, wav: wav2, voice, source, embedded }) {
   const ui = language.videoUi;
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
@@ -9201,6 +10014,7 @@ function shell2({ meta, language, scenesHtml, data, wav: wav2, voice, source, em
 ${rootTag({ lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: embedded.find((t) => t.name === meta.theme).mode ?? (meta.mode === "dark" ? "dark" : "light"), style: meta.style, voice, video: true })}
 <head>
 <meta charset="utf-8">
+${cspMeta([MUX_SCRIPT, EXPORT_SCRIPT, PLAYER_SCRIPT])}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
@@ -9232,12 +10046,9 @@ ${scenesHtml}
 <script type="application/json" id="amv-data">${json}</script>
 ${wav2 ? audioTag(wav2) : ""}
 ${sourceTag(source)}
-<script>
-${VIDEO_MUX_JS}</script>
-<script>
-${VIDEO_EXPORT_JS}</script>
-<script>
-${VIDEO_JS}</script>
+<script>${MUX_SCRIPT}</script>
+<script>${EXPORT_SCRIPT}</script>
+<script>${PLAYER_SCRIPT}</script>
 </body>
 </html>
 `;
@@ -9513,7 +10324,7 @@ import { join as join9 } from "node:path";
 // src/update.js
 import { spawn as spawn3 } from "node:child_process";
 var UPDATE = Object.freeze({
-  checkEveryDays: 7,
+  checkEveryDays: 1,
   hintEveryDays: 3,
   timeoutMs: 5e3,
   url: "https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/package.json",
@@ -9752,15 +10563,17 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, rmSync as rmSync6 } from "node:fs";
-import { lstat, realpath, readFile } from "node:fs/promises";
-import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch } from "node:fs";
+import { lstat, realpath, readFile, stat } from "node:fs/promises";
+import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
 var TOKEN_LENGTH = 22;
 var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
+var EVENTS = "e";
+var SETTLE_MS = 150;
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
 function lanRank(address) {
   const [a, b] = address.split(".").map(Number);
@@ -9823,6 +10636,9 @@ function pageLink({ port, secret, baseUrl }, dir, file) {
   const origin = baseUrl ?? `http://${HOST}:${port}`;
   return `${origin}/${PREFIX_OF[dir]}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
 }
+function eventLink({ secret }, file) {
+  return `/${EVENTS}/${pageToken(secret, "pages", file)}/${encodeURIComponent(file)}`;
+}
 function validFileName(name) {
   return typeof name === "string" && name.length > 0 && name.endsWith(".html") && !/[/\\\0]/.test(name) && !name.includes("..");
 }
@@ -9871,7 +10687,7 @@ function writeInfo(home, info) {
     rmSync6(tmp, { force: true });
     writeFileSync6(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
-    renameSync4(tmp, infoPath(home));
+    renameSync5(tmp, infoPath(home));
   } finally {
     rmSync6(tmp, { force: true });
   }
@@ -9893,12 +10709,128 @@ async function resolvePage(home, dir, file) {
     const path = join10(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
-    return real.startsWith(root + sep2) ? real : null;
+    return real.startsWith(root + sep3) ? real : null;
   } catch {
     return null;
   }
 }
-function handler(home, secret, allowedHosts) {
+function withLiveReload(html, eventPath) {
+  const { ui } = resolveLanguage({ declared: readPage(html).lang });
+  const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">${LIVE_SCRIPT_BODY}</script>
+`;
+  const at3 = html.lastIndexOf("</body>");
+  return at3 === -1 ? html + script : html.slice(0, at3) + script + html.slice(at3);
+}
+function liveStreams(home) {
+  const streams = /* @__PURE__ */ new Map();
+  const seen = /* @__PURE__ */ new Map();
+  let watcher = null;
+  let timer = null;
+  let running = false;
+  let again = false;
+  let opening = 0;
+  const stopIfIdle = () => {
+    if (streams.size === 0 && opening === 0) stopWatching();
+  };
+  const version = async (file) => {
+    try {
+      const s = await stat(await resolvePage(home, "pages", file));
+      return `${s.mtimeMs}:${s.size}:${s.ino}`;
+    } catch {
+      return null;
+    }
+  };
+  const compare = async () => {
+    for (const [file, open] of streams) {
+      const now = await version(file);
+      if (now === null || now === seen.get(file)) continue;
+      seen.set(file, now);
+      for (const res of open) if (!res.writableEnded) res.write("event: changed\ndata: changed\n\n");
+    }
+  };
+  const run2 = async () => {
+    timer = null;
+    if (running) {
+      again = true;
+      return;
+    }
+    running = true;
+    try {
+      do {
+        again = false;
+        await compare();
+      } while (again);
+    } catch {
+    } finally {
+      running = false;
+    }
+  };
+  const settle2 = () => {
+    clearTimeout(timer);
+    timer = setTimeout(run2, SETTLE_MS);
+  };
+  const startWatching = () => {
+    if (watcher) return;
+    try {
+      watcher = watch(join10(home, "pages"), settle2);
+    } catch {
+      return;
+    }
+    watcher.on("error", stopWatching);
+  };
+  function stopWatching() {
+    clearTimeout(timer);
+    timer = null;
+    watcher?.close();
+    watcher = null;
+  }
+  return {
+    // The headers go out only after the page's version is recorded, so a change right after the stream opens is not missed.
+    async open(file, res, headers) {
+      startWatching();
+      opening += 1;
+      let now;
+      try {
+        now = await version(file);
+      } finally {
+        opening -= 1;
+      }
+      if (res.destroyed) return stopIfIdle();
+      if (!streams.has(file)) {
+        streams.set(file, /* @__PURE__ */ new Set());
+        seen.set(file, now);
+      }
+      streams.get(file).add(res);
+      res.on("close", () => {
+        const open = streams.get(file);
+        open?.delete(res);
+        if (open?.size === 0) {
+          streams.delete(file);
+          seen.delete(file);
+        }
+        stopIfIdle();
+      });
+      res.writeHead(200, headers);
+      res.write(": open\n\n");
+    },
+    close() {
+      stopWatching();
+      for (const open of streams.values()) for (const res of open) res.end();
+      streams.clear();
+    }
+  };
+}
+async function openEvents(req, res, home, file, live) {
+  if (req.method !== "GET") {
+    res.setHeader("Allow", "GET");
+    return reply(req, res, 405, "text/plain; charset=utf-8", "Method not allowed\n");
+  }
+  const { origin, "sec-fetch-dest": dest } = req.headers;
+  if (origin !== void 0 && origin !== "null" || dest !== void 0 && dest !== "empty") return notFound(req, res);
+  if (!await resolvePage(home, "pages", file)) return notFound(req, res);
+  return live.open(file, res, { ...HEADERS, "Content-Type": "text/event-stream; charset=utf-8", "Access-Control-Allow-Origin": "null" });
+}
+function handler(home, secret, allowedHosts, live) {
   return async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
@@ -9909,7 +10841,8 @@ function handler(home, secret, allowedHosts) {
       const parts = req.url.split(/[?#]/)[0].split("/");
       if (parts.length !== 4 || parts[0] !== "") return notFound(req, res);
       const [, prefix, token, raw] = parts;
-      const dir = Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
+      const events = prefix === EVENTS;
+      const dir = events ? "pages" : Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
       if (!dir || !token || !raw) return notFound(req, res);
       let file;
       try {
@@ -9918,12 +10851,14 @@ function handler(home, secret, allowedHosts) {
         return notFound(req, res);
       }
       if (!validFileName(file) || !tokenMatches(secret, dir, file, token)) return notFound(req, res);
+      if (events) return await openEvents(req, res, home, file, live);
       const dest = req.headers["sec-fetch-dest"];
       if (dest !== void 0 && dest !== "document") return notFound(req, res);
       const real = await resolvePage(home, dir, file);
       if (!real) return notFound(req, res);
       const html = await readFile(real);
-      const body = LOOPBACK_HOST.test(req.headers.host) ? html : withoutUpdateNotice(html.toString("utf8"));
+      const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString("utf8") : withoutUpdateNotice(html.toString("utf8"));
+      const body = dir === "pages" ? withLiveReload(page, eventLink({ secret }, file)) : page;
       return reply(req, res, 200, "text/html; charset=utf-8", body);
     } catch {
       return notFound(req, res);
@@ -9952,7 +10887,8 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const running = readServeInfo(home);
   if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   const secret = randomBytes(32).toString("hex");
-  const server = createServer(handler(home, secret, allowedHosts));
+  const live = liveStreams(home);
+  const server = createServer(handler(home, secret, allowedHosts, live));
   await new Promise((done, fail) => {
     server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : e));
     server.listen(port, lan ? LAN_BIND : HOST, done);
@@ -9970,6 +10906,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const close = () => {
     closed ??= new Promise((done) => {
       removeInfo(home, secret);
+      live.close();
       server.close(() => done());
       server.closeAllConnections();
     });
@@ -10012,11 +10949,11 @@ var MAX_LISTED_WARNINGS = 20;
 var USAGE = `Answer me with HTML ${VERSION} \u2014 renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--replace <page>] [--no-open] [--theme ${["auto", ...themeNames("page")].join("|")}]
+  am render <file|->  [-o <file>] [--replace <page>] [--no-open] [--theme ${["auto", ...themeNames("page")].join("|")}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme \u2026] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
@@ -10030,6 +10967,7 @@ Usage:
   am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
+- -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
 - A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
@@ -10077,7 +11015,7 @@ var IMAGE_HELP = `Images: a screenshot, photo or render that already exists as a
 - Put the image alone on its line; the alt text becomes its caption, so write what the picture shows (the STE check reads it).
 - Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
-- http(s) URLs and data: URIs are left as they are. A URL needs the network when the page is opened.
+- Remote images do not load: the page blocks every remote request, so an http(s) or // URL shows nothing and the render warns about it. Save the image and use its local path. data: URIs work.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
 - Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
 var CODE_HELP = `Code blocks: real code from a file, or code you type
@@ -10275,6 +11213,10 @@ async function readStream(stream) {
   for await (const chunk of stream) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   return Buffer.concat(chunks).toString("utf8");
 }
+function oldNodeHint(version = process.version) {
+  if (Number(version.slice(1).split(".")[0]) >= 20) return "";
+  return `Answer me with HTML needs Node.js 20 or newer (found ${version}). Update Node.js: https://nodejs.org/`;
+}
 function shouldOpen(opts, env, config) {
   if (opts.open) return true;
   if (opts["no-open"]) return false;
@@ -10299,7 +11241,9 @@ async function cmdRender(src, opts, ctx, baseDir) {
     return reportError(e, fail);
   }
   const file = outputPath("pages", result.meta.title, opts, ctx);
+  if (!file) return 2;
   emit(result, file, ctx);
+  if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
   if (replaced && replaced !== resolve4(file)) rmSync7(replaced, { force: true });
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
@@ -10334,7 +11278,7 @@ am theme add <name> [--use] [--force]
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
 am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
 am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again
-- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.6.0 or newer; before that, save the file by hand (see the catalog page).
+- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.5.3 or newer; before that, save the file by hand (see the catalog page).
 
 Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
 
@@ -10363,13 +11307,17 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   Target these classes (they stay stable): ${THEME_SELECTORS.join(" ")}.
   Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
   am theme check warns about them; the catalog and am theme add reject them.
+- Diagram tokens (optional): node-fill node-stroke node-width node-radius node-shadow node-text, hi-fill hi-stroke hi-text, edge-color edge-width edge-label, actor-fill actor-stroke actor-text, note-fill note-stroke note-width note-radius, cluster-fill cluster-stroke, lifeline-color (each with a -- prefix).
+  They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. Widths and radii are a number or px / em (a bare number is px);
+  --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
-- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1).
-- Warns about external resources in css and video.css (url() or image-set() to http(s) or //, @import, @font-face, backslash escapes).
+- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1),
+  and diagram text on its fill (node, highlighted node, actor, note, edge label) when the theme sets a diagram token for it. A width, radius or shadow token with a bad value is an error.
+- Warns about external resources in css, video.css and token values (url() or image-set() to http(s) or //, @import, @font-face, backslash escapes).
 - Exits with 1 when there is an error. Without errors it renders two specimen pages (light, dark) with every component.`;
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const { fail, io } = ctx;
@@ -10446,10 +11394,12 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   return finish(file, opts, config, ctx);
 }
 async function cmdVideo(src, opts, ctx) {
-  const { fail } = ctx;
+  const { fail, print } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
   if (!validVoice(voice, fail)) return 2;
+  let file = opts.out ? outputPath("videos", "", opts, ctx) : null;
+  if (opts.out && !file) return 2;
   let result;
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
@@ -10458,8 +11408,10 @@ async function cmdVideo(src, opts, ctx) {
     fail(`\u2717 Voice-over failed: ${e.message}. Add --voice off for captions only`);
     return 1;
   }
-  const file = outputPath("videos", result.meta.title, opts, ctx);
+  file ??= outputPath("videos", result.meta.title, opts, ctx);
+  if (!file) return 2;
   emit(result, file, ctx);
+  if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
   for (const format of ["mp4", "webm"]) {
     if (opts[format] && !await exportVideo(file, result.wav, format, ctx)) return 1;
   }
@@ -10513,15 +11465,30 @@ function loadConfig({ fail, env, themes: themes2 }) {
 function themeWarnings({ fail, themes: themes2 }) {
   themes2.warnings.forEach((w) => fail(`! ${w}`));
 }
-function outputPath(dir, title, opts, { env, io }) {
-  if (opts.out) return resolve4(io.cwd ?? process.cwd(), opts.out);
+function outputPath(dir, title, opts, { env, io, fail }) {
+  if (opts.out) {
+    const file = resolve4(io.cwd ?? process.cwd(), opts.out);
+    if (statSync4(file, { throwIfNoEntry: false })?.isDirectory()) {
+      fail("\u2717 -o names a folder; give a file path, for example -o page.html");
+      return null;
+    }
+    return file;
+  }
   return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
-  if (resolve4(file).startsWith(home + sep3)) ensureHome(home);
+  const path = resolve4(file);
+  if (path.startsWith(home + sep4)) ensureHome(home);
   mkdirSync4(dirname3(file), { recursive: true });
-  writeFileSync7(file, html);
+  if (!path.startsWith(join11(home, "pages") + sep4)) return writeFileSync7(file, html);
+  const tmp = join11(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
+  try {
+    writeFileSync7(tmp, html);
+    renameOver(tmp, file);
+  } finally {
+    rmSync7(tmp, { force: true });
+  }
 }
 function emit(result, file, { print, env }, note2 = "") {
   writePage(file, result.html, env);
@@ -10543,11 +11510,11 @@ function emit(result, file, { print, env }, note2 = "") {
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  diagram ${count(notes.length, "warning")} (the page is written; fix the draft if that is not what you meant):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function printHtmlWarnings(notes = [], print) {
-  const lines = [...new Set(notes.toSorted((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
+  const lines = [...new Set([...notes].sort((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
   if (!lines.length) return;
   print(`  html ${count(lines.length, "warning")} (the page differs from the draft here; fix the draft if that is not what you meant):`);
   lines.slice(0, MAX_LISTED_WARNINGS).forEach((l3) => print(`  ${l3}`));
@@ -10556,7 +11523,7 @@ function printHtmlWarnings(notes = [], print) {
 function printMathWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  math ${count(notes.length, "warning")} (the page is written; fix the TeX and render again):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function summaryLine(result) {
@@ -10804,6 +11771,9 @@ main(process.argv.slice(2), { background: true, scriptPath: process.argv[1] }).t
   },
   (err) => {
     process.stderr.write(`\u2717 Internal error: ${err.stack || err}
+`);
+    const hint = oldNodeHint();
+    if (hint) process.stderr.write(`  ${hint}
 `);
     process.exitCode = 1;
   }

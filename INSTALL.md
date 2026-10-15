@@ -2,7 +2,7 @@
 
 > This file is written for the AI agent that installs the project. A person can follow it too.
 
-I want you to install Answer me with HTML for me. Execute all the steps below autonomously. Do not ask me anything. Decide each point yourself with the defaults here, and tell me what you did in one report at the end.
+I want you to install Answer me with HTML for me. Execute all the steps below autonomously. Do not ask me anything, except once in Step 1 if Node.js is missing or older than 20. Decide each point yourself with the defaults here, and tell me what you did in one report at the end.
 
 OBJECTIVE: the skill is installed for the agent you are running in, and `am` can render a page.
 
@@ -10,7 +10,7 @@ DONE WHEN: `node <skill dir>/scripts/am.mjs --version` prints a version number, 
 
 ## Rules
 
-- Do not ask me questions. The only reason to stop is Step 1 (Node.js is missing or too old), because nothing else can work without it.
+- Do not ask me questions. The only exception is Step 1: if Node.js is missing or too old, ask me once whether to install it, because nothing else can work without it.
 - Run only the commands in this file. Do not clone the repository or build anything. The CLI is already bundled in the skill.
 - Install **one** way per agent. A skill and a plugin with the same name load twice and their instructions conflict.
 - Never remove or overwrite an existing install. If one exists, keep it (Step 2).
@@ -19,7 +19,7 @@ DONE WHEN: `node <skill dir>/scripts/am.mjs --version` prints a version number, 
 
 ## TODO
 
-- [ ] Check Node.js 20 or newer
+- [ ] Check Node.js 20 or newer (offer to install it if missing or older)
 - [ ] Check whether it is already installed
 - [ ] Install: plugin for Claude Code, skill for every other agent
 - [ ] Check that it works
@@ -31,7 +31,18 @@ DONE WHEN: `node <skill dir>/scripts/am.mjs --version` prints a version number, 
 node --version
 ```
 
-You need v20 or newer. If it is older or missing, stop here and tell me in one sentence. Do not install Node.js yourself.
+You need v20 or newer. If it is, go to Step 2.
+
+If it is older or missing, show me the exact command for my system below and ask me once whether to run it. For nvm, also tell me that it adds lines to my shell profile.
+
+| System | Command |
+| :--- | :--- |
+| macOS with Homebrew | `brew install node` |
+| Windows | `winget install OpenJS.NodeJS.LTS` |
+| Linux, or macOS without Homebrew | `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.8/install.sh \| bash`, then `. ~/.nvm/nvm.sh && nvm install --lts` |
+
+- I agree: run the command, then run `node --version` again. If the shell does not find the new `node`, run `. ~/.nvm/nvm.sh` first, here and before `node` in later steps (nvm), or use `"C:\Program Files\nodejs\node.exe"` (Windows). If it still fails, stop and tell me what happened.
+- I say no: stop here and tell me in one sentence, with the link https://nodejs.org/.
 
 ## Step 2: Check for an existing install
 
@@ -116,7 +127,7 @@ Send one message. Keep it to these lines:
 | `Unknown command: /answer-me-with-html:config` | The plugin is not installed. Use `/answer-me-with-html config`. |
 | The skill is not found after install | Start a new session. In Claude Code, run `/reload-plugins`. |
 | The same instructions appear twice | The skill and the plugin are both installed. Report it; do not remove either. |
-| `node: command not found`, or Node older than 20 | Stop at Step 1 and report it. |
+| `node: command not found`, or Node older than 20 | Go back to Step 1 and offer to install it. |
 | `npx` cannot reach the network | Report it, with the "Manual install" link from the README. |
 
-EXECUTE NOW: complete the TODO list above to achieve: `am --version` prints a version number and the agent can see the skill. Do not ask me anything; send the final report.
+EXECUTE NOW: complete the TODO list above to achieve: `am --version` prints a version number and the agent can see the skill. Do not ask me anything except the Node.js question in Step 1; send the final report.

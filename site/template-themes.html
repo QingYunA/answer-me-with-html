@@ -3,23 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{c_meta_title}}</title>
-<meta name="description" content="{{c_meta_desc}}">
+<title>{{th_meta_title}}</title>
+<meta name="description" content="{{th_meta_desc}}">
 <link rel="canonical" href="{{CANONICAL}}">
 <link rel="alternate" hreflang="en" href="{{SITE_URL}}themes/">
 <link rel="alternate" hreflang="zh-CN" href="{{SITE_URL}}zh/themes/">
 <link rel="alternate" hreflang="x-default" href="{{SITE_URL}}themes/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Answer me with HTML">
-<meta property="og:title" content="{{c_meta_title}}">
-<meta property="og:description" content="{{c_meta_desc}}">
+<meta property="og:title" content="{{th_meta_title}}">
+<meta property="og:description" content="{{th_meta_desc}}">
 <meta property="og:url" content="{{CANONICAL}}">
 <meta property="og:locale" content="{{og_locale}}">
 <meta property="og:image" content="{{SITE_URL}}images/{{og_image}}">
 <meta property="og:image:alt" content="{{og_image_alt}}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{c_meta_title}}">
-<meta name="twitter:description" content="{{c_meta_desc}}">
+<meta name="twitter:title" content="{{th_meta_title}}">
+<meta name="twitter:description" content="{{th_meta_desc}}">
 <meta name="twitter:image" content="{{SITE_URL}}images/{{og_image}}">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
@@ -52,15 +52,17 @@
 <section class="sheet" aria-labelledby="c-title">
   <header class="sheet-head">
     <span class="sheet-id" aria-hidden="true">T</span>
-    <h1 id="c-title">{{c_title}}</h1>
+    <h1 id="c-title">{{th_title}}</h1>
   </header>
-  <p class="sheet-lede">{{c_lede}}</p>
-  <div class="catalog">
-  {{THEME_CARDS}}
-  </div>
-  <aside class="always catalog-submit" aria-labelledby="c-submit-t">
-    <div class="col-head"><span class="mono">{{c_submit_k}}</span><h3 id="c-submit-t">{{c_submit_t}}</h3></div>
-    <p>{{c_submit_d}}</p>
+  <p class="sheet-lede">{{th_lede}}</p>
+  <p class="catalog-cta"><a class="btn btn-primary btn-sm" href="#make">{{th_submit_cta}}</a></p>
+  {{THEME_WALL}}
+  <aside class="always catalog-submit" id="make" aria-labelledby="c-submit-t">
+    <div class="col-head"><span class="mono">{{th_submit_k}}</span><h3 id="c-submit-t">{{th_submit_t}}</h3></div>
+    <p class="tinstall-lead">{{th_make_lead}}</p>
+    <div class="copybox prompt"><pre id="c-make">{{th_make_prompt}}</pre></div>
+    <button type="button" class="btn btn-primary catalog-make-copy" data-copy="c-make" data-done="{{copied}}">{{th_copy_agent}}</button>
+    <p class="fine">{{th_submit_d}}</p>
   </aside>
 </section>
 

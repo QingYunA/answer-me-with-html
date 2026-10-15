@@ -21,6 +21,8 @@ if (replyBtn) {
   const boxes = new Map();
   // The bar is built below with the sheet; the handlers that change the counts only call this.
   let refreshBar = () => {};
+  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.
+  let stuck = null;
 
   const load = () => {
     try {
@@ -128,7 +130,11 @@ if (replyBtn) {
 
   // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary
   // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.
+  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the
+  // button says what to do instead of showing the "Copied ✓" label the reader cannot trust.
   const copyText = async (str, btn) => {
+    stuck?.remove();
+    stuck = null;
     try {
       await navigator.clipboard.writeText(str);
       // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.
@@ -136,9 +142,23 @@ if (replyBtn) {
     } catch {
       const tmp = Object.assign(document.createElement('textarea'), { value: str });
       tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';
-      document.body.append(tmp);
+      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea
+      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.
+      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.
+      (sheet.open ? sheet : document.body).append(tmp);
       tmp.select();
-      document.execCommand('copy');
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch {
+        copied = false;
+      }
+      if (!copied) {
+        stuck = tmp;
+        btn.textContent = ui.copyFailed;
+        setTimeout(() => { btn.textContent = ui.copy; }, 3000);
+        return;
+      }
       tmp.remove();
     }
     btn.textContent = ui.done;
@@ -160,6 +180,8 @@ if (replyBtn) {
   };
   replyBtn.addEventListener('click', open);
   close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));
+  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.
+  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });
   copy.addEventListener('click', () => copyText(text.value, copy));
 
   const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });

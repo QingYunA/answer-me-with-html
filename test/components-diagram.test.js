@@ -325,7 +325,7 @@ test('er: a box fits its widest field at the size the field renders, and a highl
   // 11px of padding on each side, then the 12px gap the FK/UK marker leaves; the fields render at 12px because the size
   // is set in the style attribute, which the stylesheet cannot override.
   const fits = (width, bold) => 11 + measure('shipping_address_reference', 12, { bold }) + 12 + measure('UK', 11, { mono: true, bold }) <= width - 11;
-  assert.match(svg, /class="am-er-field" style="font-size:12px"/);
+  assert.match(svg, /class="am-er-field am-node-text" style="font-size:12px"/);
   assert.ok(fits(boxes[0], true), 'the highlighted entity is measured with bold text');
   assert.ok(fits(boxes[1], false));
   assert.ok(boxes[0] > boxes[1], 'bold text needs a wider box');

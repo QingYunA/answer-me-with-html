@@ -71,7 +71,7 @@ token 数存在 [bench/corpus/tokens.json](bench/corpus/tokens.json) 里，运�
 
 ## 安装
 
-需要本机装有 [Node.js](https://nodejs.org/) 20 或更高版本。不需要 `npm install`，CLI 已经打包在 skill 里了。
+需要本机装有 [Node.js](https://nodejs.org/) 20 或更高版本。不需要 `npm install`，CLI 已经打包在 skill 里了。还没装 Node.js？用下面推荐的方式安装，Agent 会先问你，再替你装好。
 
 ### 让 Agent 帮你装（推荐）
 
@@ -79,7 +79,7 @@ token 数存在 [bench/corpus/tokens.json](bench/corpus/tokens.json) 里，运�
 
 > 帮我安装 Answer me with HTML：读 https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/INSTALL.md，照着做。
 
-[INSTALL.md](INSTALL.md) 是写给 Agent 看的。它在 Claude Code 里装插件，在其他 Agent 里装 skill，已有安装会保留，全程不向你提问，用"TCP 三次握手"页面验证后给你一份汇报。如果你的 Agent 打不开链接，用 `npx -y skills add QingYunA/answer-me-with-html -g -y -a <你的 Agent 名>`（Claude Code 是 `-a claude-code`）。
+[INSTALL.md](INSTALL.md) 是写给 Agent 看的。它在 Claude Code 里装插件，在其他 Agent 里装 skill，已有安装会保留，除非缺少 Node.js 或版本低于 20，否则全程不向你提问，用"TCP 三次握手"页面验证后给你一份汇报。如果你的 Agent 打不开链接，用 `npx -y skills add QingYunA/answer-me-with-html -g -y -a <你的 Agent 名>`（Claude Code 是 `-a claude-code`）。
 
 ### Claude Code 插件
 
@@ -186,7 +186,7 @@ Server -> Client: SYN-ACK
 
 ## 更新与清理
 
-需要手动更新。Agent 每周向 GitHub 查一次最新版本号，有新版本就告诉你，不会上传任何内容。想更新，对 Agent 说"更新一下 answer-me-with-html"。页面会堆在 `~/.answer-me-with-html/` 里，说"清理一下页面"，Agent 会先问你再删。其他安装方式和全部选项见[参考](docs/reference.zh-CN.md#更新与清理)。
+需要手动更新。使用时，CLI 最多每天在后台向 GitHub 查一次新版本；有新版本时，最多每三天向 Agent 提示一次，不会上传任何内容。想更新，对 Agent 说"更新一下 answer-me-with-html"。页面会堆在 `~/.answer-me-with-html/` 里，说"清理一下页面"，Agent 会先问你再删。其他安装方式和全部选项见[参考](docs/reference.zh-CN.md#更新与清理)。
 
 ## 为什么做这个
 

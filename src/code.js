@@ -3,7 +3,7 @@
 // A ```diff fence is a diff block: the model pastes a unified diff and src/diff.js draws it (red and green lines, old and new numbers, a +N −N stat).
 // The page keeps the path and lines in data-am-src / data-am-lines; `am patch` reads the code back when the file has moved.
 
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { parseAttrs } from './parse.js';
 import { esc } from './svg/text.js';
@@ -28,9 +28,9 @@ const SECRET_FILE = new RegExp([
   '\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$',
 ].join('|'), 'i');
 // Folders that hold keys, logins or a repository's internals; nothing inside them is quoted.
-const SECRET_DIR = new Set(['.git', '.ssh', '.aws', '.azure', '.gnupg', '.kube', '.docker', '.password-store']);
-// Text that looks like a private key, a token or a password. A file with one anywhere is not quoted at all.
-const SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
+export const SECRET_DIR = new Set(['.git', '.ssh', '.aws', '.azure', '.gnupg', '.kube', '.docker', '.password-store']);
+// Text that looks like a private key, a token, a password or a URL with a password in it (://user:password@host). A file with one anywhere is not quoted at all.
+export const SECRET_TEXT = /:\/\/[^\s:@/"'`$<>{}]*:[^\s@/"'`$<>{}]+@|sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 
 export class CodeError extends Error {
   constructor(message, line = 0, example = CODE_EXAMPLE) {
@@ -79,12 +79,28 @@ function localPath(ref, baseDir) {
   return rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
 }
 
+// Refuse a secret file or a file inside a secret folder. rel is the path under baseDir; via says how the draft reached the file.
+function assertNotSecret(ref, rel, via) {
+  if (SECRET_FILE.test(basename(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+    throw new CodeError(`"${ref}" ${via ? 'points to' : 'is'} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  }
+}
+
 // The lines the block quotes, from the file. null when the file does not exist or is outside baseDir.
+// A link is followed first, so the checks run on the file that is read and not on the name the draft gives it.
 function readSlice(ref, range, baseDir) {
-  const path = localPath(ref, baseDir);
-  if (!path) return null;
-  if (SECRET_FILE.test(basename(path)) || relative(baseDir, path).split(sep).some((part) => SECRET_DIR.has(part))) {
-    throw new CodeError(`"${ref}" is a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  const written = localPath(ref, baseDir);
+  if (!written) return null;
+  assertNotSecret(ref, relative(baseDir, written), false);
+  let path;
+  try {
+    path = realpathSync(written);
+    const root = realpathSync(baseDir);
+    if (!localPath(path, root)) throw new CodeError(`Code file "${ref}" is a link to a file outside the current folder ${baseDir}; only files inside it are quoted`);
+    assertNotSecret(ref, relative(root, path), true);
+  } catch (err) {
+    if (err instanceof CodeError) throw err;
+    return null;
   }
   let size;
   try {

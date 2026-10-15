@@ -6,7 +6,7 @@
     "ja": "ポップアート",
     "he": "פופ ארט"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Answer me with HTML",
   "license": "MIT",
   "description": {
@@ -22,7 +22,14 @@
       "--shadow": "4px 4px 0 var(--pop-magenta), 7px 7px 0 var(--line)",
       "--pop-magenta": "#ec008c",
       "--pop-yellow": "#ffe600",
-      "--pop-dots": "rgba(0, 174, 239, 0.18)"
+      "--pop-dots": "rgba(0, 174, 239, 0.18)",
+      "--node-width": "2.5px",
+      "--node-shadow": "drop-shadow(3px 3px 0 var(--pop-magenta))",
+      "--edge-width": "2.2",
+      "--note-width": "2px",
+      "--note-radius": "10px",
+      "--lifeline-color": "var(--line)",
+      "--cluster-stroke": "#00aeef"
     },
     "light": {
       "--bg": "#ffffff",
@@ -44,7 +51,17 @@
       "--head-bg": "#00aeef",
       "--head-fg": "#111111",
       "--pop-title-fg": "var(--ink)",
-      "--pop-title-shadow": "var(--pop-yellow)"
+      "--pop-title-shadow": "var(--pop-yellow)",
+      "--edge-color": "#0091c7",
+      "--hi-fill": "#ffe600",
+      "--hi-stroke": "#111111",
+      "--hi-text": "#111111",
+      "--actor-fill": "#00aeef",
+      "--actor-stroke": "#111111",
+      "--actor-text": "#111111",
+      "--note-fill": "#ffe600",
+      "--note-stroke": "#111111",
+      "--cluster-fill": "#e6f6fd"
     },
     "dark": {
       "--bg": "#111114",
@@ -66,7 +83,17 @@
       "--head-bg": "#00aeef",
       "--head-fg": "#111111",
       "--pop-title-fg": "var(--pop-yellow)",
-      "--pop-title-shadow": "var(--pop-magenta)"
+      "--pop-title-shadow": "var(--pop-magenta)",
+      "--edge-color": "#00aeef",
+      "--hi-fill": "#ffe600",
+      "--hi-stroke": "#f2f2f2",
+      "--hi-text": "#111111",
+      "--actor-fill": "#00aeef",
+      "--actor-stroke": "#f2f2f2",
+      "--actor-text": "#111111",
+      "--note-fill": "#4d4200",
+      "--note-stroke": "#ffe600",
+      "--cluster-fill": "#10303f"
     }
   },
   "css": "& .am-head h1 { font-family: var(--head-font); font-weight: 800; font-size: 34px; letter-spacing: 0.01em; text-transform: uppercase; }\n& .am-panel-head h2 { font-family: var(--head-font); font-weight: 800; font-size: 16px; letter-spacing: 0.03em; text-transform: uppercase; }\n& .am-panel-id { font-family: var(--head-font); font-weight: 800; }\n@media (max-width: 760px) {\n  & .am-head h1 { font-size: 27px; }\n}\n& body { background-image: radial-gradient(var(--pop-dots) 1.3px, transparent 1.5px); background-size: 8px 8px; }\n& .am-head h1 { color: var(--pop-title-fg); text-shadow: 3px 3px 0 var(--pop-title-shadow); }\n& .am-panel-head { background: var(--head-bg); color: var(--head-fg); }\n& .am-panel-id { background: var(--pop-yellow); color: var(--head-fg); }\n& .am-panel-meta { color: var(--head-fg); }\n& .am-panel-head .am-comment-btn { color: var(--head-fg); }\n& .am-panel:hover .am-panel-head .am-comment-btn { border-color: color-mix(in srgb, var(--head-fg) 55%, transparent); }\n& .am-panel-head .am-comment-btn:hover, & .am-panel-head .am-comment-btn:focus-visible, & .am-panel-head .am-comment-btn[aria-expanded=\"true\"], & .am-panel-head .am-comment-btn.am-comment-btn--on { color: var(--head-fg); border-color: var(--head-fg); }"

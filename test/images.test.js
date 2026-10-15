@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { renderDoc, RenderError } from '../src/render.js';
@@ -202,4 +202,160 @@ test('cli help image: prints the syntax', async () => {
   const r = await run(['help', 'image']);
   assert.equal(r.code, 0);
   assert.match(r.out, /!\[What the picture shows\]/);
+});
+
+// The file is checked, not only its name: link target, folder, and the first bytes against the extension.
+const canSymlink = (() => {
+  const probe = mkdtempSync(join(tmpdir(), 'am-images-probe-'));
+  try {
+    symlinkSync(probe, join(probe, 'l'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+})();
+const skipLinks = canSymlink ? false : 'cannot create symlinks here (Windows needs privileges)';
+
+const pad = (head) => Buffer.concat([head, Buffer.alloc(16)]);
+const HEADERS = {
+  png: PNG,
+  jpg: pad(Buffer.from([0xff, 0xd8, 0xff, 0xe0])),
+  jpeg: pad(Buffer.from([0xff, 0xd8, 0xff, 0xdb])),
+  gif: pad(Buffer.from('GIF89a')),
+  webp: pad(Buffer.concat([Buffer.from('RIFF'), Buffer.from([4, 0, 0, 0]), Buffer.from('WEBPVP8 ')])),
+  avif: pad(Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypavif')])),
+  svg: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'),
+};
+const embedded = (path, base = dir) => renderDoc(draft(`![x](${path})`), {}, {}, { baseDir: base }).html;
+const imageError = (path, base = dir) => {
+  try {
+    embedded(path, base);
+  } catch (err) {
+    return err;
+  }
+  return null;
+};
+
+test('image: every supported type is accepted when its first bytes match', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-types-'));
+  try {
+    for (const [ext, bytes] of Object.entries(HEADERS)) {
+      writeFileSync(join(folder, `a.${ext}`), bytes);
+      assert.ok(embedded(`a.${ext}`, folder).includes(bytes.toString('base64')), ext);
+    }
+    writeFileSync(join(folder, 'b.gif'), pad(Buffer.from('GIF87a')));
+    writeFileSync(join(folder, 'c.avif'), pad(Buffer.concat([Buffer.from([0, 0, 0, 0x1c]), Buffer.from('ftypavis')])));
+    assert.ok(embedded('b.gif', folder).includes('data:image/gif'));
+    assert.ok(embedded('c.avif', folder).includes('data:image/avif'));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: an SVG may start with a BOM, an XML declaration, comments, whitespace and a doctype', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-svg-'));
+  try {
+    const prefix = '﻿<?xml version="1.0"?>\n<!-- made by hand -->\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n  ';
+    writeFileSync(join(folder, 'a.svg'), `${prefix}<svg viewBox="0 0 1 1"></svg>`);
+    assert.ok(embedded('a.svg', folder).includes('data:image/svg+xml'));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: a file whose content is not what its extension says is refused', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-fake-'));
+  try {
+    writeFileSync(join(folder, 'text.png'), 'API_KEY=abc\n');
+    writeFileSync(join(folder, 'gif-as.png'), HEADERS.gif);
+    writeFileSync(join(folder, 'png-as.jpg'), PNG);
+    writeFileSync(join(folder, 'html.svg'), '<html><body></body></html>');
+    writeFileSync(join(folder, 'empty.webp'), '');
+    for (const name of ['text.png', 'gif-as.png', 'png-as.jpg', 'html.svg', 'empty.webp']) {
+      const err = imageError(name, folder);
+      assert.ok(err instanceof RenderError && err.component === 'image', name);
+      assert.match(err.message, new RegExp(`"${name}" is named \\.${name.split('.')[1]} but its content is not`), name);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: an SVG that holds a key is refused', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-svgkey-'));
+  try {
+    writeFileSync(join(folder, 'k.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><text>AKIAABCDEFGHIJKLMNOP</text></svg>');
+    assert.match(imageError('k.svg', folder).message, /"k\.svg" looks like it holds a key or a token/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: a real PNG inside a folder that holds keys is refused', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-dir-'));
+  try {
+    mkdirSync(join(folder, '.ssh'));
+    writeFileSync(join(folder, '.ssh', 'shot.png'), PNG);
+    // Forward slashes: in Markdown, the \. of a Windows path is an escaped dot, so the backslash would be lost.
+    const abs = join(folder, '.ssh', 'shot.png').replaceAll('\\', '/');
+    for (const path of [abs, '.ssh/shot.png']) {
+      const err = imageError(path, folder);
+      assert.ok(err instanceof RenderError, path);
+      assert.match(err.message, /is in a folder that holds keys or logins/, path);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: a symlink to a file that is not an image is refused, and one to a real image works', { skip: skipLinks }, () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-links-'));
+  try {
+    writeFileSync(join(folder, 'key.txt'), '-----BEGIN OPENSSH PRIVATE KEY-----\n');
+    symlinkSync('key.txt', join(folder, 'shot.png'));
+    assert.match(imageError('shot.png', folder).message, /"shot\.png" is named \.png but its content is not/);
+    writeFileSync(join(folder, 'real.png'), PNG);
+    symlinkSync('real.png', join(folder, 'alias.png'));
+    assert.ok(embedded('alias.png', folder).includes(DATA_URI));
+    assert.ok(embedded(join(folder, 'alias.png'), folder).includes(DATA_URI));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: a link into a folder that holds keys is refused, even when the link itself sits in a normal folder', { skip: skipLinks }, () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-dirlink-'));
+  try {
+    mkdirSync(join(folder, '.aws'));
+    writeFileSync(join(folder, '.aws', 'shot.png'), PNG);
+    symlinkSync('.aws/shot.png', join(folder, 'shot.png'));
+    symlinkSync('.aws', join(folder, 'pics'), 'dir');
+    for (const name of ['shot.png', 'pics/shot.png']) {
+      assert.match(imageError(name, folder).message, /is in a folder that holds keys or logins/, name);
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: an absolute path outside the project stays allowed', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-abs-'));
+  try {
+    writeFileSync(join(folder, 'shot.png'), PNG);
+    assert.ok(embedded(join(folder, 'shot.png'), dir).includes(DATA_URI));
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('image: a dangling symlink is "not found"', { skip: skipLinks }, () => {
+  const folder = mkdtempSync(join(tmpdir(), 'am-images-dangling-'));
+  try {
+    symlinkSync('nowhere.png', join(folder, 'gone.png'));
+    assert.match(imageError('gone.png', folder).message, /Image not found/);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });

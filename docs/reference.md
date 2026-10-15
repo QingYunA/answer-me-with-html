@@ -25,7 +25,7 @@ A -> B: label
 
 - Every `## ` heading is a panel. The letters A, B, C are optional and added for you.
 - `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. `span` is a hint: the page sizes each panel to its content, so wide tables and diagrams need no `span`. Write `span` only for a panel that must stand out. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the justified layout in a browser ignores it.
-- When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup.
+- When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup. The page carries a Content-Security-Policy, so a script or an inline event handler in the block does not run and nothing loads from the network.
 - A placeholder such as `<host>` is shown as text. Inside a sentence only text-level tags stay (`b`, `kbd`, `sup`, `a`, `span`, `br`, `img` ...), and tags that break the page (`script`, `style`, `iframe` ...) are shown as text too. Put raw markup in an `html` or `svg` block and code in backticks. The render lists every tag it changed.
 
 Full syntax for a component: `am help <component>`.
@@ -97,7 +97,7 @@ For something a diagram cannot show, such as a real screen, use an image that al
 - Put the image alone on its line. The alt text becomes its caption, so write what the picture shows. The writing check reads it.
 - Use the absolute path. A relative path is read from the draft file's folder, or from the current folder when the draft comes from stdin. A space in the path is fine.
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, so the page stays one file that opens offline. A wide image scales down to its panel.
-- `http(s)` URLs and `data:` URIs are left as they are. A URL needs the network when the page is opened.
+- Remote images do not load: the page blocks every remote request, so an `http(s)` or `//` URL shows nothing, and the render warns about it. Save the image and use its local path. `data:` URIs work.
 - The page keeps the path of each image. `am patch` embeds the image again from the file, or from the page when the file has moved.
 - The tool does not generate images.
 
@@ -152,7 +152,7 @@ A -> B: hello
 AM_EOF
 ````
 
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
+Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
 
 ## Languages
 
@@ -222,9 +222,29 @@ The classes your `css` may target stay stable: a later version keeps every one o
 | Drawing frame | `.am-frame`, `.am-ruler` |
 | Comment button | `.am-comment-btn`, `.am-comment-btn--on` |
 
+### Diagram tokens
+
+A theme restyles what is inside a diagram (flow, sequence, er, and the boxes of a tree) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+
+| Part | Tokens | Default |
+| :--- | :--- | :--- |
+| Node (flow, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
+| Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
+| Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |
+| Sequence note | `--note-fill`, `--note-stroke`, `--note-width`, `--note-radius` | `--warn-bg`, `--warn`, 1, 2px |
+| Group box (flow) | `--cluster-fill`, `--cluster-stroke` | `--fill`, `--line-2` |
+| Lifeline | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`, `--edge-width`, `--node-radius`, `--note-width` and `--note-radius` take a number or a `px` or `em` value (a bare number means px). `--node-radius` also rounds actors and does not change the pill and diamond shapes. `--node-shadow` is `none` or one or more `drop-shadow(...)`, for example `drop-shadow(3px 3px 0 #111111)`, and also casts the shadow of actors. Any other value is an error, and the theme is skipped.
+- Colors are any CSS color. In light and dark mode `am theme check` reads these pairs and needs 4.5:1, only when the theme sets one side: `--node-text` on `--node-fill`, `--hi-text` on `--hi-fill`, `--actor-text` on `--actor-fill`, `--ink` on `--note-fill`, and `--edge-label` on `--paper`. Dark mode keeps the light value of a token it does not set, so set both.
+- A token value goes through the same external-resource check as `css`: no `url()` or `image-set()` to `http:`, `https:` or `//`, and no backslash. `am theme check` warns; the catalog and `am theme add` reject.
+- There is no token for the font family, size, weight or letter spacing in a diagram. The CLI measures diagram text for the sans font, so a different font would overflow its box.
+- The corner radius needs Safari 17.4 or newer; an older Safari draws the default radius.
+
 ### Theme catalog
 
-[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
+[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To make a theme and submit it to the catalog, ask your agent to follow [/themes/make.md](https://answer-me-with-html.com/themes/make.md); for the other ways (the website editor, an issue form or a PR), see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
 
 
 #### Install a theme: `am theme add`
@@ -244,7 +264,7 @@ am theme remove <name>         # delete a theme file
 - `am theme update` replaces each theme that came from the catalog and is unchanged since the install; a file you edited is skipped with a note (`am theme add <name> --force` replaces it). `am theme update <name>` does one theme.
 - `am theme remove <name>` deletes the file and its record (never a built-in theme). If it was the default theme, the default goes back to `auto`. Pages already made keep their look, because a page carries its own theme.
 - The output prints theme names and versions only. Labels and descriptions from the catalog are for the website and are never printed, so the text of a catalog cannot reach an agent through the command.
-- Versions before 0.6.0 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
+- Versions before 0.5.3 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
 
 ## Opening pages from a remote machine
 
@@ -266,10 +286,11 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 - Treat a link as the password of its page: anyone who can reach the port and has the link can open the page, including other users of the same machine. Share it only with yourself.
 - Give the tunnel a local port of its own. Do not reuse a port where you opened pages from another server or another host: a page from that other server could have left a service worker in your browser for that address, and it would see the pages served there later.
 - Each page opens in a browser sandbox of its own, so a script in one page cannot read another. Because of that, Reply answers, comments and remarks on an `http://` link last only until you close the page: copy the reply before you close it.
+- An open page reloads by itself when its file changes, for example after `am patch` or a new render to the same file, and keeps its scroll position. If you have already answered, commented or marked something on the page, it does not reload; it shows "Page updated · Reload" instead, so you can copy your reply first. The server adds this to the pages it sends, not to the files: a page opened from `file://` does not reload. The page listens on `/e/<token>/<file>` with the token of its own link, and that link carries only "changed", never the page.
 
 ## Updating and cleaning up
 
-**Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` and `highlights.json` from GitHub to read the latest version number and its highlights. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Each page made while you are out of date also has a "New version" button at the start of the toolbar; click it for up to three highlights of the new version in the page language, the update command and a copy button. `am serve` takes the button out of a page it sends to another device (`--lan` or `--public-url`), and the page itself never goes online. Turn this off with `/answer-me-with-html:config update_check off`.
+**Updating.** Updates are manual, and the tool tells you when one is out. Once a day, a background process downloads this project's `package.json` and `highlights.json` from GitHub to read the latest version number and its highlights. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Each page made while you are out of date also has a "New version" button at the start of the toolbar; click it for up to three highlights of the new version in the page language, the update command and a copy button. `am serve` takes the button out of a page it sends to another device (`--lan` or `--public-url`), and the page itself never goes online. Turn this off with `/answer-me-with-html:config update_check off`.
 
 | Installed with | Update with |
 | :--- | :--- |
@@ -293,7 +314,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `theme` | `auto` | Default theme: `auto` (paper for long text, blueprint for diagrams), `blueprint`, `shadcn`, `paper`, or your own theme |
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
-| `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
+| `update_check` | `on` | Check GitHub for a new version once a day and mention it. Never updates by itself |
 | `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
 
@@ -320,7 +341,7 @@ Answer me with HTML turns the parts a machine can check into an English and Chin
 - **Length:** Steps stay under 20 English words or 35 Chinese characters. Descriptions stay under 25 words or 45 characters. Paragraphs have at most 6 sentences.
 - **Words:** Prefer common words: "use", not "utilize"; "before", not "prior to". In Chinese, drop empty verbs: write 优化, not 进行优化.
 - **Chinese vocabulary:** Common typos (登陆 → 登录), vague quantities (尽快, 若干, 大概, 多次), 以上 / 以下 / 以内 after a number (the endpoint is ambiguous), and one-meaning-one-word choices (单击 → 点击, 键入 → 输入, 入参 → 参数). Only the entries that are almost never wrong, taken from [Simplified Technical Chinese](https://github.com/mzopedia/simplified-technical-chinese), a controlled Chinese modelled on the STE method.
-- **Style:** Flags English passive voice, three or more 的 in one sentence, and stock phrases such as 赋能 and 闭环.
+- **Style:** Flags English passive voice in steps (descriptions may use it), three or more 的 in one sentence, stock phrases such as 赋能 and 闭环, and opening or closing filler such as 下面我来 and 希望对你有帮助.
 - **Japanese:** A draft with kana is treated as Japanese: the page buttons are in Japanese and the page gets `lang="ja"`. Only the length rules apply, with the Chinese character limits. Write `lang: ja` in the draft to force it.
 - **Other languages:** Any other language gets only the length rules: sentences in words (characters for Chinese and Japanese text), paragraphs in sentences. The English and Chinese word lists and the passive-voice rule do not run on it.
 

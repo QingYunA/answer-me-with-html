@@ -1,10 +1,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
-import { main } from '../src/cli.js';
+import { fileURLToPath } from 'node:url';
+import { main, oldNodeHint } from '../src/cli.js';
 
 let dir;
 before(() => { dir = mkdtempSync(join(tmpdir(), 'am-test-')); });
@@ -31,6 +33,12 @@ const GOOD = '---\ntitle: CLI 测试\n---\n## A 流程\n```flow\nA -> B\n```\n';
 test('cli: --version and --help', async () => {
   assert.match((await run(['--version'])).out, /^\d+\.\d+\.\d+/);
   assert.match((await run([])).out, /Usage:/);
+});
+
+test('cli: oldNodeHint names the Node version below 20 and is empty from 20 on', () => {
+  assert.match(oldNodeHint('v18.20.0'), /needs Node\.js 20 or newer \(found v18\.20\.0\).*https:\/\/nodejs\.org\//);
+  assert.equal(oldNodeHint('v20.0.0'), '');
+  assert.equal(oldNodeHint('v24.1.0'), '');
 });
 
 test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stats', async () => {
@@ -67,6 +75,77 @@ test('cli render: file argument + -o + theme override', async () => {
   const r = await run(['render', 'in.md', '-o', 'out/x.html', '--theme', 'shadcn']);
   assert.equal(r.code, 0, r.err);
   assert.match(readFileSync(join(dir, 'out/x.html'), 'utf8'), /data-theme="shadcn"/);
+});
+
+test('cli render: -o rejects an existing folder with one actionable error', async () => {
+  mkdirSync(join(dir, 'render-folder'));
+  const r = await run(['render', '-', '-o', 'render-folder'], { stdin: GOOD });
+  assert.equal(r.code, 2);
+  assert.match(r.err, /^✗ -o names a folder; give a file path, for example -o page\.html\n$/);
+  assert.equal(r.out, '');
+});
+
+test('cli executable: a folder output exits without an internal stack', () => {
+  mkdirSync(join(dir, 'bundle-folder'));
+  const cli = fileURLToPath(new URL('../skills/answer-me-with-html/scripts/am.mjs', import.meta.url));
+  const r = spawnSync(process.execPath, [cli, 'render', '-', '-o', 'bundle-folder'], {
+    cwd: dir, input: GOOD, encoding: 'utf8',
+    env: { ...process.env, AM_HOME: dir, AM_NO_OPEN: '1', AM_NO_UPDATE_CHECK: '1' },
+  });
+  assert.equal(r.status, 2, r.stderr);
+  assert.equal(r.stderr, '✗ -o names a folder; give a file path, for example -o page.html\n');
+  assert.equal(r.stdout, '');
+});
+
+test('cli render: an extensionless -o remains a file and says so', async () => {
+  const r = await run(['render', '-', '-o', 'extensionless-page'], { stdin: GOOD });
+  assert.equal(r.code, 0, r.err);
+  assert.match(readFileSync(join(dir, 'extensionless-page'), 'utf8'), /<h1>CLI 测试<\/h1>/);
+  assert.match(r.out, /! -o names a file without an extension; use \.html for an HTML page/);
+});
+
+test('cli render: -o creates a missing parent for an HTML file', async () => {
+  const r = await run(['render', '-', '-o', 'new-parent/page.html'], { stdin: GOOD });
+  assert.equal(r.code, 0, r.err);
+  assert.match(readFileSync(join(dir, 'new-parent/page.html'), 'utf8'), /<h1>CLI 测试<\/h1>/);
+  assert.doesNotMatch(r.out, /without an extension/);
+});
+
+test('cli video: -o rejects an existing folder and notices an extensionless file', async () => {
+  mkdirSync(join(dir, 'video-folder'));
+  const src = '---\ntitle: V\n---\n## A\n> Narration.\n';
+  const folder = await run(['video', '-', '--voice', 'off', '-o', 'video-folder'], { stdin: src });
+  assert.equal(folder.code, 2);
+  assert.match(folder.err, /^✗ -o names a folder; give a file path, for example -o page\.html\n$/);
+  assert.equal(folder.out, '');
+
+  const file = await run(['video', '-', '--voice', 'off', '-o', 'extensionless-video'], { stdin: src });
+  assert.equal(file.code, 0, file.err);
+  assert.match(readFileSync(join(dir, 'extensionless-video'), 'utf8'), /<html/);
+  assert.match(file.out, /! -o names a file without an extension; use \.html for an HTML page/);
+});
+
+test('cli video: a folder output is rejected before narration starts', async () => {
+  const folder = join(dir, 'video-before-voice');
+  const home = join(dir, 'unused-voice-home');
+  mkdirSync(folder);
+  let calls = 0;
+  const provider = {
+    name: 'test', voice: 'test', id: 'output-path-test', concurrency: 1,
+    synth: async () => { calls++; return new Int16Array(16000); },
+  };
+  const out = sink();
+  const err = sink();
+  const code = await main(['video', '-', '-o', folder, '--no-open'], {
+    stdout: out.stream, stderr: err.stream,
+    stdin: Readable.from(['## A\n> Narration.\n']),
+    env: { AM_HOME: home, AM_NO_UPDATE_CHECK: '1' }, cwd: dir, ttsProvider: provider,
+  });
+  assert.equal(code, 2, err.text);
+  assert.equal(calls, 0, 'an invalid destination must not synthesize narration');
+  assert.equal(existsSync(home), false, 'no narration cache is created');
+  assert.equal(out.text, '');
+  assert.equal(err.text, '✗ -o names a folder; give a file path, for example -o page.html\n');
 });
 
 test('cli render: limits 0 / 0 renders a page and does not hang', { timeout: 5000 }, async () => {

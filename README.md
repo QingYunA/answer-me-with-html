@@ -72,7 +72,7 @@ Explainer videos save even more: about 18× fewer output tokens and 12× faster 
 
 ## Install
 
-You need [Node.js](https://nodejs.org/) 20 or newer. There is no `npm install` step. The CLI is bundled inside the skill.
+You need [Node.js](https://nodejs.org/) 20 or newer. There is no `npm install` step. The CLI is bundled inside the skill. No Node.js yet? With the recommended install below, your agent asks you and then installs it.
 
 ### Let your agent install it (recommended)
 
@@ -80,7 +80,7 @@ Paste this into Claude Code, Codex, Cursor, OpenCode or any other agent:
 
 > Install Answer me with HTML: read https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/INSTALL.md and follow it.
 
-[INSTALL.md](INSTALL.md) is written for agents. It installs the plugin in Claude Code and the skill in other agents, keeps an existing install, asks you nothing, and ends with one report after checking the result with the TCP three-way handshake page. If your agent cannot open links, use `npx -y skills add QingYunA/answer-me-with-html -g -y -a <your agent name>` (for Claude Code, `-a claude-code`).
+[INSTALL.md](INSTALL.md) is written for agents. It installs the plugin in Claude Code and the skill in other agents, keeps an existing install, asks you nothing unless Node.js is missing or older than 20, and ends with one report after checking the result with the TCP three-way handshake page. If your agent cannot open links, use `npx -y skills add QingYunA/answer-me-with-html -g -y -a <your agent name>` (for Claude Code, `-a claude-code`).
 
 ### Claude Code plugin
 
@@ -187,7 +187,7 @@ To turn it off, delete that rule. Want fewer pages instead? See [less proactive]
 
 ## Updating and cleaning up
 
-Updates are manual. Once a week the agent checks GitHub for a new version number and tells you; nothing about you is sent. To update, tell your agent "update answer-me-with-html". Pages pile up in `~/.answer-me-with-html/`. Say "clean up the pages", and the agent asks before it deletes anything. Other install methods and every option: [reference](docs/reference.md#updating-and-cleaning-up).
+Updates are manual. When used, the CLI checks GitHub for a new version in the background at most once a day. If one is available, it prompts the agent at most once every three days; nothing about you is sent. To update, tell your agent "update answer-me-with-html". Pages pile up in `~/.answer-me-with-html/`. Say "clean up the pages", and the agent asks before it deletes anything. Other install methods and every option: [reference](docs/reference.md#updating-and-cleaning-up).
 
 ## Background
 

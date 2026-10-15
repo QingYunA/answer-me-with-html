@@ -201,3 +201,74 @@ test('close after reply: a page made without the setting never shows the countdo
   await load();
   assert.equal(await evaluate('document.querySelector(".am-closing")'), null);
 });
+
+// Opens Reply on the plain page with the clipboard API refused and the fallback forced, then clicks Copy. The fallback is what
+// runs on a file:// page, and its return value is the only signal the reader's browser gives.
+const clickCopyWithFallback = async (fallbackWorks) => {
+  await load();
+  await evaluate(`(() => {
+    navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
+    document.execCommand = () => ${fallbackWorks};
+    document.querySelector('input[value="Memcached"]').click();
+    document.querySelector('[data-am="reply"]').click();
+    document.querySelector('dialog.am-reply [data-act="copy"]').click();
+  })()`);
+};
+const COPY_LABEL = 'document.querySelector("dialog.am-reply [data-act=\\"copy\\"]").textContent';
+const STUCK = `(() => {
+  const tmp = [...document.querySelectorAll('textarea')].find((t) => t.style.top === '-100px');
+  const text = document.querySelector('dialog.am-reply textarea');
+  return {
+    stuck: Boolean(tmp),
+    selected: Boolean(tmp) && document.activeElement === tmp && tmp.selectionStart === 0 && tmp.selectionEnd === tmp.value.length,
+    same: Boolean(tmp) && tmp.value === text.value && text.value.startsWith('# Re:'),
+  };
+})()`;
+
+test('reply: a copy the fallback also refuses says so and keeps the text selected', { skip: SKIP }, async () => {
+  await clickCopyWithFallback(false);
+  assert.equal(await until(`${COPY_LABEL} !== 'Copy reply'`), true, 'the button reports the outcome');
+  assert.equal(await evaluate(COPY_LABEL), 'Copy failed — press Cmd/Ctrl+C');
+  assert.deepEqual(await evaluate(STUCK), { stuck: true, selected: true, same: true }, 'the reply text stays selected for Cmd/Ctrl+C');
+  assert.equal(await until(`${COPY_LABEL} === 'Copy reply'`, 4500), true, 'the label returns to Copy reply');
+  assert.equal((await evaluate(STUCK)).selected, true, 'the selection outlives the message');
+  await evaluate('document.querySelector("dialog.am-reply [data-act=\\"close\\"]").click()');
+  assert.equal(await until(`${STUCK}.stuck === false`, 2000), true, 'closing the sheet drops the leftover textarea');
+});
+
+test('reply: a copy the fallback accepts still says Copied ✓ and leaves nothing behind', { skip: SKIP }, async () => {
+  await clickCopyWithFallback(true);
+  assert.equal(await until(`${COPY_LABEL} !== 'Copy reply'`), true, 'the button reports the outcome');
+  assert.equal(await evaluate(COPY_LABEL), 'Copied ✓');
+  assert.equal((await evaluate(STUCK)).stuck, false, 'the temporary textarea is removed');
+});
+
+// The fallback for real, not stubbed: the click runs as a user gesture so execCommand may copy, and the test reads the clipboard
+// itself, because execCommand can report success while it copies nothing. Seeds the clipboard first, so a copy that did not
+// happen leaves the seed.
+const copyForReal = async (opener) => {
+  await cdp.send('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+  await load();
+  const r = await send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
+    await navigator.clipboard.writeText('SEED');
+    const read = navigator.clipboard.readText.bind(navigator.clipboard);
+    navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
+    document.querySelector('input[value="Memcached"]').click();
+    const btn = (${opener})();
+    btn.click();
+    await new Promise((r) => setTimeout(r, 100));
+    return { label: btn.textContent, clipboard: (await read()).slice(0, 5) };
+  })()` });
+  if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
+  return r.result.value;
+};
+
+test('reply: with the clipboard API refused, the bottom bar still puts the reply on the clipboard', { skip: SKIP }, async () => {
+  const r = await copyForReal(`() => document.querySelector('.am-reply-bar .am-btn--reply')`);
+  assert.deepEqual(r, { label: 'Copied ✓', clipboard: '# Re:' });
+});
+
+test('reply: with the clipboard API refused, the sheet still puts the reply on the clipboard', { skip: SKIP }, async () => {
+  const r = await copyForReal(`() => { document.querySelector('[data-am="reply"]').click(); return document.querySelector('dialog.am-reply [data-act="copy"]'); }`);
+  assert.deepEqual(r, { label: 'Copied ✓', clipboard: '# Re:' });
+});
