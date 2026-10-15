@@ -1,7 +1,7 @@
 // am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, renameSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
 import { VERSION } from './assets.js';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -23,7 +23,7 @@ import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck, pageUpdate } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { ensureHome } from './home.js';
-import { hasCommand } from './sys.js';
+import { hasCommand, renameOver } from './sys.js';
 import { loadMath } from './math-load.js';
 import { replacePanel, PatchError } from './patch.js';
 import { readState } from './state.js';
@@ -590,7 +590,7 @@ function writePage(file, html, env) {
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
   try {
     writeFileSync(tmp, html);
-    renameSync(tmp, file);
+    renameOver(tmp, file);
   } finally {
     rmSync(tmp, { force: true });
   }

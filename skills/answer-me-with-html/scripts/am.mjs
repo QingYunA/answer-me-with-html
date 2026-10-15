@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.3";
@@ -9389,14 +9389,27 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync3 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as join7 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
+import { renameSync as renameSync3 } from "node:fs";
 function hasCommand(cmd) {
   return spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" }).status === 0;
+}
+var BUSY = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
+var sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+function renameOver(from, to, { platform = process.platform, rename = renameSync3, wait = sleep } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return rename(from, to);
+    } catch (e) {
+      if (platform !== "win32" || attempt > 5 || !BUSY.has(e.code)) throw e;
+      wait(20 * attempt);
+    }
+  }
 }
 
 // src/video/tts.js
@@ -9713,7 +9726,7 @@ function readCache(file) {
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync3(tmp, file);
+  renameSync4(tmp, file);
 }
 function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
@@ -10401,7 +10414,7 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, rmSync as rmSync6, watch } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
 import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
@@ -10525,7 +10538,7 @@ function writeInfo(home, info) {
     rmSync6(tmp, { force: true });
     writeFileSync6(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
-    renameSync4(tmp, infoPath(home));
+    renameSync5(tmp, infoPath(home));
   } finally {
     rmSync6(tmp, { force: true });
   }
@@ -11306,7 +11319,7 @@ function writePage(file, html, env) {
   const tmp = join11(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
   try {
     writeFileSync7(tmp, html);
-    renameSync5(tmp, file);
+    renameOver(tmp, file);
   } finally {
     rmSync7(tmp, { force: true });
   }
