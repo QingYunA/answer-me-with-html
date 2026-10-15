@@ -66,7 +66,7 @@ function field({ id, label, path, kind = 'input', options, hint, area }) {
   const errId = `ed-err-${id}`;
   const input = kind === 'select'
     ? el('select', { id: `ed-${id}`, class: 'ed-input' }, options.map(([value, text]) => el('option', { value, text })))
-    : area ? el('textarea', { id: `ed-${id}`, class: 'ed-input ed-area', rows: '2' }) : el('input', { id: `ed-${id}`, class: 'ed-input', type: 'text', spellcheck: 'false' });
+    : area ? el('textarea', { id: `ed-${id}`, class: 'ed-input ed-area', rows: '3' }) : el('input', { id: `ed-${id}`, class: 'ed-input', type: 'text', spellcheck: 'false' });
   const error = el('p', { class: 'ed-err', id: errId });
   input.setAttribute('aria-describedby', errId);
   controls.set(k, { input, error });
