@@ -1297,7 +1297,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
+import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep4 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -8229,81 +8229,14 @@ function resolveLanguage({ declared, previous, text = "" }) {
 }
 
 // src/images.js
-import { readFileSync as readFileSync2, statSync } from "node:fs";
+import { readFileSync as readFileSync3, realpathSync as realpathSync2, statSync as statSync2 } from "node:fs";
 import { homedir } from "node:os";
-import { extname, isAbsolute, resolve } from "node:path";
+import { extname as extname2, isAbsolute as isAbsolute2, resolve as resolve2, sep as sep2 } from "node:path";
 import { fileURLToPath } from "node:url";
-var TYPES = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-  ".avif": "image/avif",
-  ".svg": "image/svg+xml"
-};
-var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
-var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
-var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
-var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
-var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
-var ImageError = class extends Error {
-  constructor(message, ref) {
-    super(message);
-    this.name = "ImageError";
-    this.ref = ref;
-  }
-};
-function decodeRef(src) {
-  const ref = src.replace(/&amp;/g, "&");
-  try {
-    return decodeURI(ref);
-  } catch {
-    return ref;
-  }
-}
-function localPath(ref, baseDir) {
-  if (ref.startsWith("file:")) return fileURLToPath(ref);
-  if (ref.startsWith("~/")) return resolve(homedir(), ref.slice(2));
-  return resolve(baseDir, ref);
-}
-function readImage(ref, baseDir) {
-  const path = localPath(ref, baseDir);
-  const type = TYPES[extname(path).toLowerCase()];
-  if (!type) throw new ImageError(`"${ref}" is not an image file; use ${Object.keys(TYPES).join(" ")}`, ref);
-  let size;
-  try {
-    size = statSync(path).size;
-  } catch {
-    return null;
-  }
-  if (size > MAX_IMAGE_BYTES) {
-    throw new ImageError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
-  }
-  return `data:${type};base64,${readFileSync2(path).toString("base64")}`;
-}
-function assertNoImageText(html) {
-  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
-  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
-}
-function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
-  if (checkText) assertNoImageText(html);
-  return html.replace(IMG_SRC, (whole, before, src) => {
-    const ref = decodeRef(src);
-    if (NOT_LOCAL.test(ref)) return whole;
-    const uri = readImage(ref, baseDir) ?? known.get(ref);
-    if (!uri) throw new ImageError(`Image not found: "${ref}"${isAbsolute(ref) ? "" : ` (relative paths are read from ${baseDir})`}. Use the absolute path of an existing file`, ref);
-    return `<img${before}data-am-src="${src}" src="${uri}"`;
-  });
-}
-function readEmbeddedImages(html) {
-  return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
-}
 
 // src/code.js
-import { readFileSync as readFileSync3, statSync as statSync2 } from "node:fs";
-import { basename as basename2, extname as extname2, isAbsolute as isAbsolute2, relative, resolve as resolve2, sep } from "node:path";
+import { readFileSync as readFileSync2, realpathSync, statSync } from "node:fs";
+import { basename as basename2, extname, isAbsolute, relative, resolve, sep } from "node:path";
 
 // src/diff.js
 var DiffError = class extends Error {
@@ -8414,7 +8347,7 @@ var SECRET_FILE = new RegExp([
   "\\.(?:pem|key|p12|pfx|keystore|jks|tfvars|tfstate(?:\\.backup)?|sqlite3?|db|kdbx|ovpn)$"
 ].join("|"), "i");
 var SECRET_DIR = /* @__PURE__ */ new Set([".git", ".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"]);
-var SECRET_TEXT = /sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
+var SECRET_TEXT = /:\/\/[^\s:@/"'`$<>{}]*:[^\s@/"'`$<>{}]+@|sk-ant-|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abeprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.|(?:password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)["']?\s*[:=]\s*["'][^"'\s$<{]{12,}["']/i;
 var CodeError = class extends Error {
   constructor(message, line = 0, example = CODE_EXAMPLE) {
     super(message);
@@ -8448,20 +8381,33 @@ function parseCodeArgs(args, diff = false) {
   const text = (key) => typeof attrs[key] === "string" || typeof attrs[key] === "number" ? String(attrs[key]) : void 0;
   return { src: text("src"), lines: text("lines"), hl: text("hl"), title: text("title"), start: text("start"), file: text("file") };
 }
-function localPath2(ref, baseDir) {
-  const path = resolve2(baseDir, ref);
+function localPath(ref, baseDir) {
+  const path = resolve(baseDir, ref);
   const rel = relative(baseDir, path);
-  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute2(rel) ? null : path;
+  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
+}
+function assertNotSecret(ref, rel, via) {
+  if (SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+    throw new CodeError(`"${ref}" ${via ? "points to" : "is"} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  }
 }
 function readSlice(ref, range, baseDir) {
-  const path = localPath2(ref, baseDir);
-  if (!path) return null;
-  if (SECRET_FILE.test(basename2(path)) || relative(baseDir, path).split(sep).some((part) => SECRET_DIR.has(part))) {
-    throw new CodeError(`"${ref}" is a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
+  const written = localPath(ref, baseDir);
+  if (!written) return null;
+  assertNotSecret(ref, relative(baseDir, written), false);
+  let path;
+  try {
+    path = realpathSync(written);
+    const root = realpathSync(baseDir);
+    if (!localPath(path, root)) throw new CodeError(`Code file "${ref}" is a link to a file outside the current folder ${baseDir}; only files inside it are quoted`);
+    assertNotSecret(ref, relative(root, path), true);
+  } catch (err) {
+    if (err instanceof CodeError) throw err;
+    return null;
   }
   let size;
   try {
-    const stat2 = statSync2(path);
+    const stat2 = statSync(path);
     if (!stat2.isFile()) throw new CodeError(`"${ref}" is not a file`);
     size = stat2.size;
   } catch (err) {
@@ -8469,7 +8415,7 @@ function readSlice(ref, range, baseDir) {
     return null;
   }
   if (size > MAX_FILE_BYTES) throw new CodeError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; code files up to ${MAX_FILE_BYTES / 1048576} MB are read`);
-  const buf = readFileSync3(path);
+  const buf = readFileSync2(path);
   if (buf.includes(0)) throw new CodeError(`"${ref}" is a binary file, not code`);
   if (SECRET_TEXT.test(buf.toString("utf8"))) throw new CodeError(`"${ref}" looks like it holds a key or a token somewhere in the file; no part of it is embedded. Write a sketch instead`);
   const all = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
@@ -8498,7 +8444,7 @@ function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* 
     if (text.trim()) throw new CodeError("a block with src= takes its code from the file; leave the block empty");
     body = readSlice(opts.src, range, baseDir) ?? known.get(`${opts.src}#${opts.lines ?? ""}`);
     if (!body) {
-      const where2 = localPath2(opts.src, baseDir) ? "not found" : `outside the current folder ${baseDir}; only files inside it are quoted`;
+      const where2 = localPath(opts.src, baseDir) ? "not found" : `outside the current folder ${baseDir}; only files inside it are quoted`;
       throw new CodeError(`Code file "${opts.src}" is ${where2}`);
     }
     first = range?.from ?? 1;
@@ -8516,7 +8462,7 @@ function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = /* 
   const hl = opts.hl ? parseHighlight(opts.hl) : /* @__PURE__ */ new Set();
   const outside = [...hl].find((n) => n < first || n > last);
   if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not in the block (lines ${first}-${last})`);
-  const shownLang = lang || (opts.src ? extname2(opts.src).slice(1).toLowerCase() : "");
+  const shownLang = lang || (opts.src ? extname(opts.src).slice(1).toLowerCase() : "");
   const numbered = Boolean(opts.src || opts.start);
   const where = opts.src ? `${opts.src}${range ? `:${range.from === range.to ? range.from : `${range.from}-${range.to}`}` : ""}` : "";
   const title = opts.title ?? where;
@@ -8543,11 +8489,104 @@ function renderDiff(text, opts, { copyButton, long }) {
   const outside = [...hl].find((n) => !diff.newLines.has(n));
   if (outside !== void 0) throw new CodeError(`hl=${opts.hl}: line ${outside} is not a new-side line of the diff`);
   const file = opts.file ?? diff.title;
-  const shownLang = extname2(file).slice(1).toLowerCase() || "diff";
+  const shownLang = extname(file).slice(1).toLowerCase() || "diff";
   const stat2 = `<span class="am-code-stat"><span class="am-code-stat-add">+${diff.add}</span> <span class="am-code-stat-del">\u2212${diff.del}</span></span>`;
   const head = `<figcaption class="am-code-head"><span class="am-code-title"${opts.title && file ? ` title="${esc(file)}"` : ""}>${esc(opts.title ?? file)}</span>${stat2}<span class="am-code-lang">${esc(shownLang)}</span>${copyButton}</figcaption>`;
   const html = `<figure class="am-codeblock am-codeblock--diff">${head}<pre class="am-code am-code--diff${diff.numbered ? " am-code--dnum" : ""}"><code data-lang="${esc(shownLang)}">${diffRowsHtml(diff, hl)}</code></pre></figure>`;
   return { html, file: null, warnings: [...diff.warnings, ...long] };
+}
+
+// src/images.js
+var TYPES = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".svg": "image/svg+xml"
+};
+var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+var IMAGE_EXAMPLE = "![What the picture shows](/absolute/path/to/screenshot.png)";
+var NOT_LOCAL = /^(?:(?!file:)[a-z][a-z0-9+.-]+:|\/\/|#)/i;
+var IMG_SRC = /<img\b([^>]*?)\bsrc="([^"]*)"/g;
+var TEXT_IMAGE = /!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])/;
+var EMBEDDED = /<img\b[^>]*?\bdata-am-src="([^"]*)" src="(data:[^"]*)"/g;
+var ImageError = class extends Error {
+  constructor(message, ref) {
+    super(message);
+    this.name = "ImageError";
+    this.ref = ref;
+  }
+};
+function decodeRef(src) {
+  const ref = src.replace(/&amp;/g, "&");
+  try {
+    return decodeURI(ref);
+  } catch {
+    return ref;
+  }
+}
+function localPath2(ref, baseDir) {
+  if (ref.startsWith("file:")) return fileURLToPath(ref);
+  if (ref.startsWith("~/")) return resolve2(homedir(), ref.slice(2));
+  return resolve2(baseDir, ref);
+}
+var startsWith = (buf, text, at3 = 0) => buf.length >= at3 + text.length && buf.toString("latin1", at3, at3 + text.length) === text;
+var SVG_START = /^\uFEFF?(?:\s|<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^[>]*(?:\[[\s\S]*?\]\s*)?>)*<svg(?=[\s>/])/;
+var MAGIC = {
+  "image/png": (buf) => startsWith(buf, "\x89PNG\r\n\n"),
+  "image/jpeg": (buf) => startsWith(buf, "\xFF\xD8\xFF"),
+  "image/gif": (buf) => startsWith(buf, "GIF87a") || startsWith(buf, "GIF89a"),
+  "image/webp": (buf) => startsWith(buf, "RIFF") && startsWith(buf, "WEBP", 8),
+  "image/avif": (buf) => startsWith(buf, "ftypavif", 4) || startsWith(buf, "ftypavis", 4),
+  "image/svg+xml": (buf) => SVG_START.test(buf.toString("utf8"))
+};
+var inSecretDir = (path) => path.split(sep2).some((part) => SECRET_DIR.has(part));
+function readImage(ref, baseDir) {
+  const path = localPath2(ref, baseDir);
+  const ext = extname2(path).toLowerCase();
+  const type = TYPES[ext];
+  if (!type) throw new ImageError(`"${ref}" is not an image file; use ${Object.keys(TYPES).join(" ")}`, ref);
+  let real;
+  let stat2;
+  try {
+    real = realpathSync2(path);
+    stat2 = statSync2(real);
+  } catch {
+    return null;
+  }
+  if (inSecretDir(path) || inSecretDir(real)) {
+    throw new ImageError(`"${ref}" is in a folder that holds keys or logins (${[...SECRET_DIR].join(" ")}); it is not embedded. Copy the image somewhere else first`, ref);
+  }
+  if (!stat2.isFile()) throw new ImageError(`"${ref}" is not a file`, ref);
+  const size = stat2.size;
+  if (size > MAX_IMAGE_BYTES) {
+    throw new ImageError(`"${ref}" is ${(size / 1048576).toFixed(1)} MB; the limit is ${MAX_IMAGE_BYTES / 1048576} MB. Shrink or crop the image first`, ref);
+  }
+  const buf = readFileSync3(real);
+  if (!MAGIC[type](buf)) throw new ImageError(`"${ref}" is named ${ext} but its content is not ${type === "image/svg+xml" ? "SVG" : type.slice(6).toUpperCase()} data; it is not embedded`, ref);
+  if (type === "image/svg+xml" && SECRET_TEXT.test(buf.toString("utf8"))) {
+    throw new ImageError(`"${ref}" looks like it holds a key or a token; it is not embedded`, ref);
+  }
+  return `data:${type};base64,${buf.toString("base64")}`;
+}
+function assertNoImageText(html) {
+  const left = html.replace(/<(code|pre)\b[\s\S]*?<\/\1>/g, "").replace(/<[^>]*>/g, "").match(TEXT_IMAGE);
+  if (left) throw new ImageError(`"${left[0]}" was not read as an image. Check the path: write a space as %20, or put the path in < and >`, left[0]);
+}
+function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), checkText = true } = {}) {
+  if (checkText) assertNoImageText(html);
+  return html.replace(IMG_SRC, (whole, before, src) => {
+    const ref = decodeRef(src);
+    if (NOT_LOCAL.test(ref)) return whole;
+    const uri = readImage(ref, baseDir) ?? known.get(ref);
+    if (!uri) throw new ImageError(`Image not found: "${ref}"${isAbsolute2(ref) ? "" : ` (relative paths are read from ${baseDir})`}. Use the absolute path of an existing file`, ref);
+    return `<img${before}data-am-src="${src}" src="${uri}"`;
+  });
+}
+function readEmbeddedImages(html) {
+  return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
 }
 
 // src/render.js
@@ -10416,7 +10455,7 @@ import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
+import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -10560,7 +10599,7 @@ async function resolvePage(home, dir, file) {
     const path = join10(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
-    return real.startsWith(root + sep2) ? real : null;
+    return real.startsWith(root + sep3) ? real : null;
   } catch {
     return null;
   }
@@ -11313,9 +11352,9 @@ function outputPath(dir, title, opts, { env, io }) {
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
   const path = resolve4(file);
-  if (path.startsWith(home + sep3)) ensureHome(home);
+  if (path.startsWith(home + sep4)) ensureHome(home);
   mkdirSync4(dirname3(file), { recursive: true });
-  if (!path.startsWith(join11(home, "pages") + sep3)) return writeFileSync7(file, html);
+  if (!path.startsWith(join11(home, "pages") + sep4)) return writeFileSync7(file, html);
   const tmp = join11(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
   try {
     writeFileSync7(tmp, html);
