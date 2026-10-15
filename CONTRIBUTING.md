@@ -35,10 +35,11 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a wall of themes, a page for each theme, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). A page that does not use a catalog theme does not carry it.
 
-There are three ways to submit a theme. **A catalog theme needs no accepted issue first.** A maintainer reviews every theme before it goes in.
+There are four ways to submit a theme. **A catalog theme needs no accepted issue first.** A maintainer reviews every theme before it goes in.
 
-- **The website editor** at [answer-me-with-html.com/themes/new/](https://answer-me-with-html.com/themes/new/) is the main way. You start from a built-in or catalog theme (or upload a file), change it in a form or as JSON, see it live in light and dark, and check it with the catalog rules as you edit. Submit opens the issue form below with your theme filled in; Download gives you the file for a PR.
-- **The issue form** is what the editor fills in. Open [Submit a theme](https://github.com/QingYunA/answer-me-with-html/issues/new?template=theme.yml), type the name and paste the theme file. A bot checks the theme and comments with what to fix. Edit the issue and it checks again.
+- **An agent** is the main way. The wall's "Copy for your agent" prompt points the agent at [/themes/make.md](https://answer-me-with-html.com/themes/make.md) (`site/make.md`): start from the closest catalog theme, change it, check it with `am theme check`, show the user both specimen pages, and give the user the prefilled issue URL. It needs no new command, so it works from 0.4.10. `/llms.txt` (`site/llms.txt`) points at the same guide. When a catalog rule changes, change `site/make.md` too; `test/site.test.js` checks that it names every token and selector.
+- **The website editor** at [answer-me-with-html.com/themes/new/](https://answer-me-with-html.com/themes/new/) is for editing by hand. You start from a built-in or catalog theme (or upload a file), change it in a form or as JSON, see it live in light and dark, and check it with the catalog rules as you edit. Submit opens the issue form below with your theme filled in; Download gives you the file for a PR.
+- **The issue form** is what the guide and the editor fill in. Open [Submit a theme](https://github.com/QingYunA/answer-me-with-html/issues/new?template=theme.yml), type the name and paste the theme file. A bot checks the theme and comments with what to fix. Edit the issue and it checks again.
 - **A PR** adds `marketplace/themes/<name>.json`. One theme per PR is easiest to review.
 
 Whichever way you submit, the theme must follow these rules:

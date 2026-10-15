@@ -244,7 +244,7 @@ AM_EOF
 
 ### 主题库
 
-[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题提交到主题库（issue 表单、网站编辑器或 PR），见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想做一个主题并提交到主题库，让你的 agent 按 [/themes/make.md](https://answer-me-with-html.com/themes/make.md) 的步骤做；其他方式（网站编辑器、issue 表单或 PR）见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
 
 
 #### 安装主题：`am theme add`

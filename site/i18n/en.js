@@ -394,7 +394,9 @@ export default {
   th_lede: 'Each theme is one JSON file. Pick a card to see the theme on a sample page, in light and dark, and to install it. Hover or focus a card to peek at its dark mode. A page that does not use a theme does not carry it.',
   th_submit_k: 'Contribute',
   th_submit_t: 'Add your own theme',
-  th_submit_d: 'Make it in the <a href="new/">theme editor</a>: start from a theme, see it live and send it for review. A maintainer reads every theme before it goes on the wall. You can also open a pull request that adds <code>marketplace/themes/&lt;name&gt;.json</code>; the rules are in <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>. A catalog name is reserved forever.',
+  th_submit_d: 'You can also make one by hand in the <a href="new/" id="submit-theme">theme editor</a>, or open a pull request that adds <code>marketplace/themes/&lt;name&gt;.json</code>; the rules are in <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>. A maintainer reads every theme before it goes on the wall. A catalog name is reserved forever.',
+  th_make_lead: 'Ask your agent. Describe the look you want: the agent starts from the closest theme here, checks it, shows you the result in light and dark, and helps you submit it.',
+  th_make_prompt: 'Make me a theme for Answer me with HTML that looks like: &lt;describe the look&gt;. Follow https://answer-me-with-html.com/themes/make.md',
   th_back: 'All themes',
   th_page_title: '{label} theme — Answer me with HTML',
   th_page_desc: '{desc} A page theme for Answer me with HTML: see it in light and dark, then install it with one command or ask your agent to do it.',
@@ -420,7 +422,7 @@ export default {
   th_note_font: 'am theme add needs Answer me with HTML 0.5.3 or newer. The manual steps work on 0.4.10 and newer, but versions before 0.5.3 show system fonts instead of {font}.',
   th_copy_aria: 'Copy: {what} ({name})',
 
-  th_submit_cta: 'Submit a theme',
+  th_submit_cta: 'Make your own theme',
   th_start: 'Start from this theme',
 
   ed_meta_title: 'Make a theme — Answer me with HTML',

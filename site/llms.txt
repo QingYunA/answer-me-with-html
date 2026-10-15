@@ -1,0 +1,13 @@
+# Answer me with HTML
+
+> A skill for coding agents. The agent writes a short Markdown draft, and a bundled CLI (`am`) builds one HTML page from it: diagrams, tables, callouts, light and dark. Install: `npx skills add QingYunA/answer-me-with-html`.
+
+## Themes
+
+- [Make a theme](https://answer-me-with-html.com/themes/make.md): steps for an agent to make a theme, check it, show it to the user and submit it to the catalog
+- [Theme catalog](https://answer-me-with-html.com/themes/index.json): every catalog theme, with the URL of its JSON file; install one with `am theme add <name>`
+
+## Docs
+
+- [README](https://github.com/QingYunA/answer-me-with-html#readme): what it does, install and use
+- [Reference](https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/docs/reference.md): the draft format, every component, settings and themes

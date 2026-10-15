@@ -9,6 +9,8 @@
 // - themes/<name>/ and zh/themes/<name>/: one page for each theme, site/template-theme.html.
 // - themes/new/ and zh/themes/new/: the theme editor, site/template-editor.html, made interactive by assets/editor.js.
 // - themes/<name>.json and themes/index.json: marketplace/themes/ published as it is, and the list of it (site/catalog.mjs).
+// - themes/make.md: site/make.md, the steps an agent follows to make and submit a theme (the wall's prompt points at it).
+// - llms.txt: site/llms.txt, a short index of the Markdown an agent can read.
 import { build } from 'esbuild';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -181,6 +183,7 @@ function prerender(dist, catalog) {
 function copyImages(dist) {
   copyFileSync(join(ROOT, 'docs/logo.svg'), join(dist, 'assets/logo.svg'));
   copyFileSync(join(ROOT, 'docs/logo.svg'), join(dist, 'favicon.svg'));
+  copyFileSync(join(SITE, 'llms.txt'), join(dist, 'llms.txt'));
   mkdirSync(join(dist, 'images'), { recursive: true });
   for (const name of IMAGES) copyFileSync(join(ROOT, 'docs/images', name), join(dist, 'images', name));
 }
@@ -203,6 +206,7 @@ function writeCatalog(dist, entries) {
   mkdirSync(to, { recursive: true });
   for (const { file } of entries) copyFileSync(join(CATALOG_DIR, file), join(to, file));
   writeFileSync(join(to, 'index.json'), catalogIndex(entries, SITE_URL));
+  copyFileSync(join(SITE, 'make.md'), join(to, 'make.md'));
 }
 
 // The stargazer count, or '' when it cannot be read (offline, rate-limited); the build never fails on it.

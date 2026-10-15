@@ -559,6 +559,8 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .ttags li { font-size: 11px; padding: 2px 7px; border: 1px solid var(--line-2); background: var(--fill); color: var(--ink-2); }
 .catalog-submit { margin-top: clamp(28px, 4vw, 44px); }
 .catalog-submit > p { margin-bottom: 0; }
+.catalog-submit .copybox.prompt pre { padding-right: 16px; }
+.catalog-make-copy { margin: 12px 0 16px; }
 
 .tback { display: inline-block; margin-bottom: 18px; font-size: 13px; }
 .sheet-head--theme h1 { flex: none; }
@@ -590,7 +592,7 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .tolder .tstep:last-of-type + .copybox { margin-bottom: 14px; }
 .tolder .tstep { margin-top: 14px; }
 /* Without JavaScript the sample and mode switches and the Copy buttons do nothing, so they stay hidden, and the frame shows the page at full width. */
-html:not(.js) .tview-bar, html:not(.js) .tcopy-btn, html:not(.js) .tinstall-agent { display: none; }
+html:not(.js) .tview-bar, html:not(.js) .tcopy-btn, html:not(.js) .tinstall-agent, html:not(.js) .catalog-make-copy { display: none; }
 html:not(.js) .tview-box { aspect-ratio: auto; }
 html:not(.js) .tview-box iframe { position: static; width: 100%; height: 80vh; transform: none; }
 html:not(.js) .tinstall .copybox pre { padding-right: 16px; }

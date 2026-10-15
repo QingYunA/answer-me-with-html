@@ -416,7 +416,9 @@ export default {
   th_lede: '每个主题就是一个 JSON 文件。点开一张卡片，可以在示例页面上看这个主题的浅色和深色效果，并安装它。鼠标悬停或键盘聚焦在卡片上，可以先看一眼深色。没用到某个主题的页面，不会带上它。',
   th_submit_k: '参与',
   th_submit_t: '提交你自己的主题',
-  th_submit_d: '在<a href="new/">主题编辑器</a>里制作：选一个主题作起点，实时预览，再提交审核。每个主题上墙前都由维护者审核。也可以提交 PR，新增 <code>marketplace/themes/&lt;name&gt;.json</code>，规则见 <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>。主题库里的名字永久保留。',
+  th_submit_d: '也可以在<a href="new/" id="submit-theme">主题编辑器</a>里手动制作，或者提交 PR，新增 <code>marketplace/themes/&lt;name&gt;.json</code>，规则见 <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>。每个主题上墙前都由维护者审核。主题库里的名字永久保留。',
+  th_make_lead: '交给你的 agent。说出你想要的样子，agent 会从这里最接近的主题改起，检查之后给你看浅色和深色效果，再帮你提交。',
+  th_make_prompt: '帮我给 Answer me with HTML 做一个主题，风格是：&lt;描述你想要的样子&gt;。按 https://answer-me-with-html.com/themes/make.md 的步骤做。',
   th_back: '全部主题',
   th_page_title: '{label}主题 — Answer me with HTML',
   th_page_desc: '{desc}Answer me with HTML 的页面主题：可看浅色和深色效果，一条命令安装，或让 agent 代装。',
@@ -442,7 +444,7 @@ export default {
   th_note_font: 'am theme add 需要 Answer me with HTML 0.5.3 或更新版本。手动安装在 0.4.10 及以上都能用，但 0.5.3 之前的版本显示系统字体，不显示 {font}。',
   th_copy_aria: '复制：{what}（{name}）',
 
-  th_submit_cta: '提交主题',
+  th_submit_cta: '做一个自己的主题',
   th_start: '以此主题为起点',
 
   ed_meta_title: '制作主题 — Answer me with HTML',

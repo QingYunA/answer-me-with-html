@@ -193,7 +193,8 @@ test('site build: the wall has one link card per catalog theme, with a pre-rende
       assert.match(html, new RegExp(`<iframe src="${name}/preview\\.html"[^>]*loading="lazy"[^>]*tabindex="-1"[^>]*aria-hidden="true"`), `${page}: thumbnail of ${name}`);
     }
     assert.ok(!html.includes('engine.js'), `${page}: the wall does not mention the renderer`);
-    assert.ok(!/role="tab(list|panel)?"|tcopy-btn|<pre/.test(html), `${page}: no install UI on the wall`);
+    // The one <pre> is the prompt that hands making a theme to an agent; installing happens on each theme's page.
+    assert.ok(!/role="tab(list|panel)?"|tcopy-btn|<pre(?! id="c-make")/.test(html), `${page}: no install UI on the wall`);
     assert.match(html, /Font: Bangers|字体: Bangers/);
     assert.match(html, /data-page="catalog"/);
   }
@@ -259,12 +260,34 @@ test('site build: the gallery pages point at each other as the other language', 
   assert.match(read(join(ROOT, 'site/dist/zh/themes/index.html')), /class="tool lang-switch" href="\.\.\/\.\.\/themes\/"/);
 });
 
-test('site build: the wall links to the editor in both languages', BUILT, () => {
-  for (const [page, text] of [['themes/index.html', 'Submit a theme'], ['zh/themes/index.html', '提交主题']]) {
+test('site build: the wall hands making a theme to an agent, and links to the editor, in both languages', BUILT, () => {
+  for (const page of ['themes/index.html', 'zh/themes/index.html']) {
     const html = read(join(ROOT, 'site/dist', page));
-    assert.match(html, new RegExp(`<a class="btn btn-primary btn-sm" href="new/"[^>]*>${text}</a>`), page);
-    assert.ok(html.includes('<a href="new/">'), `${page}: the contribute note links the editor too`);
+    assert.match(html, /<a class="btn btn-primary btn-sm" href="#make">/, `${page}: the top button jumps to the make box`);
+    assert.match(html, /<pre id="c-make">[^<]*https:\/\/answer-me-with-html\.com\/themes\/make\.md[^<]*<\/pre>/, `${page}: the prompt names the guide`);
+    assert.match(html, /data-copy="c-make"/, `${page}: the prompt has a copy button`);
+    assert.ok(html.includes('<a href="new/" id="submit-theme">'), `${page}: the editor stays as a link`);
   }
+});
+
+test('site build: the agent guide and llms.txt are published as they are', BUILT, () => {
+  const dist = join(ROOT, 'site/dist');
+  assert.equal(read(join(dist, 'themes/make.md')), read(join(ROOT, 'site/make.md')));
+  assert.equal(read(join(dist, 'llms.txt')), read(join(ROOT, 'site/llms.txt')));
+  assert.ok(read(join(dist, 'llms.txt')).includes('https://answer-me-with-html.com/themes/make.md'));
+});
+
+test('site make.md: names every color and diagram token, every theme selector and the issue form fields', async () => {
+  const { COLOR_TOKENS, DIAGRAM_TOKENS } = await import('../src/themes/check.js');
+  const { THEME_SELECTORS } = await import('../src/themes/selectors.js');
+  const { BUILTIN_NAMES } = await import('../src/themes/registry.js');
+  const { MAX_NAME, MAX_BYTES } = await import('../src/themes/catalog-rules.js');
+  const guide = read(join(ROOT, 'site/make.md'));
+  for (const name of [...COLOR_TOKENS, ...DIAGRAM_TOKENS, ...THEME_SELECTORS, ...BUILTIN_NAMES]) assert.ok(guide.includes(`\`${name}\``), name);
+  assert.ok(guide.includes(`at most ${MAX_NAME} characters`) && guide.includes(`at most ${MAX_BYTES / 1024} KB`));
+  const form = read(join(ROOT, '.github/ISSUE_TEMPLATE/theme.yml'));
+  for (const id of ['name', 'theme']) assert.match(form, new RegExp(`id: ${id}\\b`), id);
+  assert.ok(guide.includes('template:"theme.yml"') && guide.includes('name:n') && guide.includes('theme:JSON.stringify'));
 });
 
 test('site build: every theme page links to the editor with that theme as the start', BUILT, () => {
