@@ -506,6 +506,8 @@ async function cmdVideo(src, opts, ctx) {
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
   if (!validVoice(voice, fail)) return 2;
+  let file = opts.out ? outputPath('videos', '', opts, ctx) : null;
+  if (opts.out && !file) return 2;
   let result;
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
@@ -514,7 +516,7 @@ async function cmdVideo(src, opts, ctx) {
     fail(`✗ Voice-over failed: ${e.message}. Add --voice off for captions only`);
     return 1;
   }
-  const file = outputPath('videos', result.meta.title, opts, ctx);
+  file ??= outputPath('videos', result.meta.title, opts, ctx);
   if (!file) return 2;
   emit(result, file, ctx);
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');

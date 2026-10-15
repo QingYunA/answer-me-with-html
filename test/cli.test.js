@@ -125,6 +125,29 @@ test('cli video: -o rejects an existing folder and notices an extensionless file
   assert.match(file.out, /! -o names a file without an extension; use \.html for an HTML page/);
 });
 
+test('cli video: a folder output is rejected before narration starts', async () => {
+  const folder = join(dir, 'video-before-voice');
+  const home = join(dir, 'unused-voice-home');
+  mkdirSync(folder);
+  let calls = 0;
+  const provider = {
+    name: 'test', voice: 'test', id: 'output-path-test', concurrency: 1,
+    synth: async () => { calls++; return new Int16Array(16000); },
+  };
+  const out = sink();
+  const err = sink();
+  const code = await main(['video', '-', '-o', folder, '--no-open'], {
+    stdout: out.stream, stderr: err.stream,
+    stdin: Readable.from(['## A\n> Narration.\n']),
+    env: { AM_HOME: home, AM_NO_UPDATE_CHECK: '1' }, cwd: dir, ttsProvider: provider,
+  });
+  assert.equal(code, 2, err.text);
+  assert.equal(calls, 0, 'an invalid destination must not synthesize narration');
+  assert.equal(existsSync(home), false, 'no narration cache is created');
+  assert.equal(out.text, '');
+  assert.equal(err.text, '✗ -o names a folder; give a file path, for example -o page.html\n');
+});
+
 test('cli render: limits 0 / 0 renders a page and does not hang', { timeout: 5000 }, async () => {
   const r = await run(['render', '-', '-o', 'zero.html'], { stdin: '## A\n```limits\nx | 0 / 0\n```\n' });
   assert.equal(r.code, 0, r.err);
