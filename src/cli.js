@@ -1,9 +1,9 @@
 // am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname, basename, sep } from 'node:path';
+import { join, resolve, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
@@ -38,11 +38,11 @@ const MAX_LISTED_WARNINGS = 20;
 const USAGE = `Answer me with HTML ${VERSION} — renders a Markdown draft into a single-file HTML explainer page
 
 Usage:
-  am render <file|->  [-o <path>] [--replace <page>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
+  am render <file|->  [-o <file>] [--replace <page>] [--no-open] [--theme ${['auto', ...themeNames('page')].join('|')}]
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <path>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
@@ -56,6 +56,7 @@ Usage:
   am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
+- -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
 - A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
@@ -331,7 +332,9 @@ async function cmdRender(src, opts, ctx, baseDir) {
     return reportError(e, fail);
   }
   const file = outputPath('pages', result.meta.title, opts, ctx);
+  if (!file) return 2;
   emit(result, file, ctx);
+  if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   // Delete the earlier attempt only now: a render that fails above keeps it.
   if (replaced && replaced !== resolve(file)) rmSync(replaced, { force: true });
   // A page with STE, code or math warnings is likely to be rendered again, so it opens only when --open asks for it.
@@ -499,7 +502,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
 }
 
 async function cmdVideo(src, opts, ctx) {
-  const { fail } = ctx;
+  const { fail, print } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
   if (!validVoice(voice, fail)) return 2;
@@ -512,7 +515,9 @@ async function cmdVideo(src, opts, ctx) {
     return 1;
   }
   const file = outputPath('videos', result.meta.title, opts, ctx);
+  if (!file) return 2;
   emit(result, file, ctx);
+  if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   for (const format of ['mp4', 'webm']) {
     if (opts[format] && !(await exportVideo(file, result.wav, format, ctx))) return 1;
   }
@@ -579,8 +584,15 @@ function themeWarnings({ fail, themes }) {
 }
 
 // Output path: the -o path when given, otherwise pages/ or videos/ in the data directory. io.now can inject a clock.
-function outputPath(dir, title, opts, { env, io }) {
-  if (opts.out) return resolve(io.cwd ?? process.cwd(), opts.out);
+function outputPath(dir, title, opts, { env, io, fail }) {
+  if (opts.out) {
+    const file = resolve(io.cwd ?? process.cwd(), opts.out);
+    if (statSync(file, { throwIfNoEntry: false })?.isDirectory()) {
+      fail('✗ -o names a folder; give a file path, for example -o page.html');
+      return null;
+    }
+    return file;
+  }
   return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 
