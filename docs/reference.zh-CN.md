@@ -32,7 +32,7 @@ A -> B: 标签
 
 ## 在页面上回复
 
-每个页面都有**回复**按钮。读者可以在任意面板上写评论（面板标题栏里的气泡按钮），然后把一段 Markdown 回复复制给 Agent。刷新页面后，选择和评论都还在。
+每个页面都有**回复**按钮。读者可以在任意面板上写评论（面板标题栏里的气泡按钮），然后把一段 Markdown 回复复制给 Agent。刷新页面后，选择和评论都还在。读者作答、评论或标注后，页面底部会出现一条栏，显示各项数量，一键复制回复；回复面板默认显示渲染后的回复，将被复制的 Markdown 折叠在下方。
 
 **标注**按钮打开后，读者可以点击段落、列表项、引用、代码块、表格或 $$ 公式块，选一个类型（建议、保留、疑问、关注），也可以写一句批注。标注显示在该块上，刷新后仍在，并在回复的“标注”一节里带上该块开头的引文返回。页面标题和面板标题不能标注，请用面板评论。
 
@@ -206,8 +206,65 @@ AM_EOF
 - 亮色和暗色都要写全所有颜色变量。`am help theme` 会列出这些变量，并给出完整格式。
 - 字体只能写本机已安装的字体。系统会自动加上默认字体作为回退，没装这些字体的读者也能正常阅读。
 - `css` 里每条选择器都以 `&` 开头。`&` 代表主题的根节点，这样这些规则只在这个主题下生效。
+- `font`（可选）写本工具自带的字体名。用这个主题生成的页面会内嵌该字体，不需要联网，其他主题的页面也不会变大。目前只有 `bangers`（[Bangers](https://github.com/googlefonts/bangers)，SIL OFL 1.1）；在 `css` 里使用它的字体族，例如 `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`。不认识这个字段的旧版本会忽略它，显示回退字体。视频页面不内嵌这个字体。
+- `requires`（可选）写主题支持的最低版本，格式 `x.y.z`。版本更低时，这个主题会被跳过，并提示 `needs Answer me with HTML x.y.z or newer`；不认识这个字段的旧版本会忽略它。
+- 文件要自成一体：不要写指向 `http:`、`https:` 或 `//` 的 `url()` 或 `image-set()`，不要 `@import`，不要 `@font-face`，也不要用反斜杠转义（转义可以绕过检查）。外链会在每次打开页面时发出请求，而页面要能离线使用。`am theme check` 会对这些情况给出警告，已有的主题仍然可用；主题库和 `am theme add` 会拒收它们。
 - 每个页面都内嵌了内置主题和它自己的主题，所以换一台电脑也能打开。
-- `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，并生成两页包含全部组件的样张。
+- `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，对外部资源给出警告，并生成两页包含全部组件的样张。
+
+`css` 可以选中的类名保持稳定：以后的版本会保留其中每一个，也不会再新增必填的颜色变量。
+
+| 部分 | 类名 |
+| :--- | :--- |
+| 页面头部 | `.am-head`、`.am-head h1`、`.am-head-meta`、`.am-intro` |
+| 面板 | `.am-panel`、`.am-panel--bare`、`.am-panel-head`、`.am-panel-head h2`、`.am-panel-id`、`.am-panel-meta`、`.am-panel-body` |
+| 内容 | `.am-md`、`.am-callout`、`.am-callout--ok`、`.am-callout--warn`、`.am-callout--err`、`.am-callout-title`、`.am-kv` |
+| 绘图框 | `.am-frame`、`.am-ruler` |
+| 评论按钮 | `.am-comment-btn`、`.am-comment-btn--on` |
+
+### 图表变量
+
+主题可以用变量（而不是选择器）改变图表内部的样子：flow、sequence、er，以及 tree 的方框。把它们写进 `tokens`，所有图表都会跟着变。这些变量全部可选：一个都不写的主题，图表和以前完全一样；旧版本会忽略它们。
+
+| 部分 | 变量 | 默认值 |
+| :--- | :--- | :--- |
+| 节点（flow、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（tree 方框：`--radius`）、无、`--ink` |
+| 高亮节点（`*`） | `--hi-fill`、`--hi-stroke`、`--hi-text` | `--accent-bg`、`--accent`、`--accent` |
+| 连线与消息 | `--edge-color`、`--edge-width`、`--edge-label` | `--ink-2`、1.3、`--accent` |
+| 时序图参与者（含 `== 分隔 ==` 的框） | `--actor-fill`、`--actor-stroke`、`--actor-text` | `--node-fill`、`--node-stroke`、`--node-text` |
+| 时序图备注 | `--note-fill`、`--note-stroke`、`--note-width`、`--note-radius` | `--warn-bg`、`--warn`、1、2px |
+| 分组框（flow） | `--cluster-fill`、`--cluster-stroke` | `--fill`、`--line-2` |
+| 生命线 | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`、`--edge-width`、`--node-radius`、`--note-width`、`--note-radius` 写数字或 `px`、`em` 值（单独的数字按 px 算）。`--node-radius` 也会圆角化参与者，不改变胶囊形和菱形。`--node-shadow` 写 `none` 或一个以上的 `drop-shadow(...)`，例如 `drop-shadow(3px 3px 0 #111111)`，参与者也会带这个阴影。其他写法算错误，主题会被跳过。
+- 颜色可以是任何 CSS 颜色。亮色和暗色下，`am theme check` 会读下面这些配对，要求 4.5:1，而且只在主题设置了其中一边时才检查：`--node-fill` 上的 `--node-text`、`--hi-fill` 上的 `--hi-text`、`--actor-fill` 上的 `--actor-text`、`--note-fill` 上的 `--ink`、`--paper` 上的 `--edge-label`。暗色模式里没写的变量沿用亮色的值，所以两边都写。
+- 变量的值和 `css` 一样要过外部资源检查：不要指向 `http:`、`https:` 或 `//` 的 `url()`、`image-set()`，也不要反斜杠。`am theme check` 会警告；主题库和 `am theme add` 会拒收。
+- 图表里的字体族、字号、字重和字距没有变量。CLI 按无衬线字体测量图表文字，换字体会让文字溢出方框。
+- 圆角需要 Safari 17.4 或更新版本；更旧的 Safari 画默认圆角。
+
+### 主题库
+
+[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题加进主题库，见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+
+
+#### 安装主题：`am theme add`
+
+```bash
+am theme add comic --use       # 下载、检查并保存主题，同时设为默认主题
+am theme list [--remote]       # 内置主题，以及你的主题（带版本和来源）
+am theme update [name]         # 更新来自主题库的主题
+am theme remove <name>         # 删除一个主题文件
+```
+
+- `am theme add <name>` 读取主题库清单（`https://answer-me-with-html.com/themes/index.json`，或环境变量 `AM_CATALOG_URL` 指向的地址：只接受 https，或指向 `localhost`、`127.0.0.1`、`[::1]` 的 http，因为明文 http 下清单和文件可以被一起替换，sha256 就起不到作用；重定向到不符合这条规则的地址会被拒绝），从同一个地址下载 `themes/<name>.json`，并按清单核对大小和 sha256。随后做主题库 CI 的同一套检查：是有效的主题文件、没有对比度错误、没有外部资源。文件先写入临时文件再改名保存到 `~/.answer-me-with-html/themes/<name>.json`，中途中断不会留下半个文件。只接受主题库里的名字，不接受网址或路径。`requires` 高于当前版本的主题会被拒绝，并说明需要哪个版本。网络请求 8 秒超时。
+- `--use` 同时设为默认主题，等同 `am config set theme <name>`，不会再问别的。
+- 同名文件如果不是主题库给的那份，永远不会被覆盖，因为它可能是你自己的主题：命令会停下并提示 `--force`。完全相同的文件会提示已经安装。如果文件仍然和主题库给的一模一样，新版本会直接替换，不需要 `--force`。
+- 每个主题的来源记在数据目录的 `state.json` 里（`catalogThemes`：名字、已安装文件的版本和 sha256）。主题文件夹里只放主题文件。没有记录的文件算你自己的（`local`）。
+- `am theme list` 不联网。安装后被你改过的文件显示为 `catalog, edited`。加 `--remote` 会再读取主题库，标出有更新的主题和你还没有的主题。
+- `am theme update` 更新每个来自主题库且安装后没改过的主题；你改过的文件会被跳过并给出提示（`am theme add <name> --force` 可替换）。`am theme update <name>` 只更新一个。
+- `am theme remove <name>` 删除文件和它的记录（内置主题不能删）。如果它是默认主题，默认值会回到 `auto`。已经生成的页面外观不变，因为页面自带主题。
+- 输出里只有主题名和版本号。主题库里的标签和描述是给网站看的，命令不会打印，所以主题库里的文字进不了 agent 的上下文。
+- 0.5.3 之前的版本没有 `am theme add`：按主题库页面上的方式手动保存文件（`curl` 或 PowerShell）。
 
 ## 在远程机器上打开页面
 
@@ -258,9 +315,12 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
 | `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
+| `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
 
 配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
+
+`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面只在标签页关闭前保留你的作答，所以开启后作答会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
 
 ## 少一点主动
 

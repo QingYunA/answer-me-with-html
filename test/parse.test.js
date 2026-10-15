@@ -85,6 +85,26 @@ test('automatic IDs skip letters already taken explicitly', () => {
   assert.deepEqual(doc.panels.map((p) => p.id), ['B', 'A', 'C']);
 });
 
+test('a title that starts with a word such as "A" or "I" keeps that word (#208)', () => {
+  const doc = parseDoc('## The app asks the cache\nx\n## A miss goes to the database\ny\n## I think we should cache\nz\n## C programs leak memory\nw');
+  assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
+    ['A', 'The app asks the cache'],
+    ['B', 'A miss goes to the database'],
+    ['C', 'I think we should cache'],
+    ['D', 'C programs leak memory'],
+  ]);
+});
+
+test('a letter is still an ID before a capitalized, non-Latin or numbered title', () => {
+  const doc = parseDoc('## A Where data goes\nx\n## B 三次握手\ny\n## C1 `npm` scripts\nz\n## D 2024 results {span=2}\nw');
+  assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
+    ['A', 'Where data goes'],
+    ['B', '三次握手'],
+    ['C1', '`npm` scripts'],
+    ['D', '2024 results'],
+  ]);
+});
+
 test('error: an unclosed fenced block reports its start line', () => {
   assert.throws(
     () => parseDoc('## A\n文本\n```flow\nA -> B'),

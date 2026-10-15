@@ -54,10 +54,13 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     '.am-node--hi .am-node-shape', '.am-node--hi text', '.am-edge', '.am-arrow',
     '.am-edge-label rect', '.am-diagram .am-edge-label text', '.am-cluster',
     '.am-diagram .am-cluster-label', '.am-lifeline', '.am-actor', '.am-note',
-    '.am-diagram .am-step',
+    '.am-diagram .am-step', '.am-diagram .am-node-text', '.am-diagram .am-node--hi .am-node-text', '.am-diagram .am-actor-text',
+    '.am-diagram .am-er-key', '.am-diagram .am-node--hi .am-er-key',
   ];
   const { common, light } = getTheme('blueprint').tokens;
   const tokens = { ...common, ...light };
+  // Diagram tokens the blueprint theme does not set: the fallback is the default the diagram always had (docs/reference.md, "Diagram tokens").
+  const defaults = { '--edge-width': ['1.3'], '--note-width': ['1'], '--node-radius': ['2px', '3px'], '--note-radius': ['2px'] };
   for (const selector of selectors) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const rule = html.match(new RegExp(`${escaped} \\{([^}]+)\\}`))?.[1];
@@ -66,9 +69,12 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     assert.ok(vars.length > 0);
     for (const [, value] of vars) {
       assert.match(value, /^--[\w-]+,\s*\S/, `${selector} ${value} needs a fallback`);
-      // Color and stroke-width fallbacks are copied from the blueprint light theme; update them here when its tokens change.
-      const [name, fallback] = value.split(/,\s*/);
-      if (/^[#\d]/.test(fallback)) assert.equal(fallback, tokens[name], `${selector} ${name} fallback must equal the blueprint light token`);
+    }
+    // A fallback chain such as var(--node-fill, var(--paper, #ffffff)) ends in a literal: check the literal of every chain. Color and stroke-width
+    // fallbacks are copied from the blueprint light theme; update them here when its tokens change.
+    for (const [, name, fallback] of rule.matchAll(/var\((--[\w-]+),\s*([#\d][^\s,)]*)\)/g)) {
+      if (name in tokens) assert.equal(fallback, tokens[name], `${selector} ${name} fallback must equal the blueprint light token`);
+      else assert.ok(defaults[name]?.includes(fallback), `${selector} ${name} fallback ${fallback} is not its documented default`);
     }
   }
 });
@@ -153,6 +159,23 @@ test('render: the new-version notice speaks the page language and escapes the co
   assert.match(html, /新版本 <bdi>0\.9\.0<\/bdi>/);
   assert.match(html, /<span>更新 answer-me-with-html<\/span>/);
   assert.match(html, /<code dir="ltr">git pull &amp;&amp; npm install<\/code>/);
+});
+
+test('render: close_after_reply adds the countdown data, styles and script to the Reply button', () => {
+  const { html } = renderDoc('## A\nx', {}, {}, { closeAfter: true });
+  const ui = JSON.parse(html.match(/data-am="reply" data-ui="([^"]*)"/)[1].replaceAll('&quot;', '"').replaceAll('&amp;', '&'));
+  assert.deepEqual(ui.closeAfter, { seconds: 3, closing: 'Closing this tab in {n}s', keep: 'Keep open', closeFailed: 'Reply copied. You can close this tab now.' });
+  assert.match(html, /\.am-closing:popover-open/);
+  assert.match(html, /am-reply-copied/);
+  assert.match(html, /window\.close\(\)/);
+});
+
+test('render: without close_after_reply the page carries nothing of the countdown, and the labels follow the page language', () => {
+  const plain = renderDoc('## A\nx').html;
+  assert.doesNotMatch(plain, /closeAfter|am-closing|window\.close/);
+  assert.equal(renderDoc('## A\nx', {}, {}, { closeAfter: false }).html, plain);
+  const zh = renderDoc('---\nlang: zh\n---\n## A\n中文', {}, {}, { closeAfter: true }).html;
+  assert.match(zh, /\{n\} 秒后关闭此标签页/);
 });
 
 test('render: the colophon links to the project and has the version, render time and a star link', () => {

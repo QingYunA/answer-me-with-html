@@ -13,6 +13,9 @@ on:
       - 'scripts/inline-assets.mjs'
       - 'skills/answer-me-with-html/scripts/am.mjs'
       - '.github/workflows/pages.yml'
+  # Rebuild every 6 hours so the star count baked into the page stays current.
+  schedule:
+    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:

@@ -86,6 +86,7 @@ AM_EOF
    If the render output has a `link:` line, the user runs `am serve`: use that URL as the page link instead, with the URL as the label too, and skip the `file://` link below. Never start `am serve` yourself; only the user starts it.
    Otherwise write the page link as a Markdown link to a `file://` URL, with the URL as the label too: `[file:///abs/path.html](file:///abs/path.html)`. Take the absolute path from the `✓` line and add `file://` in front; do not percent-encode it. GUI hosts (Codex, Antigravity) render this as a clickable link, and a terminal still shows the full URL.
    If you have a `present` tool (DeepSeek Harness), call it with the absolute path from the `✓` line before you reply, so the user can open the page from a card in the app. Still end the reply with the link.
+   If you have an in-app browser tool (such as `open_in_codex` in OpenAI Codex), the render output has a `link:` line, and `am config get open` is not `off`, call that tool with the link (`open_in_codex`: `target: { type: "browser", url: "<link>" }`) so the user sees the page in the app's browser panel. Still end the reply with the link.
 
 When a page already exists and only one panel needs to change, do not rewrite the whole page. Take the source draft from the HTML's `#am-source`, replace only the matching `##` section, and overwrite the page in place:
 
@@ -118,7 +119,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 ## B {bare}            ← bare: no title bar (suits a kv title block)
 ```
 
-- The panel letter ID can be omitted; it is assigned automatically.
+- The panel letter ID can be omitted; it is assigned automatically. A capital letter and a space before a capitalized word is read as the ID, so write the ID before a title such as `A Miss Goes Unseen`: `## B A Miss Goes Unseen`.
 - ```html / ```svg fenced blocks are embedded as-is. **Use them only when no component can express the content.**
 - Math in text: `$x^2$` inline, and `$$` on its own line before and after a block; put a long formula in a `$$` block. `\$` writes a dollar sign. Diagrams and video take no math.
 - Full reference: `am help format`; component syntax: `am help <component>`; component list: `am list`.

@@ -32,7 +32,7 @@ Full syntax for a component: `am help <component>`.
 
 ## Answer on the page
 
-Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload.
+Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
@@ -206,8 +206,65 @@ Put one JSON file per theme in `~/.answer-me-with-html/themes/`. The file name i
 - Light and dark must each set every color variable. `am help theme` lists them and shows the whole format.
 - Name installed fonts only. The default fonts are added as the fallback, so a reader without your fonts still gets readable text.
 - In `css`, start every selector with `&`. It stands for the theme's root, so the rules apply only under this theme.
+- `font` (optional) names a font this tool ships. A page rendered with the theme embeds it, so it needs no network and the other pages do not grow. The only value for now is `bangers` ([Bangers](https://github.com/googlefonts/bangers), SIL OFL 1.1); use the family in `css`, for example `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`. A version that does not know the field ignores it and shows the fallback font. Video pages do not embed the font.
+- `requires` (optional) is the oldest version of this tool the theme supports, as `x.y.z`. On an older version the theme is skipped with `needs Answer me with HTML x.y.z or newer`; a version that does not know the field ignores it.
+- Keep the file self-contained: no `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face` and no backslash escapes (they can hide a link from the check). A link would send a request every time someone opens a page, and pages work offline. `am theme check` warns about them; your existing theme keeps working. The theme catalog and `am theme add` reject them.
 - Each page carries the built-in themes plus its own theme, so it still opens on any machine.
-- `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, and renders two specimen pages with every component.
+- `am theme check notes` reports missing variables, invalid colors and low contrast in light and dark, warns about external resources, and renders two specimen pages with every component.
+
+The classes your `css` may target stay stable: a later version keeps every one of them, and never adds a required color variable.
+
+| Part | Classes |
+| :--- | :--- |
+| Page head | `.am-head`, `.am-head h1`, `.am-head-meta`, `.am-intro` |
+| Panel | `.am-panel`, `.am-panel--bare`, `.am-panel-head`, `.am-panel-head h2`, `.am-panel-id`, `.am-panel-meta`, `.am-panel-body` |
+| Content | `.am-md`, `.am-callout`, `.am-callout--ok`, `.am-callout--warn`, `.am-callout--err`, `.am-callout-title`, `.am-kv` |
+| Drawing frame | `.am-frame`, `.am-ruler` |
+| Comment button | `.am-comment-btn`, `.am-comment-btn--on` |
+
+### Diagram tokens
+
+A theme restyles what is inside a diagram (flow, sequence, er, and the boxes of a tree) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+
+| Part | Tokens | Default |
+| :--- | :--- | :--- |
+| Node (flow, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
+| Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
+| Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |
+| Sequence note | `--note-fill`, `--note-stroke`, `--note-width`, `--note-radius` | `--warn-bg`, `--warn`, 1, 2px |
+| Group box (flow) | `--cluster-fill`, `--cluster-stroke` | `--fill`, `--line-2` |
+| Lifeline | `--lifeline-color` | `--ink-3` |
+
+- `--node-width`, `--edge-width`, `--node-radius`, `--note-width` and `--note-radius` take a number or a `px` or `em` value (a bare number means px). `--node-radius` also rounds actors and does not change the pill and diamond shapes. `--node-shadow` is `none` or one or more `drop-shadow(...)`, for example `drop-shadow(3px 3px 0 #111111)`, and also casts the shadow of actors. Any other value is an error, and the theme is skipped.
+- Colors are any CSS color. In light and dark mode `am theme check` reads these pairs and needs 4.5:1, only when the theme sets one side: `--node-text` on `--node-fill`, `--hi-text` on `--hi-fill`, `--actor-text` on `--actor-fill`, `--ink` on `--note-fill`, and `--edge-label` on `--paper`. Dark mode keeps the light value of a token it does not set, so set both.
+- A token value goes through the same external-resource check as `css`: no `url()` or `image-set()` to `http:`, `https:` or `//`, and no backslash. `am theme check` warns; the catalog and `am theme add` reject.
+- There is no token for the font family, size, weight or letter spacing in a diagram. The CLI measures diagram text for the sans font, so a different font would overflow its box.
+- The corner radius needs Safari 17.4 or newer; an older Safari draws the default radius.
+
+### Theme catalog
+
+[answer-me-with-html.com/themes/](https://answer-me-with-html.com/themes/) shows ready-made themes, each drawn live in light and dark, with the commands that install it: `comic`, `manga` and `pop`, which use the Bangers font. A catalog theme is one file in your themes folder, so a page that does not use it does not carry it. The catalog list is at [/themes/index.json](https://answer-me-with-html.com/themes/index.json) (name, version, size and sha256 of every file), and the files are in [`marketplace/themes/`](../marketplace/themes). To add a theme to the catalog, see [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog).
+
+
+#### Install a theme: `am theme add`
+
+```bash
+am theme add comic --use       # download, check and save the theme, and make it the default
+am theme list [--remote]       # built-in themes, then yours with version and source
+am theme update [name]         # update themes that came from the catalog
+am theme remove <name>         # delete a theme file
+```
+
+- `am theme add <name>` reads the catalog index (`https://answer-me-with-html.com/themes/index.json`, or the URL in the `AM_CATALOG_URL` environment variable: https only, or http for `localhost`, `127.0.0.1` and `[::1]`, because over plain http the index and the file could both be swapped and the sha256 would prove nothing; a redirect to an address that breaks this rule is refused), downloads `themes/<name>.json` from the same address, and checks its size and sha256 against the index. It then runs the checks of the catalog CI: a valid theme file, no contrast error, no external resource. It saves the file to `~/.answer-me-with-html/themes/<name>.json` through a temporary file, so an interrupted run leaves no half file. Only catalog names work, not URLs or paths. A theme that `requires` a newer version is refused with the version it needs. Network calls time out after 8 seconds.
+- `--use` also sets the default theme, the same as `am config set theme <name>`. It asks nothing else.
+- A file with that name that is not the catalog's is never overwritten, because it may be your own theme: the command stops and suggests `--force`. The identical file is reported as already installed. A file that is still exactly what the catalog gave you is replaced by a newer version without `--force`.
+- Where each theme came from is recorded in `state.json` in the data folder (`catalogThemes`: name, version and sha256 of the installed file). The themes folder holds theme files only. Without a record, a file counts as your own (`local`).
+- `am theme list` needs no network. A file you changed after installing shows as `catalog, edited`. `--remote` also reads the catalog and marks themes with an update and themes you do not have.
+- `am theme update` replaces each theme that came from the catalog and is unchanged since the install; a file you edited is skipped with a note (`am theme add <name> --force` replaces it). `am theme update <name>` does one theme.
+- `am theme remove <name>` deletes the file and its record (never a built-in theme). If it was the default theme, the default goes back to `auto`. Pages already made keep their look, because a page carries its own theme.
+- The output prints theme names and versions only. Labels and descriptions from the catalog are for the website and are never printed, so the text of a catalog cannot reach an agent through the command.
+- Versions before 0.5.3 have no `am theme add`: save the file by hand, as the catalog page shows (`curl` or PowerShell).
 
 ## Opening pages from a remote machine
 
@@ -258,9 +315,12 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
 | `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
+| `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
+
+`close_after_reply` applies to pages made while it is on. Pages that `am serve` sends keep your answers only until the tab closes, so with this setting on the answers go with the tab; the clipboard still holds the reply. A browser refuses to close a tab after a link in the page has moved it (for example a contents link), and then the page says that you can close the tab yourself.
 
 ## Less proactive
 

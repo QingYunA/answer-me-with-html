@@ -3,3 +3,5 @@
 *.png binary
 *.gif binary
 *.mp4 binary
+# The bundle is generated: git stops at a conflict instead of merging it line by line (a line merge once left a duplicate declaration). Rebuild it with npm run build.
+skills/answer-me-with-html/scripts/am.mjs merge=binary

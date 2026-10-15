@@ -1,10 +1,17 @@
 // Site chrome and motion: color mode, language choice, sheet rulers, nav state, draw-on lines, count-ups,
-// the hero crosshair, copy buttons, install tabs, the figure lightbox. The playground loads later from playground.js.
+// the hero crosshair, copy buttons, install tabs, the figure lightbox. The page's own script loads later:
+// playground.js (home), catalog.js (theme wall) or theme.js (one theme's page).
 const root = document.documentElement;
 const UI = JSON.parse(document.getElementById('site-ui')?.textContent || '{}');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+
+// ── Visit counting: one named event per key click, with a short value from a fixed set. Never pass what a visitor typed. ──
+// The tracker (Umami, from the site's own subdomain) may be blocked or still loading; then this does nothing.
+export function track(name, data) {
+  try { window.umami?.track(name, data); } catch { /* counting must never get in the way */ }
+}
 
 // ── Toast: any script can show one with a 'site:toast' event ──
 const toastEl = $('#toast');
@@ -27,13 +34,18 @@ function setMode(mode, lock) {
   }
   dispatchEvent(new CustomEvent('site:mode', { detail: mode }));
 }
-$('#mode-toggle')?.addEventListener('click', () => setMode(root.dataset.mode === 'dark' ? 'light' : 'dark', true));
+$('#mode-toggle')?.addEventListener('click', () => {
+  const to = root.dataset.mode === 'dark' ? 'light' : 'dark';
+  track('mode-toggle', { to });
+  setMode(to, true);
+});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
   if (!root.hasAttribute('data-mode-locked')) setMode(e.matches ? 'dark' : 'light', false);
 });
 
 // ── Language switch: remember the choice so the English page stops redirecting ──
 $('.lang-switch')?.addEventListener('click', (e) => {
+  track('lang-switch', { to: e.currentTarget.dataset.lang });
   try { localStorage.setItem('am-site-lang', e.currentTarget.dataset.lang); } catch { /* no storage */ }
   e.currentTarget.href = e.currentTarget.getAttribute('href') + location.hash;
 });
@@ -147,6 +159,20 @@ if (hero && matchMedia('(pointer: fine)').matches) {
   hero.addEventListener('pointerleave', () => hero.classList.remove('has-cursor'));
 }
 
+// ── Hero buttons ──
+for (const a of $$('.cta a')) a.addEventListener('click', () => track('cta', { to: a.hash.slice(1) }));
+
+// ── Links that leave the site ──
+const OUTBOUND = { 'github.com': 'github', 'discord.gg': 'discord', 'discord.com': 'discord', 'linux.do': 'linuxdo', 'x.com': 'x', 'twitter.com': 'x' };
+function trackOutbound(e) {
+  if (e.type === 'auxclick' && e.button !== 1) return;
+  const a = e.target.closest?.('a[href]');
+  if (!a || !/^https?:$/.test(a.protocol) || a.hostname === location.hostname) return;
+  track('outbound', { to: OUTBOUND[a.hostname.replace(/^www\./, '')] || 'other' });
+}
+document.addEventListener('click', trackOutbound);
+document.addEventListener('auxclick', trackOutbound);
+
 // ── Copy buttons ──
 export async function copyText(text) {
   try {
@@ -171,7 +197,11 @@ function flash(btn, ok) {
   toast(ok ? UI.copied : UI.copyFailed);
 }
 for (const btn of $$('.copy-btn')) {
-  btn.addEventListener('click', async () => flash(btn, await copyText(btn.parentElement.querySelector('pre').textContent)));
+  const method = btn.closest('.tab-panel')?.id.replace(/^ip-/, '') || 'always-on';
+  btn.addEventListener('click', async () => {
+    track('install-copy', { method });
+    flash(btn, await copyText(btn.parentElement.querySelector('pre').textContent));
+  });
 }
 addEventListener('site:copied', (e) => flash(e.detail.button, e.detail.ok));
 
@@ -235,8 +265,17 @@ function syncFrameMode(frame) {
     if (doc?.documentElement) doc.documentElement.setAttribute('data-mode', root.dataset.mode);
   } catch { /* another origin: leave it */ }
 }
+// The player is a same-origin page: its first click (play) is counted once per visit.
+let videoPlayed = false;
+function trackVideoPlay(frame) {
+  try {
+    frame.contentDocument.addEventListener('click', () => {
+      if (!videoPlayed) { videoPlayed = true; track('video-play'); }
+    });
+  } catch { /* another origin: leave it */ }
+}
 if (video) {
-  video.addEventListener('load', () => syncFrameMode(video));
+  video.addEventListener('load', () => { syncFrameMode(video); trackVideoPlay(video); });
   addEventListener('site:mode', () => syncFrameMode(video));
   const load = () => { if (!video.src) video.src = video.dataset.src; };
   if ('IntersectionObserver' in window) {
@@ -247,7 +286,7 @@ if (video) {
   } else load();
 }
 
-// ── The playground and the live demos load once the page is idle ──
+// ── The playground and the live demos (on the theme pages: the wall's hover and the theme page's controls) load once the page is idle ──
 const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 300));
 // If the scripts cannot load, the hero shows the page the build prerendered.
 function heroFallback() {
@@ -260,7 +299,8 @@ function heroFallback() {
   $('.demo-status', demo).textContent = UI.fallback;
   $('.demo-note', demo).innerHTML = UI.fallbackNote;
 }
-idle(() => import('./playground.js').catch((err) => {
-  console.error('playground failed to load', err);
+const pageScript = { catalog: './catalog.js', theme: './theme.js' }[root.dataset.page] ?? './playground.js';
+idle(() => import(pageScript).catch((err) => {
+  console.error(`${pageScript} failed to load`, err);
   heroFallback();
 }), { timeout: 900 });

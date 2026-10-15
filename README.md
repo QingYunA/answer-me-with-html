@@ -173,7 +173,7 @@ Change settings with a slash command. There are no config files to edit by hand.
 | Any agent | `/answer-me-with-html config open off`, or just say "stop opening the browser" |
 | Terminal | `am config` to view, `am config set open off` to change, `am config reset` to restore defaults |
 
-The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `update_check` and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
+The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `update_check`, `close_after_reply` (close the tab after the reply is copied) and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
 
 ## Always-on mode (recommended)
 
@@ -231,7 +231,7 @@ The CLI does the rest. It picks the template, places the panels, applies the the
 
 - **Layout by code:** Panel placement and diagram coordinates are computed, not guessed. Labels don't get cut off, and there are no gaps in the grid.
 - **Fixes its own mistakes:** When a draft has an error, the CLI returns the line number, the component and a correct example. The agent fixes it in one try.
-- **Three themes:** `blueprint` looks like an engineering drawing, `shadcn` uses clean cards, and `paper` is set for long reading. By default the CLI picks paper for long text and blueprint for diagrams. All have light and dark modes, and you can add your own.
+- **Three themes:** `blueprint` looks like an engineering drawing, `shadcn` uses clean cards, and `paper` is set for long reading. By default the CLI picks paper for long text and blueprint for diagrams. All have light and dark modes, and you can add your own or take one from the [theme catalog](https://answer-me-with-html.com/themes/).
 - **One file, no dependencies:** Each page is a single `.html` with no CDN links or web fonts. It opens offline and is easy to share.
 - **Languages:** Chinese (Simplified and Traditional), English and Japanese get their own buttons and fonts. Other languages work with English buttons. See [languages](docs/reference.md#languages).
 - **Writing check:** Drafts are checked against rules adapted from ASD-STE100: long sentences, wordy phrases, passive voice. It only warns unless you ask for strict mode.
@@ -315,4 +315,4 @@ Found a bug? Please open a [GitHub issue](https://github.com/QingYunA/answer-me-
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The Bangers font that a theme can embed is under the [SIL Open Font License 1.1](skills/answer-me-with-html/licenses/OFL-Bangers.txt).

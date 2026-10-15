@@ -264,6 +264,20 @@ test('cli config: set / get / reset, changed values are marked with *', async ()
   assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'auto');
 });
 
+test('cli config: close_after_reply decides whether a rendered or patched page closes its tab after the reply is copied', async () => {
+  const off = await run(['render', '-', '-o', 'off.html'], { stdin: '## A\nx' });
+  assert.equal(off.code, 0, off.err);
+  assert.doesNotMatch(readFileSync(join(dir, 'off.html'), 'utf8'), /closeAfter|am-closing/);
+  assert.equal((await run(['config', 'set', 'close_after_reply', 'on'])).code, 0);
+  const on = await run(['render', '-', '-o', 'on.html'], { stdin: '## A\nx' });
+  assert.equal(on.code, 0, on.err);
+  assert.match(readFileSync(join(dir, 'on.html'), 'utf8'), /&quot;closeAfter&quot;/);
+  // A patch follows the setting at the time of the patch, like the theme and the style.
+  assert.equal((await run(['patch', 'off.html', '--panel', 'A'], { stdin: '## A\ny' })).code, 0);
+  assert.match(readFileSync(join(dir, 'off.html'), 'utf8'), /&quot;closeAfter&quot;/);
+  await run(['config', 'reset']);
+});
+
 test('cli config: booleans print as on/off; an unknown key or invalid value returns 2', async () => {
   await run(['config', 'set', 'open', 'off']);
   assert.equal((await run(['config', 'get', 'open'])).out.trim(), 'off');

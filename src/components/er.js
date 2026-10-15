@@ -366,7 +366,7 @@ function nodeSvgOf(entity, x, y, size, step, pageDir) {
   // The name starts at the edge where reading starts and the key marker sits at the other one. The anchors keep their names:
   // the svg's direction="rtl" turns "start" into the right end of the text, so on a right-to-left page the name moves to the right edge.
   const [nameX, keyX] = pageDir === 'rtl' ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
-  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
+  const head = `<text class="am-er-head am-node-text" font-weight="600" x="${f(nameX)}" y="${f(top + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top + PAD + HEAD_LH)}"/>`;
   // A marked row has a band across the box and its sign at the start of the row; every row of such an entity moves in by the sign column.
   const rtl = pageDir === 'rtl';
@@ -378,7 +378,7 @@ function nodeSvgOf(entity, x, y, size, step, pageDir) {
       // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
       const marker = field.marker ? `<text class="am-er-key am-cluster-label"${mark} x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : '';
       const band = field.state ? `<rect class="am-er-band"${mark} x="${f(left + 1)}" y="${f(cy - FIELD_LH / 2)}" width="${f(size.width - 2)}" height="${FIELD_LH}"/><text class="am-er-sign"${mark} x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(SIGN[field.state], pageDir))}</text>` : '';
-      return `${band}<text class="am-er-field"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
+      return `${band}<text class="am-er-field am-node-text"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
     })
     .join('');
   // The badge sits in the corner opposite the one where reading starts.

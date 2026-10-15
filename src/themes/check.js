@@ -1,6 +1,11 @@
 // User theme files: turn the JSON into a theme definition (normalizeTheme), and check its colors (checkColors).
 // normalizeTheme reports problems that make a theme unusable; checkColors reports problems a reader would see.
+// A theme file may grow new optional fields (font, requires); a CLI that does not know a field ignores it, because
+// normalizeTheme reads only the fields it names. Keep it that way: never reject a field only because it is unknown.
 import { parseColor, contrast } from './color.js';
+import { FONT_NAMES } from './font-list.js';
+import { VERSION } from '../assets.js';
+import { newer } from '../version.js';
 import { SANS, MONO } from './fonts.js';
 import blueprint from './blueprint.js';
 import { languageIds } from '../languages/registry.js';
@@ -13,8 +18,47 @@ export const COLOR_TOKENS = Object.freeze([
   '--ok', '--ok-bg', '--err', '--err-bg', '--warn', '--warn-bg', '--head-bg', '--head-fg',
 ]);
 
+// Optional tokens for what is inside a diagram (docs/reference.md, "Diagram tokens"). Each has a default, so none is ever required.
+export const DIAGRAM_TOKENS = Object.freeze([
+  '--node-fill', '--node-stroke', '--node-width', '--node-radius', '--node-shadow', '--node-text',
+  '--hi-fill', '--hi-stroke', '--hi-text',
+  '--edge-color', '--edge-width', '--edge-label',
+  '--actor-fill', '--actor-stroke', '--actor-text',
+  '--note-fill', '--note-stroke', '--note-width', '--note-radius',
+  '--cluster-fill', '--cluster-stroke', '--lifeline-color',
+]);
+// A length is a plain number or a px / em value; a bare number means px, so it also works as a CSS border width.
+const LENGTH_TOKENS = Object.freeze(['--node-width', '--edge-width', '--node-radius', '--note-width', '--note-radius']);
+const LENGTH = /^(?:\d+|\d*\.\d+)(?:px|em)?$/;
+
 const LANGS = languageIds();
 const UNSAFE_VALUE = /[;{}<]/;
+
+// none, or one or more drop-shadow(...) filters: a shadow is the only filter a theme needs, and a filter can load a file through url().
+function shadowOk(value) {
+  const v = value.trim();
+  if (v === 'none') return true;
+  let rest = v;
+  while (rest) {
+    if (!/^drop-shadow\(/i.test(rest)) return false;
+    let depth = 0;
+    let end = -1;
+    for (let i = 'drop-shadow'.length; i < rest.length && end < 0; i++) {
+      if (rest[i] === '(') depth++;
+      else if (rest[i] === ')' && --depth === 0) end = i;
+    }
+    if (end < 0 || /url\(/i.test(rest.slice(0, end))) return false;
+    rest = rest.slice(end + 1).trimStart();
+  }
+  return true;
+}
+
+// An error for a diagram token whose value is not plain, or '' when it is fine.
+function diagramTokenProblem(key, value) {
+  if (LENGTH_TOKENS.includes(key) && !LENGTH.test(value.trim())) return 'must be a number or a px / em value, like 2 or 2.5px';
+  if (key === '--node-shadow' && !shadowOk(value)) return 'must be none or one or more drop-shadow(...), with no url()';
+  return '';
+}
 
 // Returns { theme, errors }. theme is built even when there are errors, so am theme check can go on to check colors.
 export function normalizeTheme(name, data, builtinNames = []) {
@@ -30,11 +74,15 @@ export function normalizeTheme(name, data, builtinNames = []) {
       errors.push(`${where} must be an object of CSS variables`);
       return {};
     }
+    const out = {};
     for (const [k, v] of Object.entries(g)) {
+      out[k] = v;
       if (!k.startsWith('--')) errors.push(`${where}: "${k}" must start with --`);
       else if (typeof v !== 'string' || UNSAFE_VALUE.test(v)) errors.push(`${where}: ${k} must be a string without ; { } <`);
+      else if (diagramTokenProblem(k, v)) errors.push(`${where}: ${k} ${diagramTokenProblem(k, v)}`);
+      else if (LENGTH_TOKENS.includes(k) && /^[\d.]+$/.test(v.trim())) out[k] = `${v.trim()}px`;
     }
-    return g;
+    return out;
   };
   const common = group('tokens.common', tokens.common);
   const light = group('tokens.light', tokens.light);
@@ -56,6 +104,8 @@ export function normalizeTheme(name, data, builtinNames = []) {
   }
 
   const label = labelField(data.label, name, errors);
+  const font = fontField(data.font, errors);
+  requiresField(data.requires, errors);
   // Missing layout tokens come from blueprint; a theme's own fonts keep the default stack as the fallback.
   const fonts = {};
   if (common['--font-sans']) fonts['--font-sans'] = `${common['--font-sans']}, ${SANS}`;
@@ -67,11 +117,29 @@ export function normalizeTheme(name, data, builtinNames = []) {
     scope: ['page', 'video'],
     user: true,
     ownFont: Boolean(common['--font-sans']),
+    font,
     tokens: { common: { ...blueprint.tokens.common, ...common, ...fonts }, light, dark },
     css,
     video,
   };
   return { theme, errors };
+}
+
+// font: the name of a font the CLI ships (font-css.js); a page rendered with the theme embeds it. An older CLI ignores the field.
+function fontField(font, errors) {
+  if (font === undefined) return undefined;
+  if (typeof font !== 'string' || !FONT_NAMES.includes(font)) {
+    errors.push(`font must be one of: ${FONT_NAMES.join(', ')}`);
+    return undefined;
+  }
+  return font;
+}
+
+// requires: the oldest CLI version the theme supports, as x.y.z.
+function requiresField(requires, errors) {
+  if (requires === undefined) return;
+  if (typeof requires !== 'string' || !/^\d+\.\d+\.\d+$/.test(requires)) errors.push('requires must be a version in x.y.z format');
+  else if (newer(requires, VERSION)) errors.push(`needs Answer me with HTML ${requires} or newer`);
 }
 
 function labelField(label, name, errors) {
@@ -103,9 +171,71 @@ function cssField(where, css, errors) {
   return css;
 }
 
+const ESCAPE = 'escape sequence (\\)';
+
+// Links a theme must not carry: a page opens offline, and a link would send a request each time someone opens it. Returns what the
+// css holds, comments stripped: url() or image-set() to http:, https: or //, any @import, any @font-face (a theme names a shipped font with
+// `font`), and any backslash (an escape could hide the others).
+// A local theme file only gets a warning from this (am theme check); the catalog and am theme add reject it.
+export function externalResources(css) {
+  if (typeof css !== 'string') return [];
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const found = [];
+  for (const m of text.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
+    if (/^(?:https?:|\/\/)/i.test(m[2].trim())) found.push(`url(${m[2].trim()})`);
+  }
+  // image-set() takes a bare quoted string, with no url() around it.
+  for (const m of text.matchAll(/(?:-webkit-)?image-set\(([^;{}]*)/gi)) {
+    for (const s of m[1].matchAll(/(['"])\s*((?:https?:|\/\/)[^'"]*)\1/gi)) found.push(`image-set(${s[2].trim()})`);
+  }
+  if (/@import\b/i.test(text)) found.push('@import');
+  if (/@font-face\b/i.test(text)) found.push('@font-face');
+  // A CSS escape can spell url( or @import in a way the checks above do not read (u\72 l(...)), and a theme has no need for one.
+  if (text.includes('\\')) found.push(ESCAPE);
+  return found;
+}
+
+// What a theme definition carries that it must not, as { where, found } pairs: its css, its video.css, and the value of every token
+// (a token such as --node-shadow can hold a url() as well as css can).
+export function themeLinks(theme) {
+  const groups = (where, tokens) => ['common', 'light', 'dark'].flatMap((mode) =>
+    Object.entries(tokens?.[mode] ?? {}).map(([k, v]) => ({ where: `${where}.${mode} ${k}`, text: v })));
+  const sources = [
+    { where: 'css', text: theme?.css }, { where: 'video.css', text: theme?.video?.css },
+    ...groups('tokens', theme?.tokens), ...groups('video.tokens', theme?.video?.tokens),
+  ];
+  return sources.flatMap(({ where, text }) => externalResources(text).map((found) => ({ where, found })));
+}
+
+// Warnings for a theme definition's css, video.css and token values.
+export function externalResourceWarnings(theme) {
+  return themeLinks(theme).map(({ where, found }) => (found === ESCAPE
+    ? `${where}: ${found} can hide a link from this check; a theme has no need for one (write the value plainly)`
+    : `${where}: ${found} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`));
+}
+
 // Pairs read as text need 4.5:1; status colors on their tint are badges and need at least 3:1 (4.5:1 gives a warning only).
 const TEXT_PAIRS = [['--ink', '--paper'], ['--ink', '--bg'], ['--ink-2', '--paper'], ['--ink-2', '--bg'], ['--head-fg', '--head-bg'], ['--accent', '--paper']];
 const BADGE_PAIRS = [['--accent', '--accent-bg'], ['--ok', '--ok-bg'], ['--err', '--err-bg'], ['--warn', '--warn-bg']];
+// Diagram text on the fill it is drawn on. Each side lists the tokens that can supply it, first one set wins (the same chain as base.css).
+// A pair is checked only when the theme sets one of its diagram tokens (`when`); a theme that sets none draws what it always did.
+const DIAGRAM_PAIRS = [
+  { fg: ['--node-text', '--ink'], bg: ['--node-fill', '--paper'], when: ['--node-text', '--node-fill'] },
+  { fg: ['--hi-text', '--accent'], bg: ['--hi-fill', '--accent-bg'], when: ['--hi-text', '--hi-fill'] },
+  { fg: ['--actor-text', '--node-text', '--ink'], bg: ['--actor-fill', '--node-fill', '--paper'], when: ['--actor-text', '--actor-fill', '--node-text', '--node-fill'] },
+  { fg: ['--ink'], bg: ['--note-fill', '--warn-bg'], when: ['--note-fill'] },
+  { fg: ['--edge-label', '--accent'], bg: ['--paper'], when: ['--edge-label'] },
+];
+const VAR_REF = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^()]+))?\)$/;
+
+// A token's color: a value that is var(--other) follows that token (a few steps at most); null when it is not a color this check reads.
+function colorOf(set, key, depth = 0) {
+  const value = set[key]?.trim();
+  if (value === undefined || depth > 4) return null;
+  const ref = value.match(VAR_REF);
+  if (ref) return set[ref[1]] === undefined ? (ref[2] ? parseColor(ref[2].trim()) : null) : colorOf(set, ref[1], depth + 1);
+  return parseColor(value);
+}
 
 // Returns { errors, warnings } for a theme definition (built-in or user).
 export function checkColors(theme) {
@@ -130,6 +260,21 @@ export function checkColors(theme) {
       const r = ratio(fg, bg);
       if (r !== null && r < 3) errors.push(say(fg, bg, r, 3));
       else if (r !== null && r < 4.5) warnings.push(say(fg, bg, r, 4.5));
+    }
+    const seen = new Set();
+    for (const { fg, bg, when } of DIAGRAM_PAIRS) {
+      if (!when.some((k) => set[k] !== undefined)) continue;
+      const [fgKey, bgKey] = [fg, bg].map((chain) => chain.find((k) => set[k] !== undefined));
+      // An actor that takes its colors from the node tokens reads the same pair as the node: say it once.
+      if (!fgKey || !bgKey || seen.has(`${fgKey} ${bgKey}`)) continue;
+      seen.add(`${fgKey} ${bgKey}`);
+      const [fgColor, bgColor] = [colorOf(set, fgKey), colorOf(set, bgKey)];
+      if (!fgColor || !bgColor) {
+        warnings.push(`${mode}: ${fgKey} on ${bgKey} was not checked, because a value is not a color this check reads (use hex, rgb() or hsl())`);
+        continue;
+      }
+      const r = contrast(fgColor, bgColor, colorOf(set, '--paper') ?? undefined);
+      if (r < 4.5) errors.push(say(fgKey, bgKey, r, 4.5));
     }
   }
   return { errors, warnings };

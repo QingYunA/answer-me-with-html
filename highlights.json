@@ -1,28 +1,28 @@
 {
-  "version": "0.5.2",
+  "version": "0.5.3",
   "en": [
-    "Install as a DeepSeek Harness plugin: `dsh plugin add`",
-    "In DeepSeek Harness, open the page from a card in the sidebar",
-    "Remark mode: marks on a timeline stay when the window width changes"
+    "Theme catalog: `am theme add comic --use` installs a theme from the website",
+    "Themes can restyle diagrams: nodes, edges, notes, highlights and shadows",
+    "Reply: see your reply laid out, and copy it from a bar at the bottom of the page"
   ],
   "zh": [
-    "可以装成 DeepSeek Harness 插件：`dsh plugin add`",
-    "在 DeepSeek Harness 里，从侧边栏的卡片直接打开页面",
-    "标注模式：窗口宽度变化后，时间线上的标记不再丢失"
+    "主题库：`am theme add comic --use` 从官网安装主题",
+    "主题可以改图了：节点、连线、注释框、高亮和阴影",
+    "回复：直接看到排好版的回复，在页面底部一栏一键复制"
   ],
   "zh-Hant": [
-    "可以裝成 DeepSeek Harness 外掛：`dsh plugin add`",
-    "在 DeepSeek Harness 裡，從側邊欄的卡片直接開啟頁面",
-    "標註模式：視窗寬度變化後，時間軸上的標記不再遺失"
+    "主題庫：`am theme add comic --use` 從官網安裝主題",
+    "主題可以改圖了：節點、連線、註解框、醒目標示和陰影",
+    "回覆：直接看到排好版的回覆，在頁面底部一欄一鍵複製"
   ],
   "ja": [
-    "DeepSeek Harness のプラグインとしてインストール：`dsh plugin add`",
-    "DeepSeek Harness では、サイドバーのカードからページを開ける",
-    "注記モード：ウィンドウ幅が変わってもタイムラインの印が消えない"
+    "テーマカタログ：`am theme add comic --use` でサイトからテーマをインストール",
+    "テーマで図も変わる：ノード、線、注記、強調、影",
+    "返信：整形された返信を確認し、ページ下部のバーからワンクリックでコピー"
   ],
   "he": [
-    "התקנה כתוסף של DeepSeek Harness: `dsh plugin add`",
-    "ב-DeepSeek Harness פותחים את הדף מכרטיס בסרגל הצד",
-    "מצב סימון: סימונים בציר זמן נשמרים כשרוחב החלון משתנה"
+    "קטלוג ערכות עיצוב: `am theme add comic --use` מתקין ערכת עיצוב מהאתר",
+    "ערכת עיצוב משנה גם תרשימים: צמתים, קווים, הערות, הדגשות וצללים",
+    "תגובה: רואים את התגובה מעוצבת ומעתיקים אותה מסרגל בתחתית הדף"
   ]
 }

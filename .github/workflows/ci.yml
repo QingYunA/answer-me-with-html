@@ -61,6 +61,31 @@ jobs:
           cache: npm
       - run: npm ci && npm run site
 
+  snapshot:
+    # Refactors keep the HTML byte-identical (CONTRIBUTING.md). The job reports the comparison with the PR base
+    # in its summary and does not fail: an intended difference is called out in the PR instead.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Compare the rendered HTML with the PR base
+        shell: bash
+        env:
+          BASE: origin/${{ github.base_ref }}
+        run: |
+          if node scripts/snapshot.mjs "$BASE" > snapshot.txt 2>&1; then status=same; else status=different; fi
+          cat snapshot.txt
+          { echo "### HTML snapshot against $BASE"; echo '```'; cat snapshot.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" = different ]; then echo "::warning::The rendered HTML differs from $BASE. Call out the difference in the PR, or fix it."; fi
+
   coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 15

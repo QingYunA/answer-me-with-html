@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit review settings. Reviews are advisory: CI and a maintainer decide what merges.
+language: en-US
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    # The bundle is rebuilt from src/ by npm run build.
+    - "!skills/answer-me-with-html/scripts/am.mjs"
+    - "!package-lock.json"
+    - "!**/*.png"
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Follow CONTRIBUTING.md. Code, comments, CLI output and test
+        names are English; only viewer-facing page and video UI is
+        localized.
+    - path: "src/runtime/**"
+      instructions: |
+        These scripts run inside the generated page in the reader's
+        browser. Check every state a control can be used in (a dialog
+        open or closed, file:// or http), and ask for a case in
+        test/*-browser.test.js when behaviour changes.
+    - path: "src/languages/**"
+      instructions: |
+        A new or renamed label must appear in every language file
+        listed in src/languages/registry.js.
+    - path: "src/themes/**"
+      instructions: |
+        Never add a required color token without a default, and never
+        remove or rename a class listed in src/themes/selectors.js.
+    - path: "skills/answer-me-with-html/SKILL.md"
+      instructions: |
+        Every agent reads this file on every page. Flag instructions
+        that contradict another step, or that make the agent start
+        long-running processes or change user settings.
+chat:
+  art: false

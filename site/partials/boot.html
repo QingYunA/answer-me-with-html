@@ -1,0 +1,15 @@
+<script>
+(function () {
+  var d = document.documentElement, s = null;
+  d.className += ' js';
+  try { s = localStorage.getItem('am-site-mode'); } catch (e) {}
+  d.setAttribute('data-mode', s === 'light' || s === 'dark' ? s : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  if (s === 'light' || s === 'dark') d.setAttribute('data-mode-locked', '');
+  try {
+    if (d.lang === 'en' && !localStorage.getItem('am-site-lang') && /^zh/i.test(navigator.language || '')) {
+      localStorage.setItem('am-site-lang', 'zh');
+      location.replace('{{ALT_HREF}}' + location.hash);
+    }
+  } catch (e) {}
+})();
+</script>

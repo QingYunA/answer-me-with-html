@@ -30,80 +30,559 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, mkdirSync as mkdirSync3, existsSync as existsSync6, rmSync as rmSync6 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7 } from "node:fs";
 
 // src/assets.js
-var VERSION = "0.5.2";
-var BASE_CSS = '/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */\n*, *::before, *::after { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  background: var(--bg); color: var(--ink);\n  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;\n  -webkit-font-smoothing: antialiased;\n}\ncode, pre, kbd { font-family: var(--font-mono); }\n\n/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-toolbar {\n  position: fixed; top: 12px; inset-inline-end: 12px; z-index: 10; display: flex; gap: 6px;\n}\n.am-btn {\n  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;\n}\n.am-btn:hover { border-color: var(--ink-3); }\n.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n/* Theme and mode lists: a label and a native select inside one button-like box */\n.am-pick {\n  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding-block: 0; padding-inline: 10px 4px;\n}\n.am-pick:hover { border-color: var(--ink-3); }\n.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-pick select {\n  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;\n}\n.am-pick option { color: var(--ink); background: var(--paper); }\n\n/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-head { margin: 0 0 20px; padding-inline-end: 300px; }\n.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }\n.am-sub { margin: 4px 0 0; color: var(--ink-2); }\n.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }\n.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-inline-end: 6px; }\n.am-intro { margin-top: 12px; max-width: 80ch; }\n\n/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }\n.am-frame { position: relative; }\n.am-grid {\n  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));\n  gap: 20px; align-items: start;\n}\n.am-ruler { display: none; }\n.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }\n.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }\n.am-ruler--top { top: 0; }\n.am-ruler--bottom { bottom: 0; }\n.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }\n.am-ruler--left { left: 0; }\n.am-ruler--right { right: 0; }\n.am-ruler--top span + span, .am-ruler--bottom span + span { border-inline-start: 1px solid var(--line); }\n.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }\n\n/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-panel {\n  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);\n  box-shadow: var(--shadow); min-width: 0; overflow: hidden;\n}\n.am-panel-head {\n  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;\n}\n.am-panel-id {\n  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;\n  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;\n}\n.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }\n.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: end; }\n.am-panel-body { padding: 14px 16px 16px; }\n.am-panel-body > * + * { margin-top: 12px; }\n\n/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-md > :first-child { margin-top: 0; }\n.am-md > :last-child { margin-bottom: 0; }\n.am-md p { margin: 0 0 8px; }\n.am-md ul, .am-md ol { margin: 0 0 8px; padding-inline-start: 20px; }\n.am-md li + li { margin-top: 3px; }\n.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }\n.am-md a { color: var(--accent); }\n.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }\n.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }\n.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }\n.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }\n.am-md th {\n  text-align: start; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;\n  padding: 6px 10px; border-bottom: 1px solid var(--line-2);\n}\n/* th { text-align: start } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */\n.am-md th[align="right"] { text-align: right; }\n.am-md th[align="center"] { text-align: center; }\n.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }\n.am-md tbody tr:nth-child(even) td { background: var(--fill); }\n.am-table-wrap { overflow-x: auto; }\n/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */\n.am-md img { max-width: 100%; max-height: 70vh; height: auto; }\n.am-figure { margin: 0; text-align: center; }\n.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }\n.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }\n.am-code {\n  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);\n  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;\n}\n/* Ask: a decision the reader makes; the suggested option starts selected */\n.am-ask { margin: 10px 0; padding: 10px 12px 8px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--fill); min-width: 0; }\n/* The question floats inside the box, so a long question wraps like text instead of riding on the border */\n.am-ask-q { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; }\n/* Two columns: the control, then the label, tag and note, which wrap under the label and never under the control */\n.am-ask-opt { clear: both; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 5px 2px; cursor: pointer; }\n.am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }\n.am-ask-tag { display: inline-block; font-size: 11px; line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }\n.am-ask-note { display: block; color: var(--ink-2); }\n/* Comment box under each panel, and the Reply sheet */\n.am-comment-btn {\n  display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;\n  border: 1px solid transparent; border-radius: var(--radius); padding: 3px; cursor: pointer;\n}\n.am-panel-meta + .am-comment-btn { margin-inline-start: 0; }\n.am-panel:hover .am-comment-btn, .am-comment-btn:focus-visible, .am-comment-btn[aria-expanded="true"] { border-color: var(--line-2); color: var(--ink-2); }\n.am-panel .am-comment-btn.am-comment-btn--on { color: var(--accent); border-color: var(--accent); }\n.am-panel--bare { position: relative; }\n.am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }\n.am-comment { padding: 0 14px 12px; }\n.am-comment textarea, .am-reply textarea {\n  width: 100%; font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 8px 10px; resize: vertical;\n}\n.am-comment textarea:focus-visible, .am-reply textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n.am-btn--reply { color: var(--paper); background: var(--ink); border-color: var(--ink); }\n.am-btn--reply:hover { opacity: .88; }\n.am-reply {\n  width: min(640px, calc(100vw - 32px)); padding: 16px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-reply::backdrop { background: rgba(0,0,0,.35); }\n.am-reply-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }\n.am-reply-head span { color: var(--ink-2); font-size: 13px; }\n.am-reply textarea { font-family: var(--font-mono); font-size: 12.5px; }\n.am-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }\n.am-reply .am-btn:disabled { opacity: .5; cursor: default; }\n/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */\n.am-codeblock { margin: 10px 0; min-width: 0; }\n.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }\n.am-code-head {\n  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);\n  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;\n}\n.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }\n.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }\n.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }\n.am-code-lang + .am-code-copy { margin-left: 0; }\n.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }\n.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-code code { display: block; min-width: max-content; }\n.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }\n.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }\n.am-code--num .am-ln::before {\n  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);\n  user-select: none; -webkit-user-select: none;\n}\n\n/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-status { white-space: nowrap; font-weight: 500; }\n.am-status--ok { color: var(--ok); }\n.am-status--no { color: var(--err); }\n.am-status--warn { color: var(--warn); }\n.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }\n\n/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-callout {\n  border: 1px solid var(--line-2); border-inline-start: 3px solid var(--accent); background: var(--accent-bg);\n  padding: 10px 14px; border-radius: var(--radius);\n}\n.am-callout--ok { border-inline-start-color: var(--ok); background: var(--ok-bg); }\n.am-callout--warn { border-inline-start-color: var(--warn); background: var(--warn-bg); }\n.am-callout--err { border-inline-start-color: var(--err); background: var(--err-bg); }\n.am-callout-title { font-weight: 600; margin-bottom: 4px; }\n\n/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-kv {\n  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;\n  border-top: var(--bw) solid var(--line); border-inline-start: var(--bw) solid var(--line);\n}\n.am-kv-cell { border-inline-end: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }\n.am-kv-cell--wide { grid-column: 1 / -1; }\n.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }\n.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }\n.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }\n\n/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-timeline { list-style: none; margin: 0; padding: 0; }\n.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }\n.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }\n.am-timeline--h li::before {\n  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);\n}\n.am-timeline--h li:first-child::before { inset-inline-start: 50%; }\n.am-timeline--h li:last-child::before { inset-inline-end: 50%; }\n.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }\n.am-tl-dot {\n  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;\n  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);\n}\n.am-tl-item--hi .am-tl-dot { background: var(--accent); border-color: var(--accent); }\n.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }\n.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }\n.am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }\n.am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }\n.am-timeline--v li:last-child::before { display: none; }\n.am-timeline--v .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }\n.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }\n.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }\n.am-timeline--v .am-tl-text { margin-top: 2px; }\n/* .am-tl-wrap is the container (src/components/timeline.js): a horizontal timeline answers to the width it has, not to the width of the window, since a\n   sheet puts panels two or three to a row. Below 560 px (about 90 px for each of the six items a timeline has by default) its dates\n   wrap and the dots cover them, so it lays out like timeline v: line and dots at the start, text beside them. */\n.am-tl-wrap { container-type: inline-size; }\n@container (max-width: 560px) {\n  .am-timeline--h { display: block; padding-top: 0; }\n  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }\n  .am-timeline--h li::before, .am-timeline--h li:first-child::before {\n    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);\n  }\n  .am-timeline--h li:last-child::before { display: none; }\n  .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }\n  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }\n  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }\n  .am-timeline--h .am-tl-text { margin-top: 2px; }\n}\n\n/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }\n.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }\n.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }\n.am-annot-scroll { overflow-x: auto; }\n.am-annot-line {\n  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);\n  padding-bottom: calc(var(--rows, 0) * 17px + 14px);\n}\n.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }\n.am-annot-line--wrap .am-seg { white-space: nowrap; }\n.am-seg { position: relative; }\n.am-seg::after {\n  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;\n  border: 1px solid var(--accent); border-top: 0;\n}\n.am-seg-n {\n  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * 17px);\n  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;\n}\n.am-seg--err { color: var(--err); }\n.am-seg--err::after { border-color: var(--err); }\n.am-seg--err .am-seg-n { color: var(--err); }\n.am-annot-caption { font-size: 12px; color: var(--ink-2); }\n\n/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lim + .am-lim { margin-top: 14px; }\n.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }\n.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }\n.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }\n.am-lim-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--accent-bg); border-inline-end: 1px solid var(--accent); }\n.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }\n.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-inline-end-color: var(--err); }\n.am-lim.is-over .am-lim-val { color: var(--err); }\n.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }\n.am-lim-ticks span { position: absolute; transform: translateX(-50%); }\n.am-lim-ticks span:first-child { transform: none; }\n.am-lim-note { font-size: 11px; color: var(--ink-2); margin-inline-start: 6px; }\n\n/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-tree { font-size: 13px; }\n.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }\n.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-root--solo { padding-bottom: 12px; }\n.am-tree-root--solo::after { display: none; }\n.am-tree-box {\n  border: var(--bw) solid var(--line); background: var(--paper); padding: 6px 14px; text-align: center;\n  border-radius: var(--radius); font-weight: 600;\n}\n.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }\n.am-tree-box--root { background: var(--accent-bg); font-size: 15px; padding: 8px 28px; }\n.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }\n.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }\n.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }\n.am-tree-col:first-child::before { inset-inline-start: 50%; }\n.am-tree-col:last-child::before { inset-inline-end: 50%; }\n.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }\n.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }\n.am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }\n.am-tree-list ul { margin-inline-start: 16px; }\n.am-tree-list li { position: relative; padding: 3px 0; padding-inline-start: 18px; }\n.am-tree-list li::before { content: ""; position: absolute; inset-inline-start: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }\n.am-tree-list li::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; border-inline-start: 1px solid var(--ink-3); }\n.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }\n.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-inline-end: 4px; }\n.am-tree code { font: 12px var(--font-mono); }\n.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }\n.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }\n\n/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-diagram { margin: 0; overflow-x: auto; text-align: center; }\n/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */\n.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }\n.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }\n.am-node-shape { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-node--hi .am-node-shape { fill: var(--accent-bg, #e4ecf8); stroke: var(--accent, #1d5fbf); }\n.am-node--hi text { fill: var(--accent, #1d5fbf); font-weight: 600; }\n.am-edge { fill: none; stroke: var(--ink-2, #4b5260); stroke-width: 1.3; }\n.am-edge--dashed { stroke-dasharray: 5 4; }\n.am-arrow { fill: var(--ink-2, #4b5260); }\n.am-edge-label rect { fill: var(--paper, #ffffff); }\n.am-diagram .am-edge-label text { fill: var(--accent, #1d5fbf); font-size: 11.5px; }\n.am-cluster { fill: var(--fill, #f3f5f8); stroke: var(--line-2, #d6dae1); stroke-width: 1; stroke-dasharray: 4 3; }\n.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }\n.am-lifeline { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 4 4; }\n.am-actor { fill: var(--paper, #ffffff); stroke: var(--line, #1d2026); stroke-width: var(--bw, 1.5px); }\n.am-note { fill: var(--warn-bg, #fdf3e2); stroke: var(--warn, #a8620a); stroke-width: 1; }\n.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }\n\n.am-diagram-expand {\n  /* In flow and sticky: it sits at the end edge (right on a left-to-right page) and stays in view when the diagram scrolls sideways.\n     It takes its own row above the drawing, so it never covers a node at the top-right corner of the drawing. */\n  position: sticky; inset-inline-start: calc(100% - 36px); z-index: 2;\n  display: flex; align-items: center; justify-content: center;\n  width: 28px; height: 28px; padding: 0; margin: 0 0 4px; margin-inline: auto 8px;\n  color: var(--ink-2); background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);\n  cursor: pointer; opacity: 0.72;\n  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;\n}\n.am-diagram:hover .am-diagram-expand,\n.am-diagram-expand:focus-visible { opacity: 1; }\n.am-diagram-expand:hover {\n  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);\n}\n.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-lightbox {\n  position: fixed; inset: 0; z-index: 1000;\n  display: flex; flex-direction: column;\n  touch-action: none;\n}\n.am-lightbox[hidden] { display: none !important; }\n\n.am-lightbox-backdrop {\n  position: absolute; inset: 0;\n  background: rgba(0, 0, 0, 0.72);\n  backdrop-filter: blur(6px);\n  -webkit-backdrop-filter: blur(6px);\n}\n\n.am-lightbox-header {\n  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;\n  display: flex; align-items: center; justify-content: space-between;\n  z-index: 10; pointer-events: none;\n}\n.am-lightbox-title {\n  display: inline-flex; align-items: center; gap: 8px;\n  color: rgba(255, 255, 255, 0.92);\n  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;\n  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);\n  pointer-events: auto;\n  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;\n}\n.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }\n.am-lightbox-actions {\n  display: flex; align-items: center; gap: 8px; pointer-events: auto;\n}\n.am-lightbox-close {\n  width: 32px; height: 32px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: 50%;\n  color: var(--ink);\n  font-size: 15px; line-height: 1;\n  cursor: pointer;\n  display: flex; align-items: center; justify-content: center;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);\n  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;\n}\n.am-lightbox-close:hover {\n  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);\n}\n.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n\n.am-lightbox-stage {\n  position: absolute;\n  top: 54px; bottom: 20px; left: 24px; right: 24px;\n  background: var(--paper);\n  border: var(--bw, 1px) solid var(--line-2);\n  border-radius: max(var(--radius), 14px);\n  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);\n  overflow: hidden;\n  cursor: grab;\n  user-select: none;\n  -webkit-user-select: none;\n}\n.am-lightbox-stage.am-panning { cursor: grabbing; }\n\n.am-lightbox-canvas {\n  position: absolute; left: 0; top: 0;\n  transform-origin: 0 0;\n  will-change: transform;\n  pointer-events: none;\n}\n.am-lightbox-canvas svg {\n  max-width: none !important;\n  max-height: none !important;\n  display: block;\n  font-family: var(--font-sans, sans-serif);\n}\n\n/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }\n.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }\n.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }\n.am-toc { position: sticky; top: 24px; font-size: 13px; }\n.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }\n.am-toc a:hover { color: var(--ink); border-inline-start-color: var(--accent); }\n.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }\n\n/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */\n@media (max-width: 1100px) {\n  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }\n}\n@media (max-width: 760px) {\n  .am-sheet, .am-doc { padding: 56px 12px 24px; }\n  .am-head { padding-inline-end: 0; }\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }\n  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }\n  .am-toc { position: static; }\n  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }\n  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about\n     two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)\n     gives a table panel the width its columns read well at. */\n  .am-md th, .am-md td { min-width: 8em; }\n  .am-diagram svg { max-width: none; }\n  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }\n  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }\n}\n.am-colophon { margin: 0 0 8px; font: 11px var(--font-mono); color: var(--ink-3); }\n.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }\n\n@media print {\n  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply { display: none !important; }\n  body { background: var(--paper); }\n  .am-panel { break-inside: avoid; box-shadow: none; }\n}\n/* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one\n   (a wide table, a wide diagram): one panel per row instead. */\n@media print and (max-width: 1100px) {\n  .am-grid { grid-template-columns: minmax(0, 1fr); }\n  .am-grid > .am-panel { grid-column: auto !important; }\n}\n.am-panel--bare { border: 0; background: transparent; box-shadow: none; }\n.am-panel--bare > .am-panel-body { padding: 0; }\n.am-panel--bare .am-kv { background: var(--paper); }\n\n/* Remark mode: block marks with a note, collected into the Reply copy (src/runtime/remark.js). Each kind borrows a status colour of\n   the theme, so a mark reads in light and dark mode on every theme. */\n.am-btn--remark.is-on { background: var(--ink); border-color: var(--ink); color: var(--paper); }\n.am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }\n:is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }\n:is(.am-mark, .am-remark-kind)[data-kind="concern"] { --mark: var(--err); --mark-bg: var(--err-bg); }\n.am-mark { border-inline-start: 3px solid var(--mark); padding-inline-start: 10px; background: var(--mark-bg); border-radius: 1px; }\n/* The note chip sits inside the marked block (a table takes it as its caption, a list item puts it before its sub-list), so lists and\n   grids keep their children. */\n.am-mark-note {\n  display: block; margin-block-start: 4px; font: 12px/1.5 var(--font-sans); letter-spacing: normal; text-transform: none;\n  color: var(--ink-2); white-space: pre-wrap; caption-side: bottom; text-align: start;\n}\n.am-mark-note b { color: var(--ink); font-weight: 600; }\ncaption.am-mark-note { display: table-caption; }\n/* Table rows have their own backgrounds, so a tint on the table would show on every other row only: the bar marks a table. */\ntable.am-mark { background: none; }\n.am-remark-pop {\n  position: absolute; z-index: 40; width: min(264px, calc(100vw - 16px)); padding: 8px; display: grid; gap: 6px;\n  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14);\n}\n.am-remark-pop[hidden] { display: none; }\n.am-remark-kinds { display: flex; gap: 6px; flex-wrap: wrap; }\n.am-remark-kind { font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }\n.am-remark-kind:hover { border-color: var(--ink-3); }\n.am-remark-kind[aria-pressed="true"] { color: var(--ink); border-color: var(--mark); background: var(--mark-bg); }\n.am-remark-kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\n.am-remark-pop textarea { font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }\n.am-remark-actions { display: flex; gap: 6px; }\n.am-remark-actions .am-btn:disabled { opacity: .5; cursor: default; }\n@media print { .am-remark-pop { display: none !important; } }\n';
-var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.\n  const carrier = document.querySelector('.am-toolbar');\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // The button reads its label from data-done for a moment after a copy.\n  const flash = (btn) => {\n    const original = btn.textContent;\n    btn.textContent = btn.dataset.done;\n    setTimeout(() => { btn.textContent = original; }, 1400);\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  copyBtn?.addEventListener('click', async () => {\n    const nodes = document.querySelectorAll('#am-source');\n    await copyText(nodes[nodes.length - 1]?.value ?? '');\n    flash(copyBtn);\n  });\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash(btn);\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const why = same ? (d.touched ? ui.confirmed : ui.untouched) : `${ui.was}: ${d.suggested.join(', ') || '\u2014'}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n\n  const load = () => {\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page.\n    if (state && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      if (state.touched) touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><textarea readonly rows=\"14\"></textarea><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  replyBtn.addEventListener('click', () => {\n    const reply = compose();\n    text.value = reply || ui.empty;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  });\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  copy.addEventListener('click', async () => {\n    try {\n      await navigator.clipboard.writeText(text.value);\n    } catch {\n      text.select();\n      document.execCommand('copy');\n    }\n    copy.textContent = ui.done;\n    setTimeout(() => { copy.textContent = ui.copy; }, 1400);\n  });\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    let kind = mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    keep.addEventListener('click', () => {\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const kindBtns = KINDS.map((k) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => {\n        kind = k;\n        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));\n        keep.disabled = false;\n      });\n      return kb;\n    });\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n})();\n";
-var RTL_JS = `(() => {
-// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script
-// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of
-// reply-view.js, with its \`export\` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).
-const RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;
+var VERSION = "0.5.3";
+var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-sans); font-size: 14px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+code, pre, kbd { font-family: var(--font-mono); }
 
-// Right-to-left pages only: src/render.js adds this script after the page script when the page reads right to left.
-// The Reply sheet holds the reply as Markdown in a textarea, and a textarea gives the whole text one direction. Lines that start
-// with markup or Latin letters ("# Re: ...", "1. [E] ...", "- **A \xB7 ...**") then come out reordered for a Hebrew reader.
-// This script shows the reply drawn instead: headings, bold answers and quoted comments, each line in its own direction.
-// The textarea stays in the sheet as what Copy copies, so the copied text does not change.
-// A plain ES module for tests; the page gets it with its \`export\` keyword dropped and rtl-letter.js in front of it in place of the
-// import (src/runtime/compose.js).
+/* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-toolbar {
+  position: fixed; top: 12px; inset-inline-end: 12px; z-index: 10; display: flex; gap: 6px;
+}
+.am-btn {
+  font: 12px/1 var(--font-sans); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 7px 10px; cursor: pointer;
+}
+.am-btn:hover { border-color: var(--ink-3); }
+.am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Theme and mode lists: a label and a native select inside one button-like box */
+.am-pick {
+  display: flex; align-items: center; gap: 6px; font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding-block: 0; padding-inline: 10px 4px;
+}
+.am-pick:hover { border-color: var(--ink-3); }
+.am-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-pick select {
+  font: inherit; color: var(--ink); background: transparent; border: 0; padding: 6px 2px; cursor: pointer; outline: none;
+}
+.am-pick option { color: var(--ink); background: var(--paper); }
 
-const escHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.
-const dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');
+/* \u2500\u2500 Header \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-head { margin: 0 0 20px; padding-inline-end: 300px; }
+.am-head h1 { margin: 0; font-size: 24px; line-height: 1.25; letter-spacing: -0.01em; }
+.am-sub { margin: 4px 0 0; color: var(--ink-2); }
+.am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }
+.am-head-meta b { font-family: var(--font-mono); font-weight: 400; color: var(--ink-3); margin-inline-end: 6px; }
+.am-intro { margin-top: 12px; max-width: 80ch; }
 
-// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the "quote" of a remark. Each piece is isolated in its own direction,
-// so a Latin answer inside a Hebrew line keeps its place, and "A \xB7 title" still starts with the panel letter.
-const piece = (tag, text) => \`<\${tag}><bdi dir="\${dirOf(text)}">\${text}</bdi></\${tag}>\`;
-function inline(s) {
-  return escHtml(s)
-    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))
-    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))
-    // The quoted start of a marked block ("- **A \xB7 concern** "text""): isolated, so Latin text in a Hebrew line keeps its place.
-    .replace(/&quot;(.+)&quot;$/, (_, t) => \`&quot;<bdi dir="\${dirOf(t)}">\${t}</bdi>&quot;\`);
+/* \u2500\u2500 sheet template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }
+.am-frame { position: relative; }
+.am-grid {
+  display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 20px; align-items: start;
+}
+.am-ruler { display: none; }
+.am-ruler span { flex: 1; display: flex; align-items: center; justify-content: center; }
+.am-ruler--top, .am-ruler--bottom { left: 18px; right: 18px; height: 18px; }
+.am-ruler--top { top: 0; }
+.am-ruler--bottom { bottom: 0; }
+.am-ruler--left, .am-ruler--right { top: 18px; bottom: 18px; width: 18px; flex-direction: column; }
+.am-ruler--left { left: 0; }
+.am-ruler--right { right: 0; }
+.am-ruler--top span + span, .am-ruler--bottom span + span { border-inline-start: 1px solid var(--line); }
+.am-ruler--left span + span, .am-ruler--right span + span { border-top: 1px solid var(--line); }
+
+/* \u2500\u2500 Panels \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-panel {
+  background: var(--paper); border: var(--bw) solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); min-width: 0; overflow: hidden;
+}
+.am-panel-head {
+  display: flex; align-items: stretch; gap: 0; border-bottom: var(--bw) solid var(--line); min-height: 34px;
+}
+.am-panel-id {
+  display: flex; align-items: center; justify-content: center; min-width: 34px; padding: 0 8px;
+  background: var(--head-bg); color: var(--head-fg); font-weight: 600; font-size: 14px;
+}
+.am-panel-head h2 { margin: 0; padding: 7px 12px; font-size: 15px; font-weight: 600; flex: 1; display: flex; align-items: center; }
+.am-panel-meta { align-self: center; padding: 0 12px; font: 11px/1.3 var(--font-mono); color: var(--ink-2); text-align: end; }
+.am-panel-body { padding: 14px 16px 16px; }
+.am-panel-body > * + * { margin-top: 12px; }
+
+/* \u2500\u2500 Markdown body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-md > :first-child { margin-top: 0; }
+.am-md > :last-child { margin-bottom: 0; }
+.am-md p { margin: 0 0 8px; }
+.am-md ul, .am-md ol { margin: 0 0 8px; padding-inline-start: 20px; }
+.am-md li + li { margin-top: 3px; }
+.am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: 13px; }
+.am-md a { color: var(--accent); }
+.am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
+.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
+.am-md table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.am-md th {
+  text-align: start; font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400;
+  padding: 6px 10px; border-bottom: 1px solid var(--line-2);
+}
+/* th { text-align: start } outranks the align attribute from Markdown alignment, so restore right and center columns explicitly. */
+.am-md th[align="right"] { text-align: right; }
+.am-md th[align="center"] { text-align: center; }
+.am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+.am-md tbody tr:nth-child(even) td { background: var(--fill); }
+.am-table-wrap { overflow-x: auto; }
+/* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
+.am-md img { max-width: 100%; max-height: 70vh; height: auto; }
+.am-figure { margin: 0; text-align: center; }
+.am-figure img { display: block; margin: 0 auto; border: 1px solid var(--line-2); border-radius: var(--radius); }
+.am-figure figcaption { margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--ink-2); }
+.am-code {
+  margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);
+  border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;
+}
+/* Ask: a decision the reader makes; the suggested option starts selected */
+.am-ask { margin: 10px 0; padding: 10px 12px 8px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--fill); min-width: 0; }
+/* The question floats inside the box, so a long question wraps like text instead of riding on the border */
+.am-ask-q { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; }
+/* Two columns: the control, then the label, tag and note, which wrap under the label and never under the control */
+.am-ask-opt { clear: both; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 5px 2px; cursor: pointer; }
+.am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
+.am-ask-tag { display: inline-block; font-size: 11px; line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.am-ask-note { display: block; color: var(--ink-2); }
+/* Comment box under each panel, and the Reply sheet */
+.am-comment-btn {
+  display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
+  border: 1px solid transparent; border-radius: var(--radius); padding: 3px; cursor: pointer;
+}
+.am-panel-meta + .am-comment-btn { margin-inline-start: 0; }
+.am-panel:hover .am-comment-btn, .am-comment-btn:focus-visible, .am-comment-btn[aria-expanded="true"] { border-color: var(--line-2); color: var(--ink-2); }
+.am-panel .am-comment-btn.am-comment-btn--on { color: var(--accent); border-color: var(--accent); }
+.am-panel--bare { position: relative; }
+.am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }
+.am-comment { padding: 0 14px 12px; }
+.am-comment textarea, .am-reply textarea {
+  width: 100%; font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); padding: 8px 10px; resize: vertical;
+}
+.am-comment textarea:focus-visible, .am-reply textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-btn--reply { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.am-btn--reply:hover { opacity: .88; }
+.am-reply {
+  width: min(640px, calc(100vw - 32px)); padding: 16px; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.am-reply::backdrop { background: rgba(0,0,0,.35); }
+.am-reply-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
+.am-reply-head span { color: var(--ink-2); font-size: 13px; }
+.am-reply textarea { font-family: var(--font-mono); font-size: 12.5px; }
+.am-reply-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.am-reply .am-btn:disabled { opacity: .5; cursor: default; }
+/* The sheet shows the reply drawn (src/runtime/reply-view.js), each line in its own direction; the Markdown that Copy copies sits under a fold. */
+.am-reply-view {
+  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;
+}
+.am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-reply-view > div { text-align: start; unicode-bidi: isolate; }
+.am-rv-gap { height: .5em; }
+.am-rv-h1 { font-weight: 700; font-size: 15px; }
+.am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+.am-rv-tag {
+  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;
+  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-rv-a { padding-inline-start: 1.6em; }
+.am-rv-a em { color: var(--ink-2); }
+.am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }
+.am-reply-raw summary { margin-top: 10px; margin-bottom: 6px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+/* The bar at the bottom of the page: counts and one-click copy, so the reader need not go to the Reply button at the top. */
+.am-reply-bar {
+  position: fixed; inset-block-end: 16px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);
+  z-index: 10; display: flex; align-items: center; gap: 10px; padding-block: 8px; padding-inline: 14px 8px; font-size: 13px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.18);
+}
+.am-reply-bar[hidden] { display: none; }
+.am-reply-bar-count { color: var(--ink-2); }
+.am-reply-bar .am-btn { flex: none; white-space: nowrap; }
+body.am-has-reply-bar { padding-block-end: 72px; }
+@media (max-width: 480px) {
+  .am-reply-bar { inset-inline: 12px; width: auto; justify-content: space-between; }
+}
+/* Code block: a header (title or path:lines, language, copy), then one span per line; numbered blocks show the line number in a gutter */
+.am-codeblock { margin: 10px 0; min-width: 0; }
+.am-codeblock .am-code { border-top-left-radius: 0; border-top-right-radius: 0; padding: 10px 0; }
+.am-code-head {
+  display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font: 12px/1.3 var(--font-sans); color: var(--ink-2);
+  background: var(--paper); border: 1px solid var(--line-2); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0;
+}
+.am-code-title { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.am-code-lang { margin-left: auto; color: var(--ink-3); text-transform: lowercase; }
+.am-code-copy { font: 12px/1 var(--font-sans); color: var(--ink-2); background: transparent; border: 1px solid var(--line-2); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; margin-left: auto; }
+.am-code-lang + .am-code-copy { margin-left: 0; }
+.am-code-copy:hover { border-color: var(--ink-3); color: var(--ink); }
+.am-code-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-code code { display: block; min-width: max-content; }
+.am-ln { display: block; padding: 0 14px; min-height: 1.5em; white-space: pre; }
+.am-ln--hl { background: var(--accent-bg); box-shadow: inset 3px 0 0 var(--accent); }
+.am-code--num .am-ln::before {
+  content: attr(data-n); display: inline-block; width: 3.5ch; margin-right: 12px; text-align: right; color: var(--ink-3);
+  user-select: none; -webkit-user-select: none;
 }
 
-// The reply text (src/runtime/reply-text.js) as HTML, one block per line.
-function replyViewHtml(text) {
-  return text
-    .replace(/\\n$/, '')
-    .split('\\n')
-    .map((line) => {
-      const dir = dirOf(line);
-      let m;
-      if (!line.trim()) return '<div class="am-rv-gap"></div>';
-      if ((m = line.match(/^(#{1,2}) (.*)$/))) return \`<div class="am-rv-h\${m[1].length}" dir="\${dir}">\${inline(m[2])}</div>\`;
-      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {
-        return \`<div class="am-rv-q" dir="\${dir}"><bdi>\${m[1]}.</bdi> <bdi class="am-rv-tag">\${escHtml(m[2])}</bdi> \${inline(m[3])}</div>\`;
-      }
-      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return \`<div class="am-rv-a" dir="\${dir}">\${m[1]} \${inline(m[2])}</div>\`;
-      if ((m = line.match(/^- (.*)$/))) return \`<div class="am-rv-c" dir="\${dir}">\${inline(m[1])}</div>\`;
-      // A comment line is shown exactly as the reader typed it.
-      if ((m = line.match(/^ {2}> ?(.*)$/))) return \`<div class="am-rv-quote" dir="\${dirOf(m[1])}">\${escHtml(m[1]) || '&nbsp;'}</div>\`;
-      return \`<div dir="\${dir}">\${inline(line)}</div>\`;
-    })
-    .join('');
-}
+/* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-status { white-space: nowrap; font-weight: 500; }
+.am-status--ok { color: var(--ok); }
+.am-status--no { color: var(--err); }
+.am-status--warn { color: var(--warn); }
+.am-status-icon { display: inline-block; width: 1.1em; font-weight: 700; }
 
-if (typeof document !== 'undefined') {
-  const button = document.querySelector('[data-am="reply"]');
-  const sheet = document.querySelector('dialog.am-reply');
-  const source = sheet?.querySelector('textarea');
-  if (button && source) {
-    const view = Object.assign(document.createElement('div'), { className: 'am-reply-view', tabIndex: 0 });
-    source.before(view);
-    sheet.classList.add('am-reply--view');
-    // Runs after the page script's own handler, which has just filled the textarea.
-    button.addEventListener('click', () => {
-      view.innerHTML = replyViewHtml(source.value);
-      view.scrollTop = 0;
-    });
+/* \u2500\u2500 callout \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-callout {
+  border: 1px solid var(--line-2); border-inline-start: 3px solid var(--accent); background: var(--accent-bg);
+  padding: 10px 14px; border-radius: var(--radius);
+}
+.am-callout--ok { border-inline-start-color: var(--ok); background: var(--ok-bg); }
+.am-callout--warn { border-inline-start-color: var(--warn); background: var(--warn-bg); }
+.am-callout--err { border-inline-start-color: var(--err); background: var(--err-bg); }
+.am-callout-title { font-weight: 600; margin-bottom: 4px; }
+
+/* \u2500\u2500 kv title block \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-kv {
+  display: grid; grid-template-columns: repeat(var(--kv-cols, 2), minmax(0, 1fr)); margin: 0;
+  border-top: var(--bw) solid var(--line); border-inline-start: var(--bw) solid var(--line);
+}
+.am-kv-cell { border-inline-end: var(--bw) solid var(--line); border-bottom: var(--bw) solid var(--line); padding: 6px 10px 8px; min-width: 0; }
+.am-kv-cell--wide { grid-column: 1 / -1; }
+.am-kv dt { font: 11px/1.4 var(--font-mono); color: var(--ink-2); }
+.am-kv dd { margin: 2px 0 0; font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.am-kv-cell--wide dd { font-size: 17px; font-weight: 600; }
+
+/* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-timeline { list-style: none; margin: 0; padding: 0; }
+.am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
+.am-timeline--h li::before {
+  content: ""; position: absolute; top: 31px; left: 0; right: 0; border-top: var(--bw) solid var(--line);
+}
+.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
+.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
+.am-tl-when { display: block; font-size: 15px; font-weight: 500; height: 24px; }
+.am-tl-dot {
+  position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
+  border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
+}
+.am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
+.am-tl-title { display: block; font-size: 12.5px; font-weight: 500; }
+.am-tl-text { display: block; font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+.am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
+.am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
+.am-timeline--v li:last-child::before { display: none; }
+.am-timeline--v .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
+.am-timeline--v .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
+.am-timeline--v .am-tl-title { display: inline; font-size: 14px; }
+.am-timeline--v .am-tl-text { margin-top: 2px; }
+/* .am-tl-wrap is the container (src/components/timeline.js): a horizontal timeline answers to the width it has, not to the width of the window, since a
+   sheet puts panels two or three to a row. Below 560 px (about 90 px for each of the six items a timeline has by default) its dates
+   wrap and the dots cover them, so it lays out like timeline v: line and dots at the start, text beside them. */
+.am-tl-wrap { container-type: inline-size; }
+@container (max-width: 560px) {
+  .am-timeline--h { display: block; padding-top: 0; }
+  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
+    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
   }
+  .am-timeline--h li:last-child::before { display: none; }
+  .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
+  .am-timeline--h .am-tl-when { display: inline; height: auto; font: 12px var(--font-mono); color: var(--ink-2); margin-inline-end: 8px; }
+  .am-timeline--h .am-tl-title { display: inline; font-size: 14px; }
+  .am-timeline--h .am-tl-text { margin-top: 2px; }
 }
-})();
+
+/* \u2500\u2500 annot sentence notes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-annot + .am-annot { border-top: 1px solid var(--line-2); padding-top: 12px; }
+.am-annot-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.am-annot-meta { font: 11px var(--font-mono); font-weight: 400; color: var(--ink-2); }
+.am-annot-scroll { overflow-x: auto; }
+.am-annot-line {
+  position: relative; display: inline-block; white-space: pre; font: 14px/1.6 var(--font-mono);
+  padding-bottom: calc(var(--rows, 0) * 17px + 14px);
+}
+.am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }
+.am-annot-line--wrap .am-seg { white-space: nowrap; }
+.am-seg { position: relative; }
+.am-seg::after {
+  content: ""; position: absolute; left: 1px; right: 1px; top: calc(100% + 1px); height: 5px;
+  border: 1px solid var(--accent); border-top: 0;
+}
+.am-seg-n {
+  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * 17px);
+  font: 11px/16px var(--font-sans); color: var(--accent); white-space: nowrap;
+}
+.am-seg--err { color: var(--err); }
+.am-seg--err::after { border-color: var(--err); }
+.am-seg--err .am-seg-n { color: var(--err); }
+.am-annot-caption { font-size: 12px; color: var(--ink-2); }
+
+/* \u2500\u2500 limits bars \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-lim + .am-lim { margin-top: 14px; }
+.am-lim-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; margin-bottom: 4px; }
+.am-lim-val { font: 12px var(--font-mono); color: var(--accent); white-space: nowrap; }
+.am-lim-track { position: relative; height: 12px; border: 1px solid var(--line-2); background: var(--fill); border-radius: calc(var(--radius) / 2); }
+.am-lim-fill { position: absolute; inset-inline-start: 0; top: 0; bottom: 0; background: var(--accent-bg); border-inline-end: 1px solid var(--accent); }
+.am-lim-mark { position: absolute; top: -4px; bottom: -4px; border-left: 2px solid var(--accent); }
+.am-lim.is-over .am-lim-fill { background: var(--err-bg); border-inline-end-color: var(--err); }
+.am-lim.is-over .am-lim-val { color: var(--err); }
+.am-lim-ticks { position: relative; height: 16px; font: 10px/16px var(--font-mono); color: var(--ink-3); }
+.am-lim-ticks span { position: absolute; transform: translateX(-50%); }
+.am-lim-ticks span:first-child { transform: none; }
+.am-lim-note { font-size: 11px; color: var(--ink-2); margin-inline-start: 6px; }
+
+/* \u2500\u2500 tree \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-tree { font-size: 13px; }
+.am-tree-root { display: flex; justify-content: center; position: relative; padding-bottom: 18px; }
+.am-tree-root::after { content: ""; position: absolute; bottom: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+.am-tree-root--solo { padding-bottom: 12px; }
+.am-tree-root--solo::after { display: none; }
+.am-tree-box {
+  border: var(--node-width, var(--bw)) solid var(--node-stroke, var(--line)); background: var(--node-fill, var(--paper)); padding: 6px 14px; text-align: center;
+  border-radius: var(--node-radius, var(--radius)); font-weight: 600; color: var(--node-text, inherit); filter: var(--node-shadow, none);
+}
+.am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: 12px; }
+/* The root box and a highlighted box are emphasis: they take the highlight tokens. With none set the root box keeps its accent tint and a highlighted box looks like any other. */
+.am-tree-box--root, .am-tree-box--hi { border-color: var(--hi-stroke, var(--node-stroke, var(--line))); color: var(--hi-text, var(--node-text, inherit)); }
+.am-tree-box--root { background: var(--hi-fill, var(--accent-bg)); }
+.am-tree-box--hi { background: var(--hi-fill, var(--node-fill, var(--paper))); }
+.am-tree-box--root small, .am-tree-box--hi small { color: var(--hi-text, var(--ink-2)); }
+.am-tree-box--root { font-size: 15px; padding: 8px 28px; }
+.am-tree-cols { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); }
+.am-tree-col { position: relative; padding: 18px 8px 0; min-width: 0; }
+.am-tree-col::before { content: ""; position: absolute; top: 0; left: 0; right: 0; border-top: var(--bw) solid var(--line); }
+.am-tree-col:first-child::before { inset-inline-start: 50%; }
+.am-tree-col:last-child::before { inset-inline-end: 50%; }
+.am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+.am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
+.am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
+.am-tree-list ul { margin-inline-start: 16px; }
+.am-tree-list li { position: relative; padding: 3px 0; padding-inline-start: 18px; }
+.am-tree-list li::before { content: ""; position: absolute; inset-inline-start: 0; top: 0.95em; width: 12px; border-top: 1px solid var(--ink-3); }
+.am-tree-list li::after { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; border-inline-start: 1px solid var(--ink-3); }
+.am-tree-list li:last-child::after { bottom: auto; height: 0.95em; }
+.am-tree-tag { font: 11px var(--font-mono); color: var(--ink-3); margin-inline-end: 4px; }
+.am-tree code { font: 12px var(--font-mono); }
+.am-tree-sub { display: block; font-size: 11.5px; color: var(--ink-2); }
+.am-tree-hi > .am-tree-label { color: var(--accent); font-weight: 600; }
+
+/* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+/* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
+.am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
+.am-diagram text { fill: var(--ink, #16181d); font-size: 13px; }
+/* Diagram tokens (docs/reference.md, "Diagram tokens"): each painted part reads an optional token and falls back to the look it always had,
+   so a theme that sets none of them draws the same diagram. Font family, size and weight are not tokens: diagram text is measured for the sans font. */
+.am-node-shape { fill: var(--node-fill, var(--paper, #ffffff)); stroke: var(--node-stroke, var(--line, #1d2026)); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); }
+/* A cylinder is two shapes (body, then cap): only the body casts the shadow. */
+.am-node-shape ~ .am-node-shape { filter: none; }
+/* The corner radius is an SVG attribute (the fallback for Safari before 17.4, which ignores a CSS rx); the default here equals the attribute. A pill and a diamond keep their shape. */
+.am-node--rect .am-node-shape, .am-node--er .am-node-shape { rx: var(--node-radius, 3px); }
+.am-node--hi .am-node-shape { fill: var(--hi-fill, var(--accent-bg, #e4ecf8)); stroke: var(--hi-stroke, var(--accent, #1d5fbf)); }
+.am-diagram .am-node-text { fill: var(--node-text, var(--ink, #16181d)); }
+.am-node--hi text { fill: var(--hi-text, var(--accent, #1d5fbf)); font-weight: 600; }
+.am-diagram .am-node--hi .am-node-text { fill: var(--hi-text, var(--accent, #1d5fbf)); }
+.am-edge { fill: none; stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
+.am-edge--dashed { stroke-dasharray: 5 4; }
+.am-arrow { fill: var(--edge-color, var(--ink-2, #4b5260)); }
+.am-edge-label rect { fill: var(--paper, #ffffff); }
+.am-diagram .am-edge-label text { fill: var(--edge-label, var(--accent, #1d5fbf)); font-size: 11.5px; }
+.am-cluster { fill: var(--cluster-fill, var(--fill, #f3f5f8)); stroke: var(--cluster-stroke, var(--line-2, #d6dae1)); stroke-width: 1; stroke-dasharray: 4 3; }
+.am-diagram .am-cluster-label { fill: var(--ink-2, #4b5260); font: 11px var(--font-mono, monospace); }
+/* The PK / FK / UK marks of an entity follow the node text, and the highlighted text in a highlighted entity, so they stay readable on the theme's fills. */
+.am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
+.am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
+.am-lifeline { stroke: var(--lifeline-color, var(--ink-3, #8b929e)); stroke-width: 1; stroke-dasharray: 4 4; }
+/* An actor (and the box of a divider) looks like a node unless the theme sets the actor tokens. */
+.am-actor { fill: var(--actor-fill, var(--node-fill, var(--paper, #ffffff))); stroke: var(--actor-stroke, var(--node-stroke, var(--line, #1d2026))); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); rx: var(--node-radius, 2px); }
+.am-diagram .am-actor-text { fill: var(--actor-text, var(--node-text, var(--ink, #16181d))); }
+.am-note { fill: var(--note-fill, var(--warn-bg, #fdf3e2)); stroke: var(--note-stroke, var(--warn, #a8620a)); stroke-width: var(--note-width, 1); rx: var(--note-radius, 2px); }
+.am-diagram .am-step { fill: var(--ink-3, #8b929e); font: 10px var(--font-mono, monospace); }
+
+.am-diagram-expand {
+  /* In flow and sticky: it sits at the end edge (right on a left-to-right page) and stays in view when the diagram scrolls sideways.
+     It takes its own row above the drawing, so it never covers a node at the top-right corner of the drawing. */
+  position: sticky; inset-inline-start: calc(100% - 36px); z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; margin: 0 0 4px; margin-inline: auto 8px;
+  color: var(--ink-2); background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2); border-radius: var(--radius);
+  cursor: pointer; opacity: 0.72;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+}
+.am-diagram:hover .am-diagram-expand,
+.am-diagram-expand:focus-visible { opacity: 1; }
+.am-diagram-expand:hover {
+  opacity: 1; color: var(--ink); border-color: var(--accent); background: var(--fill);
+}
+.am-diagram-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* \u2500\u2500 Diagram Lightbox and Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column;
+  touch-action: none;
+}
+.am-lightbox[hidden] { display: none !important; }
+
+.am-lightbox-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.am-lightbox-header {
+  position: absolute; top: 12px; left: 24px; right: 24px; height: 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  z-index: 10; pointer-events: none;
+}
+.am-lightbox-title {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  font: 13px/1 var(--font-sans, sans-serif); font-weight: 500;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw;
+}
+.am-lightbox-title svg { stroke: rgba(255, 255, 255, 0.85); flex-shrink: 0; }
+.am-lightbox-actions {
+  display: flex; align-items: center; gap: 8px; pointer-events: auto;
+}
+.am-lightbox-close {
+  width: 32px; height: 32px;
+  background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2);
+  border-radius: 50%;
+  color: var(--ink);
+  font-size: 15px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s, color 0.15s, transform 0.15s, border-color 0.15s;
+}
+.am-lightbox-close:hover {
+  color: var(--accent); border-color: var(--accent); background: var(--fill); transform: scale(1.05);
+}
+.am-lightbox-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.am-lightbox-stage {
+  position: absolute;
+  top: 54px; bottom: 20px; left: 24px; right: 24px;
+  background: var(--paper);
+  border: var(--bw, 1px) solid var(--line-2);
+  border-radius: max(var(--radius), 14px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.am-lightbox-stage.am-panning { cursor: grabbing; }
+
+.am-lightbox-canvas {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+  pointer-events: none;
+}
+.am-lightbox-canvas svg {
+  max-width: none !important;
+  max-height: none !important;
+  display: block;
+  font-family: var(--font-sans, sans-serif);
+}
+
+/* \u2500\u2500 doc template \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
+.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
+.am-toc { position: sticky; top: 24px; font-size: 13px; }
+.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }
+.am-toc a:hover { color: var(--ink); border-inline-start-color: var(--accent); }
+.am-doc-body > .am-panel + .am-panel { margin-top: 20px; }
+
+/* \u2500\u2500 Responsive and print \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+@media (max-width: 1100px) {
+  .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .am-grid > .am-panel { grid-column: auto !important; }
+  .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 760px) {
+  .am-sheet, .am-doc { padding: 56px 12px 24px; }
+  .am-head { padding-inline-end: 0; }
+  .am-grid { grid-template-columns: minmax(0, 1fr); }
+  .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
+  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }
+  .am-toc { position: static; }
+  .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
+  /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about
+     two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)
+     gives a table panel the width its columns read well at. */
+  .am-md th, .am-md td { min-width: 8em; }
+  .am-diagram svg { max-width: none; }
+  .am-lightbox-header { top: 8px; left: 12px; right: 12px; }
+  .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }
+}
+.am-colophon { margin: 0 0 8px; font: 11px var(--font-mono); color: var(--ink-3); }
+.am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+@media print {
+  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  body { background: var(--paper); }
+  .am-panel { break-inside: avoid; box-shadow: none; }
+}
+/* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
+   (a wide table, a wide diagram): one panel per row instead. */
+@media print and (max-width: 1100px) {
+  .am-grid { grid-template-columns: minmax(0, 1fr); }
+  .am-grid > .am-panel { grid-column: auto !important; }
+}
+.am-panel--bare { border: 0; background: transparent; box-shadow: none; }
+.am-panel--bare > .am-panel-body { padding: 0; }
+.am-panel--bare .am-kv { background: var(--paper); }
+
+/* Remark mode: block marks with a note, collected into the Reply copy (src/runtime/remark.js). Each kind borrows a status colour of
+   the theme, so a mark reads in light and dark mode on every theme. */
+.am-btn--remark.is-on { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }
+:is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }
+:is(.am-mark, .am-remark-kind)[data-kind="concern"] { --mark: var(--err); --mark-bg: var(--err-bg); }
+.am-mark { border-inline-start: 3px solid var(--mark); padding-inline-start: 10px; background: var(--mark-bg); border-radius: 1px; }
+/* The note chip sits inside the marked block (a table takes it as its caption, a list item puts it before its sub-list), so lists and
+   grids keep their children. */
+.am-mark-note {
+  display: block; margin-block-start: 4px; font: 12px/1.5 var(--font-sans); letter-spacing: normal; text-transform: none;
+  color: var(--ink-2); white-space: pre-wrap; caption-side: bottom; text-align: start;
+}
+.am-mark-note b { color: var(--ink); font-weight: 600; }
+caption.am-mark-note { display: table-caption; }
+/* Table rows have their own backgrounds, so a tint on the table would show on every other row only: the bar marks a table. */
+table.am-mark { background: none; }
+.am-remark-pop {
+  position: absolute; z-index: 40; width: min(264px, calc(100vw - 16px)); padding: 8px; display: grid; gap: 6px;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14);
+}
+.am-remark-pop[hidden] { display: none; }
+.am-remark-kinds { display: flex; gap: 6px; flex-wrap: wrap; }
+.am-remark-kind { font: 12px/1 var(--font-sans); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line-2); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.am-remark-kind:hover { border-color: var(--ink-3); }
+.am-remark-kind[aria-pressed="true"] { color: var(--ink); border-color: var(--mark); background: var(--mark-bg); }
+.am-remark-kind:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.am-remark-pop textarea { font: 13px/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }
+.am-remark-actions { display: flex; gap: 6px; }
+.am-remark-actions .am-btn:disabled { opacity: .5; cursor: default; }
+@media print { .am-remark-pop { display: none !important; } }
 `;
+var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.\n  const carrier = document.querySelector('.am-toolbar');\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // The button reads its label from data-done for a moment after a copy.\n  const flash = (btn) => {\n    const original = btn.textContent;\n    btn.textContent = btn.dataset.done;\n    setTimeout(() => { btn.textContent = original; }, 1400);\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  copyBtn?.addEventListener('click', async () => {\n    const nodes = document.querySelectorAll('#am-source');\n    await copyText(nodes[nodes.length - 1]?.value ?? '');\n    flash(copyBtn);\n  });\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash(btn);\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const why = same ? (d.touched ? ui.confirmed : ui.untouched) : `${ui.was}: ${d.suggested.join(', ') || '\u2014'}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page.\n    if (state && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      if (state.touched) touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    let kind = mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    keep.addEventListener('click', () => {\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const kindBtns = KINDS.map((k) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => {\n        kind = k;\n        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));\n        keep.disabled = false;\n      });\n      return kb;\n    });\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n})();\n";
 var DIFF_CSS = "/* Diff block (only on pages that have one): red and green lines, a hunk row, and two gutters, old and new, drawn from data-o / data-n.\n   The hues are fixed and mixed into the theme's own --fill and --ink, so they read as green and red in every theme, light and dark. */\n.am-codeblock--diff { --diff-add: #1f9d4d; --diff-del: #d1344a; }\n.am-code-stat { display: inline-flex; gap: 6px; flex: none; font: 12px/1.3 var(--font-mono); }\n.am-code-stat-add { color: color-mix(in srgb, var(--diff-add) 75%, var(--ink)); }\n.am-code-stat-del { color: color-mix(in srgb, var(--diff-del) 75%, var(--ink)); }\n.am-code--diff .am-ln { display: flex; padding: 0 14px 0 0; }\n.am-code--diff:not(.am-code--dnum) .am-ln { padding-left: 14px; }\n.am-code--dnum .am-ln::before, .am-code--dnum .am-ln::after {\n  flex: none; box-sizing: content-box; width: 3.5ch; padding: 0 6px; text-align: right; color: var(--ink-3);\n  user-select: none; -webkit-user-select: none;\n}\n.am-code--dnum .am-ln::before { content: attr(data-o); order: -2; }\n.am-code--dnum .am-ln::after { content: attr(data-n); order: -1; margin-right: 10px; }\n.am-ln--add { background: color-mix(in srgb, var(--diff-add) 14%, var(--fill)); }\n.am-ln--del { background: color-mix(in srgb, var(--diff-del) 14%, var(--fill)); }\n.am-ln--add::before, .am-ln--add::after { background: color-mix(in srgb, var(--diff-add) 28%, var(--fill)); }\n.am-ln--del::before, .am-ln--del::after { background: color-mix(in srgb, var(--diff-del) 28%, var(--fill)); }\n.am-code--diff .am-ln--hl { box-shadow: none; }\n.am-code--diff .am-ln--hl::before { box-shadow: inset 3px 0 0 var(--accent); }\n.am-code--diff .am-ln--ctx.am-ln--hl { background: var(--accent-bg); }\n.am-code--diff .am-ln--hunk { display: block; min-height: 0; padding: 1px 14px; font-size: 11.5px; color: var(--ink-3); background: color-mix(in srgb, var(--accent) 8%, var(--fill)); }\n.am-code--dnum .am-ln--hunk::before, .am-code--dnum .am-ln--hunk::after { content: none; }\n.am-code--diff .am-ln--meta { display: none; }\n";
 var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Changes view (.am-view-changes) draws change styling: colors, strike-through, faded items
    and badges. Before and After look like a plain diagram, and the items that do not exist in the view are hidden.
@@ -193,7 +672,7 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 .am-delta-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media print { .am-delta-switch { display: none !important; } }
 `;
-var RTL_CSS = '/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout\n   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */\n\n/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */\nhtml[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }\nhtml[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }\n\n/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width\n   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */\nhtml[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,\nhtml[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,\nhtml[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,\nhtml[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {\n  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;\n}\nhtml[dir="rtl"] .am-head h1 { letter-spacing: normal; }\n/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */\nhtml[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }\n\n/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */\nhtml[dir="rtl"] .am-diagram svg { direction: rtl; }\n\n/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */\nhtml[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }\nhtml[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }\n\n/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left\n   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the\n   start of its note would otherwise run together as one left-to-right piece. */\nhtml[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }\n\n/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of\n   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */\nhtml[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }\n@container (max-width: 560px) {\n  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }\n}\n\n/* Reply sheet: a textarea gives the whole Markdown reply one direction, so "1. [E] ..." and "# Re: ..." came out reordered.\n   src/runtime/reply-view.js draws the reply instead, each line in its own direction; the textarea stays as the copy source. */\nhtml[dir="rtl"] .am-reply--view textarea {\n  position: absolute; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; resize: none;\n}\nhtml[dir="rtl"] .am-reply-view {\n  max-height: min(60vh, 26em); overflow: auto; padding: 10px 12px; font: 14px/1.6 var(--font-sans); color: var(--ink);\n  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); overflow-wrap: anywhere;\n}\nhtml[dir="rtl"] .am-reply-view:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }\nhtml[dir="rtl"] .am-reply-view > div { text-align: start; unicode-bidi: isolate; }\nhtml[dir="rtl"] .am-rv-gap { height: .5em; }\nhtml[dir="rtl"] .am-rv-h1 { font-weight: 700; font-size: 15px; }\nhtml[dir="rtl"] .am-rv-h2 { font-weight: 700; color: var(--ink-2); margin-top: 2px; }\nhtml[dir="rtl"] .am-rv-tag {\n  display: inline-block; min-width: 1.6em; padding: 0 4px; font-size: 12px; line-height: 1.5; text-align: center;\n  color: var(--ink-2); border: 1px solid var(--line-2); border-radius: var(--radius);\n}\nhtml[dir="rtl"] .am-rv-a { padding-inline-start: 1.6em; }\nhtml[dir="rtl"] .am-rv-a em { color: var(--ink-2); }\nhtml[dir="rtl"] .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }\n\n/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.\n   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play\n   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */\nhtml[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-titleblock { text-align: right; }\n/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */\nhtml[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }\nhtml[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-controls { direction: ltr; }\n\n/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */\nhtml[dir="rtl"] pre .am-mark-note { direction: rtl; }\n/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */\nhtml[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }\n';
+var RTL_CSS = '/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout\n   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */\n\n/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */\nhtml[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }\nhtml[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }\n\n/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width\n   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */\nhtml[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,\nhtml[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,\nhtml[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,\nhtml[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {\n  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;\n}\nhtml[dir="rtl"] .am-head h1 { letter-spacing: normal; }\n/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */\nhtml[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }\n\n/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */\nhtml[dir="rtl"] .am-diagram svg { direction: rtl; }\n\n/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */\nhtml[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }\nhtml[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }\n\n/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left\n   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the\n   start of its note would otherwise run together as one left-to-right piece. */\nhtml[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }\n\n/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of\n   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */\nhtml[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }\n@container (max-width: 560px) {\n  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }\n}\n\n/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.\n   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play\n   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */\nhtml[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-titleblock { text-align: right; }\n/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */\nhtml[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }\nhtml[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-controls { direction: ltr; }\n\n/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */\nhtml[dir="rtl"] pre .am-mark-note { direction: rtl; }\n/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */\nhtml[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }\n';
 var MATH_CSS = `/*
 Temml.woff2 is a clone of KaTeX_Script-Regular, except that the code points
 have been changed from ASCII to Unicode Mathematical Alphanumeric Symbols Script capitals,
@@ -579,6 +1058,7 @@ math:not(.tml-display) { max-width: 100%; overflow-x: auto; overflow-y: hidden; 
   padding: 1px 5px; border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 `;
+var FONT_CSS = { "bangers": '/* Bangers, Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers), SIL Open Font License 1.1 (https://openfontlicense.org) */\n@font-face {\n  font-family: "Bangers";\n  font-style: normal;\n  font-weight: 400 900;\n  src: url(data:font/woff2;base64,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) format("woff2");\n}' };
 var DELTA_JS = "\n// \u2500\u2500 Change markers: the Before / Changes / After switch \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// The switch starts hidden because it needs this script. It swaps the am-view-* class of its diagram; the delta styles show the colors and badges only in\n// the Changes view and hide the items that do not exist in the view.\n(() => {\n  const VIEWS = ['before', 'changes', 'after'];\n  const setView = (el, view) => {\n    el.classList.remove(...VIEWS.map((v) => `am-view-${v}`));\n    el.classList.add(`am-view-${view}`);\n  };\n  for (const bar of document.querySelectorAll('.am-delta-bar')) {\n    const view = bar.parentElement;\n    const group = bar.querySelector('.am-delta-switch');\n    if (!group) continue;\n    group.hidden = false;\n    group.addEventListener('click', (e) => {\n      const btn = e.target.closest('button[data-view]');\n      if (!btn) return;\n      setView(view, btn.dataset.view);\n      for (const b of group.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === btn));\n    });\n  }\n  // The expand button copies only the drawing into the viewer; the viewer shows the view the diagram is in.\n  document.addEventListener('click', (e) => {\n    const host = e.target.closest?.('.am-diagram-expand')?.parentElement;\n    const canvas = document.querySelector('.am-lightbox-canvas');\n    const view = host && VIEWS.find((v) => host.classList.contains(`am-view-${v}`));\n    if (view && canvas) setView(canvas, view);\n  });\n})();\n";
 var UPDATE_CSS = "/* New-version button and popover (src/render.js adds this file only to a page that has the button). The popover sits under the\n   toolbar and stays hidden unless open, so a browser without native popovers never shows it. */\n.am-btn--update { color: var(--ok); border-color: var(--ok); white-space: nowrap; }\n.am-update { display: none; }\n.am-update:popover-open {\n  display: block; position: fixed; inset-block: 52px auto; inset-inline: auto 12px; margin: 0; width: min(380px, calc(100vw - 24px));\n  padding: 14px 16px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n.am-update p { margin: 0 0 8px; }\n.am-update-title { font-weight: 600; color: var(--ok); }\n.am-update-label { color: var(--ink-2); font-size: 12px; }\n.am-update-notes { margin: 0 0 12px; padding-inline-start: 18px; }\n.am-update-notes li { margin: 2px 0; }\n.am-update-notes code { font-size: 12px; }\n.am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }\n.am-update-row > :first-child {\n  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;\n  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);\n}\n.am-update a { color: var(--accent); font-size: 12px; }\n/* A phone has no room for the words: the button keeps only its dot, and its aria-label still names the version. */\n@media (max-width: 760px) {\n  .am-btn--update .am-update-text { display: none; }\n}\n@media print {\n  .am-update { display: none !important; }\n}\n";
 var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds this script after the page script.
@@ -604,6 +1084,52 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
 })();
 `;
 var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n  });\n})();\n";
+var CLOSE_AFTER_CSS = "/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the\n   window in the top layer and stays hidden unless open. */\n.am-closing { display: none; }\n.am-closing:popover-open {\n  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  padding: 10px 14px; font-size: 13px; color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n@media print {\n  .am-closing { display: none !important; }\n}\n";
+var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src/render.js adds this script after the page script. When the reply is copied,
+// the reply sheet closes and a popover counts down to closing the tab. Browsers close only a tab no link has moved on, so a tab that
+// stays open says it can be closed. A browser without native popovers does nothing.
+(() => {
+  const ui = JSON.parse(document.querySelector('[data-am="reply"]')?.dataset.ui ?? '{}');
+  const after = ui.closeAfter;
+  if (!after || !Object.hasOwn(HTMLElement.prototype, 'popover')) return;
+  const note = Object.assign(document.createElement('div'), { className: 'am-closing' });
+  note.setAttribute('popover', 'manual');
+  note.setAttribute('role', 'status');
+  const text = document.createElement('span');
+  const keep = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: after.keep });
+  note.append(text, keep);
+  document.body.append(note);
+
+  let timer, check;
+  const stop = () => {
+    clearInterval(timer);
+    clearTimeout(check);
+    if (note.matches(':popover-open')) note.hidePopover();
+  };
+  keep.addEventListener('click', stop);
+
+  document.addEventListener('am-reply-copied', () => {
+    stop();
+    document.querySelector('dialog.am-reply')?.close();
+    let left = after.seconds;
+    const show = () => { text.textContent = after.closing.replace('{n}', left); };
+    keep.textContent = after.keep;
+    show();
+    note.showPopover();
+    timer = setInterval(() => {
+      left -= 1;
+      if (left > 0) return show();
+      clearInterval(timer);
+      window.close();
+      // Still here: the browser refused to close the tab.
+      check = setTimeout(() => {
+        text.textContent = after.closeFailed;
+        keep.textContent = ui.close;
+      }, 300);
+    }, 1000);
+  });
+})();
+`;
 var VIDEO_CSS = `/* Video player: the 1920\xD71080 stage scales to the window. All colors come from theme variables.
    Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
 html[data-video] {
@@ -771,7 +1297,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join9, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
+import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
 import { spawn as spawn4 } from "node:child_process";
 
 // src/languages/zh.js
@@ -802,8 +1328,9 @@ var zh_default = {
       comment: "\u8BC4\u8BBA",
       commentHint: "\u5BF9\u8FD9\u4E2A\u9762\u677F\u7684\u610F\u89C1",
       title: "\u4F60\u7684\u56DE\u590D",
-      hint: "\u590D\u5236\u540E\u7C98\u8D34\u5230\u5BF9\u8BDD\u91CC\u3002",
+      hint: "\u590D\u5236\u540E\u7C98\u8D34\u56DE\u548C Agent \u7684\u5BF9\u8BDD\uFF0C\u5B83\u4F1A\u6309\u4F60\u7684\u9009\u62E9\u548C\u610F\u89C1\u7EE7\u7EED\u3002",
       copy: "\u590D\u5236\u56DE\u590D",
+      copyFailed: "\u590D\u5236\u5931\u8D25 \u2014 \u8BF7\u6309 Cmd/Ctrl+C",
       close: "\u5173\u95ED",
       suggested: "\u5EFA\u8BAE",
       empty: "\u5148\u9009\u62E9\u9009\u9879\uFF0C\u6216\u5728\u9762\u677F\u4E0A\u5199\u8BC4\u8BBA\u3002",
@@ -812,8 +1339,12 @@ var zh_default = {
       confirmed: "\u786E\u8BA4\u4E86\u5EFA\u8BAE",
       untouched: "\u672A\u4F5C\u7B54\uFF0C\u4FDD\u7559\u5EFA\u8BAE",
       was: "\u539F\u4E3A",
-      typed: '\u4EE5 ">" \u5F00\u5934\u7684\u884C\u662F\u8BFB\u8005\u8F93\u5165\u7684\u6587\u5B57\u3002'
+      typed: '\u4EE5 ">" \u5F00\u5934\u7684\u884C\u662F\u8BFB\u8005\u8F93\u5165\u7684\u6587\u5B57\u3002',
+      raw: "\u67E5\u770B\u5C06\u590D\u5236\u7684\u6587\u672C",
+      preview: "\u9884\u89C8",
+      count: { answered: "\u5DF2\u4F5C\u7B54 {n} \u9879", comments: "\u8BC4\u8BBA {n} \u6761", remarks: "\u6807\u6CE8 {n} \u5904" }
     },
+    closeAfter: { closing: "{n} \u79D2\u540E\u5173\u95ED\u6B64\u6807\u7B7E\u9875", keep: "\u4FDD\u6301\u6253\u5F00", closeFailed: "\u56DE\u590D\u5DF2\u590D\u5236\uFF0C\u73B0\u5728\u53EF\u4EE5\u5173\u95ED\u6B64\u6807\u7B7E\u9875\u3002" },
     toc: "\u76EE\u5F55",
     flow: "\u6D41\u7A0B\u56FE",
     sequence: "\u65F6\u5E8F\u56FE",
@@ -874,8 +1405,9 @@ var zh_Hant_default = {
       comment: "\u8A55\u8AD6",
       commentHint: "\u5C0D\u9019\u500B\u9762\u677F\u7684\u610F\u898B",
       title: "\u4F60\u7684\u56DE\u8986",
-      hint: "\u8907\u88FD\u5F8C\u8CBC\u5230\u5C0D\u8A71\u88E1\u3002",
+      hint: "\u8907\u88FD\u5F8C\u8CBC\u56DE\u548C Agent \u7684\u5C0D\u8A71\uFF0C\u5B83\u6703\u6309\u4F60\u7684\u9078\u64C7\u548C\u610F\u898B\u7E7C\u7E8C\u3002",
       copy: "\u8907\u88FD\u56DE\u8986",
+      copyFailed: "\u8907\u88FD\u5931\u6557 \u2014 \u8ACB\u6309 Cmd/Ctrl+C",
       close: "\u95DC\u9589",
       suggested: "\u5EFA\u8B70",
       empty: "\u5148\u9078\u64C7\u9078\u9805\uFF0C\u6216\u5728\u9762\u677F\u4E0A\u5BEB\u8A55\u8AD6\u3002",
@@ -884,8 +1416,12 @@ var zh_Hant_default = {
       confirmed: "\u78BA\u8A8D\u4E86\u5EFA\u8B70",
       untouched: "\u672A\u4F5C\u7B54\uFF0C\u4FDD\u7559\u5EFA\u8B70",
       was: "\u539F\u70BA",
-      typed: '\u4EE5 ">" \u958B\u982D\u7684\u884C\u662F\u8B80\u8005\u8F38\u5165\u7684\u6587\u5B57\u3002'
+      typed: '\u4EE5 ">" \u958B\u982D\u7684\u884C\u662F\u8B80\u8005\u8F38\u5165\u7684\u6587\u5B57\u3002',
+      raw: "\u67E5\u770B\u5C07\u8907\u88FD\u7684\u6587\u5B57",
+      preview: "\u9810\u89BD",
+      count: { answered: "\u5DF2\u4F5C\u7B54 {n} \u9805", comments: "\u8A55\u8AD6 {n} \u5247", remarks: "\u6A19\u8A3B {n} \u8655" }
     },
+    closeAfter: { closing: "{n} \u79D2\u5F8C\u95DC\u9589\u6B64\u5206\u9801", keep: "\u4FDD\u6301\u958B\u555F", closeFailed: "\u56DE\u8986\u5DF2\u8907\u88FD\uFF0C\u73FE\u5728\u53EF\u4EE5\u95DC\u9589\u6B64\u5206\u9801\u3002" },
     toc: "\u76EE\u9304",
     flow: "\u6D41\u7A0B\u5716",
     sequence: "\u6642\u5E8F\u5716",
@@ -940,8 +1476,9 @@ var en_default = {
       comment: "Comment",
       commentHint: "Your comment on this panel",
       title: "Your reply",
-      hint: "Copy it and paste it into the chat.",
+      hint: "Copy it and paste it into your chat with the agent; it continues from your choices and comments.",
       copy: "Copy reply",
+      copyFailed: "Copy failed \u2014 press Cmd/Ctrl+C",
       close: "Close",
       suggested: "suggested",
       empty: "Pick options, or comment on a panel first.",
@@ -950,8 +1487,12 @@ var en_default = {
       confirmed: "suggestion confirmed",
       untouched: "not answered; suggestion kept",
       was: "was",
-      typed: 'Lines that start with ">" are text the reader typed.'
+      typed: 'Lines that start with ">" are text the reader typed.',
+      raw: "Show the text that gets copied",
+      preview: "Preview",
+      count: { answered: "Answered: {n}", comments: "Comments: {n}", remarks: "Remarks: {n}" }
     },
+    closeAfter: { closing: "Closing this tab in {n}s", keep: "Keep open", closeFailed: "Reply copied. You can close this tab now." },
     toc: "Contents",
     flow: "Flowchart",
     sequence: "Sequence diagram",
@@ -1012,8 +1553,9 @@ var ja_default = {
       comment: "\u30B3\u30E1\u30F3\u30C8",
       commentHint: "\u3053\u306E\u30D1\u30CD\u30EB\u3078\u306E\u30B3\u30E1\u30F3\u30C8",
       title: "\u3042\u306A\u305F\u306E\u8FD4\u4FE1",
-      hint: "\u30B3\u30D4\u30FC\u3057\u3066\u30C1\u30E3\u30C3\u30C8\u306B\u8CBC\u308A\u4ED8\u3051\u3066\u304F\u3060\u3055\u3044\u3002",
+      hint: "\u30B3\u30D4\u30FC\u3057\u3066\u30A8\u30FC\u30B8\u30A7\u30F3\u30C8\u3068\u306E\u30C1\u30E3\u30C3\u30C8\u306B\u8CBC\u308A\u4ED8\u3051\u308B\u3068\u3001\u3042\u306A\u305F\u306E\u9078\u629E\u3068\u30B3\u30E1\u30F3\u30C8\u3092\u3082\u3068\u306B\u7D9A\u884C\u3057\u307E\u3059\u3002",
       copy: "\u8FD4\u4FE1\u3092\u30B3\u30D4\u30FC",
+      copyFailed: "\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093 \u2014 Cmd/Ctrl+C \u3092\u62BC\u3057\u3066\u304F\u3060\u3055\u3044",
       close: "\u9589\u3058\u308B",
       suggested: "\u63A8\u5968",
       empty: "\u9078\u629E\u80A2\u3092\u9078\u3076\u304B\u3001\u30D1\u30CD\u30EB\u306B\u30B3\u30E1\u30F3\u30C8\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
@@ -1022,8 +1564,12 @@ var ja_default = {
       confirmed: "\u63A8\u5968\u3092\u78BA\u8A8D",
       untouched: "\u672A\u56DE\u7B54\uFF08\u63A8\u5968\u306E\u307E\u307E\uFF09",
       was: "\u5909\u66F4\u524D",
-      typed: "\u300C>\u300D\u3067\u59CB\u307E\u308B\u884C\u306F\u8AAD\u8005\u304C\u5165\u529B\u3057\u305F\u6587\u5B57\u3067\u3059\u3002"
+      typed: "\u300C>\u300D\u3067\u59CB\u307E\u308B\u884C\u306F\u8AAD\u8005\u304C\u5165\u529B\u3057\u305F\u6587\u5B57\u3067\u3059\u3002",
+      raw: "\u30B3\u30D4\u30FC\u3055\u308C\u308B\u30C6\u30AD\u30B9\u30C8\u3092\u8868\u793A",
+      preview: "\u30D7\u30EC\u30D3\u30E5\u30FC",
+      count: { answered: "\u56DE\u7B54\u6E08\u307F {n} \u4EF6", comments: "\u30B3\u30E1\u30F3\u30C8 {n} \u4EF6", remarks: "\u6CE8\u8A18 {n} \u4EF6" }
     },
+    closeAfter: { closing: "{n} \u79D2\u5F8C\u306B\u3053\u306E\u30BF\u30D6\u3092\u9589\u3058\u307E\u3059", keep: "\u958B\u3044\u305F\u307E\u307E\u306B\u3059\u308B", closeFailed: "\u8FD4\u4FE1\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\u3002\u3053\u306E\u30BF\u30D6\u3092\u9589\u3058\u3066\u69CB\u3044\u307E\u305B\u3093\u3002" },
     toc: "\u76EE\u6B21",
     flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
     sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
@@ -1082,8 +1628,9 @@ var he_default = {
       comment: "\u05D4\u05E2\u05E8\u05D4",
       commentHint: "\u05D4\u05D4\u05E2\u05E8\u05D4 \u05E9\u05DC\u05DA \u05E2\u05DC \u05D4\u05D7\u05DC\u05E7 \u05D4\u05D6\u05D4",
       title: "\u05D4\u05EA\u05D2\u05D5\u05D1\u05D4 \u05E9\u05DC\u05DA",
-      hint: "\u05D4\u05E2\u05EA\u05D9\u05E7\u05D5 \u05D5\u05D4\u05D3\u05D1\u05D9\u05E7\u05D5 \u05D0\u05D5\u05EA\u05D4 \u05D1\u05E6\u05F3\u05D0\u05D8.",
+      hint: "\u05D4\u05E2\u05EA\u05D9\u05E7\u05D5 \u05D5\u05D4\u05D3\u05D1\u05D9\u05E7\u05D5 \u05D1\u05E9\u05D9\u05D7\u05D4 \u05E2\u05DD \u05D4\u05E1\u05D5\u05DB\u05DF; \u05D4\u05D5\u05D0 \u05D9\u05DE\u05E9\u05D9\u05DA \u05DC\u05E4\u05D9 \u05D4\u05D1\u05D7\u05D9\u05E8\u05D5\u05EA \u05D5\u05D4\u05D4\u05E2\u05E8\u05D5\u05EA \u05E9\u05DC\u05DB\u05DD.",
       copy: "\u05D4\u05E2\u05EA\u05E7\u05EA \u05D4\u05EA\u05D2\u05D5\u05D1\u05D4",
+      copyFailed: "\u05D4\u05D4\u05E2\u05EA\u05E7\u05D4 \u05E0\u05DB\u05E9\u05DC\u05D4 \u2014 \u05D4\u05E7\u05D9\u05E9\u05D5 Cmd/Ctrl+C",
       close: "\u05E1\u05D2\u05D9\u05E8\u05D4",
       suggested: "\u05DE\u05D5\u05DE\u05DC\u05E5",
       empty: "\u05E7\u05D5\u05D3\u05DD \u05D1\u05D7\u05E8\u05D5 \u05D0\u05E4\u05E9\u05E8\u05D5\u05EA \u05D0\u05D5 \u05DB\u05EA\u05D1\u05D5 \u05D4\u05E2\u05E8\u05D4 \u05E2\u05DC \u05D0\u05D7\u05D3 \u05D4\u05D7\u05DC\u05E7\u05D9\u05DD.",
@@ -1092,8 +1639,12 @@ var he_default = {
       confirmed: "\u05D4\u05D4\u05DE\u05DC\u05E6\u05D4 \u05D0\u05D5\u05E9\u05E8\u05D4",
       untouched: "\u05DC\u05D0 \u05E0\u05E2\u05E0\u05D4; \u05D4\u05D4\u05DE\u05DC\u05E6\u05D4 \u05E0\u05E9\u05D0\u05E8\u05D4",
       was: "\u05D4\u05D9\u05D4",
-      typed: '\u05E9\u05D5\u05E8\u05D5\u05EA \u05E9\u05DE\u05EA\u05D7\u05D9\u05DC\u05D5\u05EA \u05D1-">" \u05D4\u05DF \u05D8\u05E7\u05E1\u05D8 \u05E9\u05D4\u05E7\u05D5\u05E8\u05D0 \u05D4\u05E7\u05DC\u05D9\u05D3.'
+      typed: '\u05E9\u05D5\u05E8\u05D5\u05EA \u05E9\u05DE\u05EA\u05D7\u05D9\u05DC\u05D5\u05EA \u05D1-">" \u05D4\u05DF \u05D8\u05E7\u05E1\u05D8 \u05E9\u05D4\u05E7\u05D5\u05E8\u05D0 \u05D4\u05E7\u05DC\u05D9\u05D3.',
+      raw: "\u05D4\u05E6\u05D2\u05EA \u05D4\u05D8\u05E7\u05E1\u05D8 \u05E9\u05D9\u05D5\u05E2\u05EA\u05E7",
+      preview: "\u05EA\u05E6\u05D5\u05D2\u05D4 \u05DE\u05E7\u05D3\u05D9\u05DE\u05D4",
+      count: { answered: "\u05E0\u05E2\u05E0\u05D5: {n}", comments: "\u05D4\u05E2\u05E8\u05D5\u05EA: {n}", remarks: "\u05E1\u05D9\u05DE\u05D5\u05E0\u05D9\u05DD: {n}" }
     },
+    closeAfter: { closing: "\u05D4\u05DC\u05E9\u05D5\u05E0\u05D9\u05EA \u05EA\u05D9\u05E1\u05D2\u05E8 \u05D1\u05E2\u05D5\u05D3 {n} \u05E9\u05E0\u05D9\u05D5\u05EA", keep: "\u05DC\u05D4\u05E9\u05D0\u05D9\u05E8 \u05E4\u05EA\u05D5\u05D7\u05D4", closeFailed: "\u05D4\u05EA\u05D2\u05D5\u05D1\u05D4 \u05D4\u05D5\u05E2\u05EA\u05E7\u05D4. \u05D0\u05E4\u05E9\u05E8 \u05DC\u05E1\u05D2\u05D5\u05E8 \u05D0\u05EA \u05D4\u05DC\u05E9\u05D5\u05E0\u05D9\u05EA." },
     toc: "\u05EA\u05D5\u05DB\u05DF \u05D4\u05E2\u05E0\u05D9\u05D9\u05E0\u05D9\u05DD",
     flow: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05D6\u05E8\u05D9\u05DE\u05D4",
     sequence: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05E8\u05E6\u05E3",
@@ -1468,6 +2019,30 @@ function contrast(fg, bg, base = [255, 255, 255, 1]) {
   return (Math.max(x2, y2) + 0.05) / (Math.min(x2, y2) + 0.05);
 }
 
+// src/themes/font-list.js
+var FONTS = Object.freeze({
+  bangers: {
+    family: "Bangers",
+    file: "@fontsource/bangers/files/bangers-latin-400-normal.woff2",
+    notice: "Bangers, Copyright 2010 The Bangers Project Authors (https://github.com/googlefonts/bangers), SIL Open Font License 1.1 (https://openfontlicense.org)"
+  }
+});
+var FONT_NAMES = Object.freeze(Object.keys(FONTS));
+
+// src/version.js
+var SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
+function parseVersion(v) {
+  const m = String(v).trim().match(SEMVER);
+  return m ? m.slice(1, 4).map(Number) : null;
+}
+function newer(a, b) {
+  const pa = parseVersion(a);
+  const pb = parseVersion(b);
+  if (!pa || !pb) return false;
+  const i = pa.findIndex((n, k2) => n !== pb[k2]);
+  return i !== -1 && pa[i] > pb[i];
+}
+
 // src/themes/check.js
 var NAME = /^[a-z0-9][a-z0-9-]*$/;
 var COLOR_TOKENS = Object.freeze([
@@ -1490,8 +2065,56 @@ var COLOR_TOKENS = Object.freeze([
   "--head-bg",
   "--head-fg"
 ]);
+var DIAGRAM_TOKENS = Object.freeze([
+  "--node-fill",
+  "--node-stroke",
+  "--node-width",
+  "--node-radius",
+  "--node-shadow",
+  "--node-text",
+  "--hi-fill",
+  "--hi-stroke",
+  "--hi-text",
+  "--edge-color",
+  "--edge-width",
+  "--edge-label",
+  "--actor-fill",
+  "--actor-stroke",
+  "--actor-text",
+  "--note-fill",
+  "--note-stroke",
+  "--note-width",
+  "--note-radius",
+  "--cluster-fill",
+  "--cluster-stroke",
+  "--lifeline-color"
+]);
+var LENGTH_TOKENS = Object.freeze(["--node-width", "--edge-width", "--node-radius", "--note-width", "--note-radius"]);
+var LENGTH = /^(?:\d+|\d*\.\d+)(?:px|em)?$/;
 var LANGS = languageIds();
 var UNSAFE_VALUE = /[;{}<]/;
+function shadowOk(value) {
+  const v = value.trim();
+  if (v === "none") return true;
+  let rest = v;
+  while (rest) {
+    if (!/^drop-shadow\(/i.test(rest)) return false;
+    let depth = 0;
+    let end = -1;
+    for (let i = "drop-shadow".length; i < rest.length && end < 0; i++) {
+      if (rest[i] === "(") depth++;
+      else if (rest[i] === ")" && --depth === 0) end = i;
+    }
+    if (end < 0 || /url\(/i.test(rest.slice(0, end))) return false;
+    rest = rest.slice(end + 1).trimStart();
+  }
+  return true;
+}
+function diagramTokenProblem(key, value) {
+  if (LENGTH_TOKENS.includes(key) && !LENGTH.test(value.trim())) return "must be a number or a px / em value, like 2 or 2.5px";
+  if (key === "--node-shadow" && !shadowOk(value)) return "must be none or one or more drop-shadow(...), with no url()";
+  return "";
+}
 function normalizeTheme(name, data, builtinNames = []) {
   const errors = [];
   if (!NAME.test(name)) errors.push(`the name "${name}" must use lowercase letters, digits and -`);
@@ -1504,11 +2127,15 @@ function normalizeTheme(name, data, builtinNames = []) {
       errors.push(`${where} must be an object of CSS variables`);
       return {};
     }
+    const out = {};
     for (const [k2, v] of Object.entries(g)) {
+      out[k2] = v;
       if (!k2.startsWith("--")) errors.push(`${where}: "${k2}" must start with --`);
       else if (typeof v !== "string" || UNSAFE_VALUE.test(v)) errors.push(`${where}: ${k2} must be a string without ; { } <`);
+      else if (diagramTokenProblem(k2, v)) errors.push(`${where}: ${k2} ${diagramTokenProblem(k2, v)}`);
+      else if (LENGTH_TOKENS.includes(k2) && /^[\d.]+$/.test(v.trim())) out[k2] = `${v.trim()}px`;
     }
-    return g;
+    return out;
   };
   const common = group("tokens.common", tokens.common);
   const light = group("tokens.light", tokens.light);
@@ -1528,6 +2155,8 @@ function normalizeTheme(name, data, builtinNames = []) {
     };
   }
   const label = labelField(data.label, name, errors);
+  const font = fontField(data.font, errors);
+  requiresField(data.requires, errors);
   const fonts = {};
   if (common["--font-sans"]) fonts["--font-sans"] = `${common["--font-sans"]}, ${SANS}`;
   if (common["--font-mono"]) fonts["--font-mono"] = `${common["--font-mono"]}, ${MONO}`;
@@ -1538,11 +2167,25 @@ function normalizeTheme(name, data, builtinNames = []) {
     scope: ["page", "video"],
     user: true,
     ownFont: Boolean(common["--font-sans"]),
+    font,
     tokens: { common: { ...blueprint_default.tokens.common, ...common, ...fonts }, light, dark },
     css,
     video
   };
   return { theme, errors };
+}
+function fontField(font, errors) {
+  if (font === void 0) return void 0;
+  if (typeof font !== "string" || !FONT_NAMES.includes(font)) {
+    errors.push(`font must be one of: ${FONT_NAMES.join(", ")}`);
+    return void 0;
+  }
+  return font;
+}
+function requiresField(requires, errors) {
+  if (requires === void 0) return;
+  if (typeof requires !== "string" || !/^\d+\.\d+\.\d+$/.test(requires)) errors.push("requires must be a version in x.y.z format");
+  else if (newer(requires, VERSION)) errors.push(`needs Answer me with HTML ${requires} or newer`);
 }
 function labelField(label, name, errors) {
   if (label === void 0) return Object.fromEntries(LANGS.map((l3) => [l3, name]));
@@ -1570,8 +2213,52 @@ function cssField(where, css, errors) {
   }
   return css;
 }
+var ESCAPE = "escape sequence (\\)";
+function externalResources(css) {
+  if (typeof css !== "string") return [];
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const found = [];
+  for (const m of text.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
+    if (/^(?:https?:|\/\/)/i.test(m[2].trim())) found.push(`url(${m[2].trim()})`);
+  }
+  for (const m of text.matchAll(/(?:-webkit-)?image-set\(([^;{}]*)/gi)) {
+    for (const s of m[1].matchAll(/(['"])\s*((?:https?:|\/\/)[^'"]*)\1/gi)) found.push(`image-set(${s[2].trim()})`);
+  }
+  if (/@import\b/i.test(text)) found.push("@import");
+  if (/@font-face\b/i.test(text)) found.push("@font-face");
+  if (text.includes("\\")) found.push(ESCAPE);
+  return found;
+}
+function themeLinks(theme) {
+  const groups = (where, tokens) => ["common", "light", "dark"].flatMap((mode) => Object.entries(tokens?.[mode] ?? {}).map(([k2, v]) => ({ where: `${where}.${mode} ${k2}`, text: v })));
+  const sources = [
+    { where: "css", text: theme?.css },
+    { where: "video.css", text: theme?.video?.css },
+    ...groups("tokens", theme?.tokens),
+    ...groups("video.tokens", theme?.video?.tokens)
+  ];
+  return sources.flatMap(({ where, text }) => externalResources(text).map((found) => ({ where, found })));
+}
+function externalResourceWarnings(theme) {
+  return themeLinks(theme).map(({ where, found }) => found === ESCAPE ? `${where}: ${found} can hide a link from this check; a theme has no need for one (write the value plainly)` : `${where}: ${found} loads or embeds something outside the theme file; a theme must work offline (use the font field for a shipped font)`);
+}
 var TEXT_PAIRS = [["--ink", "--paper"], ["--ink", "--bg"], ["--ink-2", "--paper"], ["--ink-2", "--bg"], ["--head-fg", "--head-bg"], ["--accent", "--paper"]];
 var BADGE_PAIRS = [["--accent", "--accent-bg"], ["--ok", "--ok-bg"], ["--err", "--err-bg"], ["--warn", "--warn-bg"]];
+var DIAGRAM_PAIRS = [
+  { fg: ["--node-text", "--ink"], bg: ["--node-fill", "--paper"], when: ["--node-text", "--node-fill"] },
+  { fg: ["--hi-text", "--accent"], bg: ["--hi-fill", "--accent-bg"], when: ["--hi-text", "--hi-fill"] },
+  { fg: ["--actor-text", "--node-text", "--ink"], bg: ["--actor-fill", "--node-fill", "--paper"], when: ["--actor-text", "--actor-fill", "--node-text", "--node-fill"] },
+  { fg: ["--ink"], bg: ["--note-fill", "--warn-bg"], when: ["--note-fill"] },
+  { fg: ["--edge-label", "--accent"], bg: ["--paper"], when: ["--edge-label"] }
+];
+var VAR_REF = /^var\(\s*(--[\w-]+)\s*(?:,\s*([^()]+))?\)$/;
+function colorOf(set, key, depth = 0) {
+  const value = set[key]?.trim();
+  if (value === void 0 || depth > 4) return null;
+  const ref = value.match(VAR_REF);
+  if (ref) return set[ref[1]] === void 0 ? ref[2] ? parseColor(ref[2].trim()) : null : colorOf(set, ref[1], depth + 1);
+  return parseColor(value);
+}
 function checkColors(theme) {
   const errors = [];
   const warnings = [];
@@ -1594,6 +2281,20 @@ function checkColors(theme) {
       const r = ratio(fg, bg);
       if (r !== null && r < 3) errors.push(say(fg, bg, r, 3));
       else if (r !== null && r < 4.5) warnings.push(say(fg, bg, r, 4.5));
+    }
+    const seen = /* @__PURE__ */ new Set();
+    for (const { fg, bg, when } of DIAGRAM_PAIRS) {
+      if (!when.some((k2) => set[k2] !== void 0)) continue;
+      const [fgKey, bgKey] = [fg, bg].map((chain) => chain.find((k2) => set[k2] !== void 0));
+      if (!fgKey || !bgKey || seen.has(`${fgKey} ${bgKey}`)) continue;
+      seen.add(`${fgKey} ${bgKey}`);
+      const [fgColor, bgColor] = [colorOf(set, fgKey), colorOf(set, bgKey)];
+      if (!fgColor || !bgColor) {
+        warnings.push(`${mode}: ${fgKey} on ${bgKey} was not checked, because a value is not a color this check reads (use hex, rgb() or hsl())`);
+        continue;
+      }
+      const r = contrast(fgColor, bgColor, colorOf(set, "--paper") ?? void 0);
+      if (r < 4.5) errors.push(say(fgKey, bgKey, r, 4.5));
     }
   }
   return { errors, warnings };
@@ -1636,22 +2337,22 @@ function pickTheme({ scope, template, visuals }) {
 }
 function themeSet(user = [], broken = /* @__PURE__ */ new Map()) {
   const all = [...ALL, ...user];
-  const list = (scope) => all.filter((t) => t.scope.includes(scope));
-  const names = (scope) => list(scope).map((t) => t.name);
+  const list2 = (scope) => all.filter((t) => t.scope.includes(scope));
+  const names2 = (scope) => list2(scope).map((t) => t.name);
   const unusable = [...broken].filter(([name]) => !BUILTIN_NAMES.includes(name));
   return Object.freeze({
-    list,
-    names,
+    list: list2,
+    names: names2,
     get: (name) => all.find((t) => t.name === name),
     // Names a draft or flag may give: usable themes plus broken ones, so the error can say what is wrong with the file.
-    choices: (scope) => [AUTO, ...names(scope), ...unusable.map(([name]) => name)],
+    choices: (scope) => [AUTO, ...names2(scope), ...unusable.map(([name]) => name)],
     // Why a name cannot be used, or null.
     problem(name, scope) {
       if (name === AUTO) return null;
-      if (names(scope).includes(name)) return null;
+      if (names2(scope).includes(name)) return null;
       const bad = unusable.find(([n]) => n === name);
       if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
-      return `Theme "${name}" is not installed. Choose one of: ${names(scope).join(" | ")}`;
+      return `Theme "${name}" is not installed. Choose one of: ${names2(scope).join(" | ")}`;
     },
     // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
     embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
@@ -1704,7 +2405,7 @@ var NUMERIC_KEYS = /* @__PURE__ */ new Set(["cols", "span"]);
 var FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
 var PANEL_HEADING = /^##\s+(.+?)\s*$/;
 var ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
-var PANEL_ID = /^([A-Z][0-9]?)\s+(.+)$/;
+var PANEL_ID = /^([A-Z][0-9]?)\s+(?![\s\p{Ll}])(.+)$/u;
 var ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 function parseDoc(source, { defaults: defaults2 = {}, choices = {} } = {}) {
   const lines = String(source).replace(/\r\n?/g, "\n").split("\n");
@@ -3290,7 +3991,7 @@ function esc(str) {
 }
 
 // src/raw-html.js
-var words2 = (list) => new Set(list.split(" "));
+var words2 = (list2) => new Set(list2.split(" "));
 var NEVER = words2("title textarea style xmp iframe noembed noframes script plaintext link meta base object embed frame frameset template html head body noscript svg math");
 var PHRASING = words2("a abbr b bdi bdo br cite code data del dfn em i img ins kbd mark q rp rt ruby s samp small span strong sub sup time u var wbr");
 var BLOCK = words2("address area article aside audio blockquote button canvas caption col colgroup datalist dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr input label legend li main map menu meter nav ol optgroup option output p picture pre progress search section select slot source summary table tbody td tfoot th thead tr track ul video acronym big center font strike tt");
@@ -4146,9 +4847,9 @@ function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top2 + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`).join("");
 }
 var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", er: "Entity relationship diagram", colon: ": ", sep: ", " };
-function diagramLabel(ui, kind2, names) {
+function diagramLabel(ui, kind2, names2) {
   const u = { ...EN_LABELS, ...ui };
-  return `${u[kind2]}${u.colon}${names.join(u.sep)}`;
+  return `${u[kind2]}${u.colon}${names2.join(u.sep)}`;
 }
 function svgOpen(width, height, label, dir = "ltr") {
   const w = Math.ceil(width);
@@ -4185,23 +4886,23 @@ var RE = {
 };
 function parseSequence(text) {
   const participants = [];
-  const add = (p) => {
+  const add2 = (p) => {
     if (!participants.includes(p)) participants.push(p);
   };
   const steps = [];
   for (const { text: t, line } of contentLines(text)) {
     let m;
     if (m = t.match(RE.participants)) {
-      m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add);
+      m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add2);
     } else if (m = t.match(RE.note)) {
       const over2 = m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
-      over2.forEach(add);
+      over2.forEach(add2);
       steps.push({ kind: "note", over: over2, text: m[2].trim(), line });
     } else if (m = t.match(RE.divider)) {
       steps.push({ kind: "divider", text: m[1], line });
     } else if (m = t.match(RE.msg)) {
-      add(m[1]);
-      add(m[3]);
+      add2(m[1]);
+      add2(m[3]);
       steps.push({ kind: "msg", from: m[1], to: m[3], dashed: m[2] === "-->", label: (m[4] ?? "").trim(), line });
     } else {
       throw new ComponentError(`sequence cannot parse "${t}". Write a message as A -> B: label (--> is a dashed return) and a note as note A: text`, line);
@@ -4304,7 +5005,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = "ltr" }) {
       const w = Math.max(...s.lines.map((l3) => measure(l3, 12))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y2 + 10)}" x2="${f(width - MARGIN)}" y2="${f(y2 + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y2)}" width="${f(w)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' font-size="12"', dir));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' class="am-actor-text" font-size="12"', dir));
       y2 += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k2}">${body.slice(start).join("")}</g>`);
@@ -4312,7 +5013,7 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = "ltr" }) {
   const height = y2 + 6;
   const actors = ps.map((p, i) => {
     const x2 = X3(xs[i]);
-    return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' font-weight="600"', dir)}</g>`;
+    return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' class="am-actor-text" font-weight="600"', dir)}</g>`;
   });
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
@@ -6556,7 +7257,7 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr") {
     const { x: x2, y: y2 } = g.node(key.get(n.id));
     const { width: w, height: h2, lines } = sizes.get(n.id);
     const badge = badgeSvg(n.state, ...badgePoint(n.shape, x2, y2, w, h2, rtl));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2, "", pageDir)}${badge}</g>`;
+    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x2, y2, w, h2)}${textLines(lines, x2, y2 + (n.shape === "db" ? 4 : 0), LH2, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
   const { width, height } = g.graph();
   const label = diagramLabel(ui, "flow", [...nodes.keys()].slice(0, 8));
@@ -6767,8 +7468,8 @@ function erLineOf(mermaid) {
   return `${from} ${MERMAID_CARDS[left]}--${MERMAID_CARDS[right]} ${to}${text ? `: ${text}` : ""}`;
 }
 function relationships({ entities, written }) {
-  const ends = (...names) => {
-    const states = names.map((name) => entities.get(name).state);
+  const ends = (...names2) => {
+    const states = names2.map((name) => entities.get(name).state);
     return ["removed", "added"].find((s) => states.includes(s));
   };
   const withState = (rel, state) => state ? { ...rel, state } : rel;
@@ -6900,7 +7601,7 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
   const left = x2 - size.width / 2;
   const top2 = y2 - size.height / 2;
   const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
-  const head = `<text class="am-er-head" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
+  const head = `<text class="am-er-head am-node-text" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top2 + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top2 + PAD + HEAD_LH)}"/>`;
   const rtl = pageDir === "rtl";
   const shift = (rtl ? -1 : 1) * signWidth(entity);
@@ -6909,7 +7610,7 @@ function nodeSvgOf(entity, x2, y2, size, step, pageDir) {
     const mark = deltaAttr(field.state);
     const marker = field.marker ? `<text class="am-er-key am-cluster-label"${mark} x="${f(keyX)}" y="${f(cy)}" text-anchor="end" dominant-baseline="central">${esc(svgLine(field.marker, pageDir))}</text>` : "";
     const band = field.state ? `<rect class="am-er-band"${mark} x="${f(left + 1)}" y="${f(cy - FIELD_LH / 2)}" width="${f(size.width - 2)}" height="${FIELD_LH}"/><text class="am-er-sign"${mark} x="${f(nameX)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(SIGN[field.state], pageDir))}</text>` : "";
-    return `${band}<text class="am-er-field"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
+    return `${band}<text class="am-er-field am-node-text"${mark} style="font-size:${FIELD_FS}px" x="${f(nameX + shift)}" y="${f(cy)}" dominant-baseline="central">${esc(svgLine(fieldText(field), pageDir))}</text>${marker}`;
   }).join("");
   const badge = badgeSvg(entity.state, rtl ? left : left + size.width, top2);
   return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"${deltaAttr(entity.state)}><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}${badge}</g>`;
@@ -7067,9 +7768,9 @@ ${head}<div class="am-panel-body">${panel.html}</div>
 var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "cols", "title", "subtitle", "lang"]);
 function headHtml(meta, introHtml, language = {}) {
   const extras = Object.entries(meta).filter(([k2, v]) => !RESERVED.has(k2) && v !== "");
-  const names = language.metaKeys ?? {};
+  const names2 = language.metaKeys ?? {};
   const value = (v) => language.dir === "rtl" ? `<bdi${hasRtl(v) ? ' dir="rtl"' : ""}>${esc(v)}</bdi>` : esc(v);
-  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k2, v]) => `<span><b>${esc(names[k2.toLowerCase()] ?? k2)}</b>${value(v)}</span>`).join("")}</div>` : "";
+  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k2, v]) => `<span><b>${esc(names2[k2.toLowerCase()] ?? k2)}</b>${value(v)}</span>`).join("")}</div>` : "";
   const sub = meta.subtitle ? `<p class="am-sub">${esc(meta.subtitle)}</p>` : "";
   const intro = introHtml ? `<div class="am-intro am-md">${introHtml}</div>` : "";
   return `<header class="am-head"><h1>${esc(meta.title || "Untitled")}</h1>${sub}${metaRow}${intro}</header>`;
@@ -7162,18 +7863,19 @@ var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
 var languageFontCss = () => fontLanguages().map((l3) => block(langSelector(l3, "html", "[data-theme][data-mode]"), { "--font-sans": l3.fonts.sans }));
 var ownLanguageFont = (t) => fontLanguages().map((l3) => block(langSelector(l3, "html", `[data-theme="${t.name}"][data-mode]`), { "--font-sans": t.tokens.common["--font-sans"] }));
-function pageCss(list = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, update = false } = {}) {
-  const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, BASE_CSS, ...math2 ? [MATH_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update ? [UPDATE_CSS] : [], ...rtl ? [RTL_CSS] : [], ...decorations].join("\n\n");
+function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, update: update2 = false, closeAfter = false, theme } = {}) {
+  const decorations = list2.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
+  const fontFace = FONT_CSS[list2.find((t) => t.name === theme)?.font];
+  const ownFonts = list2.filter((t) => t.ownFont).flatMap(ownLanguageFont);
+  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, BASE_CSS, ...math2 ? [MATH_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
 }
-function videoCss(list = themes("video"), { diff = false, delta = false, rtl = false } = {}) {
-  const parts = list.filter((t) => t.video).flatMap((t) => [
+function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = false } = {}) {
+  const parts = list2.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : "",
     t.video.css ? scoped(t.video.css, videoSel(t)) : "",
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : ""
   ]).filter(Boolean);
-  return [pageCss(list.filter((t) => t.scope.includes("page")), { diff, delta, rtl }), VIDEO_CSS, ...parts].join("\n\n");
+  return [pageCss(list2.filter((t) => t.scope.includes("page")), { diff, delta, rtl }), VIDEO_CSS, ...parts].join("\n\n");
 }
 
 // src/lint/wordlist.en.js
@@ -7345,10 +8047,10 @@ function lintMarkdown(text, startLine, out, family) {
       cells.forEach((c) => checkUnit(clean(c.replace(/^(ok|warn|✓|✔|⚠)(\s|$)/, "")), line, "descriptive", out, family));
       return;
     }
-    const list = t.match(/^(?:([-*+])|(\d+)[.)])\s+(.*)$/);
-    if (list) {
+    const list2 = t.match(/^(?:([-*+])|(\d+)[.)])\s+(.*)$/);
+    if (list2) {
       flush();
-      checkUnit(clean(list[3]), line, list[2] ? "procedural" : "descriptive", out, family);
+      checkUnit(clean(list2[3]), line, list2[2] ? "procedural" : "descriptive", out, family);
       return;
     }
     const body = clean(t.replace(/^>\s*/, ""));
@@ -7865,7 +8567,7 @@ var LintError = class extends Error {
     this.warnings = warnings;
   }
 };
-function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update } = {}) {
+function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update: update2, closeAfter = false } = {}) {
   const choices = { theme: themes2.choices("page") };
   const parsed = parseDoc(source, { defaults: defaults2, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
@@ -7885,7 +8587,7 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   const page = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui, language });
   const body = language.dir === "rtl" ? isolateLtrRuns(page) : page;
-  const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update });
+  const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update: update2, closeAfter });
   return { html, warnings, stats, meta: doc2.meta, language };
 }
 function hasVisuals({ intro, panels }) {
@@ -7979,15 +8681,15 @@ function colophon(language) {
   return `<p class="am-colophon">${label} ${link} ${VERSION} \xB7 ${time} \xB7 ${star}</p>`;
 }
 var withColophon = (body, language) => body.replace('<header class="am-head">', (head) => `${head}${colophon(language)}`);
-function updateNotice(ui, update, labelKey) {
-  if (!update) return { button: "", popover: "" };
+function updateNotice(ui, update2, labelKey) {
+  if (!update2) return { button: "", popover: "" };
   const t = ui.update;
-  const lines = update.highlights?.[labelKey] ?? update.highlights?.en;
+  const lines = update2.highlights?.[labelKey] ?? update2.highlights?.en;
   const notes = lines ? `<p class="am-update-label">${esc(t.whatsNew)}</p>
 <ul class="am-update-notes">${lines.map((l3) => `<li>${esc(l3).replace(/`([^`]+)`/g, "<code>$1</code>")}</li>`).join("")}</ul>
 ` : "";
-  const plain = t.button.replace("{version}", update.latest);
-  const fill2 = (s) => esc(s).replace("{version}", `<bdi>${esc(update.latest)}</bdi>`).replace("{current}", `<bdi>${esc(update.current)}</bdi>`);
+  const plain = t.button.replace("{version}", update2.latest);
+  const fill2 = (s) => esc(s).replace("{version}", `<bdi>${esc(update2.latest)}</bdi>`).replace("{current}", `<bdi>${esc(update2.current)}</bdi>`);
   const row = (text, code) => `<div class="am-update-row">${code ? `<code dir="ltr">${esc(text)}</code>` : `<span>${esc(text)}</span>`}<button class="am-btn" type="button" data-am="copy-text" data-text="${esc(text)}" data-done="${esc(ui.done)}">${esc(ui.copyCode)}</button></div>`;
   return {
     button: `<button class="am-btn am-btn--update" type="button" data-am="update" popovertarget="am-update" aria-label="${esc(plain)}" hidden>\u25CF <span class="am-update-text">${fill2(t.button)}</span></button>
@@ -7996,7 +8698,7 @@ function updateNotice(ui, update, labelKey) {
 <p class="am-update-title">${fill2(t.button)}</p>
 <p>${fill2(t.current)}</p>
 ${notes}<p class="am-update-label">${esc(t.run)}</p>
-${row(update.command, true)}
+${row(update2.command, true)}
 <p class="am-update-label">${esc(t.agent)}</p>
 ${row(t.agentText, false)}
 <a href="https://github.com/QingYunA/answer-me-with-html/releases" target="_blank" rel="noopener">${esc(t.notes)}</a>
@@ -8027,9 +8729,10 @@ function lightboxShell(ui, hasDiagrams) {
 </div>
 `;
 }
-function shell({ meta, language, body, source, embedded, update }) {
+var CLOSE_AFTER_SECONDS = 3;
+function shell({ meta, language, body, source, embedded, update: update2, closeAfter }) {
   const { ui, labelKey } = language;
-  const notice = updateNotice(ui, update, labelKey);
+  const notice = updateNotice(ui, update2, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style };
   return `<!doctype html>
@@ -8040,25 +8743,565 @@ ${rootTag(root)}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), update: Boolean(update) })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), update: Boolean(update2), closeAfter, theme: meta.theme })}
 </style>
 </head>
 <body>
 <div class="am-toolbar"${rootCarrierAttrs(root)}>
 ${notice.button}${pick("theme", ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick("mode", ui.modeLabel, Object.entries(ui.mode), meta.mode)}
-<button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds }))}">${esc(ui.reply.button)}</button>
+<button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {} }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
 ${notice.popover}${withColophon(body, language)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>
-${RUNTIME_JS}${language.dir === "rtl" ? RTL_JS : ""}${hasDelta(body) ? DELTA_JS : ""}${update ? UPDATE_JS : ""}</script>
+${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}</script>
 </body>
 </html>
 `;
 }
+
+// src/theme-market.js
+import { join as join6 } from "node:path";
+
+// src/config.js
+import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
+import { join as join3, dirname } from "node:path";
+
+// src/home.js
+import { mkdirSync, existsSync as existsSync2, statSync as statSync3, chmodSync } from "node:fs";
+import { homedir as homedir2 } from "node:os";
+import { join as join2 } from "node:path";
+var defaultHome = () => join2(homedir2(), ".answer-me-with-html");
+function ensureHome(home) {
+  const fresh = !existsSync2(home);
+  mkdirSync(home, { recursive: true, mode: 448 });
+  if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
+  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+}
+
+// src/config.js
+var ConfigError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "ConfigError";
+  }
+};
+var CONFIG_KEYS = Object.freeze({
+  open: { type: "bool", default: true, label: "Open the page in the browser after it is made" },
+  theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
+  mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
+  style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
+  update_check: { type: "bool", default: true, label: "Check for a new version once a week in the background and tell you (never updates by itself)" },
+  close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
+});
+var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
+var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
+function amHome(env = process.env) {
+  return env.AM_HOME || defaultHome();
+}
+function configPath(env = process.env) {
+  return join3(amHome(env), "config.json");
+}
+var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
+function configChoices(key, themes2) {
+  return key === "theme" ? [AUTO, ...themes2.names("page")] : CONFIG_KEYS[key].choices;
+}
+function coerce2(key, raw, themes2) {
+  const spec = CONFIG_KEYS[key];
+  if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
+  if (spec.type === "bool") {
+    if (typeof raw === "boolean") return raw;
+    const v2 = String(raw).trim().toLowerCase();
+    if (TRUE.has(v2)) return true;
+    if (FALSE.has(v2)) return false;
+    throw new ConfigError(`${key} accepts only on / off`);
+  }
+  const v = String(raw).trim();
+  const choices = configChoices(key, themes2);
+  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
+  return v;
+}
+function readStored(env) {
+  const file = configPath(env);
+  if (!existsSync3(file)) return { stored: {} };
+  try {
+    const data = JSON.parse(readFileSync4(file, "utf8"));
+    return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
+  } catch (e) {
+    return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
+  }
+}
+function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
+  const { stored, warning } = readStored(env);
+  const values = defaults();
+  const warnings = [warning];
+  for (const [k2, v] of Object.entries(stored)) {
+    if (!CONFIG_KEYS[k2]) continue;
+    try {
+      values[k2] = coerce2(k2, v, themes2);
+    } catch {
+      if (k2 === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
+    }
+  }
+  return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
+}
+function writeStored(stored, env) {
+  const file = configPath(env);
+  if (!Object.keys(stored).length) {
+    rmSync(file, { force: true });
+    return;
+  }
+  ensureHome(dirname(file));
+  writeFileSync(file, `${JSON.stringify(stored, null, 2)}
+`);
+}
+function setConfig(key, raw, env = process.env, themes2 = loadThemes(amHome(env))) {
+  const value = coerce2(key, raw, themes2);
+  const { stored } = readStored(env);
+  writeStored({ ...stored, [key]: value }, env);
+  return value;
+}
+function resetConfig(key, env = process.env) {
+  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "", null);
+  const { stored } = readStored(env);
+  const next = key === void 0 ? {} : Object.fromEntries(Object.entries(stored).filter(([k2]) => k2 !== key));
+  writeStored(next, env);
+}
+
+// src/themes/catalog.js
+import { createHash } from "node:crypto";
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join5 } from "node:path";
+
+// src/state.js
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, renameSync } from "node:fs";
+import { join as join4 } from "node:path";
+var DAY = 24 * 60 * 60 * 1e3;
+var statePath = (home) => join4(home, "state.json");
+function readState(home) {
+  try {
+    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
+    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  } catch {
+    return {};
+  }
+}
+function writeState(home, patch) {
+  const next = { ...readState(home), ...patch };
+  ensureHome(home);
+  const tmp = `${statePath(home)}.${process.pid}.tmp`;
+  writeFileSync2(tmp, `${JSON.stringify(next, null, 2)}
+`);
+  renameSync(tmp, statePath(home));
+  return next;
+}
+
+// src/themes/catalog.js
+var CATALOG = Object.freeze({
+  url: "https://answer-me-with-html.com/themes/index.json",
+  timeoutMs: 8e3,
+  maxIndexBytes: 256 * 1024,
+  maxThemeBytes: 16 * 1024,
+  // the catalog limit (CONTRIBUTING.md)
+  maxThemes: 200,
+  maxNameLength: 40,
+  maxRedirects: 3
+});
+var LOOPBACK = ["localhost", "127.0.0.1", "[::1]"];
+var XYZ = /^\d+\.\d+\.\d+$/;
+var SHA256 = /^[0-9a-f]{64}$/;
+var CatalogError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "CatalogError";
+  }
+};
+var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+var themesDir = (home) => join5(home, "themes");
+var themeFile = (home, name) => join5(themesDir(home), `${name}.json`);
+function catalogUrl(env = process.env) {
+  const url = env.AM_CATALOG_URL || CATALOG.url;
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new CatalogError(`AM_CATALOG_URL is not a URL: ${url}`);
+  }
+  if (!isSecure(parsed)) throw new CatalogError("AM_CATALOG_URL must be an https URL (http only for localhost)");
+  return parsed.href;
+}
+var isSecure = (url) => url.protocol === "https:" || url.protocol === "http:" && LOOPBACK.includes(url.hostname);
+function reasonOf(e, timeoutMs) {
+  if (e instanceof CatalogError) return e.message;
+  if (e?.name === "TimeoutError" || e?.name === "AbortError") return `no answer within ${Math.round(timeoutMs / 100) / 10} s`;
+  const code = e?.cause?.code ?? e?.code;
+  return typeof code === "string" && /^[A-Z0-9_]{3,30}$/.test(code) ? `network error ${code}` : "network error";
+}
+async function get(url, signal, fetchImpl) {
+  let current = url;
+  for (let hops = 0; ; hops += 1) {
+    const res = await fetchImpl(current, { signal, redirect: "manual" });
+    const location = res.status >= 300 && res.status < 400 ? res.headers?.get?.("location") : null;
+    if (!location) return res;
+    await res.body?.cancel?.();
+    if (hops >= CATALOG.maxRedirects) throw new CatalogError("too many redirects");
+    let next;
+    try {
+      next = new URL(location, current);
+    } catch {
+      throw new CatalogError("the server sent a redirect this version cannot follow");
+    }
+    if (!isSecure(next)) throw new CatalogError("the server redirected to an address that is not https");
+    current = next.href;
+  }
+}
+async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.timeoutMs } = {}) {
+  try {
+    const res = await get(url, AbortSignal.timeout(timeoutMs), fetchImpl);
+    if (!res.ok) throw new CatalogError(`HTTP ${Number.isInteger(res.status) ? res.status : "?"}`);
+    const declared = Number(res.headers?.get?.("content-length"));
+    if (declared > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);
+    const chunks = [];
+    let total = 0;
+    for await (const chunk of res.body) {
+      total += chunk.length;
+      if (total > maxBytes) throw new CatalogError(`the file is larger than ${maxBytes} bytes`);
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks);
+  } catch (e) {
+    throw new CatalogError(reasonOf(e, timeoutMs));
+  }
+}
+function entryFrom(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const { name, version, requires, size, sha256: hash } = raw;
+  if (typeof name !== "string" || !NAME.test(name) || name.length > CATALOG.maxNameLength || BUILTIN_NAMES.includes(name)) return null;
+  if (typeof version !== "string" || !XYZ.test(version)) return null;
+  if (requires !== void 0 && (typeof requires !== "string" || !XYZ.test(requires))) return null;
+  if (!Number.isInteger(size) || size <= 0 || size > CATALOG.maxThemeBytes) return null;
+  if (typeof hash !== "string" || !SHA256.test(hash)) return null;
+  return { name, version, size, sha256: hash, ...requires && { requires } };
+}
+async function fetchIndex(env = process.env, net = {}) {
+  const url = catalogUrl(env);
+  let text;
+  try {
+    text = (await download(url, CATALOG.maxIndexBytes, net)).toString("utf8");
+  } catch (e) {
+    throw new CatalogError(`Cannot read the theme catalog at ${url}: ${e.message}`);
+  }
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new CatalogError(`The theme catalog at ${url} is not valid JSON`);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.schema !== 1 || !Array.isArray(data.themes)) {
+    const newerFormat = Number.isInteger(data?.schema) && data.schema > 1;
+    throw new CatalogError(newerFormat ? `The theme catalog uses format ${data.schema}, which this version cannot read; update Answer me with HTML` : `The theme catalog at ${url} is not in a format this version reads`);
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const themes2 = data.themes.slice(0, CATALOG.maxThemes).map(entryFrom).filter((e) => e && !seen.has(e.name) && seen.add(e.name));
+  return { url, themes: themes2.sort((a, b) => a.name < b.name ? -1 : 1) };
+}
+var fileUrl = (index, name) => new URL(`${name}.json`, index.url).href;
+var needsNewer = (entry) => Boolean(entry.requires && newer(entry.requires, VERSION));
+function vet(name, bytes) {
+  let data;
+  try {
+    data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw new CatalogError("the file is not valid JSON");
+  }
+  const { theme, errors } = normalizeTheme(name, data, BUILTIN_NAMES);
+  const plural = (n, what) => `${what} (${n} problem${n === 1 ? "" : "s"})`;
+  if (errors.length) throw new CatalogError(plural(errors.length, "the file is not a valid theme"));
+  const colors = checkColors(theme).errors;
+  if (colors.length) throw new CatalogError(plural(colors.length, "the colors fail the contrast check"));
+  const links = themeLinks(theme);
+  if (links.length) throw new CatalogError(plural(links.length, "the css or a token value loads external resources or uses a backslash escape"));
+  return bytes;
+}
+async function fetchTheme(index, entry, net = {}) {
+  let bytes;
+  try {
+    bytes = await download(fileUrl(index, entry.name), entry.size, net);
+  } catch (e) {
+    throw new CatalogError(`cannot download it: ${e.message}`);
+  }
+  if (bytes.length !== entry.size) throw new CatalogError(`the file is ${bytes.length} bytes but the catalog says ${entry.size}`);
+  if (sha256(bytes) !== entry.sha256) throw new CatalogError("the file does not match the sha256 in the catalog");
+  return vet(entry.name, bytes);
+}
+function readInstalled(home) {
+  const raw = readState(home).catalogThemes;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter(([name, r]) => NAME.test(name) && typeof r?.version === "string" && typeof r?.sha256 === "string"));
+}
+function record(home, name, entry) {
+  writeState(home, { catalogThemes: { ...readInstalled(home), [name]: { version: entry.version, sha256: entry.sha256 } } });
+}
+function forget(home, name) {
+  const { [name]: _gone, ...rest } = readInstalled(home);
+  writeState(home, { catalogThemes: rest });
+}
+function readInstalledFile(home, name) {
+  try {
+    return readFileSync6(themeFile(home, name));
+  } catch {
+    return null;
+  }
+}
+function isUnchanged(home, name, installed = readInstalled(home)) {
+  const bytes = readInstalledFile(home, name);
+  return Boolean(bytes && installed[name] && sha256(bytes) === installed[name].sha256);
+}
+function writeAtomic(home, name, bytes) {
+  ensureHome(home);
+  mkdirSync2(themesDir(home), { recursive: true });
+  const tmp = `${themeFile(home, name)}.${process.pid}.tmp`;
+  try {
+    writeFileSync3(tmp, bytes);
+    renameSync2(tmp, themeFile(home, name));
+  } catch (e) {
+    rmSync2(tmp, { force: true });
+    throw e;
+  }
+}
+function install(home, entry, bytes, { force = false } = {}) {
+  const installed = readInstalled(home);
+  const existing = readInstalledFile(home, entry.name);
+  let status = "installed";
+  if (existing) {
+    if (existing.equals(bytes)) status = "same";
+    else if (isUnchanged(home, entry.name, installed)) status = "updated";
+    else if (force) status = "replaced";
+    else return { status: "conflict", previous: installed[entry.name]?.version };
+  }
+  if (status !== "same") writeAtomic(home, entry.name, bytes);
+  record(home, entry.name, entry);
+  return { status, previous: installed[entry.name]?.version };
+}
+function remove(home, name) {
+  rmSync2(themeFile(home, name), { force: true });
+  if (readInstalled(home)[name]) forget(home, name);
+}
+
+// src/theme-market.js
+var THEME_MARKET_USAGE = "am theme add <name> [--use] [--force] | list [--remote] | update [name] | remove <name>";
+async function cmdThemeMarket(action, target, opts, ctx) {
+  const net = { timeoutMs: ctx.io?.catalogTimeoutMs };
+  if (net.timeoutMs === void 0) delete net.timeoutMs;
+  if (action === "add") return add(target, opts, ctx, net);
+  if (action === "list") return list(opts, ctx, net);
+  if (action === "update") return update(target, ctx, net);
+  return removeTheme(target, ctx);
+}
+var usage = (fail, text) => (fail(`\u2717 Usage: ${text}`), 2);
+var names = (index) => index.themes.map((t) => t.name).join(" | ") || "(none)";
+async function add(name, opts, { print, fail, env }, net) {
+  if (!name) return usage(fail, "am theme add <name> [--use] [--force]");
+  if (!NAME.test(name)) {
+    fail(`\u2717 "${name}" is not a catalog theme name (lowercase letters, digits and -). am theme add takes names from the catalog only, not URLs or paths`);
+    return 2;
+  }
+  const home = amHome(env);
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  const entry = index.themes.find((t) => t.name === name);
+  if (!entry) {
+    fail(`\u2717 No catalog theme named "${name}". Available: ${names(index)}`);
+    return 2;
+  }
+  if (needsNewer(entry)) {
+    fail(`\u2717 ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION})`);
+    return 1;
+  }
+  let bytes;
+  try {
+    bytes = await fetchTheme(index, entry, net);
+  } catch (e) {
+    return netFail(e, fail, `${name}: `);
+  }
+  const path = themeFile(home, name);
+  const { status, previous } = install(home, entry, bytes, { force: opts.force });
+  if (status === "conflict") {
+    fail(`\u2717 ${path} already exists and differs from the catalog version of ${name}; it may be your own theme. Nothing was changed. To replace it: am theme add ${name} --force`);
+    return 1;
+  }
+  const done = {
+    installed: `\u2713 Installed ${name} ${entry.version}: ${path}`,
+    same: `\u2713 ${name} ${entry.version} is already installed: ${path}`,
+    updated: `\u2713 Updated ${name} ${previous ?? "?"} \u2192 ${entry.version}: ${path}`,
+    replaced: `\u2713 Replaced ${name} with the catalog version ${entry.version}: ${path}`
+  }[status];
+  print(done);
+  if (opts.use) {
+    try {
+      print(`\u2713 theme = ${setConfig("theme", name, env, loadThemes(home))}`);
+    } catch (e) {
+      if (!(e instanceof ConfigError)) throw e;
+      fail(`\u2717 ${e.message}`);
+      return 1;
+    }
+  } else if (status !== "same") {
+    print(`  Use it: theme: ${name} in a draft, --theme ${name}, or am config set theme ${name}`);
+  }
+  return 0;
+}
+function netFail(e, fail, prefix = "") {
+  if (!(e instanceof CatalogError)) throw e;
+  fail(`\u2717 ${prefix}${e.message}`);
+  return 1;
+}
+function sourceOf(home, name, installed) {
+  if (!installed[name]) return { source: "local", version: "-" };
+  return { source: isUnchanged(home, name, installed) ? "catalog" : "catalog, edited", version: installed[name].version };
+}
+async function list(opts, { print, fail, env }, net) {
+  const home = amHome(env);
+  print("Built-in themes:");
+  for (const t of BUILTIN.list("page")) print(`  ${t.name.padEnd(11)}${t.summary}`);
+  const { themes: usable, broken } = readUserThemes(home, BUILTIN_NAMES);
+  const installed = readInstalled(home);
+  const rows = [...usable.map((t) => t.name), ...broken.keys()].sort();
+  print(`
+Installed themes (${themesDir(home)}):`);
+  if (!rows.length) print("  none. Install one with: am theme add <name>   (list the catalog: am theme list --remote)");
+  for (const name of rows) {
+    const { source, version } = sourceOf(home, name, installed);
+    const bad = broken.get(name);
+    print(`  ${name.padEnd(11)}${version.padEnd(8)}${source}${bad ? `  \u2717 skipped: ${bad.reason}` : ""}`);
+  }
+  if (!opts.remote) return 0;
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  print(`
+Catalog (${index.url}):`);
+  for (const t of index.themes) {
+    const mine = installed[t.name];
+    const here = readInstalledFile(home, t.name) !== null;
+    let state;
+    if (needsNewer(t)) state = `needs Answer me with HTML ${t.requires} or newer`;
+    else if (!here) state = `not installed: am theme add ${t.name}`;
+    else if (!mine) state = `a file of this name is installed that is not from the catalog; to replace it: am theme add ${t.name} --force`;
+    else if (mine.sha256 !== t.sha256 && !newer(mine.version, t.version)) state = `update available (installed ${mine.version}): am theme update ${t.name}`;
+    else state = "installed";
+    print(`  ${t.name.padEnd(11)}${t.version.padEnd(8)}${state}`);
+  }
+  return 0;
+}
+async function update(target, { print, fail, env }, net) {
+  const home = amHome(env);
+  const installed = readInstalled(home);
+  if (target !== void 0 && !NAME.test(target)) return usage(fail, "am theme update [name]");
+  if (target !== void 0 && !installed[target]) {
+    if (readInstalledFile(home, target)) fail(`\u2717 ${target} was not installed from the catalog. To replace it with the catalog version: am theme add ${target} --force`);
+    else fail(`\u2717 No theme named "${target}" is installed from the catalog`);
+    return 2;
+  }
+  const todo = Object.keys(installed).filter((n) => target === void 0 || n === target).sort();
+  if (!todo.length) {
+    print("No themes installed from the catalog. Install one with: am theme add <name>");
+    return 0;
+  }
+  let index;
+  try {
+    index = await fetchIndex(env, net);
+  } catch (e) {
+    return netFail(e, fail);
+  }
+  let failed = false;
+  for (const name of todo) {
+    const mine = installed[name];
+    if (readInstalledFile(home, name) === null) {
+      print(`! ${name}: the file is gone from ${themesDir(home)}; reinstall it with: am theme add ${name}`);
+    } else if (!isUnchanged(home, name, installed)) {
+      print(`! ${name} skipped: the file changed since it was installed. To replace it with the catalog version: am theme add ${name} --force`);
+    } else {
+      const entry = index.themes.find((t) => t.name === name);
+      if (!entry) print(`! ${name}: no longer in the catalog; kept ${mine.version}`);
+      else if (entry.sha256 === mine.sha256 || newer(mine.version, entry.version)) print(`\u2713 ${name} is up to date (${mine.version})`);
+      else if (needsNewer(entry)) print(`! ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION}); kept ${mine.version}`);
+      else {
+        try {
+          const bytes = await fetchTheme(index, entry, net);
+          install(home, entry, bytes);
+          print(`\u2713 Updated ${name} ${mine.version} \u2192 ${entry.version}`);
+        } catch (e) {
+          failed = true;
+          netFail(e, fail, `${name}: `);
+        }
+      }
+    }
+  }
+  return failed ? 1 : 0;
+}
+function removeTheme(name, { print, fail, env }) {
+  if (!name) return usage(fail, "am theme remove <name>");
+  if (BUILTIN_NAMES.includes(name)) {
+    fail(`\u2717 "${name}" is a built-in theme and cannot be removed`);
+    return 2;
+  }
+  const home = amHome(env);
+  if (!NAME.test(name) || readInstalledFile(home, name) === null) {
+    fail(`\u2717 No theme named "${name}" in ${themesDir(home)}`);
+    return 2;
+  }
+  const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name;
+  remove(home, name);
+  print(`\u2713 Removed ${join6(themesDir(home), `${name}.json`)}`);
+  if (wasDefault) {
+    resetConfig("theme", env);
+    print(`! ${name} was the default theme; the default is auto again`);
+  }
+  print("  Pages already made keep their look: a page carries its own theme.");
+  return 0;
+}
+
+// src/themes/selectors.js
+var THEME_SELECTORS = Object.freeze([
+  // The page head: title, intro and the line of meta tags.
+  ".am-head",
+  ".am-head h1",
+  ".am-head-meta",
+  ".am-intro",
+  // A panel: the head (ID, title, meta) and the body that holds the components.
+  ".am-panel",
+  ".am-panel--bare",
+  ".am-panel-head",
+  ".am-panel-head h2",
+  ".am-panel-id",
+  ".am-panel-meta",
+  ".am-panel-body",
+  // Prose, callouts and key-value tables.
+  ".am-md",
+  ".am-callout",
+  ".am-callout--ok",
+  ".am-callout--warn",
+  ".am-callout--err",
+  ".am-callout-title",
+  ".am-kv",
+  // The panel comment button (inside the panel head) and its "has a comment" state, so it stays visible on a dark or coloured head.
+  ".am-comment-btn",
+  ".am-comment-btn--on",
+  // The drawing frame and its rulers (blueprint).
+  ".am-frame",
+  ".am-ruler"
+]);
 
 // src/video/script.js
 var NARRATION = /^\s*>\s?(.*)$/;
@@ -8145,10 +9388,10 @@ var round2 = (x2) => Math.round(x2 * 1e3) / 1e3;
 
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync as readFileSync4, writeFileSync, existsSync as existsSync2, rmSync, mkdtempSync, renameSync } from "node:fs";
+import { createHash as createHash2 } from "node:crypto";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync3 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join as join2 } from "node:path";
+import { join as join7 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -8306,7 +9549,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
       synth: (text, { voice } = {}) => withTemp(async (file) => {
         await run("say", [...voice ? ["-v", voice] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text)]);
-        return readWav(readFileSync4(file));
+        return readWav(readFileSync7(file));
       })
     };
   }
@@ -8322,7 +9565,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
       synth: (text, { voice } = {}) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", voice ?? "en-us", "-w", file, "-f", textFile(file, text)]);
-        return readWav(readFileSync4(file));
+        return readWav(readFileSync7(file));
       })
     };
   }
@@ -8389,15 +9632,15 @@ function run(cmd, args) {
 }
 function textFile(wavFile, text) {
   const p = `${wavFile}.txt`;
-  writeFileSync(p, text);
+  writeFileSync4(p, text);
   return p;
 }
 async function withTemp(fn3) {
-  const dir = mkdtempSync(join2(tmpdir(), "am-tts-"));
+  const dir = mkdtempSync(join7(tmpdir(), "am-tts-"));
   try {
-    return await fn3(join2(dir, "out.wav"));
+    return await fn3(join7(dir, "out.wav"));
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    rmSync3(dir, { recursive: true, force: true });
   }
 }
 function readWav(buf) {
@@ -8433,7 +9676,7 @@ function resample(input) {
   return out;
 }
 async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
-  if (cacheDir) mkdirSync(cacheDir, { recursive: true });
+  if (cacheDir) mkdirSync3(cacheDir, { recursive: true });
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
@@ -8448,7 +9691,7 @@ async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
       const key = `${provider.id}${voice ? `:${voice}` : ""}${language ? `
 ${language}` : ""}
 ${texts[i]}`;
-      const file = cacheDir && join2(cacheDir, `${createHash("sha1").update(key).digest("hex")}.pcm`);
+      const file = cacheDir && join7(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
@@ -8462,15 +9705,15 @@ ${texts[i]}`;
   return results;
 }
 function readCache(file) {
-  if (!existsSync2(file)) return null;
-  const buf = readFileSync4(file);
+  if (!existsSync4(file)) return null;
+  const buf = readFileSync7(file);
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync(tmp, file);
+  writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
+  renameSync3(tmp, file);
 }
 function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
@@ -8651,9 +9894,9 @@ ${VIDEO_JS}</script>
 
 // src/video/export.js
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync3, mkdtempSync as mkdtempSync2, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4, writeFileSync as writeFileSync5 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join3 } from "node:path";
+import { join as join8 } from "node:path";
 import { pathToFileURL } from "node:url";
 var ExportError = class extends Error {
 };
@@ -8681,17 +9924,17 @@ var CHROME_PATHS = {
 function findChrome(env = process.env, platform = process.platform) {
   const custom = env.AM_CHROME || env.CHROME_PATH;
   if (custom) return custom;
-  const list = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
-  return list.find((p) => p.includes("/") || p.includes("\\") ? existsSync3(p) : hasCommand(p)) ?? null;
+  const list2 = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
+  return list2.find((p) => p.includes("/") || p.includes("\\") ? existsSync5(p) : hasCommand(p)) ?? null;
 }
 async function openPlayer(htmlFile, { env, startTimeoutMs }) {
   const chromePath = findChrome(env);
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join3(tmpdir2(), "am-export-"));
+  const tmp = mkdtempSync2(join8(tmpdir2(), "am-export-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
-    `--user-data-dir=${join3(tmp, "profile")}`,
+    `--user-data-dir=${join8(tmp, "profile")}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--hide-scrollbars",
@@ -8716,7 +9959,7 @@ async function openPlayer(htmlFile, { env, startTimeoutMs }) {
       chrome.kill();
     });
     try {
-      rmSync2(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+      rmSync4(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
     } catch {
     }
   };
@@ -8750,8 +9993,8 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
     const { info, evaluate, screenshot, tmp } = player;
-    const wavFile = wav2 ? join3(tmp, "voice.wav") : null;
-    if (wav2) writeFileSync2(wavFile, wav2);
+    const wavFile = wav2 ? join8(tmp, "voice.wav") : null;
+    if (wav2) writeFileSync5(wavFile, wav2);
     const ffmpeg = spawn2("ffmpeg", [
       "-y",
       "-loglevel",
@@ -8841,7 +10084,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
       const slice = await evaluate(`window.__amvEnc.bytes(${at3}, ${Math.min(WEBM_SLICE, size - at3)})`);
       Buffer.from(slice, "base64").copy(file, at3);
     }
-    writeFileSync2(webmFile, file);
+    writeFileSync5(webmFile, file);
     return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
   } finally {
     await player.close();
@@ -8913,45 +10156,8 @@ function connect(url) {
 }
 
 // src/housekeeping.js
-import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync3 } from "node:fs";
-import { join as join6 } from "node:path";
-
-// src/state.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync3, renameSync as renameSync2 } from "node:fs";
-import { join as join5 } from "node:path";
-
-// src/home.js
-import { mkdirSync as mkdirSync2, existsSync as existsSync4, statSync as statSync3, chmodSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
-import { join as join4 } from "node:path";
-var defaultHome = () => join4(homedir2(), ".answer-me-with-html");
-function ensureHome(home) {
-  const fresh = !existsSync4(home);
-  mkdirSync2(home, { recursive: true, mode: 448 });
-  if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
-  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
-}
-
-// src/state.js
-var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join5(home, "state.json");
-function readState(home) {
-  try {
-    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
-    return data && typeof data === "object" && !Array.isArray(data) ? data : {};
-  } catch {
-    return {};
-  }
-}
-function writeState(home, patch) {
-  const next = { ...readState(home), ...patch };
-  ensureHome(home);
-  const tmp = `${statePath(home)}.${process.pid}.tmp`;
-  writeFileSync3(tmp, `${JSON.stringify(next, null, 2)}
-`);
-  renameSync2(tmp, statePath(home));
-  return next;
-}
+import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 
 // src/update.js
 import { spawn as spawn3 } from "node:child_process";
@@ -8972,18 +10178,6 @@ function parseHighlights(data, version) {
     return kept.length ? [[id, kept]] : [];
   });
   return lists.length ? Object.fromEntries(lists) : null;
-}
-var SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
-function parseVersion(v) {
-  const m = String(v).trim().match(SEMVER);
-  return m ? m.slice(1, 4).map(Number) : null;
-}
-function newer(a, b) {
-  const pa = parseVersion(a);
-  const pb = parseVersion(b);
-  if (!pa || !pb) return false;
-  const i = pa.findIndex((n, k2) => n !== pb[k2]);
-  return i !== -1 && pa[i] > pb[i];
 }
 var UPDATE_COMMANDS = Object.freeze({
   plugin: "claude plugin update answer-me-with-html@answer-me-with-html",
@@ -9080,7 +10274,7 @@ function walk(dir) {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join6(dir, e.name);
+    const p = join9(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
       const s = lstatSync(p);
@@ -9091,9 +10285,9 @@ function walk(dir) {
   });
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
-function usage(home) {
+function usage2(home) {
   const parts = Object.fromEntries(DIRS3.map((d) => {
-    const files = walk(join6(home, d));
+    const files = walk(join9(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
@@ -9101,11 +10295,11 @@ function usage(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join6(home, d)).filter((f2) => all || f2.mtime < cutoff)),
-    ...walk(join6(home, "cache"))
+    ...["pages", "videos"].flatMap((d) => walk(join9(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...walk(join9(home, "cache"))
   ];
   if (!dryRun) {
-    for (const f2 of victims) rmSync3(f2.path, { force: true });
+    for (const f2 of victims) rmSync5(f2.path, { force: true });
     writeState(home, { lastClean: now, lastCleanHint: null });
   }
   return { files: victims.length, bytes: sum(victims) };
@@ -9127,7 +10321,7 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
   let state = readState(home);
   if (!state.firstSeen) state = writeState(home, { firstSeen: now });
   const hints = [];
-  const c = cleanHint(state, usage(home), now);
+  const c = cleanHint(state, usage2(home), now);
   if (c) {
     hints.push(c);
     state = writeState(home, { lastCleanHint: now });
@@ -9139,97 +10333,6 @@ function afterRender({ home, env, config, current, scriptPath, background, now =
   }
   if (background && scriptPath && shouldCheckUpdate(state, env, config, now)) spawnUpdateCheck(home, scriptPath);
   return hints;
-}
-
-// src/config.js
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, rmSync as rmSync4, existsSync as existsSync5 } from "node:fs";
-import { join as join7, dirname } from "node:path";
-var ConfigError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "ConfigError";
-  }
-};
-var CONFIG_KEYS = Object.freeze({
-  open: { type: "bool", default: true, label: "Open the page in the browser after it is made" },
-  theme: { type: "enum", choices: CHOICES.theme, default: AUTO, label: "Default theme (auto: paper for long text, blueprint for diagrams)" },
-  mode: { type: "enum", choices: CHOICES.mode, default: "auto", label: "Default light/dark mode" },
-  style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
-  update_check: { type: "bool", default: true, label: "Check for a new version once a week in the background and tell you (never updates by itself)" },
-  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
-});
-var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
-var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
-function amHome(env = process.env) {
-  return env.AM_HOME || defaultHome();
-}
-function configPath(env = process.env) {
-  return join7(amHome(env), "config.json");
-}
-var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k2, s]) => [k2, s.default]));
-function configChoices(key, themes2) {
-  return key === "theme" ? [AUTO, ...themes2.names("page")] : CONFIG_KEYS[key].choices;
-}
-function coerce2(key, raw, themes2) {
-  const spec = CONFIG_KEYS[key];
-  if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
-  if (spec.type === "bool") {
-    if (typeof raw === "boolean") return raw;
-    const v2 = String(raw).trim().toLowerCase();
-    if (TRUE.has(v2)) return true;
-    if (FALSE.has(v2)) return false;
-    throw new ConfigError(`${key} accepts only on / off`);
-  }
-  const v = String(raw).trim();
-  const choices = configChoices(key, themes2);
-  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
-  return v;
-}
-function readStored(env) {
-  const file = configPath(env);
-  if (!existsSync5(file)) return { stored: {} };
-  try {
-    const data = JSON.parse(readFileSync6(file, "utf8"));
-    return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
-  } catch (e) {
-    return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
-  }
-}
-function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
-  const { stored, warning } = readStored(env);
-  const values = defaults();
-  const warnings = [warning];
-  for (const [k2, v] of Object.entries(stored)) {
-    if (!CONFIG_KEYS[k2]) continue;
-    try {
-      values[k2] = coerce2(k2, v, themes2);
-    } catch {
-      if (k2 === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
-    }
-  }
-  return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
-}
-function writeStored(stored, env) {
-  const file = configPath(env);
-  if (!Object.keys(stored).length) {
-    rmSync4(file, { force: true });
-    return;
-  }
-  ensureHome(dirname(file));
-  writeFileSync4(file, `${JSON.stringify(stored, null, 2)}
-`);
-}
-function setConfig(key, raw, env = process.env, themes2 = loadThemes(amHome(env))) {
-  const value = coerce2(key, raw, themes2);
-  const { stored } = readStored(env);
-  writeStored({ ...stored, [key]: value }, env);
-  return value;
-}
-function resetConfig(key, env = process.env) {
-  if (key !== void 0 && !CONFIG_KEYS[key]) coerce2(key, "", null);
-  const { stored } = readStored(env);
-  const next = key === void 0 ? {} : Object.fromEntries(Object.entries(stored).filter(([k2]) => k2 !== key));
-  writeStored(next, env);
 }
 
 // src/math-load.js
@@ -9298,9 +10401,9 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, renameSync as renameSync3, rmSync as rmSync5, watch } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync4, rmSync as rmSync6, watch } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join8, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
+import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep2 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -9363,7 +10466,7 @@ var ServeError = class extends Error {
     this.name = "ServeError";
   }
 };
-var infoPath = (home) => join8(home, "serve.json");
+var infoPath = (home) => join10(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -9395,7 +10498,7 @@ var BOOT_SLACK_MS = 5e3;
 var bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1e3 - BOOT_SLACK_MS;
 function readServeInfo(home) {
   try {
-    const info = JSON.parse(readFileSync7(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync8(infoPath(home), "utf8"));
     const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
     const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
     return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
@@ -9419,17 +10522,17 @@ function writeInfo(home, info) {
   ensureHome(home);
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   try {
-    rmSync5(tmp, { force: true });
-    writeFileSync5(tmp, `${JSON.stringify(info)}
+    rmSync6(tmp, { force: true });
+    writeFileSync6(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
-    renameSync3(tmp, infoPath(home));
+    renameSync4(tmp, infoPath(home));
   } finally {
-    rmSync5(tmp, { force: true });
+    rmSync6(tmp, { force: true });
   }
 }
 function removeInfo(home, secret) {
   try {
-    if (JSON.parse(readFileSync7(infoPath(home), "utf8")).secret === secret) rmSync5(infoPath(home), { force: true });
+    if (JSON.parse(readFileSync8(infoPath(home), "utf8")).secret === secret) rmSync6(infoPath(home), { force: true });
   } catch {
   }
 }
@@ -9440,8 +10543,8 @@ function reply(req, res, status, type, body = "") {
 var notFound = (req, res) => reply(req, res, 404, "text/plain; charset=utf-8", "Not found\n");
 async function resolvePage(home, dir, file) {
   try {
-    const root = await realpath(join8(home, dir));
-    const path = join8(root, file);
+    const root = await realpath(join10(home, dir));
+    const path = join10(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
     return real.startsWith(root + sep2) ? real : null;
@@ -9508,7 +10611,7 @@ function liveStreams(home) {
   const startWatching = () => {
     if (watcher) return;
     try {
-      watcher = watch(join8(home, "pages"), settle2);
+      watcher = watch(join10(home, "pages"), settle2);
     } catch {
       return;
     }
@@ -9697,6 +10800,8 @@ Usage:
   am serve  [--port 8765] [--lan] [--public-url <origin>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
+  am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
+  am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
   am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
 
@@ -9731,7 +10836,7 @@ A -> B
 <div>any content</div>
 \`\`\`
 
-- "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
+- "## " starts a panel; the letter ID is optional (A, B, C... are assigned automatically). A capital letter and a space before a capitalized word is read as the ID: write "## B A Miss Goes Unseen" to keep the word "A". span is a hint: the page sizes panels to fit their content, so wide tables and diagrams need no span. Write span only for a panel that must stand out.
 - An image on its own line, ![what it shows](path), becomes a captioned figure and is embedded in the page; see am help image.
 - Math in text: $x^2$ is inline; a block is a line with only $$, the TeX, and a line with only $$ (or one line: $$ E = mc^2 $$). Put a long formula in a block: a block scrolls
   inside its panel, and an inline formula may wrap after = or +. \\$ writes a dollar sign. The TeX is typeset when the page is made (Temml): no script, no network.
@@ -9874,6 +10979,9 @@ async function main(argv, io = {}) {
         "public-url": { type: "string" },
         all: { type: "boolean" },
         "dry-run": { type: "boolean" },
+        use: { type: "boolean" },
+        force: { type: "boolean" },
+        remote: { type: "boolean" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" }
       }
@@ -9927,7 +11035,7 @@ async function withSource(arg, io, fail, fn3) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync8(resolve4(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync9(resolve4(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -9954,7 +11062,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join9(amHome(ctx.env), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -9962,13 +11070,13 @@ async function cmdRender(src, opts, ctx, baseDir) {
   await loadMath(src);
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx) });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply });
   } catch (e) {
     return reportError(e, fail);
   }
   const file = outputPath("pages", result.meta.title, opts, ctx);
   emit(result, file, ctx);
-  if (replaced && replaced !== resolve4(file)) rmSync6(replaced, { force: true });
+  if (replaced && replaced !== resolve4(file)) rmSync7(replaced, { force: true });
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
   return finish(file, held ? { ...opts, "no-open": true } : opts, config, ctx);
@@ -9992,7 +11100,19 @@ Usage:
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
-var THEME_HELP = `Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
+var THEME_HELP = `Install a ready-made theme from the catalog at answer-me-with-html.com/themes/
+
+am theme add <name> [--use] [--force]
+- Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+- A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
+- It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
+am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
+am theme update [name]       update themes installed from the catalog; a file you changed is skipped (am theme add <name> --force replaces it)
+am theme remove <name>       delete a theme file (not a built-in theme); if it was the default theme, the default is auto again
+- Where each theme came from is recorded in state.json (catalogThemes). Needs Answer me with HTML 0.5.3 or newer; before that, save the file by hand (see the catalog page).
+
+Your own theme: one JSON file per theme in ~/.answer-me-with-html/themes/ (AM_HOME moves it)
 
 The file name is the theme name: themes/notes.json is theme "notes" (lowercase letters, digits and -; not a built-in name).
 Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am config set theme notes. The draft does not change.
@@ -10011,14 +11131,25 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - label: the name on the page's theme button: a string, or an object with ${languageIds().join(" / ")} strings.
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(" ")}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
-- Fonts: name installed fonts only; the default font stack is added as the fallback. No font files are embedded.
+- Fonts: name installed fonts only; the default font stack is added as the fallback.
+- font (optional): a font this tool ships, embedded in a page rendered with the theme: ${FONT_NAMES.join(" | ")}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
+  An older version ignores the field and shows the fallback font.
+- requires (optional): the oldest version of this tool the theme supports, as x.y.z. A newer requirement makes this tool skip the theme.
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
+  Target these classes (they stay stable): ${THEME_SELECTORS.join(" ")}.
+  Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
+  am theme check warns about them; the catalog and am theme add reject them.
+- Diagram tokens (optional): node-fill node-stroke node-width node-radius node-shadow node-text, hi-fill hi-stroke hi-text, edge-color edge-width edge-label, actor-fill actor-stroke actor-text, note-fill note-stroke note-width note-radius, cluster-fill cluster-stroke, lifeline-color (each with a -- prefix).
+  They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. Widths and radii are a number or px / em (a bare number is px);
+  --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
-- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1).
+- Reports invalid colors, missing variables and contrast below WCAG AA in light and dark (text 4.5:1; status badges 3:1, warning below 4.5:1),
+  and diagram text on its fill (node, highlighted node, actor, note, edge label) when the theme sets a diagram token for it. A width, radius or shadow token with a bad value is an error.
+- Warns about external resources in css, video.css and token values (url() or image-set() to http(s) or //, @import, @font-face, backslash escapes).
 - Exits with 1 when there is an error. Without errors it renders two specimen pages (light, dark) with every component.`;
 async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const { fail, io } = ctx;
@@ -10034,7 +11165,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const file = resolve4(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync8(file, "utf8");
+    html = readFileSync9(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -10048,7 +11179,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync8(resolve4(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync9(resolve4(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -10082,7 +11213,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       if (!validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx) });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -10124,7 +11255,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
   if (provider) ensureHome(amHome(env));
   const result = await renderVideo(src, {
     provider,
-    cacheDir: join9(amHome(env), "cache", "tts"),
+    cacheDir: join11(amHome(env), "cache", "tts"),
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -10164,20 +11295,20 @@ function themeWarnings({ fail, themes: themes2 }) {
 }
 function outputPath(dir, title, opts, { env, io }) {
   if (opts.out) return resolve4(io.cwd ?? process.cwd(), opts.out);
-  return join9(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
   const path = resolve4(file);
   if (path.startsWith(home + sep3)) ensureHome(home);
-  mkdirSync3(dirname3(file), { recursive: true });
-  if (!path.startsWith(join9(home, "pages") + sep3)) return writeFileSync6(file, html);
-  const tmp = join9(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
+  mkdirSync4(dirname3(file), { recursive: true });
+  if (!path.startsWith(join11(home, "pages") + sep3)) return writeFileSync7(file, html);
+  const tmp = join11(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
   try {
-    writeFileSync6(tmp, html);
-    renameSync4(tmp, file);
+    writeFileSync7(tmp, html);
+    renameSync5(tmp, file);
   } finally {
-    rmSync6(tmp, { force: true });
+    rmSync7(tmp, { force: true });
   }
 }
 function emit(result, file, { print, env }, note2 = "") {
@@ -10251,7 +11382,7 @@ function cmdClean(opts, { print, fail, env }) {
   }
   const days = opts.days === void 0 ? CLEAN.days : Number(opts.days);
   const home = amHome(env);
-  const before = usage(home);
+  const before = usage2(home);
   const dry = Boolean(opts["dry-run"]);
   const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry });
   const scope = opts.all ? "all pages and videos" : `pages and videos older than ${count(days, "day")}`;
@@ -10342,7 +11473,7 @@ function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   for (const [k2, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k2 in stored ? "*" : " ";
     const options = spec.type === "bool" ? "on | off" : configChoices(k2, themes2).join(" | ");
-    print(`${mark} ${k2.padEnd(13)}${showValue(values[k2]).padEnd(10)}${spec.label} (${options})`);
+    print(`${mark} ${k2.padEnd(19)}${showValue(values[k2]).padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== "0") print("Note: the AM_NO_OPEN environment variable is set and overrides the open setting.");
   print("* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]");
@@ -10375,13 +11506,14 @@ ${[...sections, table].join("\n\n")}
 `;
 }
 function cmdTheme(action, target, opts, ctx) {
+  if (["add", "list", "update", "remove"].includes(action)) return cmdThemeMarket(action, target, opts, ctx);
   const { print, fail, env, io } = ctx;
   if (action !== "check" || !target) {
-    fail("\u2717 Usage: am theme check <name|file.json>");
+    fail(`\u2717 Usage: am theme check <name|file.json> | ${THEME_MARKET_USAGE}`);
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join9(amHome(env), "themes", `${target}.json`);
+  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join11(amHome(env), "themes", `${target}.json`);
   const name = isFile ? basename4(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
@@ -10395,10 +11527,11 @@ function cmdTheme(action, target, opts, ctx) {
   }
   const tokens = theme?.tokens ?? theme?.video?.tokens;
   const colors = tokens ? checkColors({ tokens }) : { errors: [], warnings: [] };
+  const warnings = [...colors.warnings, ...externalResourceWarnings(theme)];
   const all = [...errors, ...colors.errors];
   all.forEach((e) => print(`\u2717 ${e}`));
-  colors.warnings.forEach((w) => print(`! ${w}`));
-  print(`${name}: ${all.length} error${all.length === 1 ? "" : "s"}, ${colors.warnings.length} warning${colors.warnings.length === 1 ? "" : "s"}`);
+  warnings.forEach((w) => print(`! ${w}`));
+  print(`${name}: ${all.length} error${all.length === 1 ? "" : "s"}, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`);
   if (all.length) return 1;
   if (!theme.scope.includes("page")) return 0;
   const themes2 = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;

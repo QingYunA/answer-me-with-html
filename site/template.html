@@ -25,21 +25,8 @@
 <meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#081322" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="{{BASE}}favicon.svg" type="image/svg+xml">
-<script>
-(function () {
-  var d = document.documentElement, s = null;
-  d.className += ' js';
-  try { s = localStorage.getItem('am-site-mode'); } catch (e) {}
-  d.setAttribute('data-mode', s === 'light' || s === 'dark' ? s : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-  if (s === 'light' || s === 'dark') d.setAttribute('data-mode-locked', '');
-  try {
-    if (d.lang === 'en' && !localStorage.getItem('am-site-lang') && /^zh/i.test(navigator.language || '')) {
-      localStorage.setItem('am-site-lang', 'zh');
-      location.replace('{{ALT_HREF}}' + location.hash);
-    }
-  } catch (e) {}
-})();
-</script>
+<script defer src="{{STATS_SCRIPT}}" data-website-id="{{STATS_WEBSITE_ID}}" data-domains="answer-me-with-html.com"></script>
+{{PARTIAL_BOOT}}
 <link rel="stylesheet" href="{{BASE}}assets/style.css">
 <link rel="modulepreload" href="{{BASE}}assets/main.js">
 <script type="module" src="{{BASE}}assets/main.js"></script>
@@ -54,28 +41,16 @@
 
 <header class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="#top">
-      <svg class="brand-mark" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="13" fill="var(--head-bg)" stroke="var(--line)" stroke-width="2"/><path fill="var(--head-fg)" fill-rule="evenodd" d="M31.4 14.25 H32.6 L44 37.25 H38.4 L36.22 32.85 H27.78 L25.6 37.25 H20 Z M32 24.34 L34.63 29.65 H29.37 Z"/><path d="M17 42.25 V47.25 H47 V42.25" fill="none" stroke="var(--brand-accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Answer me with HTML</span>
-    </a>
+{{PARTIAL_BRAND}}
     <nav class="nav" aria-label="{{nav_label}}">
       <a href="#top">{{nav_home}}</a>
       <a href="#playground">{{nav_playground}}</a>
       <a href="#video">{{nav_video}}</a>
       <a href="#benchmark">{{nav_benchmark}}</a>
       <a href="#install">{{nav_install}}</a>
+      <a href="{{BASE}}themes/">{{nav_catalog}}</a>
     </nav>
-    <div class="tools">
-      <a class="tool lang-switch" href="{{ALT_HREF}}" hreflang="{{alt_hreflang}}" lang="{{alt_hreflang}}" data-lang="{{alt_code}}" aria-label="{{alt_label_long}}">{{alt_label}}</a>
-      <button class="tool icon-btn" type="button" id="mode-toggle" aria-label="{{mode_toggle}}" title="{{mode_toggle}}">
-        <svg class="i-moon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        <svg class="i-sun" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </button>
-      <a class="tool gh" href="https://github.com/QingYunA/answer-me-with-html" aria-label="{{gh_label}}">
-        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-        <span class="gh-text">GitHub</span><span class="stars" data-stars="{{STARS}}">{{STARS}}</span>
-      </a>
-    </div>
+{{PARTIAL_TOOLS}}
   </div>
 </header>
 
@@ -394,6 +369,7 @@
         <button type="button" role="radio" aria-checked="false" data-v="dark">{{pg_mode_dark}}</button>
       </div>
       <p class="fine">{{s6_note}}</p>
+      <p class="fine"><a href="{{BASE}}themes/">{{s6_catalog}} →</a></p>
     </div>
     <div class="themes-view">
       <div class="pane-head mono"><span id="th-label">blueprint · light</span><span id="th-ms"></span></div>
@@ -604,22 +580,7 @@ cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answe
 
 </main>
 
-<footer class="footer">
-  <div class="footer-in">
-    <div class="footer-story">
-      <span class="mono footer-k">{{f_why_k}}</span>
-      <p>{{f_why}}</p>
-    </div>
-    <dl class="footer-block mono">
-      <div class="tb-wide"><dt>{{tb_project}}</dt><dd>Answer me with HTML</dd></div>
-      <div><dt>{{tb_rev}}</dt><dd>{{VERSION}}</dd></div>
-      <div><dt>{{tb_license}}</dt><dd><a href="https://github.com/QingYunA/answer-me-with-html/blob/main/LICENSE">MIT</a></dd></div>
-      <div><dt>{{f_source}}</dt><dd><a href="https://github.com/QingYunA/answer-me-with-html">GitHub</a></dd></div>
-      <div><dt>{{f_community}}</dt><dd><a href="https://discord.gg/sYQuRRZNzQ">Discord</a> · <a href="https://linux.do">LINUX DO</a></dd></div>
-      <div class="tb-wide"><dt>{{f_drawn}}</dt><dd>{{f_drawn_v}}</dd></div>
-    </dl>
-  </div>
-</footer>
+{{PARTIAL_FOOTER}}
 
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="{{zoom_dialog}}">
   <button type="button" class="lightbox-close" aria-label="{{close}}">✕</button>

@@ -172,7 +172,7 @@ Server -> Client: SYN-ACK
 | 任意 Agent | `/answer-me-with-html config open off`，或者直接说"别再自动弹浏览器了" |
 | 终端 | `am config` 查看，`am config set open off` 修改，`am config reset` 恢复默认 |
 
-配置项有 `open`（自动打开浏览器）、`theme`、`mode`（亮色或暗色）、`style`（写作检查）、`update_check` 和 `voice`（视频配音）。默认值和可选值见[参考](docs/reference.zh-CN.md#配置)。
+配置项有 `open`（自动打开浏览器）、`theme`、`mode`（亮色或暗色）、`style`（写作检查）、`update_check`、`close_after_reply`（复制回复后关闭标签页）和 `voice`（视频配音）。默认值和可选值见[参考](docs/reference.zh-CN.md#配置)。
 
 ## 高频模式（推荐）
 
@@ -230,7 +230,7 @@ SYN_RCVD -> *ESTABLISHED: 收 ACK
 
 - **版面由代码计算:** 面板位置和图形坐标都是算出来的，不靠模型猜。文字不会被截断，网格里也不会留空洞。
 - **出错能自己改:** 稿件写错时，CLI 会给出行号、组件名和一段正确示例。Agent 照着改一次就行。
-- **三套主题:** blueprint 是图纸风，shadcn 是卡片风，paper 适合读长文。默认由 CLI 按内容自动选：长文用 paper，有图表用 blueprint。三套都带亮色和暗色，页面上可以用下拉框随时切换，也可以添加你自己的主题。
+- **三套主题:** blueprint 是图纸风，shadcn 是卡片风，paper 适合读长文。默认由 CLI 按内容自动选：长文用 paper，有图表用 blueprint。三套都带亮色和暗色，页面上可以用下拉框随时切换，也可以添加你自己的主题，或者从[主题库](https://answer-me-with-html.com/zh/themes/)里取一个。
 - **单文件、零依赖:** 产物是一个 `.html`，不引用任何 CDN 或外部字体。断网也能打开，发给别人也能看。
 - **多语言:** 简体中文、繁体中文、英文和日文都有对应的按钮和字体。其他语言也能用，按钮是英文。详见[语言](docs/reference.zh-CN.md#语言)。
 - **写作检查:** 按 ASD-STE100 的思路检查稿件里的文字。句子太长、用词太绕、被动语态都会提醒。默认只提醒，不拦着。
@@ -314,4 +314,4 @@ npm run snapshot  # 与 origin/main 对比生成的 HTML（重构不能改变它
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE)。主题可以内嵌的 Bangers 字体使用 [SIL Open Font License 1.1](skills/answer-me-with-html/licenses/OFL-Bangers.txt)。

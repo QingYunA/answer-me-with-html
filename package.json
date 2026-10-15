@@ -1,14 +1,16 @@
 {
   "name": "answer-me-with-html",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Answer hard questions with a one-page HTML: the model writes a short Markdown draft; the bundled CLI handles templates, SVG auto-layout and an STE controlled-writing check.",
   "icon": "./docs/logo.svg",
   "type": "module",
+  "main": "index.js",
   "bin": {
     "am": "bin/am.js",
     "answer-me-with-html": "bin/am.js"
   },
   "files": [
+    "index.js",
     "bin",
     "src",
     "skills",
@@ -46,6 +48,7 @@
   "license": "MIT",
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
+    "@fontsource/bangers": "^5.3.0",
     "marked": "^18.0.14",
     "temml": "^0.14.0"
   },

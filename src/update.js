@@ -3,6 +3,7 @@
 // new-version button on the page. Never updates automatically.
 import { spawn } from 'node:child_process';
 import { DAY, writeState } from './state.js';
+import { parseVersion, newer } from './version.js';
 
 export const UPDATE = Object.freeze({
   checkEveryDays: 7,
@@ -31,21 +32,7 @@ export function parseHighlights(data, version) {
   return lists.length ? Object.fromEntries(lists) : null;
 }
 
-const SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
-
-export function parseVersion(v) {
-  const m = String(v).trim().match(SEMVER);
-  return m ? m.slice(1, 4).map(Number) : null;
-}
-
-// Whether a is newer than b. Returns false when either is not in x.y.z format.
-export function newer(a, b) {
-  const pa = parseVersion(a);
-  const pb = parseVersion(b);
-  if (!pa || !pb) return false;
-  const i = pa.findIndex((n, k) => n !== pb[k]);
-  return i !== -1 && pa[i] > pb[i];
-}
+export { parseVersion, newer };
 
 // The update command for each install method, as the user types it. dsh needs the
 // profile and the package name, so it is filled in by dshUpdateCommand.

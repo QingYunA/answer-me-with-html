@@ -44,7 +44,7 @@ body {
   text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
 }
 img, svg, iframe { display: block; max-width: 100%; }
-.demo-frame, .thumb iframe, #th-frame { max-width: none; }
+.demo-frame, .thumb iframe, #th-frame, .tthumb iframe, .tview-box iframe { max-width: none; }
 a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
 code, kbd, pre, .mono { font-family: var(--mono); }
@@ -119,7 +119,7 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
   flex: none; width: 48px; height: 48px; display: grid; place-items: center;
   background: var(--head-bg); color: var(--head-fg); font-weight: 700; font-size: 22px;
 }
-.sheet-head h2 { margin: 0; font-size: clamp(26px, 3.4vw, 40px); line-height: 1.1; letter-spacing: -0.03em; font-weight: 700; flex: 1; }
+.sheet-head h1, .sheet-head h2 { margin: 0; font-size: clamp(26px, 3.4vw, 40px); line-height: 1.1; letter-spacing: -0.03em; font-weight: 700; flex: 1; }
 .sheet-no { font-size: 11px; color: var(--ink-3); letter-spacing: 0.08em; white-space: nowrap; align-self: flex-start; padding-top: 4px; }
 .sheet-lede { margin: 0 0 clamp(24px, 3vw, 36px); max-width: 70ch; font-size: clamp(16px, 1.4vw, 18px); color: var(--ink-2); }
 .sheet-lede code { font-size: 0.85em; }
@@ -523,12 +523,12 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .copybox pre { margin: 0; padding: 16px 92px 16px 16px; font: 13px/1.65 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
 .copybox.prompt pre { font-family: var(--sans); font-size: 15px; border-left: 4px solid var(--accent); }
 .copybox.small pre { font-size: 13px; line-height: 1.6; }
-.copy-btn {
+.copy-btn, .tcopy-btn {
   position: absolute; top: 10px; right: 10px; height: 30px; padding: 0 12px; border: var(--bw) solid var(--line); background: var(--paper);
   font-size: 12px; font-weight: 600;
 }
-.copy-btn:hover { background: var(--ink); color: var(--paper); }
-.copy-btn.is-done { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.copy-btn:hover, .tcopy-btn:hover { background: var(--ink); color: var(--paper); }
+.copy-btn.is-done, .tcopy-btn.is-done { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .always { border: var(--bw) solid var(--line); padding: 20px; background: var(--bg); }
 .always > p { margin: 0 0 14px; color: var(--ink-2); font-size: 15px; }
 .reqs { display: flex; flex-wrap: wrap; margin: clamp(28px, 4vw, 40px) 0 0; border: var(--bw) solid var(--line); }
@@ -536,6 +536,64 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .reqs > div:last-child { border-right: 0; }
 .reqs dt { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
 .reqs dd { margin: 3px 0 0; font-size: 14px; font-weight: 600; }
+
+/* ── Theme wall (/themes/) and a theme's page (/themes/<name>/) ──── */
+.twall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(18px, 2.4vw, 30px); }
+.tcard { position: relative; height: 100%; display: flex; flex-direction: column; border: var(--bw) solid var(--line); background: var(--bg); transition: transform 0.15s, box-shadow 0.15s; }
+.tcard:hover, .tcard:focus-within { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--accent); }
+/* The sample page is drawn this wide in a frame and scaled to the card. tan(atan2(a, b)) is a / b: scale() needs a number, and the card's width is a length. */
+.tthumb { container-type: inline-size; position: relative; overflow: hidden; aspect-ratio: 4 / 3; border-bottom: var(--bw) solid var(--line); background: var(--paper); pointer-events: none; }
+.tthumb iframe { position: absolute; top: 0; left: 0; width: 900px; height: 680px; border: 0; transform-origin: 0 0; transform: scale(0.35); transform: scale(tan(atan2(100cqw, 900px))); pointer-events: none; }
+@container (max-width: 399px) {
+  .tthumb iframe { width: 520px; height: 400px; transform: scale(0.6); transform: scale(tan(atan2(100cqw, 520px))); }
+}
+.tcard-text { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px 16px; flex: 1; }
+.tcard-title { margin: 0; font-size: 20px; line-height: 1.2; letter-spacing: -0.02em; }
+.tcard-link { color: var(--ink); text-decoration: none; }
+.tcard-link::after { content: ""; position: absolute; inset: 0; z-index: 1; }
+.tcard-link:focus-visible { outline: none; }
+.tcard-link:focus-visible::after { outline: 2px solid var(--accent); outline-offset: 3px; }
+.tcard-name { font-size: 12px; color: var(--ink-2); }
+.tcard-desc { margin: 6px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+.ttags { list-style: none; margin: auto 0 0; padding: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ttags li { font-size: 11px; padding: 2px 7px; border: 1px solid var(--line-2); background: var(--fill); color: var(--ink-2); }
+.catalog-submit { margin-top: clamp(28px, 4vw, 44px); }
+.catalog-submit > p { margin-bottom: 0; }
+
+.tback { display: inline-block; margin-bottom: 18px; font-size: 13px; }
+.sheet-head--theme h1 { flex: none; }
+.sheet-head--theme .tcard-name { font-size: 13px; }
+.tmeta { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0 0 clamp(20px, 3vw, 32px); padding: 12px 0; border-block: 1px solid var(--line-2); }
+.tmeta dt { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
+.tmeta dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
+.tdetail { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: clamp(20px, 3.2vw, 44px); align-items: start; }
+.tview { min-width: 0; }
+.tview-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 14px; margin-bottom: 10px; }
+.tview-box { container-type: inline-size; position: relative; overflow: hidden; border: var(--bw) solid var(--line); background: var(--paper); aspect-ratio: 1000 / 900; }
+.tview-box iframe { position: absolute; top: 0; left: 0; width: 1000px; height: 900px; border: 0; transform-origin: 0 0; transform: scale(0.6); transform: scale(tan(atan2(100cqw, 1000px))); }
+@container (max-width: 560px) {
+  .tview-box iframe { width: 480px; transform: scale(0.7); transform: scale(tan(atan2(100cqw, 480px))); }
+}
+.tview-status { margin: 8px 0 0; min-height: 1.5em; font-size: 12px; color: var(--ink-3); }
+.tinstall { min-width: 0; position: sticky; top: calc(var(--topbar-h) + 16px); }
+.tinstall .minor { margin-top: 0; }
+.tinstall-lead { margin: 0 0 12px; color: var(--ink-2); font-size: 15px; }
+.tinstall-agent { width: 100%; margin-top: 12px; }
+.tinstall .copybox pre { font-size: 12.5px; }
+.tinstall .copybox.prompt pre { font-size: 14px; padding-right: 16px; }
+.tstep { margin: 22px 0 8px; font: 600 12px/1.4 var(--mono); letter-spacing: 0.04em; color: var(--ink-2); }
+.tolder { margin-top: 18px; border: 1px solid var(--line-2); background: var(--bg); }
+.tolder > summary { cursor: pointer; padding: 10px 14px; font-size: 14px; font-weight: 600; }
+.tolder[open] > summary { border-bottom: 1px solid var(--line-2); }
+.tolder > :not(summary) { margin-inline: 14px; }
+.tolder-d { margin-top: 12px; margin-bottom: 0; font-size: 14px; color: var(--ink-2); }
+.tolder .tstep:last-of-type + .copybox { margin-bottom: 14px; }
+.tolder .tstep { margin-top: 14px; }
+/* Without JavaScript the sample and mode switches and the Copy buttons do nothing, so they stay hidden, and the frame shows the page at full width. */
+html:not(.js) .tview-bar, html:not(.js) .tcopy-btn, html:not(.js) .tinstall-agent { display: none; }
+html:not(.js) .tview-box { aspect-ratio: auto; }
+html:not(.js) .tview-box iframe { position: static; width: 100%; height: 80vh; transform: none; }
+html:not(.js) .tinstall .copybox pre { padding-right: 16px; }
 
 /* ── Footer ─────────────────────────────────────────────── */
 .footer { border-top: var(--bw) solid var(--line); background: var(--paper); margin-top: clamp(20px, 4vw, 40px); }
@@ -587,6 +645,9 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
   .seg-col > button:last-child { border-right: 0; }
   .video, .video-draft { grid-template-columns: minmax(0, 1fr); }
   .install { grid-template-columns: minmax(0, 1fr); }
+  .tdetail { grid-template-columns: minmax(0, 1fr); }
+  .tinstall { position: static; }
+  .twall { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   .nav { display: none; }
@@ -640,6 +701,9 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
   .ste-list .m { grid-column: 2; }
   .copybox pre { padding-right: 16px; padding-top: 48px; }
   .themes-box { height: auto; aspect-ratio: 1180 / 1000; }
+  .twall { grid-template-columns: minmax(0, 1fr); }
+  .tview-bar .seg-tabs { width: 100%; }
+  .tview-bar .seg-tabs > button { flex: 1 1 auto; white-space: normal; }
   .seg-col { flex-direction: column; width: 100%; }
   .seg-col > button { border-right: 0; border-bottom: 1px solid var(--line-2); }
   .seg-col > button:last-child { border-bottom: 0; }
