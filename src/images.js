@@ -121,8 +121,9 @@ export function inlineImages(html, { baseDir = process.cwd(), known = new Map(),
 }
 
 // The remote sources (http(s) or protocol-relative) of every <img> in html, as the draft would write them. Quoted or bare, since raw html may use either.
+// \s before src, not \b: the - of data-src is a word boundary too.
 export function remoteImages(html) {
-  return [...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
+  return [...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)]
     .map((m) => decodeRef(m[1] ?? m[2] ?? m[3]))
     .filter((ref) => /^(?:https?:)?\/\//i.test(ref));
 }

@@ -8586,7 +8586,7 @@ function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ n
   });
 }
 function remoteImages(html) {
-  return [...html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) => decodeRef(m[1] ?? m[2] ?? m[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
+  return [...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) => decodeRef(m[1] ?? m[2] ?? m[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
 }
 function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));

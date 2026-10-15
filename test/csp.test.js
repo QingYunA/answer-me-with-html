@@ -7,6 +7,7 @@ import { renderDoc } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
 import { withLiveReload } from '../src/serve.js';
 import { pinScript } from '../src/csp.js';
+import { remoteImages } from '../src/images.js';
 import { LIVE_JS } from '../src/assets.js';
 import { sha256Base64 } from '../src/sha256.js';
 
@@ -107,6 +108,11 @@ lang: en
   assert.match(messages[0], /^L6 remote image https:\/\/example\.com\/chart\.png does not load in the page; save the image and use its local path$/);
   assert.match(messages[1], /^L9 remote image \/\/cdn\.example\.com\/a\.png /);
   assert.match(messages[2], /^L10 remote image http:\/\/example\.com\/b\.png /);
+});
+
+test('csp: the warning names the src attribute, not data-src before it', () => {
+  assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="//cdn.example.com/b.png">'), ['//cdn.example.com/b.png']);
+  assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="local.png">'), []);
 });
 
 test('csp: a remote image written as code is not an image and gets no warning', () => {
