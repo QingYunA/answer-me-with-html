@@ -290,7 +290,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 
 ## Updating and cleaning up
 
-**Updating.** Updates are manual, and the tool tells you when one is out. Once a week, a background process downloads this project's `package.json` and `highlights.json` from GitHub to read the latest version number and its highlights. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Each page made while you are out of date also has a "New version" button at the start of the toolbar; click it for up to three highlights of the new version in the page language, the update command and a copy button. `am serve` takes the button out of a page it sends to another device (`--lan` or `--public-url`), and the page itself never goes online. Turn this off with `/answer-me-with-html:config update_check off`.
+**Updating.** Updates are manual, and the tool tells you when one is out. Once a day, a background process downloads this project's `package.json` and `highlights.json` from GitHub to read the latest version number and its highlights. Nothing about you or your pages is sent, and the page you asked for never waits on it. When there is a newer version, the next render adds a one-line notice and the agent asks whether you want to update. Each page made while you are out of date also has a "New version" button at the start of the toolbar; click it for up to three highlights of the new version in the page language, the update command and a copy button. `am serve` takes the button out of a page it sends to another device (`--lan` or `--public-url`), and the page itself never goes online. Turn this off with `/answer-me-with-html:config update_check off`.
 
 | Installed with | Update with |
 | :--- | :--- |
@@ -314,7 +314,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `theme` | `auto` | Default theme: `auto` (paper for long text, blueprint for diagrams), `blueprint`, `shadcn`, `paper`, or your own theme |
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
-| `update_check` | `on` | Check GitHub for a new version once a week and mention it. Never updates by itself |
+| `update_check` | `on` | Check GitHub for a new version once a day and mention it. Never updates by itself |
 | `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
 

@@ -354,7 +354,7 @@ export default {
   i_req_k: '依赖',
   i_req_npm: '不需要',
   i_req_net: '联网',
-  i_req_net_v: '每周查一次新版本，可关闭',
+  i_req_net_v: '每天查一次新版本，可关闭',
   i_req_cfg: '配置',
   i_req_cfg_v: '无需配置',
 

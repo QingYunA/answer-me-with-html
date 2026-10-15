@@ -332,7 +332,7 @@ export default {
   i_req_k: 'Needs',
   i_req_npm: 'not needed',
   i_req_net: 'Network',
-  i_req_net_v: 'a weekly version check, can be turned off',
+  i_req_net_v: 'a daily version check, can be turned off',
   i_req_cfg: 'Setup',
   i_req_cfg_v: 'none',
 

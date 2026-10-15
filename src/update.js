@@ -1,4 +1,4 @@
-// New-version notice: once a week a background child process reads package.json on GitHub and writes the result into state.json;
+// New-version notice: once a day a background child process reads package.json on GitHub and writes the result into state.json;
 // on the next render, if a new version exists, print one "! Update hint" line for the Agent, which asks the user, and put a
 // new-version button on the page. Never updates automatically.
 import { spawn } from 'node:child_process';
@@ -6,7 +6,7 @@ import { DAY, writeState } from './state.js';
 import { parseVersion, newer } from './version.js';
 
 export const UPDATE = Object.freeze({
-  checkEveryDays: 7,
+  checkEveryDays: 1,
   hintEveryDays: 3,
   timeoutMs: 5000,
   url: 'https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/package.json',
