@@ -298,7 +298,8 @@ test('image: a real PNG inside a folder that holds keys is refused', () => {
   try {
     mkdirSync(join(folder, '.ssh'));
     writeFileSync(join(folder, '.ssh', 'shot.png'), PNG);
-    const abs = join(folder, '.ssh', 'shot.png');
+    // Forward slashes: in Markdown, the \. of a Windows path is an escaped dot, so the backslash would be lost.
+    const abs = join(folder, '.ssh', 'shot.png').replaceAll('\\', '/');
     for (const path of [abs, '.ssh/shot.png']) {
       const err = imageError(path, folder);
       assert.ok(err instanceof RenderError, path);
