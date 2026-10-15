@@ -1,0 +1,140 @@
+name: Theme submission
+
+# A theme submitted with the "Submit a theme" issue form (label theme-submission), see CONTRIBUTING.md, "Theme catalog".
+# - check: when the issue is opened or edited, run the catalog checks and keep one bot comment up to date.
+# - approve: when a maintainer adds the label theme-approved, check again and open a PR that adds marketplace/themes/<name>.json.
+#   CI on that PR waits until a maintainer approves the workflow run on the PR page (a PR opened with GITHUB_TOKEN needs that).
+# The issue text is untrusted. These jobs run the scripts of main, read the issue from the event file (scripts/theme-submission.mjs),
+# and pass only the issue number, the user's login and the validated theme name through env. Nothing from the issue goes into a `run:` line.
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions: {}
+
+jobs:
+  check:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'theme-submission') &&
+      (github.event.action == 'opened' || github.event.action == 'edited' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'theme-submission'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    # The latest edit is the one to check.
+    concurrency:
+      group: theme-check-${{ github.event.issue.number }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The catalog rules import the renderer's theme code, which needs the runtime dependencies (not the build tools).
+      - run: npm ci --omit=dev --ignore-scripts
+      - name: Check the theme
+        run: node scripts/theme-submission.mjs check
+      - name: Post or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          # Our own comment: written by the bot and starting with the marker. Anyone can type the marker, so the comment must be the bot's too.
+          ids=$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- theme-submission -->"))) | .id')
+          id=${ids%%$'\n'*}
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@comment.md > /dev/null
+          else
+            gh issue comment "$NUMBER" --repo "$REPO" --body-file comment.md
+          fi
+
+  approve:
+    if: >-
+      github.event.action == 'labeled' && github.event.label.name == 'theme-approved' &&
+      contains(github.event.issue.labels.*.name, 'theme-submission')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    # Never cancel an approval half way: it would leave a branch without a PR.
+    concurrency:
+      group: theme-approve-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NUMBER: ${{ github.event.issue.number }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev --ignore-scripts
+      - name: Check the theme again
+        id: check
+        run: node scripts/theme-submission.mjs check
+      - name: Stop with a comment when the theme has a problem
+        if: steps.check.outputs.ok != 'true'
+        run: |
+          set -eu
+          ids=$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments" --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- theme-submission -->"))) | .id')
+          id=${ids%%$'\n'*}
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@comment.md > /dev/null
+          else
+            gh issue comment "$NUMBER" --repo "$REPO" --body-file comment.md
+          fi
+          # Take the label off, so that adding it again after the fix starts this job again.
+          gh api -X DELETE "repos/$REPO/issues/$NUMBER/labels/theme-approved" > /dev/null || true
+          echo "::error::The theme does not pass the catalog checks; see the comment on the issue."
+          exit 1
+      - name: Commit the theme on its own branch
+        if: steps.check.outputs.ok == 'true'
+        env:
+          NAME: ${{ steps.check.outputs.name }}
+          LOGIN: ${{ github.event.issue.user.login }}
+          USER_ID: ${{ github.event.issue.user.id }}
+        run: |
+          set -euo pipefail
+          # The script has checked the name against the catalog rules; the login and id are checked here before they go into a trailer.
+          [[ "$NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]
+          [[ "$LOGIN" =~ ^[A-Za-z0-9-]+$ ]]
+          [[ "$USER_ID" =~ ^[0-9]+$ ]]
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "theme/issue-$NUMBER"
+          node scripts/theme-submission.mjs write
+          git add -- "marketplace/themes/$NAME.json"
+          git commit -m "feat(catalog): add the $NAME theme" -m "Co-authored-by: $LOGIN <$USER_ID+$LOGIN@users.noreply.github.com>"
+          # One branch per issue, so two issues that ask for the same name never overwrite each other. Only this branch is ever
+          # force-pushed: approving the same issue again rebuilds it from main.
+          git push --force origin "theme/issue-$NUMBER"
+      - name: Open the pull request
+        if: steps.check.outputs.ok == 'true'
+        id: pr
+        env:
+          NAME: ${{ steps.check.outputs.name }}
+          LOGIN: ${{ github.event.issue.user.login }}
+        run: |
+          set -euo pipefail
+          url=$(gh pr list --repo "$REPO" --head "theme/issue-$NUMBER" --state open --json url --jq '.[0].url // empty')
+          if [ -z "$url" ]; then
+            body=$(printf 'Adds the `%s` theme to the catalog.\n\nIt came from a website submission by @%s. The catalog checks passed on the issue before this PR was opened.\n\nCloses #%s\n' "$NAME" "$LOGIN" "$NUMBER")
+            url=$(gh pr create --repo "$REPO" --base main --head "theme/issue-$NUMBER" --title "feat(catalog): add the $NAME theme" --body "$body")
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Tell the issue
+        if: steps.check.outputs.ok == 'true'
+        env:
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: gh issue comment "$NUMBER" --repo "$REPO" --body "A maintainer approved this theme. The pull request is $PR_URL. Its CI starts when a maintainer approves the workflow run there."

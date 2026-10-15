@@ -1,4 +1,4 @@
-// highlights.json: the release's highlights in every page language, read by the weekly check and shown in the new-version popover.
+// highlights.json: the release's highlights in every page language, read by the daily check and shown in the new-version popover.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';

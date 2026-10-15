@@ -1,6 +1,6 @@
 // The theme wall (/themes/): each card shows the sample page the build already rendered in the theme, in a small frame.
 // Hover or focus on a card shows the frame in dark; leaving it shows light again. This page loads no renderer.
-import { track } from './main.js';
+import { copyText, track } from './main.js';
 
 for (const card of document.querySelectorAll('.tcard')) {
   const frame = card.querySelector('iframe');
@@ -19,4 +19,15 @@ for (const card of document.querySelectorAll('.tcard')) {
   const open = () => track('theme-open', { theme: card.dataset.theme });
   link.addEventListener('click', open);
   link.addEventListener('auxclick', (e) => { if (e.button === 1) open(); });
+}
+
+document.getElementById('submit-theme')?.addEventListener('click', () => track('editor-open', { from: 'wall' }));
+
+// The prompt that hands making a theme to the user's agent (it points the agent at /themes/make.md).
+for (const btn of document.querySelectorAll('[data-copy]')) {
+  btn.addEventListener('click', async () => {
+    track('theme-make-copy');
+    const text = document.getElementById(btn.dataset.copy).textContent;
+    dispatchEvent(new CustomEvent('site:copied', { detail: { button: btn, ok: await copyText(text) } }));
+  });
 }

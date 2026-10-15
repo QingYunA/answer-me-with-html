@@ -1,28 +1,28 @@
 {
-  "version": "0.5.3",
+  "version": "0.5.4",
   "en": [
-    "Theme catalog: `am theme add comic --use` installs a theme from the website",
-    "Themes can restyle diagrams: nodes, edges, notes, highlights and shadows",
-    "Reply: see your reply laid out, and copy it from a bar at the bottom of the page"
+    "Make a theme with your agent, then submit it to the catalog on the website",
+    "`am serve` reloads an open page when its file changes",
+    "Pages and videos carry a strict Content-Security-Policy"
   ],
   "zh": [
-    "主题库：`am theme add comic --use` 从官网安装主题",
-    "主题可以改图了：节点、连线、注释框、高亮和阴影",
-    "回复：直接看到排好版的回复，在页面底部一栏一键复制"
+    "让 agent 帮你做主题，再提交到官网主题库",
+    "`am serve` 打开的页面在文件变化时自动刷新",
+    "页面和视频带上严格的内容安全策略（CSP）"
   ],
   "zh-Hant": [
-    "主題庫：`am theme add comic --use` 從官網安裝主題",
-    "主題可以改圖了：節點、連線、註解框、醒目標示和陰影",
-    "回覆：直接看到排好版的回覆，在頁面底部一欄一鍵複製"
+    "讓 agent 幫你做主題，再提交到官網主題庫",
+    "`am serve` 開啟的頁面在檔案變更時自動重新整理",
+    "頁面和影片帶上嚴格的內容安全政策（CSP）"
   ],
   "ja": [
-    "テーマカタログ：`am theme add comic --use` でサイトからテーマをインストール",
-    "テーマで図も変わる：ノード、線、注記、強調、影",
-    "返信：整形された返信を確認し、ページ下部のバーからワンクリックでコピー"
+    "エージェントにテーマを作らせて、サイトのカタログに投稿",
+    "`am serve` で開いたページはファイルが変わると自動で再読み込み",
+    "ページと動画に厳格なコンテンツセキュリティポリシー（CSP）を付与"
   ],
   "he": [
-    "קטלוג ערכות עיצוב: `am theme add comic --use` מתקין ערכת עיצוב מהאתר",
-    "ערכת עיצוב משנה גם תרשימים: צמתים, קווים, הערות, הדגשות וצללים",
-    "תגובה: רואים את התגובה מעוצבת ומעתיקים אותה מסרגל בתחתית הדף"
+    "בקשו מהסוכן ליצור ערכת עיצוב ושלחו אותה לקטלוג באתר",
+    "`am serve` טוען מחדש דף פתוח כשהקובץ שלו משתנה",
+    "דפים וסרטונים כוללים מדיניות אבטחת תוכן (CSP) מחמירה"
   ]
 }

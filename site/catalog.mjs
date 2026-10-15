@@ -4,8 +4,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { normalizeTheme } from '../src/themes/check.js';
-import { BUILTIN_NAMES } from '../src/themes/registry.js';
+import { catalogProblems } from '../src/themes/catalog-rules.js';
 import { escapeHtml } from './i18n/_draft.js';
 
 const esc = escapeHtml;
@@ -15,20 +14,14 @@ const fill = (text, vars) => text.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '')
 const FONT_LABELS = { bangers: 'Bangers' };
 
 // Every theme of the catalog, sorted by name: { name, file, bytes, sha256, data }.
-// A file that is not a usable theme stops the build, so the website never publishes one (test/marketplace.test.js checks the same rules).
+// A file that breaks a catalog rule stops the build, so the website never publishes one (test/marketplace.test.js checks the same rules).
 export function readCatalog(dir) {
   return readdirSync(dir).filter((f) => f.endsWith('.json')).sort().map((file) => {
     const name = file.replace(/\.json$/, '');
-    if (name === 'index') throw new Error('marketplace/themes/index.json would replace the catalog list (themes/index.json); rename the theme');
     const bytes = readFileSync(join(dir, file));
-    const data = JSON.parse(bytes.toString('utf8'));
-    const { errors } = normalizeTheme(name, data, BUILTIN_NAMES);
-    if (errors.length) throw new Error(`marketplace/themes/${file}: ${errors.join('; ')}`);
-    for (const key of ['version', 'author', 'license']) {
-      if (typeof data[key] !== 'string' || !data[key]) throw new Error(`marketplace/themes/${file}: "${key}" is missing`);
-    }
-    if (typeof data.description?.en !== 'string') throw new Error(`marketplace/themes/${file}: "description.en" is missing`);
-    return { name, file, bytes, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), data };
+    const problems = catalogProblems(name, bytes.toString('utf8'));
+    if (problems.length) throw new Error(`marketplace/themes/${file}: ${problems.map((p) => p.message).join(' ')}`);
+    return { name, file, bytes, size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), data: JSON.parse(bytes.toString('utf8')) };
   });
 }
 

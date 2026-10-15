@@ -1,0 +1,37 @@
+name: Submit a theme
+description: Add a theme to the catalog on answer-me-with-html.com/themes/
+title: "Theme: "
+labels: ["theme-submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The easy way is the [theme editor](https://answer-me-with-html.com/themes/new/) on the website: it checks the theme as you edit and fills in this form for you.
+
+        You can also paste a theme file here. A bot checks it and comments with what to fix. A maintainer reviews every theme before it goes into the catalog. The rules are in [CONTRIBUTING.md, Theme catalog](https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog).
+
+  - type: input
+    id: name
+    attributes:
+      label: Theme name
+      description: "Lowercase letters, digits and -. This is the file name and the name people type in `am theme add`."
+      placeholder: my-theme
+    validations:
+      required: true
+
+  - type: textarea
+    id: theme
+    attributes:
+      label: Theme JSON
+      description: The whole theme file, with the catalog fields (version, author, license, description, label).
+      render: json
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: license
+    attributes:
+      label: License
+      options:
+        - label: I made this theme, and I license it under the license in the file.
+          required: true

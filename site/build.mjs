@@ -7,7 +7,10 @@
 // - index.html (English) and zh/index.html (Chinese): site/template.html filled from site/i18n/en.js and site/i18n/zh.js.
 // - themes/ (English) and zh/themes/ (Chinese): the theme wall, site/template-themes.html filled the same way, with a card for each theme of the catalog.
 // - themes/<name>/ and zh/themes/<name>/: one page for each theme, site/template-theme.html.
+// - themes/new/ and zh/themes/new/: the theme editor, site/template-editor.html, made interactive by assets/editor.js.
 // - themes/<name>.json and themes/index.json: marketplace/themes/ published as it is, and the list of it (site/catalog.mjs).
+// - themes/make.md: site/make.md, the steps an agent follows to make and submit a theme (the wall's prompt points at it).
+// - llms.txt: site/llms.txt, a short index of the Markdown an agent can read.
 import { build } from 'esbuild';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -33,7 +36,7 @@ export const STATS_SCRIPT = 'https://stats.answer-me-with-html.com/script.js';
 export const STATS_WEBSITE_ID = '6cfdb29e-3e32-432f-8371-a2aee22393ad';
 
 // The page's own browser files, copied to assets/ without changes.
-const FRONT_FILES = ['main.js', 'live.js', 'chrome.js', 'playground.js', 'catalog.js', 'theme.js', 'style.css'];
+const FRONT_FILES = ['main.js', 'live.js', 'chrome.js', 'playground.js', 'catalog.js', 'theme.js', 'editor.js', 'style.css'];
 const IMAGES = ['text-vs-page.png', 'text-vs-page-zh.png', 'tcp-en.png', 'tcp.png', 'tcp-en-dark.png', 'ste100.png', 'video-en.png', 'video-zh.png', 'plain-vs-skill.png'];
 const PRERENDER = [
   ['video', 'examples/video-tcp.en.md', 'video-en.html'],
@@ -50,12 +53,17 @@ const THEME_PAGES = [
   { lang: 'en', htmlLang: 'en', out: 'themes/index.html', alt: '../zh/themes/', path: 'themes/' },
   { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/themes/index.html', alt: '../../themes/', path: 'zh/themes/' },
 ];
+// The theme editor (site/template-editor.html). A catalog theme cannot be named "new" (src/themes/catalog-rules.js), so the folder is free.
+const EDITOR_PAGES = [
+  { lang: 'en', htmlLang: 'en', out: 'themes/new/index.html', alt: '../../zh/themes/new/', path: 'themes/new/' },
+  { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/themes/new/index.html', alt: '../../../themes/new/', path: 'zh/themes/new/' },
+];
 // The pages of one catalog theme: its own folder in each language.
 const themePages = (name) => [
   { lang: 'en', htmlLang: 'en', out: `themes/${name}/index.html`, alt: `../../zh/themes/${name}/`, path: `themes/${name}/` },
   { lang: 'zh', htmlLang: 'zh-CN', out: `zh/themes/${name}/index.html`, alt: `../../../themes/${name}/`, path: `zh/themes/${name}/` },
 ];
-export const pageGroups = (catalog) => [PAGES, THEME_PAGES, ...catalog.map((e) => themePages(e.name))];
+export const pageGroups = (catalog) => [PAGES, THEME_PAGES, EDITOR_PAGES, ...catalog.map((e) => themePages(e.name))];
 // The sample page of the theme previews: the playground's TCP draft in each language, drawn light (the page flips to dark by data-mode).
 const THEME_SAMPLES = [['en', 'site/presets/tcp.md', 'themes'], ['zh', 'site/presets/tcp.zh.md', 'zh/themes']];
 // Markup the templates share, in site/partials/<name>.html, used in a template as {{PARTIAL_<NAME>}}.
@@ -175,6 +183,7 @@ function prerender(dist, catalog) {
 function copyImages(dist) {
   copyFileSync(join(ROOT, 'docs/logo.svg'), join(dist, 'assets/logo.svg'));
   copyFileSync(join(ROOT, 'docs/logo.svg'), join(dist, 'favicon.svg'));
+  copyFileSync(join(SITE, 'llms.txt'), join(dist, 'llms.txt'));
   mkdirSync(join(dist, 'images'), { recursive: true });
   for (const name of IMAGES) copyFileSync(join(ROOT, 'docs/images', name), join(dist, 'images', name));
 }
@@ -197,6 +206,7 @@ function writeCatalog(dist, entries) {
   mkdirSync(to, { recursive: true });
   for (const { file } of entries) copyFileSync(join(CATALOG_DIR, file), join(to, file));
   writeFileSync(join(to, 'index.json'), catalogIndex(entries, SITE_URL));
+  copyFileSync(join(SITE, 'make.md'), join(to, 'make.md'));
 }
 
 // The stargazer count, or '' when it cannot be read (offline, rate-limited); the build never fails on it.
@@ -278,6 +288,7 @@ async function writePages(dist, version, catalog, groups) {
   const home = read('template.html');
   const themes = read('template-themes.html');
   const detail = read('template-theme.html');
+  const editor = read('template-editor.html');
   const partials = Object.fromEntries(PARTIALS.map((n) => [n, read(`partials/${n}.html`).text.trimEnd()]));
   const langs = [...new Set(groups.flat().map((p) => p.lang))];
   const dicts = Object.fromEntries(await Promise.all(langs.map(async (l) => [l, await loadDictionary(l)])));
@@ -288,6 +299,7 @@ async function writePages(dist, version, catalog, groups) {
   const pages = [
     ...fillGroup(home, partials, PAGES, shared, () => ({ BRAND_HREF: '#top' }), problems),
     ...fillGroup(themes, partials, THEME_PAGES, shared, (p, base) => ({ BRAND_HREF: base, THEME_WALL: wallHtml(catalog, dicts[p.lang], p.lang) }), problems),
+    ...fillGroup(editor, partials, EDITOR_PAGES, shared, (p, base) => ({ BRAND_HREF: base, BACK_HREF: '../' }), problems),
     ...catalog.flatMap((entry) => {
       const group = themePages(entry.name);
       return fillGroup(detail, partials, group, shared, (p, base) => ({ BRAND_HREF: base, BACK_HREF: '../', PATH_EN: group[0].path, PATH_ZH: group[1].path, ...detailValues(entry, dicts[p.lang], p.lang, SITE_URL) }), problems);

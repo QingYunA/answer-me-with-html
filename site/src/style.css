@@ -559,6 +559,8 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .ttags li { font-size: 11px; padding: 2px 7px; border: 1px solid var(--line-2); background: var(--fill); color: var(--ink-2); }
 .catalog-submit { margin-top: clamp(28px, 4vw, 44px); }
 .catalog-submit > p { margin-bottom: 0; }
+.catalog-submit .copybox.prompt pre { padding-right: 16px; }
+.catalog-make-copy { margin: 12px 0 16px; }
 
 .tback { display: inline-block; margin-bottom: 18px; font-size: 13px; }
 .sheet-head--theme h1 { flex: none; }
@@ -590,10 +592,78 @@ main { display: block; padding: clamp(20px, 4vw, 48px) 0 0; }
 .tolder .tstep:last-of-type + .copybox { margin-bottom: 14px; }
 .tolder .tstep { margin-top: 14px; }
 /* Without JavaScript the sample and mode switches and the Copy buttons do nothing, so they stay hidden, and the frame shows the page at full width. */
-html:not(.js) .tview-bar, html:not(.js) .tcopy-btn, html:not(.js) .tinstall-agent { display: none; }
+html:not(.js) .tview-bar, html:not(.js) .tcopy-btn, html:not(.js) .tinstall-agent, html:not(.js) .catalog-make-copy { display: none; }
 html:not(.js) .tview-box { aspect-ratio: auto; }
 html:not(.js) .tview-box iframe { position: static; width: 100%; height: 80vh; transform: none; }
 html:not(.js) .tinstall .copybox pre { padding-right: 16px; }
+
+/* ── Theme editor (/themes/new/) ──────────────────────────── */
+.catalog-cta { margin: 0 0 clamp(20px, 3vw, 30px); }
+.tstart { margin: 0 0 clamp(20px, 3vw, 28px); }
+.ed { position: relative; }
+.ed.is-drag::after { content: ""; position: absolute; inset: -10px; border: 2px dashed var(--accent); background: var(--accent-bg); opacity: 0.35; pointer-events: none; z-index: 5; }
+.ed-start { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 18px; margin-bottom: 14px; }
+.ed-start .ed-field { flex: 1 1 260px; max-width: 420px; }
+.ed-drop-note { flex: 1 1 100%; margin: 0; max-width: 70ch; }
+.ed-banner { margin: 0 0 18px; padding: 10px 14px; border: var(--bw) solid var(--line); border-left-width: 5px; background: var(--fill); font-size: 14px; overflow-wrap: anywhere; }
+.ed-banner.is-err { border-color: var(--err); background: var(--err-bg); }
+.ed-banner.is-ok { border-color: var(--accent); background: var(--accent-bg); }
+.ed-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(20px, 3.2vw, 44px); align-items: start; }
+.ed-side { min-width: 0; position: sticky; top: calc(var(--topbar-h) + 16px); max-height: calc(100vh - var(--topbar-h) - 32px); overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 22px; }
+.ed-form { min-width: 0; display: flex; flex-direction: column; gap: 26px; }
+.ed-sec { border: 0; padding: 0; margin: 0; min-width: 0; }
+.ed-sec > legend { padding: 0; width: 100%; float: left; margin-bottom: 14px; }
+.ed-sec > legend + * { clear: both; }
+.ed-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; margin-bottom: 14px; }
+.ed-field > label, .ed-tok-name { font-size: 13px; font-weight: 600; color: var(--ink); }
+.ed-input {
+  width: 100%; min-width: 0; height: 38px; padding: 0 10px; border: var(--bw) solid var(--line); border-radius: 0; background: var(--paper); color: var(--ink);
+  font: 14px var(--sans);
+}
+select.ed-input { cursor: pointer; }
+textarea.ed-input { height: auto; padding: 8px 10px; line-height: 1.5; resize: vertical; }
+.ed-input.mono { font-family: var(--mono); font-size: 13px; }
+.ed-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ed-input[aria-invalid="true"] { border-color: var(--err); background: var(--err-bg); }
+.ed-input:disabled { opacity: 0.6; cursor: wait; }
+.ed-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.ed-hint { margin: 0; }
+.ed-err { display: none; margin: 0; font-size: 13px; line-height: 1.45; color: var(--err); }
+.ed-err.is-on { display: block; margin-bottom: 10px; }
+.ed-err > span, .ed-err > p { display: block; }
+.ed-err > p { margin: 0 0 4px; }
+.ed-err code { color: inherit; background: none; border: 0; padding: 0; font-weight: 600; }
+.ed-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ed-group { margin-bottom: 14px; }
+.ed-group-t { margin: 0 0 8px; font: 600 11px/1.4 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+.ed-toks { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px 14px; }
+.ed-tok { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 4px 8px; align-items: center; }
+.ed-tok-name { grid-column: 1 / -1; font-weight: 500; }
+.ed-color { width: 38px; height: 38px; padding: 2px; border: var(--bw) solid var(--line); background: var(--paper); border-radius: 0; cursor: pointer; }
+.ed-color:disabled { opacity: 0.35; cursor: not-allowed; }
+.ed-json { min-height: 280px; white-space: pre; overflow: auto; tab-size: 2; }
+.ed-json + .ed-err { margin-top: 8px; }
+.ed-box { aspect-ratio: 1000 / 900; }
+.ed-check .minor, .ed-send { margin-top: 0; }
+.ed-count { margin: 0 0 8px; font: 600 12px var(--mono); color: var(--err); }
+.ed-ok { margin: 0; padding: 10px 14px; border: var(--bw) solid var(--accent); background: var(--accent-bg); font-size: 14px; font-weight: 600; }
+.ed-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.ed-list li { padding: 8px 10px; border: 1px solid var(--err); border-left-width: 4px; background: var(--err-bg); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.ed-list code { margin-right: 4px; color: var(--err); background: none; border: 0; padding: 0; font-weight: 700; font-size: 12px; }
+.ed-send-note { margin: 0 0 12px; font-size: 14px; color: var(--ink-2); }
+.ed-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.ed-actions .btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; transform: none; }
+#ed-submit-state { margin-top: 10px; min-height: 1.4em; }
+@media (max-width: 1024px) {
+  .ed-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Preview, checks and the buttons come first on a narrow screen, so a change is seen where it is made. */
+  .ed-side { position: static; max-height: none; overflow: visible; padding: 0; order: -1; }
+}
+@media (max-width: 720px) {
+  .ed-pair { grid-template-columns: minmax(0, 1fr); }
+  .ed-toks { grid-template-columns: minmax(0, 1fr); }
+  .ed-actions .btn { flex: 1 1 100%; }
+}
 
 /* ── Footer ─────────────────────────────────────────────── */
 .footer { border-top: var(--bw) solid var(--line); background: var(--paper); margin-top: clamp(20px, 4vw, 40px); }

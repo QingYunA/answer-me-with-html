@@ -244,7 +244,7 @@ AM_EOF
 
 ### 主题库
 
-[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想把主题加进主题库，见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想做一个主题并提交到主题库，让你的 agent 按 [/themes/make.md](https://answer-me-with-html.com/themes/make.md) 的步骤做；其他方式（网站编辑器、issue 表单或 PR）见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
 
 
 #### 安装主题：`am theme add`
@@ -290,7 +290,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 
 ## 更新与清理
 
-**更新**：需要手动更新，但有新版本时会提醒你。工具每周在后台向 GitHub 查询一次最新版本号和这个版本的亮点，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。过时期间生成的每个页面，工具栏最前面还会多一个「新版本」按钮，点开能看到新版本最多 3 条亮点（跟页面同一种语言）、更新命令和复制按钮。用 `am serve --lan` 或 `--public-url` 分享给别的设备时，`am serve` 会把按钮去掉；页面本身也不联网。关掉提醒：`/answer-me-with-html:config update_check off`。
+**更新**：需要手动更新，但有新版本时会提醒你。工具每天在后台向 GitHub 查询一次最新版本号和这个版本的亮点，不上传任何内容，也不会拖慢你要的页面。有新版本时，下一次出页面会附一行提示，Agent 会问你要不要更新。过时期间生成的每个页面，工具栏最前面还会多一个「新版本」按钮，点开能看到新版本最多 3 条亮点（跟页面同一种语言）、更新命令和复制按钮。用 `am serve --lan` 或 `--public-url` 分享给别的设备时，`am serve` 会把按钮去掉；页面本身也不联网。关掉提醒：`/answer-me-with-html:config update_check off`。
 
 | 安装方式 | 更新方法 |
 | :--- | :--- |
@@ -314,7 +314,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
-| `update_check` | `on` | 每周向 GitHub 查一次新版本并提醒你，不会自己更新 |
+| `update_check` | `on` | 每天向 GitHub 查一次新版本并提醒你，不会自己更新 |
 | `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
 

@@ -104,7 +104,8 @@ const BUILT = { skip: !existsSync(join(ROOT, 'site/dist/themes/index.json')) };
 const SITE_URL = 'https://answer-me-with-html.com/';
 const NAMES = readdirSync(join(ROOT, 'marketplace/themes')).map((f) => f.replace(/\.json$/, '')).sort();
 const DETAIL = NAMES.flatMap((name) => [`themes/${name}/index.html`, `zh/themes/${name}/index.html`]);
-const PAGES = ['index.html', 'zh/index.html', 'themes/index.html', 'zh/themes/index.html', ...DETAIL];
+const EDITOR = ['themes/new/index.html', 'zh/themes/new/index.html'];
+const PAGES = ['index.html', 'zh/index.html', 'themes/index.html', 'zh/themes/index.html', ...EDITOR, ...DETAIL];
 
 test('site build: the built pages load no script or style from another site, except the visit counter', BUILT, () => {
   for (const page of PAGES) {
@@ -132,8 +133,8 @@ test('site build: both pages carry the visit counter for the site domain only', 
 test('site build: sitemap.xml lists every page with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
   const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
   const urls = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urls.length, 4 + NAMES.length * 2);
-  const pairs = [['', 'zh/'], ['themes/', 'zh/themes/'], ...NAMES.map((n) => [`themes/${n}/`, `zh/themes/${n}/`])];
+  assert.equal(urls.length, 6 + NAMES.length * 2);
+  const pairs = [['', 'zh/'], ['themes/', 'zh/themes/'], ['themes/new/', 'zh/themes/new/'], ...NAMES.map((n) => [`themes/${n}/`, `zh/themes/${n}/`])];
   for (const [en, zh] of pairs) {
     for (const page of [en, zh]) {
       const url = urls.find((u) => u.includes(`<loc>${SITE_URL}${page}</loc>`));
@@ -192,7 +193,8 @@ test('site build: the wall has one link card per catalog theme, with a pre-rende
       assert.match(html, new RegExp(`<iframe src="${name}/preview\\.html"[^>]*loading="lazy"[^>]*tabindex="-1"[^>]*aria-hidden="true"`), `${page}: thumbnail of ${name}`);
     }
     assert.ok(!html.includes('engine.js'), `${page}: the wall does not mention the renderer`);
-    assert.ok(!/role="tab(list|panel)?"|tcopy-btn|<pre/.test(html), `${page}: no install UI on the wall`);
+    // The one <pre> is the prompt that hands making a theme to an agent; installing happens on each theme's page.
+    assert.ok(!/role="tab(list|panel)?"|tcopy-btn|<pre(?! id="c-make")/.test(html), `${page}: no install UI on the wall`);
     assert.match(html, /Font: Bangers|字体: Bangers/);
     assert.match(html, /data-page="catalog"/);
   }
@@ -256,4 +258,85 @@ test('site build: each theme has a pre-rendered preview in both languages, with 
 test('site build: the gallery pages point at each other as the other language', BUILT, () => {
   assert.match(read(join(ROOT, 'site/dist/themes/index.html')), /class="tool lang-switch" href="\.\.\/zh\/themes\/"/);
   assert.match(read(join(ROOT, 'site/dist/zh/themes/index.html')), /class="tool lang-switch" href="\.\.\/\.\.\/themes\/"/);
+});
+
+test('site build: the wall hands making a theme to an agent, and links to the editor, in both languages', BUILT, () => {
+  for (const page of ['themes/index.html', 'zh/themes/index.html']) {
+    const html = read(join(ROOT, 'site/dist', page));
+    assert.match(html, /<a class="btn btn-primary btn-sm" href="#make">/, `${page}: the top button jumps to the make box`);
+    assert.match(html, /<pre id="c-make">[^<]*https:\/\/answer-me-with-html\.com\/themes\/make\.md[^<]*<\/pre>/, `${page}: the prompt names the guide`);
+    assert.match(html, /data-copy="c-make"/, `${page}: the prompt has a copy button`);
+    assert.ok(html.includes('<a href="new/" id="submit-theme">'), `${page}: the editor stays as a link`);
+  }
+});
+
+test('site build: the agent guide and llms.txt are published as they are', BUILT, () => {
+  const dist = join(ROOT, 'site/dist');
+  assert.equal(read(join(dist, 'themes/make.md')), read(join(ROOT, 'site/make.md')));
+  assert.equal(read(join(dist, 'llms.txt')), read(join(ROOT, 'site/llms.txt')));
+  assert.ok(read(join(dist, 'llms.txt')).includes('https://answer-me-with-html.com/themes/make.md'));
+});
+
+test('site make.md: names every color and diagram token, every theme selector and the issue form fields', async () => {
+  const { COLOR_TOKENS, DIAGRAM_TOKENS } = await import('../src/themes/check.js');
+  const { THEME_SELECTORS } = await import('../src/themes/selectors.js');
+  const { BUILTIN_NAMES } = await import('../src/themes/registry.js');
+  const { MAX_NAME, MAX_BYTES } = await import('../src/themes/catalog-rules.js');
+  const guide = read(join(ROOT, 'site/make.md'));
+  for (const name of [...COLOR_TOKENS, ...DIAGRAM_TOKENS, ...THEME_SELECTORS, ...BUILTIN_NAMES]) assert.ok(guide.includes(`\`${name}\``), name);
+  assert.ok(guide.includes(`at most ${MAX_NAME} characters`) && guide.includes(`at most ${MAX_BYTES / 1024} KB`));
+  const form = read(join(ROOT, '.github/ISSUE_TEMPLATE/theme.yml'));
+  for (const id of ['name', 'theme']) assert.match(form, new RegExp(`id: ${id}\\b`), id);
+  assert.ok(guide.includes('template:"theme.yml"') && guide.includes('name:n') && guide.includes('theme:JSON.stringify'));
+});
+
+test('site build: every theme page links to the editor with that theme as the start', BUILT, () => {
+  for (const name of NAMES) {
+    for (const page of [`themes/${name}/index.html`, `zh/themes/${name}/index.html`]) {
+      const html = read(join(ROOT, 'site/dist', page));
+      assert.ok(html.includes(`href="../new/?from=${name}"`), `${page}: Start from this theme`);
+    }
+  }
+});
+
+test('site build: the editor page is built in both languages, loads its script and nothing from another site', BUILT, () => {
+  for (const [page, lang, canonical] of [[EDITOR[0], 'en', 'themes/new/'], [EDITOR[1], 'zh', 'zh/themes/new/']]) {
+    const html = read(join(ROOT, 'site/dist', page));
+    assert.match(html, /data-page="editor"/, page);
+    assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}${canonical}">`), `${page}: canonical`);
+    assert.ok(html.includes(`<link rel="alternate" hreflang="en" href="${SITE_URL}themes/new/">`) && html.includes(`<link rel="alternate" hreflang="zh-CN" href="${SITE_URL}zh/themes/new/">`), `${page}: hreflang`);
+    for (const id of ['ed-from', 'ed-file', 'ed-form', 'ed-view', 'ed-problems', 'ed-submit', 'ed-download']) assert.ok(html.includes(`id="${id}"`), `${page}: #${id}`);
+    assert.match(html, /<select id="ed-from"/);
+    assert.match(html, /<div id="ed-problems"[^>]*aria-live="polite"|<div id="ed-problems" class="ed-problems" aria-live="polite"/, `${page}: problems are announced`);
+    assert.doesNotMatch(html.replace(/<script type="application\/json"[\s\S]*?<\/script>/, ''), /\{\{\s*[\w.-]+\s*\}\}/, `${page}: no unfilled placeholder`);
+    assert.match(html, lang === 'en' ? /<h1 id="e-title">Make a theme<\/h1>/ : /<h1 id="e-title">制作主题<\/h1>/, page);
+    assert.match(html, /class="tool lang-switch" href="\.\.\/\.\.\/(?:zh\/)?themes\/new\/"|class="tool lang-switch" href="\.\.\/\.\.\/\.\.\/themes\/new\/"/, `${page}: language switch`);
+    assert.ok(html.includes('<script type="application/json" id="site-ui">'), page);
+  }
+  assert.ok(existsSync(join(ROOT, 'site/dist/assets/editor.js')), 'editor.js is published');
+  assert.ok(read(join(ROOT, 'site/dist/assets/engine.js')).includes('theme.yml'), 'the submit link is in the engine bundle');
+  assert.match(read(join(ROOT, 'site/dist/assets/main.js')), /editor: ?'\.\/editor\.js'/);
+});
+
+test('site i18n: no key is written twice in a dictionary, and both languages have every key, the editor strings of the page script too', async () => {
+  const dicts = {};
+  for (const lang of ['en', 'zh']) {
+    // The page dictionary is the object after `export default`; the `ui` object before it is a dictionary of its own.
+    const source = read(join(ROOT, 'site/i18n', `${lang}.js`)).split('export default {')[1];
+    const keys = [...source.matchAll(/^  ([A-Za-z_][\w]*):/gm)].map((m) => m[1]);
+    const seen = keys.filter((k, i) => keys.indexOf(k) !== i);
+    assert.deepEqual(seen, [], `${lang}.js writes these keys twice`);
+    dicts[lang] = (await import(pathToFileURL(join(ROOT, 'site/i18n', `${lang}.js`)).href)).default;
+  }
+  assert.deepEqual(Object.keys(dicts.en).sort(), Object.keys(dicts.zh).sort());
+  const ui = Object.fromEntries(Object.entries(dicts).map(([lang, d]) => [lang, JSON.parse(d.ui_json)]));
+  assert.deepEqual(Object.keys(ui.en.ed).sort(), Object.keys(ui.zh.ed).sort(), 'ui.ed');
+  for (const lang of ['en', 'zh']) {
+    for (const [k, v] of Object.entries(ui[lang].ed)) assert.ok(typeof v === 'string' && v.trim(), `${lang} ui.ed.${k}`);
+    for (const k of ['th_submit_cta', 'th_start', 'ed_title', 'ed_submit', 'ed_download']) assert.ok(dicts[lang][k], `${lang} ${k}`);
+  }
+  // Every string the editor script reads exists.
+  const used = [...read(join(ROOT, 'site/src/editor.js')).matchAll(/\bT\.(\w+)|T\[`(g)_\$\{/g)].map((m) => m[1]).filter(Boolean);
+  for (const k of used) assert.ok(k in ui.en.ed, `editor.js reads T.${k}`);
+  for (const g of ['surface', 'text', 'accent', 'status']) assert.ok(`g_${g}` in ui.en.ed, g);
 });

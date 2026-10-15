@@ -25,26 +25,37 @@
       ta.remove();
     }
   };
-  // The button reads its label from data-done for a moment after a copy.
-  const flash = (btn) => {
-    const original = btn.textContent;
-    btn.textContent = btn.dataset.done;
-    setTimeout(() => { btn.textContent = original; }, 1400);
+  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is
+  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,
+  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and
+  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have).
+  const flasher = (btn) => {
+    const idle = btn.textContent;
+    let clicks = 0;
+    return () => {
+      btn.textContent = btn.dataset.done;
+      const mine = ++clicks;
+      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);
+    };
   };
 
   const copyBtn = document.querySelector('[data-am="copy"]');
-  copyBtn?.addEventListener('click', async () => {
-    const nodes = document.querySelectorAll('#am-source');
-    await copyText(nodes[nodes.length - 1]?.value ?? '');
-    flash(copyBtn);
-  });
+  if (copyBtn) {
+    const flash = flasher(copyBtn);
+    copyBtn.addEventListener('click', async () => {
+      const nodes = document.querySelectorAll('#am-source');
+      await copyText(nodes[nodes.length - 1]?.value ?? '');
+      flash();
+    });
+  }
 
   // Each code block copies its own lines, without the line numbers.
   for (const btn of document.querySelectorAll('[data-am="copy-code"]')) {
+    const flash = flasher(btn);
     btn.addEventListener('click', async () => {
       const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];
       await copyText([...lines].map((l) => l.textContent).join('\n'));
-      flash(btn);
+      flash();
     });
   }
 

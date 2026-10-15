@@ -141,3 +141,5 @@ for (const btn of $$('[data-copy]')) {
 }
 const older = $('.tolder');
 older.addEventListener('toggle', () => { if (older.open) track('theme-older', { theme: name }); });
+
+$('#start-from')?.addEventListener('click', () => track('editor-open', { from: 'theme', theme: name }));

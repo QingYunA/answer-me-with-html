@@ -35,16 +35,33 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a wall of themes, a page for each theme, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). A page that does not use a catalog theme does not carry it.
 
-To submit a theme, open a PR that adds `marketplace/themes/<name>.json`. **A catalog theme PR needs no issue first.** One theme per PR is easiest to review.
+There are four ways to submit a theme. **A catalog theme needs no accepted issue first.** A maintainer reviews every theme before it goes in.
+
+- **An agent** is the main way. The wall's "Copy for your agent" prompt points the agent at [/themes/make.md](https://answer-me-with-html.com/themes/make.md) (`site/make.md`): start from the closest catalog theme, change it, check it with `am theme check`, show the user both specimen pages, and give the user the prefilled issue URL. It needs no new command, so it works from 0.4.10. `/llms.txt` (`site/llms.txt`) points at the same guide. When a catalog rule changes, change `site/make.md` too; `test/site.test.js` checks that it names every token and selector.
+- **The website editor** at [answer-me-with-html.com/themes/new/](https://answer-me-with-html.com/themes/new/) is for editing by hand. You start from a built-in or catalog theme (or upload a file), change it in a form or as JSON, see it live in light and dark, and check it with the catalog rules as you edit. Submit opens the issue form below with your theme filled in; Download gives you the file for a PR.
+- **The issue form** is what the guide and the editor fill in. Open [Submit a theme](https://github.com/QingYunA/answer-me-with-html/issues/new?template=theme.yml), type the name and paste the theme file. A bot checks the theme and comments with what to fix. Edit the issue and it checks again.
+- **A PR** adds `marketplace/themes/<name>.json`. One theme per PR is easiest to review.
+
+Whichever way you submit, the theme must follow these rules:
 
 - The file is a theme file ([docs/reference.md](docs/reference.md#your-own-theme)) plus the catalog fields `version` (`x.y.z`), `author`, `license`, and `description` (`{ "en": "one short sentence", "zh": "..." }`). `label` should have `en` and `zh`. The catalog fields are for the website; the CLI ignores them when it renders.
-- The file name is the theme name: lowercase letters, digits and `-`, and not the name of a built-in theme or `index`.
+- The file name is the theme name: lowercase letters, digits and `-`, and not the name of a built-in theme, `index` or `new`.
 - At most 16 KB. No `url()` or `image-set()` to `http:`, `https:` or `//`, no `@import`, no `@font-face`, no backslash. A theme names a font the CLI ships with `font` (only `bangers` for now); it does not bring its own.
 - `css` targets only the classes in `THEME_SELECTORS` (`src/themes/selectors.js`). If your theme needs a class that is not there, add it to the list in the same PR, with the reason.
 - Set `requires` only when the theme fails on an older version. A version that does not know a field ignores it, so a theme that uses `font` still works on 0.4.10 and newer; it shows system fonts there.
 - Every color token in light and dark, and the contrast that `am theme check` asks for.
-- `test/marketplace.test.js` checks every file: JSON, name, `normalizeTheme`, colors, links, size, metadata, selectors, and a render of `examples/tcp.en.md` with the font embedded once. `npm test` must pass. `npm run site` builds the website; open `/themes/` to see your theme on the wall and on its own page, in light and dark.
+- `catalogProblems` in `src/themes/catalog-rules.js` holds these rules: name, size, `normalizeTheme`, colors, links, metadata, selectors and diagram tokens. `test/marketplace.test.js` runs it on every file, the website build runs it, and so do the issue Action and the website editor, so they cannot disagree. The test also renders `examples/tcp.en.md` with the font embedded once. `npm test` must pass. `npm run site` builds the website; open `/themes/` to see your theme on the wall and on its own page, in light and dark.
 - **A catalog name is reserved forever.** A name that was in the catalog is never given to a built-in theme or to another theme, even after the theme is removed.
+
+### Approving a submission
+
+1. Read the issue. The bot comment must say that the theme passes the checks, and ends with a "See it rendered" link: `answer-me-with-html.com/themes/new/?issue=<number>` loads the theme of the issue into the editor (it reads the issue through the public GitHub API, 60 requests an hour without signing in), so you see it in light and dark on the sample pages. Read the theme itself, `css` most of all: it goes into other people's pages.
+2. Add the label `theme-approved`. `.github/workflows/theme-submission.yml` checks the theme again, creates the branch `theme/issue-<number>` with the file and the author as `Co-authored-by`, and opens the PR with `Closes #<issue>`.
+3. On the PR, approve the workflow run ("Approve workflows to run"). CI on a PR that the Action opened waits for this approval. A run started any other way, such as `workflow_dispatch`, does not count for the PR's required checks.
+4. Review the PR and merge it as usual. The PR holds the file as the Action wrote it; the Action uses the issue text from the moment the label was added, so read the file in the PR, not the issue.
+5. When the check fails at step 2, the Action comments and takes the label off. Add it again after the author fixes the issue. Adding it again rebuilds the branch from `main`.
+
+The Action needs the labels `theme-submission` and `theme-approved`, and the repository setting that lets Actions create pull requests (Settings, Actions, General).
 
 ## Refreshing the demo video
 

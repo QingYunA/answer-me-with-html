@@ -55,10 +55,14 @@
     <h1 id="c-title">{{th_title}}</h1>
   </header>
   <p class="sheet-lede">{{th_lede}}</p>
+  <p class="catalog-cta"><a class="btn btn-primary btn-sm" href="#make">{{th_submit_cta}}</a></p>
   {{THEME_WALL}}
-  <aside class="always catalog-submit" aria-labelledby="c-submit-t">
+  <aside class="always catalog-submit" id="make" aria-labelledby="c-submit-t">
     <div class="col-head"><span class="mono">{{th_submit_k}}</span><h3 id="c-submit-t">{{th_submit_t}}</h3></div>
-    <p>{{th_submit_d}}</p>
+    <p class="tinstall-lead">{{th_make_lead}}</p>
+    <div class="copybox prompt"><pre id="c-make">{{th_make_prompt}}</pre></div>
+    <button type="button" class="btn btn-primary catalog-make-copy" data-copy="c-make" data-done="{{copied}}">{{th_copy_agent}}</button>
+    <p class="fine">{{th_submit_d}}</p>
   </aside>
 </section>
 

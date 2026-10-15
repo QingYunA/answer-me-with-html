@@ -155,10 +155,10 @@ test('pageUpdate: the page gets the button whenever a newer version is known, wi
   assert.equal(pageUpdate({ latestVersion: '0.4.0' }, '0.3.0', '', {}, { update_check: false }), null);
 });
 
-test('shouldCheckUpdate: once a week; no check under CI, AM_NO_UPDATE_CHECK or update_check off', () => {
+test('shouldCheckUpdate: once a day; no check under CI, AM_NO_UPDATE_CHECK or update_check off', () => {
   assert.ok(shouldCheckUpdate({}, {}, {}, NOW));
-  assert.ok(!shouldCheckUpdate({ lastUpdateCheck: NOW - DAY }, {}, {}, NOW));
-  assert.ok(shouldCheckUpdate({ lastUpdateCheck: NOW - 8 * DAY }, {}, {}, NOW));
+  assert.ok(!shouldCheckUpdate({ lastUpdateCheck: NOW - DAY / 2 }, {}, {}, NOW));
+  assert.ok(shouldCheckUpdate({ lastUpdateCheck: NOW - DAY }, {}, {}, NOW));
   assert.ok(!shouldCheckUpdate({}, { CI: 'true' }, {}, NOW));
   assert.ok(!shouldCheckUpdate({}, { AM_NO_UPDATE_CHECK: '1' }, {}, NOW));
   assert.ok(!shouldCheckUpdate({}, {}, { update_check: false }, NOW));
