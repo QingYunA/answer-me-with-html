@@ -26,8 +26,9 @@ before(() => {
 });
 after(() => rmSync(home, { recursive: true, force: true }));
 
+// Submitted themes join the catalog, so the list only has to keep the first ones.
 test('catalog: the first themes are there', () => {
-  assert.deepEqual(FILES, ['comic.json', 'manga.json', 'pop.json']);
+  for (const file of ['comic.json', 'manga.json', 'pop.json']) assert.ok(FILES.includes(file), file);
 });
 
 for (const file of FILES) {
