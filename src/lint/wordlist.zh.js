@@ -10,6 +10,8 @@ export const ZH_LIGHT_VERBS = Object.freeze([
 export const ZH_CLICHES = Object.freeze([
   '赋能', '抓手', '闭环', '打通', '全方位', '多维度', '深度融合', '显著提升', '至关重要', '不可或缺',
   '与此同时', '综上所述', '值得注意的是', '总而言之', '众所周知', '毋庸置疑', '一站式', '底层逻辑', '颗粒度', '方法论',
+  // opening and closing filler: the page starts with the answer and ends when the facts end
+  '下面我来', '下面我将', '接下来我将', '让我来', '让我们来', '总的来说', '希望对你有帮助', '希望对您有帮助', '如有疑问',
 ]);
 
 // Non-approved word → approved form.

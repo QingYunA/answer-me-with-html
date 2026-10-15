@@ -9,15 +9,15 @@ const warn = (lang, body) => renderDoc(`${lang === undefined ? '' : `---\nlang: 
 const rules = (warnings) => warnings.map((w) => w.rule);
 const words = (n, word = 'word') => Array.from({ length: n }, () => word).join(' ');
 
-test('writing check: English rules still flag passive voice and wordy words in an English draft', () => {
-  assert.ok(rules(warn('en', 'The valve was closed by the operator.')).includes('passive'));
+test('writing check: English rules still flag passive steps and wordy words in an English draft', () => {
+  assert.ok(rules(warn('en', '1. The valve was closed by the operator.')).includes('passive'));
   assert.ok(rules(warn('en', 'Please utilize the valve.')).includes('word'));
-  assert.ok(rules(warn(undefined, 'The valve was closed by the operator and the line stays open for now.')).includes('passive'));
+  assert.ok(rules(warn(undefined, '1. The valve was closed by the operator and the line stays open for now.')).includes('passive'));
 });
 
 test('writing check: a language without rules gets no English passive-voice or word-list warnings', () => {
   for (const lang of ['fr', 'es', 'ko', 'pt-BR']) {
-    const w = warn(lang, 'The valve was closed by the operator. Please utilize the valve.');
+    const w = warn(lang, '1. The valve was closed by the operator. Please utilize the valve.');
     assert.deepEqual(rules(w).filter((r) => r === 'passive' || r === 'word'), [], lang);
   }
 });

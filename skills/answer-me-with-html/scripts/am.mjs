@@ -7939,7 +7939,17 @@ var ZH_CLICHES = Object.freeze([
   "\u4E00\u7AD9\u5F0F",
   "\u5E95\u5C42\u903B\u8F91",
   "\u9897\u7C92\u5EA6",
-  "\u65B9\u6CD5\u8BBA"
+  "\u65B9\u6CD5\u8BBA",
+  // opening and closing filler: the page starts with the answer and ends when the facts end
+  "\u4E0B\u9762\u6211\u6765",
+  "\u4E0B\u9762\u6211\u5C06",
+  "\u63A5\u4E0B\u6765\u6211\u5C06",
+  "\u8BA9\u6211\u6765",
+  "\u8BA9\u6211\u4EEC\u6765",
+  "\u603B\u7684\u6765\u8BF4",
+  "\u5E0C\u671B\u5BF9\u4F60\u6709\u5E2E\u52A9",
+  "\u5E0C\u671B\u5BF9\u60A8\u6709\u5E2E\u52A9",
+  "\u5982\u6709\u7591\u95EE"
 ]);
 var UNIT = String.raw`(?:个|次|秒|天|分钟|小时|倍|字|条|项|人|行|位|%|MB|GB|KB|TB|ms)?`;
 var ZH_WORDS = Object.freeze([
@@ -8074,7 +8084,7 @@ function checkUnit(text, line, kind2, out, family) {
       const preview2 = s.length > 24 ? `${s.slice(0, 24)}\u2026` : s;
       out.push({ line, rule: "sentence-length", message: `${kind2 === "procedural" ? "step" : "sentence"} has ${count2} ${unit} (max ${limit}): "${preview2}"` });
     }
-    if (englishRules && lang === "en" && PASSIVE.test(s)) {
+    if (englishRules && kind2 === "procedural" && lang === "en" && PASSIVE.test(s)) {
       out.push({ line, rule: "passive", message: `possible passive voice: "${s.match(PASSIVE)[0]}"`, suggestion: "use active voice" });
     }
   }

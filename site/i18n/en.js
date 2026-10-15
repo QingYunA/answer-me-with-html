@@ -306,7 +306,7 @@ export default {
   ste_r2: 'Words',
   ste_r2_d: '“use”, not “utilize”; “before”, not “prior to”',
   ste_r3: 'Style',
-  ste_r3_d: 'passive voice; in Chinese, empty verbs and stock phrases',
+  ste_r3_d: 'passive voice in steps; in Chinese, empty verbs and stock phrases',
 
   s10_title: 'Install',
   s10_lede: 'You need Node.js 20 or newer. There is no <code>npm install</code> step: the CLI is bundled inside the skill.',

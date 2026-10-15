@@ -91,7 +91,7 @@ test('site engine: prepare loads Temml for a draft with math, so render typesets
 test('site engine: lint checks plain prose with lines counted in the text', () => {
   const warnings = engine.lint('This method is utilized prior to the request.', 'en');
   assert.ok(warnings.some((w) => w.rule === 'word' && w.line === 1), JSON.stringify(warnings));
-  assert.ok(engine.lint('One line.\n\nThe file was written by the server.').some((w) => w.rule === 'passive' && w.line === 3));
+  assert.ok(engine.lint('One line.\n\n1. The file was written by the server.').some((w) => w.rule === 'passive' && w.line === 3));
 });
 
 test('site build: fills built-in keys first and reports unknown ones', () => {
