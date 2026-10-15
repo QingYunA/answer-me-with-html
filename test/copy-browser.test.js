@@ -105,7 +105,6 @@ const PRESS_TWICE_MEASURED = `(async () => {
   const out = {};
   for (const [name, btn] of Object.entries(buttons)) {
     const idle = btn.textContent;
-    const done = btn.dataset.done;
     btn.click();
     await sleep(800);
     const t0 = performance.now();
