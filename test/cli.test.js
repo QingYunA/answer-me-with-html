@@ -4,7 +4,7 @@ import { Readable, Writable } from 'node:stream';
 import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
-import { main } from '../src/cli.js';
+import { main, oldNodeHint } from '../src/cli.js';
 
 let dir;
 before(() => { dir = mkdtempSync(join(tmpdir(), 'am-test-')); });
@@ -31,6 +31,12 @@ const GOOD = '---\ntitle: CLI 测试\n---\n## A 流程\n```flow\nA -> B\n```\n';
 test('cli: --version and --help', async () => {
   assert.match((await run(['--version'])).out, /^\d+\.\d+\.\d+/);
   assert.match((await run([])).out, /Usage:/);
+});
+
+test('cli: oldNodeHint names the Node version below 20 and is empty from 20 on', () => {
+  assert.match(oldNodeHint('v18.20.0'), /needs Node\.js 20 or newer \(found v18\.20\.0\).*https:\/\/nodejs\.org\//);
+  assert.equal(oldNodeHint('v20.0.0'), '');
+  assert.equal(oldNodeHint('v24.1.0'), '');
 });
 
 test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stats', async () => {

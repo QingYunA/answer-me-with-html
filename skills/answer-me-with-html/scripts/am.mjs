@@ -11103,6 +11103,10 @@ async function readStream(stream) {
   for await (const chunk of stream) chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
   return Buffer.concat(chunks).toString("utf8");
 }
+function oldNodeHint(version = process.version) {
+  if (Number(version.slice(1).split(".")[0]) >= 20) return "";
+  return `Answer me with HTML needs Node.js 20 or newer (found ${version}). Update Node.js: https://nodejs.org/`;
+}
 function shouldOpen(opts, env, config) {
   if (opts.open) return true;
   if (opts["no-open"]) return false;
@@ -11383,11 +11387,11 @@ function emit(result, file, { print, env }, note2 = "") {
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  diagram ${count(notes.length, "warning")} (the page is written; fix the draft if that is not what you meant):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function printHtmlWarnings(notes = [], print) {
-  const lines = [...new Set(notes.toSorted((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
+  const lines = [...new Set([...notes].sort((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
   if (!lines.length) return;
   print(`  html ${count(lines.length, "warning")} (the page differs from the draft here; fix the draft if that is not what you meant):`);
   lines.slice(0, MAX_LISTED_WARNINGS).forEach((l3) => print(`  ${l3}`));
@@ -11396,7 +11400,7 @@ function printHtmlWarnings(notes = [], print) {
 function printMathWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  math ${count(notes.length, "warning")} (the page is written; fix the TeX and render again):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function summaryLine(result) {
@@ -11644,6 +11648,9 @@ main(process.argv.slice(2), { background: true, scriptPath: process.argv[1] }).t
   },
   (err) => {
     process.stderr.write(`\u2717 Internal error: ${err.stack || err}
+`);
+    const hint = oldNodeHint();
+    if (hint) process.stderr.write(`  ${hint}
 `);
     process.exitCode = 1;
   }

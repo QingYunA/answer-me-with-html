@@ -299,6 +299,12 @@ async function readStream(stream) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+// The line bin/am.js adds to an internal error on a Node.js older than 20, so the user knows to update Node rather than report a bug.
+export function oldNodeHint(version = process.version) {
+  if (Number(version.slice(1).split('.')[0]) >= 20) return '';
+  return `Answer me with HTML needs Node.js 20 or newer (found ${version}). Update Node.js: https://nodejs.org/`;
+}
+
 // Whether to open automatically: --open forces it > --no-open > AM_NO_OPEN (not 0) > CI environment > config open.
 export function shouldOpen(opts, env, config) {
   if (opts.open) return true;
@@ -621,13 +627,13 @@ function emit(result, file, { print, env }, note = '') {
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  diagram ${count(notes.length, 'warning')} (the page is written; fix the draft if that is not what you meant):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.component}] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 
 // Raw HTML the render changed (a placeholder shown as text, a tag or attribute removed). Not STE warnings: they never fail style: strict.
 function printHtmlWarnings(notes = [], print) {
-  const lines = [...new Set(notes.toSorted((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
+  const lines = [...new Set([...notes].sort((a, b) => a.line - b.line).map((w) => `L${w.line} [html] ${w.message}`))];
   if (!lines.length) return;
   print(`  html ${count(lines.length, 'warning')} (the page differs from the draft here; fix the draft if that is not what you meant):`);
   lines.slice(0, MAX_LISTED_WARNINGS).forEach((l) => print(`  ${l}`));
@@ -638,7 +644,7 @@ function printHtmlWarnings(notes = [], print) {
 function printMathWarnings(notes = [], print) {
   if (!notes.length) return;
   print(`  math ${count(notes.length, 'warning')} (the page is written; fix the TeX and render again):`);
-  notes.toSorted((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
+  [...notes].sort((a, b) => a.line - b.line).slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [math] ${w.message}`));
   if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 

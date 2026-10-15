@@ -71,7 +71,7 @@ token 数存在 [bench/corpus/tokens.json](bench/corpus/tokens.json) 里，运�
 
 ## 安装
 
-需要本机装有 [Node.js](https://nodejs.org/) 20 或更高版本。不需要 `npm install`，CLI 已经打包在 skill 里了。
+需要本机装有 [Node.js](https://nodejs.org/) 20 或更高版本。不需要 `npm install`，CLI 已经打包在 skill 里了。还没装 Node.js？用下面推荐的方式安装，Agent 会先问你，再替你装好。
 
 ### 让 Agent 帮你装（推荐）
 

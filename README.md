@@ -72,7 +72,7 @@ Explainer videos save even more: about 18× fewer output tokens and 12× faster 
 
 ## Install
 
-You need [Node.js](https://nodejs.org/) 20 or newer. There is no `npm install` step. The CLI is bundled inside the skill.
+You need [Node.js](https://nodejs.org/) 20 or newer. There is no `npm install` step. The CLI is bundled inside the skill. No Node.js yet? With the recommended install below, your agent asks you and then installs it.
 
 ### Let your agent install it (recommended)
 
