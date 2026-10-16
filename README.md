@@ -262,7 +262,7 @@ The agent picks a component by the shape of the information:
 | `tree` | Folders, modules, taxonomies |
 | `timeline` | History, releases, phases |
 | `limits` | A value against its limit |
-| `chart` | Bars from a table of numbers: several series, negative values, a highlighted row |
+| `chart` | Bars, lines or a pie from a table of numbers: several series, negative values, a highlighted row |
 | `annot` | Word-by-word notes on a sentence |
 | `kv` | Metadata, a drawing's title block |
 | `callout` | A conclusion, a tip, a warning |

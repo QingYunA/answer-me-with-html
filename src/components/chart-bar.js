@@ -1,28 +1,21 @@
 // Bar charts, vertical and horizontal, drawn as a static svg like flow and sequence. The layout runs left to right; a right-to-left page
 // draws its mirror image (the first row on the right, horizontal bars growing to the left). Numbers and text anchors keep their names:
 // the svg's direction="rtl" turns "start" into the right end of the text, which is the mirror of the left-to-right placement.
-import { esc, measure, wrap } from '../svg/text.js';
+import { measure, wrap } from '../svg/text.js';
 import { f, svgOpen, mirror } from '../svg/shapes.js';
-import { svgLine, svgNumber } from '../bidi.js';
 import { niceRange, fmt } from './chart-scale.js';
+import {
+  PAD, FS, LH, PLOT_H, MAX_WIDTH, SLOT_MAX, SLANT_MAX, COS, SIN,
+  shorten, fitLines, text, legendLayout, legendSvg, stepGroup, tooltip, valueAxis, categoryLabel,
+} from './chart-parts.js';
 
-const PAD = 8;
-const FS = { cat: 12, tick: 11, val: 11, legend: 12 }; // chart.css sets the same sizes
-const LH = 14;
 const GAP = 3; // between the bars of one row
-const LEGEND_LH = 18;
 const MAX_VALUE_LABELS = 12; // up to this many bars carry their value
 const BAR_W = [0, 34, 26, 22, 18, 16, 14]; // vertical bar width by series count
 const BAR_H = [0, 20, 15, 12, 10, 9, 8]; // horizontal bar height by series count
 const GUTTER = 24; // between the groups of a vertical chart
-const MAX_WIDTH = 880; // width the groups of a vertical chart share
-const SLOT_MAX = 104;
-const PLOT_H = 220;
 const PLOT_W = 420;
 const CAT_WIDTH = 180; // the label column of a horizontal chart
-const SLANT = 40;
-const SLANT_MAX = 140;
-const [COS, SIN] = [Math.cos((SLANT * Math.PI) / 180), Math.sin((SLANT * Math.PI) / 180)];
 
 // data: { series: [name] | null, rows: [{ label, values, hi }] }; unit is added to the ticks and the value labels.
 export function drawBars(data, { horizontal = false, unit = '', dir = 'ltr', label }) {
@@ -46,53 +39,10 @@ export function drawBars(data, { horizontal = false, unit = '', dir = 'ltr', lab
 
 // ── Pieces both directions share ──
 
-// The text cut to fit, with an ellipsis; the whole text is the tooltip of the label.
-function shorten(text, max, size) {
-  if (measure(text, size) <= max) return text;
-  const chars = [...text];
-  while (chars.length > 1 && measure(`${chars.join('')}…`, size) > max) chars.pop();
-  return `${chars.join('').trimEnd()}…`;
-}
-
-// A label in at most maxLines lines of at most maxWidth.
-function fitLines(label, maxWidth, maxLines, size) {
-  const lines = wrap(label, maxWidth, size);
-  const kept = lines.slice(0, maxLines);
-  kept[kept.length - 1] = [kept.at(-1), ...lines.slice(maxLines)].join(' ');
-  return kept.map((l) => shorten(l, maxWidth, size));
-}
-
-// Ticks and values are numbers: they read left to right in every language. Everything else is text and goes through svgLine.
-const NUMBERS = new Set(['am-ch-tick', 'am-ch-val']);
-const text = (cls, x, y, str, dir, attrs = '') => `<text class="${cls}" x="${f(x)}" y="${f(y)}"${attrs}>${esc(NUMBERS.has(cls) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
-
-// The legend: a swatch and a name for each series, wrapped to maxWidth. Positions are relative to the legend's left edge.
-function legendLayout(names, maxWidth) {
-  if (names.length < 2) return { items: [], height: 0 };
-  const items = [];
-  let [x, y] = [0, 0];
-  for (const [k, name] of names.entries()) {
-    const w = 16 + measure(name, FS.legend);
-    if (x > 0 && x + w > maxWidth) [x, y] = [0, y + LEGEND_LH];
-    items.push({ k, name, x, y, w });
-    x += w + 18;
-  }
-  return { items, height: y + LEGEND_LH + 6, width: Math.max(...items.map((i) => i.x + i.w)) };
-}
-
-function legendSvg({ items }, left, top, { rtl, dir }, W) {
-  return items.map(({ k, name, x, y, w }) => {
-    const sw = rtl ? W - (left + x) - 10 : left + x;
-    return `<rect class="am-ch-sw am-ch-s${k + 1}" x="${f(sw)}" y="${f(top + y + 2)}" width="10" height="10" rx="2"/>${text('am-ch-leg', rtl ? W - (left + x + 16) : left + x + 16, top + y + 7, name, dir, ' dominant-baseline="central"')}`;
-  }).join('');
-}
-
 // The classes of a bar. A highlighted row of a single series takes the accent color; a chart with a highlight mutes its other rows.
 const barClass = (m, row, k) => `am-ch-bar ${row.hi && m.count === 1 ? 'am-ch-hi' : `am-ch-s${k + 1}`}`;
 const rowClass = (m, row) => `am-ch-row${m.anyHi ? (row.hi ? ' is-hi' : ' is-dim') : ''}`;
-const rowGroup = (m, row, i, title, inner) => `<g data-step="${i}" class="${rowClass(m, row)}">${title}${inner}</g>`;
-const squash = (s) => s.replace(/\s/g, '');
-const tooltip = (label, shown) => (squash(label) === squash(shown) ? '' : `<title>${esc(label)}</title>`);
+const rowGroup = (m, row, i, title, inner) => stepGroup(i, rowClass(m, row), title, inner);
 
 // ── Vertical bars ──
 
@@ -135,11 +85,7 @@ function verticalBars(m) {
   const y = (v) => plotTop + ((range.max - v) / (range.max - range.min)) * PLOT_H;
   const y0 = y(0);
   const body = [legendSvg(legend, PAD, PAD, m, W)];
-  for (const t of range.ticks) {
-    const line = t === 0 ? 'am-ch-zero' : 'am-ch-grid';
-    body.push(`<line class="${line}" x1="${f(rectX(axisX, n * slot))}" y1="${f(y(t))}" x2="${f(rectX(axisX, n * slot) + n * slot)}" y2="${f(y(t))}"/>`);
-    body.push(text('am-ch-tick', X(axisX - 6), y(t), m.tick(t), dir, ' text-anchor="end" dominant-baseline="central"'));
-  }
+  body.push(...valueAxis(m, { axisX, width: n * slot, y, W, X }));
   for (const [i, row] of rows.entries()) {
     const x0 = axisX + i * slot;
     const cx = x0 + slot / 2;
@@ -153,16 +99,8 @@ function verticalBars(m) {
       const at = v >= 0 ? top - 4 : top + h + FS.val + 1;
       return bar + text('am-ch-val', X(x + bw / 2), at, m.tick(v), dir, ' text-anchor="middle"');
     });
-    let name;
-    let shown = row.label;
-    if (plan.lines) {
-      name = plan.lines[i].map((l, j) => text('am-ch-cat', X(cx), catTop + 11 + j * LH, l, dir, ' text-anchor="middle"')).join('');
-    } else {
-      shown = plan.shown[i];
-      const [ax, ay] = [X(cx + 3), catTop + 4];
-      name = text('am-ch-cat', ax, ay, shown, dir, ` text-anchor="end" transform="rotate(${rtl ? SLANT : -SLANT} ${f(ax)} ${f(ay)})"`);
-    }
-    body.push(rowGroup(m, row, i, tooltip(row.label, plan.lines ? row.label : shown), parts.join('') + name));
+    const cat = categoryLabel(plan, i, row.label, cx, catTop, { X, rtl, dir });
+    body.push(rowGroup(m, row, i, cat.tip, parts.join('') + cat.svg));
   }
   return { width: W, height, body };
 }

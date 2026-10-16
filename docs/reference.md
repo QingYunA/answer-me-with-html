@@ -130,7 +130,7 @@ Syntax in the CLI: `am help format`.
 
 ## Charts
 
-For numbers that you compare, write a `chart` block. It draws bars from a table, so you do not write an `svg` block by hand:
+For numbers that you compare, write a `chart` block. It draws bars, a line or a pie from a table, so you do not write an `svg` block by hand:
 
 ````markdown
 ```chart bar unit=ms
@@ -141,17 +141,19 @@ Postgres    | 28  | 95
 ```
 ````
 
-- The type follows `chart`: `bar` draws vertical bars and `bar horizontal` draws horizontal bars. Each line is a label and one number for each series, with `|` between the cells.
-- A first line whose values are not numbers names the series. Its label cell may be empty. A row with more than one number needs this line, so the reader can tell what each color is. Without it every row has one number: one series and no legend. Write 1 to 6 series and up to 24 rows.
-- A number is plain: an optional `+` or `-`, digits and an optional decimal point. A negative value draws below the zero line. The axis always starts at 0, it is never broken, and it ends on the first round tick at or above the largest value.
+- The type follows `chart`: `bar` draws vertical bars, `bar horizontal` draws horizontal bars, `line` draws a line for each series and `pie` draws a donut. Each line is a label and one number for each series, with `|` between the cells.
+- A first line whose values are not numbers names the series. Its label cell may be empty. A row with more than one number needs this line, so the reader can tell what each color is. Without it every row has one number: one series and no legend. `bar` and `line` take 1 to 6 series. A `bar` takes up to 24 rows and a `line` up to 60 points.
+- A number is plain: an optional `+` or `-`, digits and an optional decimal point. On `bar` and `line` a negative value draws below the zero line. The axis always starts at 0, it is never broken, and it ends on the first round tick at or above the largest value.
 - `unit=` is added to the axis and to the value labels as it is: `unit=%` gives `40%`, `unit=ms` gives `40ms`, and `unit=" ms"` gives `40 ms`. The panel title is the chart title, so there is no `title=`.
-- `*` before a label highlights the row. With one series its bar uses the accent color, and with several series it keeps its series colors. The other rows turn gray.
+- `*` before a label highlights the row. On `bar` with one series its bar uses the accent color, and with several series it keeps its series colors. The other bars turn gray. On `line` the points of the row are larger and show their values, and a thin guide line marks its position; the lines keep their colors and nothing turns gray. On `pie` the slice keeps its color and the other slices turn gray.
 - A chart with more than one series has a legend. Up to 12 bars carry their value. A long label in a vertical chart is slanted before it is shortened.
-- Under the chart, a collapsed table holds every number. A screen reader can read it and a reader can copy from it. Its label follows the page language.
-- A right-to-left page mirrors the chart: the first row is on the right and horizontal bars grow to the left. Numbers stay left to right.
+- `line`: each row is a position on the horizontal axis, the first row on the left. With one series and up to 12 points every point shows its value; with more, only the highlighted row does. With many points the labels on the axis are thinned to every second, third or later one, so they do not overlap.
+- `pie`: one number on each row, so a first line may give one series name and no more. Values are 0 or more and at least one is above 0. Write up to 6 slices, one for each series color. The slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's color, label, value and percentage. The percentage is a whole number, with one decimal when a slice is so small that it would show 0%. The total is in the middle.
+- Under the chart, a collapsed table holds every number. A `pie` table also has a share column. A screen reader can read it and a reader can copy from it. Its labels follow the page language.
+- A right-to-left page mirrors the chart: the first row is on the right, horizontal bars grow to the left, and a pie goes counterclockwise with its list on the left. Numbers stay left to right.
 - The series colors are theme tokens (`--series-1` to `--series-6`, see [Diagram tokens](#diagram-tokens)). A page without a chart does not carry the chart styles.
-- In an `am video` scene, a chart steps row by row, like `limits`.
-- A line that has the wrong number of cells, a value that is not a number, and a table over the limits are errors with the line number and a correct example.
+- In an `am video` scene, a chart steps row by row, like `limits`: a `line` adds one point of each series, a `pie` adds one slice.
+- A line that has the wrong number of cells, a value that is not a number, a negative or all-zero pie, and a table over the limits are errors with the line number and a correct example.
 
 Full syntax: `am help chart`.
 
@@ -251,7 +253,7 @@ The classes your `css` may target stay stable: a later version keeps every one o
 
 ### Diagram tokens
 
-A theme restyles what is inside a diagram (flow, sequence, er, the boxes of a tree, and the bars of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+A theme restyles what is inside a diagram (flow, sequence, er, the boxes of a tree, and the bars, lines and slices of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
 
 | Part | Tokens | Default |
 | :--- | :--- | :--- |

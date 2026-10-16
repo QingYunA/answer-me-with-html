@@ -21,14 +21,31 @@ html[data-mode="dark"] {
 .am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }
 .am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }
 .am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }
-/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray. */
+/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray (a line is never gray). */
 .am-ch-hi { fill: var(--accent, #1d5fbf); }
-.am-ch-row.is-dim .am-ch-bar { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }
+.am-ch-row.is-dim .am-ch-bar, .am-ch-row.is-dim .am-ch-slice, .am-ch-row.is-dim .am-ch-sw { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }
+
+/* A line: a stroke in the series color, a dot on each point; the dot has an outline in the paper color where lines cross. A pie slice has
+   the same outline, which is the gap between slices. */
+.am-ch-line { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.am-ch-line.am-ch-s1 { stroke: var(--series-1, var(--am-ch-1)); }
+.am-ch-line.am-ch-s2 { stroke: var(--series-2, var(--am-ch-2)); }
+.am-ch-line.am-ch-s3 { stroke: var(--series-3, var(--am-ch-3)); }
+.am-ch-line.am-ch-s4 { stroke: var(--series-4, var(--am-ch-4)); }
+.am-ch-line.am-ch-s5 { stroke: var(--series-5, var(--am-ch-5)); }
+.am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }
+.am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }
+.am-ch-slice { stroke-width: 2; stroke-linejoin: round; }
+.am-ch-guide { stroke: var(--line-2, #d6dae1); stroke-width: 1.5; }
 
 .am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }
 .am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }
 .am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: 12px; }
 .am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: 11px; }
+/* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */
+.am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }
+.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: 12px; font-variant-numeric: tabular-nums; }
+.am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }
 
 /* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */
 .am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: 13px; }
@@ -49,6 +66,7 @@ html[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }
 .am-ch-data thead th:nth-child(5)::before { background: var(--series-4, var(--am-ch-4)); }
 .am-ch-data thead th:nth-child(6)::before { background: var(--series-5, var(--am-ch-5)); }
 .am-ch-data thead th:nth-child(7)::before { background: var(--series-6, var(--am-ch-6)); }
+.am-ch-data--pie thead th::before { content: none; }
 .am-ch-data th, .am-ch-data td { padding: 7px 10px; font-variant-numeric: tabular-nums; }
 .am-ch-data th[scope="row"] { text-align: start; font-weight: 400; }
 /* Numbers read left to right in every language and line up on their right edge, under the series name. */

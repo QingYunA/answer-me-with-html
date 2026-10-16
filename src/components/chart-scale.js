@@ -44,3 +44,12 @@ export function niceRange(values) {
   const ticks = Array.from({ length: down + up + 1 }, (_, i) => round((i - down) * step));
   return { min, max, step, ticks };
 }
+
+// A share of a pie as written beside a slice and in the data table: a whole number, one decimal when a slice is so small that rounding
+// would show 0% (a slice of 0 shows 0%), and <0.1% under that.
+export function percent(value, total) {
+  const p = total > 0 ? (value / total) * 100 : 0;
+  if (p === 0 || Math.round(p) > 0) return `${Math.round(p)}%`;
+  const tenth = Math.round(p * 10) / 10;
+  return tenth > 0 ? `${tenth}%` : '<0.1%';
+}

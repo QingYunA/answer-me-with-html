@@ -1,4 +1,4 @@
-// The chart component (spec #264, slice 1): bar and bar horizontal. Parsing and errors, the value axis, what the drawing carries
+// The chart component (spec #264): the parts all types share and bar and bar horizontal (line and pie are in chart-line.test.js and chart-pie.test.js). Parsing and errors, the value axis, what the drawing carries
 // (value labels, legend, highlight, data table), right-to-left mirroring, and how a page or a video takes the chart styles.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -108,9 +108,9 @@ test('parseOptions: the type, horizontal and unit', () => {
 test('parseOptions: a missing or unsupported type is an error on the fence line', () => {
   throwsAt(() => parseOptions(''), 0, /needs a type/);
   throwsAt(() => parseOptions('unit=ms'), 0, /needs a type/);
-  throwsAt(() => parseOptions('line'), 0, /chart line is not supported yet; use bar/);
-  throwsAt(() => parseOptions('pie'), 0, /chart pie is not supported yet; use bar/);
-  throwsAt(() => parseOptions('radar'), 0, /unknown chart type "radar"; use bar/);
+  throwsAt(() => parseOptions('radar'), 0, /unknown chart type "radar"; use bar, line or pie/);
+  throwsAt(() => parseOptions('line horizontal'), 0, /chart line has no "horizontal" option/);
+  throwsAt(() => parseOptions('pie horizontal'), 0, /chart pie has no "horizontal" option/);
   throwsAt(() => parseOptions('bar sideways'), 0, /no "sideways" option/);
   throwsAt(() => parseOptions('bar title=Latency'), 0, /no title= option/);
 });
@@ -264,7 +264,7 @@ test('chart bar: * highlights a row; the other rows are muted', () => {
 });
 
 test('chart.css: the rows next to a highlight are gray, not translucent, and the data table triangle points down when open in both directions', () => {
-  const rule = CHART_CSS.match(/\.am-ch-row\.is-dim \.am-ch-bar \{([^}]*)\}/)[1];
+  const rule = CHART_CSS.match(/\.am-ch-row\.is-dim \.am-ch-bar, \.am-ch-row\.is-dim \.am-ch-slice, \.am-ch-row\.is-dim \.am-ch-sw \{([^}]*)\}/)[1];
   assert.match(rule, /fill: var\(--line-2, #d6dae1\); fill: color-mix\(in oklch, var\(--ink-3, #8b929e\) 40%, var\(--paper, #ffffff\)\);/, 'a fallback first, then the mix');
   assert.doesNotMatch(rule, /opacity/);
   assert.match(CHART_CSS, /\.am-ch-data\[open\] summary::before \{ transform: rotate\(90deg\); \}/);
@@ -396,7 +396,7 @@ test('page: a chart error names the line and shows a correct example', () => {
   const draft = '## A\n```chart bar\nA | 1\nB | x\n```\n';
   assert.throws(() => renderDoc(draft, { theme: 'blueprint' }), (e) => e instanceof RenderError && e.line === 4 && e.component === 'chart' && /is not a number/.test(e.message) && /^```chart bar unit=ms/.test(e.example));
   assert.throws(() => renderDoc('## A\n```chart\nA | 1\n```\n', { theme: 'blueprint' }), (e) => e instanceof RenderError && e.line === 2 && /needs a type/.test(e.message));
-  assert.throws(() => renderDoc('## A\n```chart line\nA | 1\n```\n', { theme: 'blueprint' }), (e) => e instanceof RenderError && /not supported yet/.test(e.message));
+  assert.throws(() => renderDoc('## A\n```chart radar\nA | 1\n```\n', { theme: 'blueprint' }), (e) => e instanceof RenderError && /unknown chart type/.test(e.message));
 });
 
 test('page: the diagram viewer opens a chart, because its svg is a direct child of an am-diagram', () => {
