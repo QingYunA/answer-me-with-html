@@ -8,6 +8,7 @@ on:
       - 'site/**'
       - 'src/**'
       - 'examples/**'
+      - 'marketplace/**'
       - 'docs/images/**'
       - 'package.json'
       - 'scripts/inline-assets.mjs'
