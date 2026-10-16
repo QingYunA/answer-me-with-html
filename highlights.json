@@ -1,28 +1,28 @@
 {
-  "version": "0.5.4",
+  "version": "0.5.5",
   "en": [
-    "Make a theme with your agent, then submit it to the catalog on the website",
-    "`am serve` reloads an open page when its file changes",
-    "Pages and videos carry a strict Content-Security-Policy"
+    "Bar, line and pie charts: write the numbers in a `chart` block",
+    "Clear all remarks on a page with one button",
+    "`am serve --secret-file` keeps page links working after a restart"
   ],
   "zh": [
-    "让 agent 帮你做主题，再提交到官网主题库",
-    "`am serve` 打开的页面在文件变化时自动刷新",
-    "页面和视频带上严格的内容安全策略（CSP）"
+    "柱状图、折线图、饼图：把数字写进 `chart` 代码块",
+    "一个按钮清除页面上的所有标注",
+    "`am serve --secret-file` 让页面链接在重启后依然有效"
   ],
   "zh-Hant": [
-    "讓 agent 幫你做主題，再提交到官網主題庫",
-    "`am serve` 開啟的頁面在檔案變更時自動重新整理",
-    "頁面和影片帶上嚴格的內容安全政策（CSP）"
+    "長條圖、折線圖、圓餅圖：把數字寫進 `chart` 程式碼區塊",
+    "一個按鈕清除頁面上的所有標註",
+    "`am serve --secret-file` 讓頁面連結在重新啟動後依然有效"
   ],
   "ja": [
-    "エージェントにテーマを作らせて、サイトのカタログに投稿",
-    "`am serve` で開いたページはファイルが変わると自動で再読み込み",
-    "ページと動画に厳格なコンテンツセキュリティポリシー（CSP）を付与"
+    "棒グラフ・折れ線グラフ・円グラフ：数値を `chart` ブロックに書くだけ",
+    "ボタン一つでページの注記をすべて消去",
+    "`am serve --secret-file` で再起動後もページのリンクが有効"
   ],
   "he": [
-    "בקשו מהסוכן ליצור ערכת עיצוב ושלחו אותה לקטלוג באתר",
-    "`am serve` טוען מחדש דף פתוח כשהקובץ שלו משתנה",
-    "דפים וסרטונים כוללים מדיניות אבטחת תוכן (CSP) מחמירה"
+    "תרשימי עמודות, קו ועוגה: כתבו את המספרים בבלוק `chart`",
+    "ניקוי כל הסימונים בדף בלחיצה אחת",
+    "`am serve --secret-file` שומר על קישורי הדפים אחרי הפעלה מחדש"
   ]
 }
