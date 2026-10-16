@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <a href="https://answer-me-with-html.com/"><b>Website</b></a> · <a href="https://atomgit.com/weixin_43367137/answer-me-with-html">AtomGit</a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
+  <a href="https://answer-me-with-html.com/"><b>Website</b></a> · <a href="#install">Install</a> · <a href="#what-you-ask-what-you-get">Examples</a> · <a href="#explainer-videos">Videos</a> · <a href="#always-on-mode-recommended">Always-on mode</a> · <a href="docs/reference.md">Reference</a> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 Once installed, ask questions the way you always do:
@@ -301,6 +301,7 @@ Ask questions, share pages you made, suggest features, or just say hi.
 - [Discord](https://discord.gg/sYQuRRZNzQ)
 - QQ group: `1127099407`
 - [LINUX DO](https://linux.do), a Chinese-language developer forum
+- [AtomGit](https://atomgit.com/weixin_43367137/answer-me-with-html)
 
 Found a bug? Please open a [GitHub issue](https://github.com/QingYunA/answer-me-with-html/issues).
 
