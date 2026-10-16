@@ -35,7 +35,7 @@ export function fitLines(label, maxWidth, maxLines, size) {
 
 // Ticks, values, shares and the total are numbers: they read left to right in every language. Everything else is text and goes through svgLine.
 const NUMBERS = new Set(['am-ch-tick', 'am-ch-val', 'am-ch-num', 'am-ch-total']);
-export const text = (cls, x, y, str, dir, attrs = '') => `<text class="${cls}" x="${f(x)}" y="${f(y)}"${attrs}>${esc(NUMBERS.has(cls) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
+export const text = (cls, x, y, str, dir, attrs = '') => `<text class="${cls}" x="${f(x)}" y="${f(y)}"${attrs}>${esc(NUMBERS.has(cls.split(' ')[0]) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
 
 // The legend: a swatch and a name for each series, wrapped to maxWidth. Positions are relative to the legend's left edge.
 export function legendLayout(names, maxWidth) {

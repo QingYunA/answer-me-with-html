@@ -3,7 +3,7 @@
 // Each row is one step group (the points of the row, the segments that lead to them and the value labels), so a video grows the lines row by row.
 import { measure, wrap } from '../svg/text.js';
 import { f, svgOpen, mirror } from '../svg/shapes.js';
-import { niceRange, fmt } from './chart-scale.js';
+import { lineRange, fmt } from './chart-scale.js';
 import {
   PAD, FS, LH, PLOT_H, MAX_WIDTH, SLOT_MAX, SLANT_MAX, COS, SIN,
   shorten, text, legendLayout, legendSvg, stepGroup, valueAxis, categoryLabel,
@@ -13,7 +13,9 @@ const MAX_VALUE_LABELS = 12; // with one series, up to this many points carry th
 const DOT = 3.5;
 const DOT_HI = 5.5;
 const LABEL_GAP = 9; // from the centre of a dot to the baseline of its label, above it
-const MIN_APART = 12; // the least height between two value labels to the right of their dots
+const MIN_APART = 13; // the least height between two value labels of a column
+const LABEL_SIDE = 8; // between a dot and its label in the column
+const COLUMN_END = 0.8; // a guide further along than this share of the plot has its column on the inline-start side
 
 // data: { series: [name] | null, rows: [{ label, values, hi }] }; unit is added to the ticks and the value labels.
 export function drawLines(data, { unit = '', dir = 'ltr', label }) {
@@ -23,7 +25,7 @@ export function drawLines(data, { unit = '', dir = 'ltr', label }) {
     rows,
     count,
     names: data.series ?? [],
-    range: niceRange(rows.flatMap((r) => r.values)),
+    range: lineRange(rows.flatMap((r) => r.values)),
     unit,
     rtl: dir === 'rtl',
     dir,
@@ -58,26 +60,22 @@ function planAxis(rows, slot) {
   return { show, lines: null, shown, widths: shown.map((l) => measure(l, FS.cat)) };
 }
 
-// The value labels of one row. One series: above its dot, below at a valley (both neighbours are higher). Several series: the top dot has its
-// label above and the bottom dot below, the ones between to the right of their dots, so the labels keep the order of the dots.
-function valueLabels(m, X, x, values, ys, valleys) {
-  const place = (k, [px, py, anchor]) => text('am-ch-val', X(px), py, m.tick(values[k]), m.dir, ` text-anchor="${anchor}"${anchor === 'start' ? ' dominant-baseline="central"' : ''}`);
-  const above = (k) => [x, ys[k] - LABEL_GAP, 'middle'];
-  const below = (k) => [x, ys[k] + LABEL_GAP + FS.val, 'middle'];
-  if (ys.length === 1) return place(0, valleys[0] ? below(0) : above(0));
+// The value labels of one row. One series: above its dot, below at a valley (both neighbours are higher). Several series: a column beside
+// the guide line, each label at the height of its dot and in its series color, pushed apart so none touches another. The column is on the
+// inline-end side of the guide, or on the inline-start side when the guide is near the end of the plot (end: which side, 'start' or 'end').
+function valueLabels(m, X, x, values, ys, { valleys, end, bottom }) {
+  const label = (k, px, py, extra) => text(`am-ch-val am-ch-s${k + 1}`, X(px), py, m.tick(values[k]), m.dir, extra);
+  if (ys.length === 1) return text('am-ch-val', X(x), valleys[0] ? ys[0] + LABEL_GAP + FS.val : ys[0] - LABEL_GAP, m.tick(values[0]), m.dir, ' text-anchor="middle"');
   const order = ys.map((y, k) => k).sort((a, b) => ys[a] - ys[b]);
-  const out = [];
-  let last = -Infinity;
-  for (const [j, k] of order.entries()) {
-    if (j === 0) out[k] = above(k);
-    else if (j === order.length - 1) out[k] = below(k);
-    else {
-      last = Math.max(ys[k], last + MIN_APART);
-      out[k] = [x + DOT_HI + 4, last, 'start'];
-    }
-    if (j === 0) last = ys[k];
+  const at = order.map((k) => ys[k]);
+  for (let j = 1; j < at.length; j++) at[j] = Math.max(at[j], at[j - 1] + MIN_APART);
+  let limit = bottom;
+  for (let j = at.length - 1; j >= 0; j--) {
+    at[j] = Math.min(at[j], limit);
+    limit = at[j] - MIN_APART;
   }
-  return ys.map((y, k) => place(k, out[k])).join('');
+  const [px, anchor] = end === 'end' ? [x + DOT_HI + LABEL_SIDE, 'start'] : [x - DOT_HI - LABEL_SIDE, 'end'];
+  return order.map((k, j) => label(k, px, at[j], ` text-anchor="${anchor}" dominant-baseline="central"`)).join('');
 }
 
 // The line from one dot to the next, from the edge of one to the edge of the other, so a dot is never drawn under its own line.
@@ -95,16 +93,18 @@ function lineChart(m) {
   const plan = planAxis(rows, slot);
   const labelled = rows.map((r) => m.carries(r));
   const anyLabels = labelled.some(Boolean);
-  const valueW = rows.map((r, i) => (labelled[i] ? Math.max(...r.values.map((v) => measure(m.tick(v), FS.val))) : 0));
+  const valueW = rows.map((r, i) => (labelled[i] ? Math.max(...r.values.map((v) => measure(m.tick(v), FS.val, { bold: m.count > 1 }))) : 0));
 
   const tickW = Math.max(...range.ticks.map((t) => measure(m.tick(t), FS.tick)));
   // What reaches past the plot on the left and on the right: a flat label is centred on its row, a slanted one ends there and reaches back
   // to the left, a value label is centred on its dot.
+  const columnEnd = (i) => ((i + 0.5) / n > COLUMN_END ? 'start' : 'end');
   const over = rows.map((r, i) => {
     const half = Math.max(plan.show[i] ? (plan.lines ? plan.widths[i] / 2 : 0) : 0, valueW[i] / 2);
     const slanted = plan.show[i] && !plan.lines ? plan.widths[i] * COS + FS.cat * SIN - 3 : 0;
-    const side = valueW[i] && m.count > 2 ? valueW[i] + DOT_HI + 4 : 0; // a label to the right of its dot
-    return { left: Math.max(half, slanted) - (i + 0.5) * slot, right: Math.max(half, side) - (n - i - 0.5) * slot };
+    const column = valueW[i] && m.count > 1 ? valueW[i] + DOT_HI + LABEL_SIDE : 0; // the labels beside the guide
+    const [left, right] = columnEnd(i) === 'end' ? [0, column] : [column, 0];
+    return { left: Math.max(half, slanted, left) - (i + 0.5) * slot, right: Math.max(half, right) - (n - i - 0.5) * slot };
   });
   const axisX = Math.max(PAD + tickW + 6, PAD + Math.max(...over.map((o) => o.left)));
   const plotW = n * slot;
@@ -132,7 +132,7 @@ function lineChart(m) {
     if (labelled[i]) {
       const around = (j, k) => rows[j]?.values[k];
       const valleys = row.values.map((v, k) => i > 0 && i < n - 1 && around(i - 1, k) > v && around(i + 1, k) > v);
-      parts.push(valueLabels(m, X, cx(i), row.values, row.values.map(y), valleys));
+      parts.push(valueLabels(m, X, cx(i), row.values, row.values.map(y), { valleys, end: columnEnd(i), bottom: plotBottom }));
     }
     let tip = '';
     if (plan.show[i]) {

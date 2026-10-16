@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import { COMPONENTS, ComponentError } from '../src/components/index.js';
 import { parseChart, parseOptions } from '../src/components/chart.js';
 import { measure } from '../src/svg/text.js';
+import { lineRange, niceRange } from '../src/components/chart-scale.js';
+import { CHART_CSS } from '../src/assets.js';
 import { renderDoc, RenderError } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
 
@@ -15,7 +17,7 @@ const num = Number;
 // The dots in document order: { x, y, r, cls }.
 const dots = (html) => [...html.matchAll(/<circle class="am-ch-dot (am-ch-s\d)" cx="([\d.-]+)" cy="([\d.-]+)" r="([\d.]+)"/g)].map((m) => ({ cls: m[1], x: num(m[2]), y: num(m[3]), r: num(m[4]) }));
 const segments = (html) => [...html.matchAll(/<path class="am-ch-line (am-ch-s\d)" d="M([\d.-]+),([\d.-]+) L([\d.-]+),([\d.-]+)"/g)].map((m) => ({ cls: m[1], x0: num(m[2]), y0: num(m[3]), x1: num(m[4]), y1: num(m[5]) }));
-const texts = (html, cls) => [...html.matchAll(new RegExp(`<text class="${cls}"([^>]*)>([^<]*)</text>`, 'g'))].map((m) => m[2]);
+const texts = (html, cls) => [...html.matchAll(new RegExp(`<text class="${cls}(?: am-ch-s\\d)?"([^>]*)>([^<]*)</text>`, 'g'))].map((m) => m[2]);
 const guides = (html) => [...html.matchAll(/<line class="am-ch-guide" x1="([\d.-]+)"/g)].map((m) => num(m[1]));
 const zeroY = (html) => num(html.match(/<line class="am-ch-zero" x1="[\d.]+" y1="([\d.]+)"/)[1]);
 const LRI = String.fromCharCode(0x2066);
@@ -78,11 +80,52 @@ test('chart line: a segment runs from the edge of one dot to the edge of the nex
   assert.ok(s[0].y1 < s[0].y0, 'it rises with the values');
 });
 
-test('chart line: the axis starts at 0 even when every value is large', () => {
-  const html = render('A | 1000\nB | 1010');
-  assert.equal(texts(html, 'am-ch-tick')[0], '0');
-  const [a, b] = dots(html);
-  assert.ok(Math.abs(zeroY(html) - b.y) / Math.abs(zeroY(html) - a.y) < 1.02);
+test('lineRange: a line axis covers the data and may start above 0, unlike a bar', () => {
+  const large = lineRange([1000, 1010, 1160]);
+  assert.deepEqual({ min: large.min, max: large.max }, { min: 1000, max: 1175 }, 'values that are all large do not start at 0');
+  assert.ok(large.ticks.every((t) => t >= 1000 && t <= 1175) && large.ticks.length <= 8);
+  assert.equal(niceRange([1000, 1160]).min, 0, 'a bar axis still starts at 0');
+  const lo = lineRange([950, 1010]);
+  assert.deepEqual({ min: lo.min, max: lo.max }, { min: 950, max: 1010 });
+  assert.deepEqual(lineRange([0.8, 1.2]).ticks, [0.8, 0.9, 1, 1.1, 1.2]);
+});
+
+test('lineRange: the axis includes 0 when the smallest value is at most a third of the largest, and when values reach or cross 0', () => {
+  assert.deepEqual(lineRange([7, 22, 9]), niceRange([7, 22, 9]), '7 is under a third of 22');
+  assert.equal(lineRange([10, 30]).min, 0, 'exactly a third');
+  assert.ok(lineRange([10.5, 30]).min > 0, 'just over a third');
+  assert.deepEqual(lineRange([-3, 5]), niceRange([-3, 5]), 'crossing zero');
+  assert.deepEqual(lineRange([-20, -5]), niceRange([-20, -5]), 'all negative');
+  assert.deepEqual(lineRange([0, 5]), niceRange([0, 5]));
+  assert.deepEqual(lineRange([5, 5]), niceRange([5, 5]), 'a flat line');
+  assert.throws(() => lineRange([1, Infinity]), RangeError);
+});
+
+test('lineRange: the ticks are nice, one step apart, and end at or beyond the data', () => {
+  for (const values of [[1000, 1160], [950, 1010], [2500, 2600], [3, 4, 5], [123456789012, 123456789999], [4.5, 9.7], [11, 15]]) {
+    const r = lineRange(values);
+    assert.ok(r.min <= Math.min(...values) && r.max >= Math.max(...values), JSON.stringify(values));
+    assert.ok(r.max - Math.max(...values) < r.step && Math.min(...values) - r.min < r.step, 'less than a step of room');
+    assert.ok(r.ticks.length >= 2 && r.ticks.length <= 8);
+    assert.ok(r.ticks.every((t, i) => i === 0 || Math.abs(t - r.ticks[i - 1] - r.step) < r.step * 1e-6));
+    assert.equal(r.ticks[0], r.min);
+    assert.equal(r.ticks.at(-1), r.max);
+  }
+  assert.ok(lineRange([3, 4, 5]).ticks.every(Number.isInteger), 'whole numbers get whole ticks');
+});
+
+test('chart line: values that are all large do not start the axis at 0, and values that rise from the floor do', () => {
+  const large = render('Jan | 1000\nFeb | 1010\nMar | 1160');
+  assert.equal(texts(large, 'am-ch-tick')[0], '1000');
+  assert.doesNotMatch(large, /class="am-ch-zero"/, 'no zero line when 0 is not on the axis');
+  const [a, b, c] = dots(large);
+  assert.ok(a.y > b.y && b.y > c.y && a.y - c.y > 150, 'the line uses the height of the plot');
+  const small = render('A | 7\nB | 22\nC | 9');
+  assert.equal(texts(small, 'am-ch-tick')[0], '0');
+  assert.match(small, /class="am-ch-zero"/);
+  assert.equal(texts(render('A | 12\nB | -8'), 'am-ch-tick')[0], '-10');
+  // A bar chart of the same numbers still starts at 0.
+  assert.equal(texts(render('A | 1000\nB | 1160', 'bar'), 'am-ch-tick')[0], '0');
 });
 
 test('chart line: a negative value is drawn below the zero line, with ticks below it', () => {
@@ -123,14 +166,66 @@ test('chart line: with several series only the highlighted row carries values', 
   assert.deepEqual(texts(render(many), 'am-ch-val'), ['5'], 'one series with many points: the highlighted row only');
 });
 
-test('chart line: the value labels of one row keep the order of their dots and do not overlap', () => {
-  const html = render('| a | b | c | d\n* X | 10 | 11 | 12 | 30\nY | 1 | 2 | 3 | 4');
-  const ys = [...html.matchAll(/<text class="am-ch-val" x="[\d.-]+" y="([\d.-]+)"/g)].map((m) => num(m[1]));
-  assert.equal(ys.length, 4);
+test('chart line: with several series the labels of the highlighted row form a column beside the guide, in series colors, none touching', () => {
+  const html = render('| a | b | c | d\n* X | 10 | 11 | 12 | 30\nY | 1 | 2 | 3 | 4\nZ | 2 | 2 | 2 | 2');
+  const labels = [...html.matchAll(/<text class="am-ch-val (am-ch-s\d)" x="([\d.-]+)" y="([\d.-]+)"[^>]*text-anchor="(\w+)"[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], x: num(m[2]), y: num(m[3]), anchor: m[4], t: m[5] }));
+  assert.equal(labels.length, 4);
+  assert.deepEqual(new Set(labels.map((l) => l.cls)), new Set(['am-ch-s1', 'am-ch-s2', 'am-ch-s3', 'am-ch-s4']), 'each label has the class of its series');
+  assert.deepEqual(labels.map((l) => l.t).sort(), ['10', '11', '12', '30']);
+  assert.equal(new Set(labels.map((l) => l.x)).size, 1, 'one column');
+  const [guide] = guides(html);
+  assert.ok(labels.every((l) => l.x > guide && l.anchor === 'start'), 'on the inline-end side of the guide');
+  const ys = labels.map((l) => l.y).sort((p, q) => p - q);
+  for (let i = 1; i < ys.length; i++) assert.ok(ys[i] - ys[i - 1] >= 13 - 0.11, `labels ${ys.join(' ')}`);
+  // Where the dots are far apart, each label stays at the height of its dot.
+  const far = render('| a | b\n* X | 10 | 90\nY | 1 | 2');
+  const [dotA, dotB] = dots(far);
+  const farLabels = [...far.matchAll(/<text class="am-ch-val (am-ch-s\d)" x="[\d.-]+" y="([\d.-]+)"/g)].map((m) => ({ cls: m[1], y: num(m[2]) }));
+  assert.ok(Math.abs(farLabels.find((l) => l.cls === 'am-ch-s1').y - dotA.y) < 0.2 && Math.abs(farLabels.find((l) => l.cls === 'am-ch-s2').y - dotB.y) < 0.2);
+});
+
+test('chart line: the labels of dots that are close are ordered like the dots, and pushed up when the column reaches the bottom of the plot', () => {
+  const html = render('| a | b | c\n* X | 0 | 0 | 0\nY | 1 | 1 | 1');
+  const ys = [...html.matchAll(/<text class="am-ch-val am-ch-s\d" x="[\d.-]+" y="([\d.-]+)"/g)].map((m) => num(m[1]));
+  assert.equal(ys.length, 3);
   const sorted = [...ys].sort((p, q) => p - q);
-  for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i] - sorted[i - 1] >= 11, `labels ${sorted.join(' ')}`);
-  const dotY = dots(html).slice(0, 4).map((d) => d.y);
-  assert.deepEqual(ys.map((y, k) => [y, k]).sort((p, q) => p[0] - q[0]).map((e) => e[1]), dotY.map((y, k) => [y, k]).sort((p, q) => p[0] - q[0]).map((e) => e[1]), 'the highest label belongs to the highest dot');
+  for (let i = 1; i < 3; i++) assert.ok(sorted[i] - sorted[i - 1] >= 12.9);
+  const zero = num(html.match(/<line class="am-ch-zero" x1="[\d.]+" y1="([\d.]+)"/)[1]);
+  assert.ok(sorted.at(-1) <= zero + 0.1, 'the lowest label does not go below the plot');
+});
+
+test('chart line: near the end of the plot the column goes to the inline-start side of the guide, in both directions', () => {
+  const body = '| a | b\nA | 1 | 5\nB | 2 | 6\nC | 3 | 7\nD | 4 | 8\n* E | 5 | 9';
+  const ltr = render(body, 'line', { dir: 'ltr' });
+  const [guide] = guides(ltr);
+  const anchors = [...ltr.matchAll(/<text class="am-ch-val am-ch-s\d" x="([\d.-]+)"[^>]*text-anchor="(\w+)"/g)].map((m) => ({ x: num(m[1]), a: m[2] }));
+  assert.ok(anchors.every((l) => l.x < guide && l.a === 'end'));
+  const rtl = render(body, 'line', { dir: 'rtl' });
+  const [rguide] = guides(rtl);
+  const ranchors = [...rtl.matchAll(/<text class="am-ch-val am-ch-s\d" x="([\d.-]+)"[^>]*text-anchor="(\w+)"/g)].map((m) => ({ x: num(m[1]), a: m[2] }));
+  assert.ok(ranchors.every((l) => l.x > rguide && l.a === 'end'), 'mirrored: the column is on the right of the guide, which is on the left');
+  // In the middle of the plot the column is on the inline-end side: to the left of the guide in a right-to-left page.
+  const mid = render('| a | b\nA | 1 | 5\n* B | 2 | 6\nC | 3 | 7\nD | 4 | 8\nE | 5 | 9', 'line', { dir: 'rtl' });
+  assert.ok([...mid.matchAll(/<text class="am-ch-val am-ch-s\d" x="([\d.-]+)"/g)].every((m) => num(m[1]) < guides(mid)[0]));
+});
+
+test('chart line: the labels of the column stay inside the drawing', () => {
+  for (const dir of ['ltr', 'rtl']) {
+    for (const hi of [0, 4, 9]) {
+      const body = Array.from({ length: 10 }, (_, i) => `${i === hi ? '* ' : ''}R${i} | ${i * 100} | ${i * 90 + 5}`).join('\n');
+      const html = render(`| a | b\n${body}`, 'line unit=ms', { dir });
+      const w = num(html.match(/viewBox="0 0 (\d+)/)[1]);
+      const found = [...html.matchAll(/<text class="am-ch-val am-ch-s\d" x="([\d.-]+)"[^>]*text-anchor="(\w+)"[^>]*>([^<]*)<\/text>/g)];
+      assert.equal(found.length, 2);
+      for (const m of found) {
+        const width = measure(m[3].replaceAll(LRI, '').replaceAll(PDI, ''), 11, { bold: true });
+        const [x, anchor] = [num(m[1]), m[2]];
+        // In a right-to-left drawing "start" is the right end of the text.
+        const [from, to] = (anchor === 'start') === (dir === 'ltr') ? [x, x + width] : [x - width, x];
+        assert.ok(from >= 0 && to <= w + 0.5, `${dir} row ${hi}: ${m[3]} spans ${from}-${to} in ${w}`);
+      }
+    }
+  }
 });
 
 // ── highlight ──
@@ -141,6 +236,7 @@ test('chart line: * makes the points of the row larger, adds a guide line at its
   assert.ok(wed.every((d) => d.r > 5), 'larger dots on the highlighted row');
   assert.ok(others.every((d) => d.r < 4));
   assert.deepEqual(guides(html), [wed[0].x], 'one guide, at the x of the row');
+  assert.match(CHART_CSS, /\.am-ch-guide \{ stroke: var\(--ink-3, #8b929e\); stroke-width: 1; stroke-dasharray: 3 3; \}/, 'a 1px dashed guide in --ink-3');
   assert.match(html, /<g data-step="2" class="am-ch-row is-hi">/);
   assert.doesNotMatch(html, /is-dim/, 'a line chart never grays a row');
   assert.deepEqual(new Set(all.map((d) => d.cls)), new Set(['am-ch-s1', 'am-ch-s2', 'am-ch-s3']), 'no accent color, even with one series');
@@ -216,7 +312,7 @@ test('chart line, rtl: the first row is on the right, only the positions mirror,
   assert.ok(numbers.length > 8 && numbers.every((t) => t.startsWith(LRI) && t.endsWith(PDI)));
   const s = segments(rtl);
   assert.ok(s[0].x1 < s[0].x0, 'a segment runs from the right to the left');
-  assert.deepEqual(texts(ltr, 'am-ch-val'), ['9%', '38%', '70%']);
+  assert.deepEqual(texts(ltr, 'am-ch-val'), ['70%', '38%', '9%'], 'the highest dot has the top label');
 });
 
 test('chart line, rtl: a negative value keeps its sign on the left', () => {

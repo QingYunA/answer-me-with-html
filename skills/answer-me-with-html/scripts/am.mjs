@@ -675,7 +675,7 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 @media print { .am-delta-switch { display: none !important; } }
 `;
 var RTL_CSS = '/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout\n   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */\n\n/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */\nhtml[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }\nhtml[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }\n\n/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width\n   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */\nhtml[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,\nhtml[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,\nhtml[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,\nhtml[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {\n  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;\n}\nhtml[dir="rtl"] .am-head h1 { letter-spacing: normal; }\n/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */\nhtml[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }\n\n/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */\nhtml[dir="rtl"] .am-diagram svg { direction: rtl; }\n\n/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */\nhtml[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }\nhtml[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }\n\n/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left\n   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the\n   start of its note would otherwise run together as one left-to-right piece. */\nhtml[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }\n\n/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of\n   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */\nhtml[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(15px, calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }\n@container (max-width: 560px) {\n  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: 15px; }\n}\n\n/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.\n   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play\n   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */\nhtml[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-titleblock { text-align: right; }\n/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */\nhtml[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }\nhtml[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-controls { direction: ltr; }\n\n/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */\nhtml[dir="rtl"] pre .am-mark-note { direction: rtl; }\n/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */\nhtml[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }\n';
-var CHART_CSS = '/* Charts (src/components/chart.js). Only a page with a chart carries this file, the way only a page with math carries the math styles.\n   Series colors are the diagram tokens --series-1 to --series-6 (docs/reference.md, "Diagram tokens"): a theme that sets one wins, and\n   the fallbacks are the fixed palette below (Tableau 10 style), a set for light and a set for dark. Bars carry their value, the legend names\n   the series and the data table holds the numbers, so a color is never the only way to read a bar. The axis, grid and labels read the usual\n   tokens, so a theme that sets nothing still gets a chart in its own colors. */\nhtml {\n  --am-ch-1: #4e79a7; --am-ch-2: #f28e2b; --am-ch-3: #e15759; --am-ch-4: #76b7b2; --am-ch-5: #59a14f; --am-ch-6: #b07aa1;\n}\nhtml[data-mode="dark"] {\n  --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n}\n@media (prefers-color-scheme: dark) {\n  html[data-mode="auto"] {\n    --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n  }\n}\n\n.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray (a line is never gray). */\n.am-ch-hi { fill: var(--accent, #1d5fbf); }\n.am-ch-row.is-dim .am-ch-bar, .am-ch-row.is-dim .am-ch-slice, .am-ch-row.is-dim .am-ch-sw { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }\n\n/* A line: a stroke in the series color, a dot on each point; the dot has an outline in the paper color where lines cross. A pie slice has\n   the same outline, which is the gap between slices. */\n.am-ch-line { fill: none; stroke-width: 2.5; stroke-linecap: round; }\n.am-ch-line.am-ch-s1 { stroke: var(--series-1, var(--am-ch-1)); }\n.am-ch-line.am-ch-s2 { stroke: var(--series-2, var(--am-ch-2)); }\n.am-ch-line.am-ch-s3 { stroke: var(--series-3, var(--am-ch-3)); }\n.am-ch-line.am-ch-s4 { stroke: var(--series-4, var(--am-ch-4)); }\n.am-ch-line.am-ch-s5 { stroke: var(--series-5, var(--am-ch-5)); }\n.am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }\n.am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }\n.am-ch-slice { stroke-width: 2; stroke-linejoin: round; }\n.am-ch-guide { stroke: var(--line-2, #d6dae1); stroke-width: 1.5; }\n\n.am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }\n.am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }\n.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: 12px; }\n.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: 11px; }\n/* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */\n.am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }\n.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: 12px; font-variant-numeric: tabular-nums; }\n.am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }\n\n/* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */\n.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: 13px; }\n.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: 11px/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }\n.am-ch-data summary::-webkit-details-marker { display: none; }\n.am-ch-data summary::before { content: ""; width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .15s; }\n.am-ch-data[open] summary::before { transform: rotate(90deg); }\n/* The triangle points to the end side, which is the left on a right-to-left page: it turns the other way to point down. */\nhtml[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }\n@media (prefers-reduced-motion: reduce) { .am-ch-data summary::before { transition: none; } }\n.am-ch-data summary:hover { color: var(--ink); }\n.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }\n.am-ch-data thead th { font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }\n.am-ch-data thead th::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; }\n.am-ch-data thead th:nth-child(2)::before { background: var(--series-1, var(--am-ch-1)); }\n.am-ch-data thead th:nth-child(3)::before { background: var(--series-2, var(--am-ch-2)); }\n.am-ch-data thead th:nth-child(4)::before { background: var(--series-3, var(--am-ch-3)); }\n.am-ch-data thead th:nth-child(5)::before { background: var(--series-4, var(--am-ch-4)); }\n.am-ch-data thead th:nth-child(6)::before { background: var(--series-5, var(--am-ch-5)); }\n.am-ch-data thead th:nth-child(7)::before { background: var(--series-6, var(--am-ch-6)); }\n.am-ch-data--pie thead th::before { content: none; }\n.am-ch-data th, .am-ch-data td { padding: 7px 10px; font-variant-numeric: tabular-nums; }\n.am-ch-data th[scope="row"] { text-align: start; font-weight: 400; }\n/* Numbers read left to right in every language and line up on their right edge, under the series name. */\n.am-ch-data td, .am-ch-data thead th { text-align: right; }\n.am-ch-data tbody tr:nth-child(even) > * { background: var(--fill); }\n';
+var CHART_CSS = '/* Charts (src/components/chart.js). Only a page with a chart carries this file, the way only a page with math carries the math styles.\n   Series colors are the diagram tokens --series-1 to --series-6 (docs/reference.md, "Diagram tokens"): a theme that sets one wins, and\n   the fallbacks are the fixed palette below (Tableau 10 style), a set for light and a set for dark. Bars carry their value, the legend names\n   the series and the data table holds the numbers, so a color is never the only way to read a bar. The axis, grid and labels read the usual\n   tokens, so a theme that sets nothing still gets a chart in its own colors. */\nhtml {\n  --am-ch-1: #4e79a7; --am-ch-2: #f28e2b; --am-ch-3: #e15759; --am-ch-4: #76b7b2; --am-ch-5: #59a14f; --am-ch-6: #b07aa1;\n}\nhtml[data-mode="dark"] {\n  --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n}\n@media (prefers-color-scheme: dark) {\n  html[data-mode="auto"] {\n    --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n  }\n}\n\n.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray (a line is never gray). */\n.am-ch-hi { fill: var(--accent, #1d5fbf); }\n.am-ch-row.is-dim .am-ch-bar, .am-ch-row.is-dim .am-ch-slice, .am-ch-row.is-dim .am-ch-sw { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }\n\n/* A line: a stroke in the series color, a dot on each point; the dot has an outline in the paper color where lines cross. A pie slice has\n   the same outline, which is the gap between slices. */\n.am-ch-line { fill: none; stroke-width: 2.5; stroke-linecap: round; }\n.am-ch-line.am-ch-s1 { stroke: var(--series-1, var(--am-ch-1)); }\n.am-ch-line.am-ch-s2 { stroke: var(--series-2, var(--am-ch-2)); }\n.am-ch-line.am-ch-s3 { stroke: var(--series-3, var(--am-ch-3)); }\n.am-ch-line.am-ch-s4 { stroke: var(--series-4, var(--am-ch-4)); }\n.am-ch-line.am-ch-s5 { stroke: var(--series-5, var(--am-ch-5)); }\n.am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }\n.am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }\n.am-ch-slice { stroke-width: 2; stroke-linejoin: round; }\n.am-ch-guide { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 3 3; }\n\n.am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }\n.am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }\n.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: 12px; }\n.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: 11px; }\n/* The value labels of a highlighted row in a chart with several series take the color of their series, in a heavier weight to read on it. */\n.am-diagram .am-ch-val.am-ch-s1, .am-diagram .am-ch-val.am-ch-s2, .am-diagram .am-ch-val.am-ch-s3, .am-diagram .am-ch-val.am-ch-s4, .am-diagram .am-ch-val.am-ch-s5, .am-diagram .am-ch-val.am-ch-s6 { font-weight: 600; }\n.am-diagram .am-ch-val.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-diagram .am-ch-val.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-diagram .am-ch-val.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-diagram .am-ch-val.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-diagram .am-ch-val.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-diagram .am-ch-val.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */\n.am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }\n.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: 12px; font-variant-numeric: tabular-nums; }\n.am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }\n\n/* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */\n.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: 13px; }\n.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: 11px/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }\n.am-ch-data summary::-webkit-details-marker { display: none; }\n.am-ch-data summary::before { content: ""; width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .15s; }\n.am-ch-data[open] summary::before { transform: rotate(90deg); }\n/* The triangle points to the end side, which is the left on a right-to-left page: it turns the other way to point down. */\nhtml[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }\n@media (prefers-reduced-motion: reduce) { .am-ch-data summary::before { transition: none; } }\n.am-ch-data summary:hover { color: var(--ink); }\n.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }\n.am-ch-data thead th { font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }\n.am-ch-data thead th::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; }\n.am-ch-data thead th:nth-child(2)::before { background: var(--series-1, var(--am-ch-1)); }\n.am-ch-data thead th:nth-child(3)::before { background: var(--series-2, var(--am-ch-2)); }\n.am-ch-data thead th:nth-child(4)::before { background: var(--series-3, var(--am-ch-3)); }\n.am-ch-data thead th:nth-child(5)::before { background: var(--series-4, var(--am-ch-4)); }\n.am-ch-data thead th:nth-child(6)::before { background: var(--series-5, var(--am-ch-5)); }\n.am-ch-data thead th:nth-child(7)::before { background: var(--series-6, var(--am-ch-6)); }\n.am-ch-data--pie thead th::before { content: none; }\n.am-ch-data th, .am-ch-data td { padding: 7px 10px; font-variant-numeric: tabular-nums; }\n.am-ch-data th[scope="row"] { text-align: start; font-weight: 400; }\n/* Numbers read left to right in every language and line up on their right edge, under the series name. */\n.am-ch-data td, .am-ch-data thead th { text-align: right; }\n.am-ch-data tbody tr:nth-child(even) > * { background: var(--fill); }\n';
 var MATH_CSS = `/*
 Temml.woff2 is a clone of KaTeX_Script-Regular, except that the code points
 have been changed from ASCII to Unicode Mathematical Alphanumeric Symbols Script capitals,
@@ -7822,6 +7822,20 @@ function percent(value, total) {
   const tenth = Math.round(p * 10) / 10;
   return tenth > 0 ? `${tenth}%` : "<0.1%";
 }
+function lineRange(values) {
+  if (values.some((value) => !Number.isFinite(value))) throw new RangeError("chart values must be finite");
+  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  if (lo <= hi / 3 || lo === hi) return niceRange(values);
+  const whole = values.every(Number.isInteger);
+  const count2 = (step2) => Math.ceil(hi / step2 - 1e-9) - Math.floor(lo / step2 + 1e-9);
+  let step;
+  for (step of steps(hi - lo, whole)) if (count2(step) <= MAX_STEPS) break;
+  const down = Math.floor(lo / step + 1e-9);
+  const up = Math.ceil(hi / step - 1e-9);
+  const [min, max] = [round2(down * step), round2(up * step)];
+  if (!Number.isFinite(max - min)) throw new RangeError("chart values are too large to scale");
+  return { min, max, step, ticks: Array.from({ length: up - down + 1 }, (_2, i) => round2((down + i) * step)) };
+}
 
 // src/components/chart-parts.js
 var PAD2 = 8;
@@ -7847,7 +7861,7 @@ function fitLines(label, maxWidth, maxLines, size) {
   return kept.map((l3) => shorten(l3, maxWidth, size));
 }
 var NUMBERS = /* @__PURE__ */ new Set(["am-ch-tick", "am-ch-val", "am-ch-num", "am-ch-total"]);
-var text = (cls, x2, y2, str, dir, attrs = "") => `<text class="${cls}" x="${f(x2)}" y="${f(y2)}"${attrs}>${esc(NUMBERS.has(cls) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
+var text = (cls, x2, y2, str, dir, attrs = "") => `<text class="${cls}" x="${f(x2)}" y="${f(y2)}"${attrs}>${esc(NUMBERS.has(cls.split(" ")[0]) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
 function legendLayout(names2, maxWidth) {
   if (names2.length < 2) return { items: [], height: 0 };
   const items = [];
@@ -8019,7 +8033,9 @@ var MAX_VALUE_LABELS2 = 12;
 var DOT = 3.5;
 var DOT_HI = 5.5;
 var LABEL_GAP = 9;
-var MIN_APART = 12;
+var MIN_APART = 13;
+var LABEL_SIDE = 8;
+var COLUMN_END = 0.8;
 function drawLines(data, { unit = "", dir = "ltr", label }) {
   const { rows } = data;
   const count2 = rows[0].values.length;
@@ -8027,7 +8043,7 @@ function drawLines(data, { unit = "", dir = "ltr", label }) {
     rows,
     count: count2,
     names: data.series ?? [],
-    range: niceRange(rows.flatMap((r) => r.values)),
+    range: lineRange(rows.flatMap((r) => r.values)),
     unit,
     rtl: dir === "rtl",
     dir,
@@ -8055,24 +8071,19 @@ function planAxis(rows, slot) {
   const shown2 = labels.map((l3) => shorten(l3, SLANT_MAX, FS4.cat));
   return { show, lines: null, shown: shown2, widths: shown2.map((l3) => measure(l3, FS4.cat)) };
 }
-function valueLabels(m, X3, x2, values, ys, valleys) {
-  const place = (k2, [px, py, anchor]) => text("am-ch-val", X3(px), py, m.tick(values[k2]), m.dir, ` text-anchor="${anchor}"${anchor === "start" ? ' dominant-baseline="central"' : ""}`);
-  const above = (k2) => [x2, ys[k2] - LABEL_GAP, "middle"];
-  const below = (k2) => [x2, ys[k2] + LABEL_GAP + FS4.val, "middle"];
-  if (ys.length === 1) return place(0, valleys[0] ? below(0) : above(0));
+function valueLabels(m, X3, x2, values, ys, { valleys, end, bottom }) {
+  const label = (k2, px2, py, extra) => text(`am-ch-val am-ch-s${k2 + 1}`, X3(px2), py, m.tick(values[k2]), m.dir, extra);
+  if (ys.length === 1) return text("am-ch-val", X3(x2), valleys[0] ? ys[0] + LABEL_GAP + FS4.val : ys[0] - LABEL_GAP, m.tick(values[0]), m.dir, ' text-anchor="middle"');
   const order = ys.map((y2, k2) => k2).sort((a, b) => ys[a] - ys[b]);
-  const out = [];
-  let last = -Infinity;
-  for (const [j2, k2] of order.entries()) {
-    if (j2 === 0) out[k2] = above(k2);
-    else if (j2 === order.length - 1) out[k2] = below(k2);
-    else {
-      last = Math.max(ys[k2], last + MIN_APART);
-      out[k2] = [x2 + DOT_HI + 4, last, "start"];
-    }
-    if (j2 === 0) last = ys[k2];
+  const at3 = order.map((k2) => ys[k2]);
+  for (let j2 = 1; j2 < at3.length; j2++) at3[j2] = Math.max(at3[j2], at3[j2 - 1] + MIN_APART);
+  let limit = bottom;
+  for (let j2 = at3.length - 1; j2 >= 0; j2--) {
+    at3[j2] = Math.min(at3[j2], limit);
+    limit = at3[j2] - MIN_APART;
   }
-  return ys.map((y2, k2) => place(k2, out[k2])).join("");
+  const [px, anchor] = end === "end" ? [x2 + DOT_HI + LABEL_SIDE, "start"] : [x2 - DOT_HI - LABEL_SIDE, "end"];
+  return order.map((k2, j2) => label(k2, px, at3[j2], ` text-anchor="${anchor}" dominant-baseline="central"`)).join("");
 }
 function segment(X3, [x0, y0], [x1, y1], [hi0, hi1], k2) {
   const len = Math.hypot(x1 - x0, y1 - y0);
@@ -8087,13 +8098,15 @@ function lineChart(m) {
   const plan = planAxis(rows, slot);
   const labelled = rows.map((r) => m.carries(r));
   const anyLabels = labelled.some(Boolean);
-  const valueW = rows.map((r, i) => labelled[i] ? Math.max(...r.values.map((v) => measure(m.tick(v), FS4.val))) : 0);
+  const valueW = rows.map((r, i) => labelled[i] ? Math.max(...r.values.map((v) => measure(m.tick(v), FS4.val, { bold: m.count > 1 }))) : 0);
   const tickW = Math.max(...range.ticks.map((t) => measure(m.tick(t), FS4.tick)));
+  const columnEnd = (i) => (i + 0.5) / n > COLUMN_END ? "start" : "end";
   const over2 = rows.map((r, i) => {
     const half = Math.max(plan.show[i] ? plan.lines ? plan.widths[i] / 2 : 0 : 0, valueW[i] / 2);
     const slanted = plan.show[i] && !plan.lines ? plan.widths[i] * COS + FS4.cat * SIN - 3 : 0;
-    const side = valueW[i] && m.count > 2 ? valueW[i] + DOT_HI + 4 : 0;
-    return { left: Math.max(half, slanted) - (i + 0.5) * slot, right: Math.max(half, side) - (n - i - 0.5) * slot };
+    const column = valueW[i] && m.count > 1 ? valueW[i] + DOT_HI + LABEL_SIDE : 0;
+    const [left, right] = columnEnd(i) === "end" ? [0, column] : [column, 0];
+    return { left: Math.max(half, slanted, left) - (i + 0.5) * slot, right: Math.max(half, right) - (n - i - 0.5) * slot };
   });
   const axisX = Math.max(PAD2 + tickW + 6, PAD2 + Math.max(...over2.map((o) => o.left)));
   const plotW = n * slot;
@@ -8117,7 +8130,7 @@ function lineChart(m) {
     if (labelled[i]) {
       const around = (j2, k2) => rows[j2]?.values[k2];
       const valleys = row.values.map((v, k2) => i > 0 && i < n - 1 && around(i - 1, k2) > v && around(i + 1, k2) > v);
-      parts.push(valueLabels(m, X3, cx(i), row.values, row.values.map(y2), valleys));
+      parts.push(valueLabels(m, X3, cx(i), row.values, row.values.map(y2), { valleys, end: columnEnd(i), bottom: plotBottom }));
     }
     let tip = "";
     if (plan.show[i]) {
@@ -8209,9 +8222,9 @@ Memcached  | 9   | 31
 - A first line whose values are not numbers names the series; its label cell may be empty. With more than one number on a row this line is required. bar and line take 1 to 6 series; up to ${MAX_ROWS.bar} rows for bar, ${MAX_ROWS.line} for line.
 - line: each row is a position on the horizontal axis, each series is a line with a dot on every point. With one series and up to 12 points every point carries its value; otherwise only the highlighted row does.
 - pie: one number on each row (a series name line may give one name), 0 or more, at least one above 0, up to ${MAX_ROWS.pie} slices. Slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's value and percentage; the total is in the middle.
-- Numbers are plain: an optional + or -, digits, an optional decimal point. bar and line draw a negative value below the zero line. The axis starts at 0.
+- Numbers are plain: an optional + or -, digits, an optional decimal point. bar and line draw a negative value below the zero line. A bar axis starts at 0; a line axis may start above 0, but starts at 0 when the smallest value is a third of the largest or less, or the values reach 0.
 - unit=% (or ms, KB) is added to the axis and the value labels as it is; unit=" ms" gives a space. The panel title is the chart title, so there is no title=.
-- * before a label highlights the row. bar: with one series its bar uses the accent color, with several it keeps its series colors, and the other rows turn gray. line: the row's points are larger and carry their value, with a thin guide line; the lines keep their colors. pie: the slice keeps its color and the other slices turn gray.
+- * before a label highlights the row. bar: with one series its bar uses the accent color, with several it keeps its series colors, and the other rows turn gray. line: the row's points are larger and carry their value, with a thin dashed guide line (several series: the values in a column beside it); the lines keep their colors. pie: the slice keeps its color and the other slices turn gray.
 - With more than one series the chart has a legend. Up to 12 bars carry their value; a collapsed table under the chart holds all the numbers.`,
   example: "```chart bar unit=ms\n       | p50 | p95\n* Redis     | 12  | 40\nMemcached   | 9   | 31\nPostgres    | 28  | 95\n```",
   render(text2, { args = "", dir = "ltr", ui, video } = {}) {

@@ -53,3 +53,21 @@ export function percent(value, total) {
   const tenth = Math.round(p * 10) / 10;
   return tenth > 0 ? `${tenth}%` : '<0.1%';
 }
+
+// The value axis of a line: it covers the data, and a line encodes position, not length, so it may start above 0. It includes 0 when the
+// values reach it or cross it, or when the smallest value is at most a third of the largest (the lines then rise from the floor); 0 would
+// squeeze values that are all large into a flat line. The ticks still end on nice values at or beyond the data.
+export function lineRange(values) {
+  if (values.some((value) => !Number.isFinite(value))) throw new RangeError('chart values must be finite');
+  const [lo, hi] = [Math.min(...values), Math.max(...values)];
+  if (lo <= hi / 3 || lo === hi) return niceRange(values);
+  const whole = values.every(Number.isInteger);
+  const count = (step) => Math.ceil(hi / step - 1e-9) - Math.floor(lo / step + 1e-9);
+  let step;
+  for (step of steps(hi - lo, whole)) if (count(step) <= MAX_STEPS) break;
+  const down = Math.floor(lo / step + 1e-9);
+  const up = Math.ceil(hi / step - 1e-9);
+  const [min, max] = [round(down * step), round(up * step)];
+  if (!Number.isFinite(max - min)) throw new RangeError('chart values are too large to scale');
+  return { min, max, step, ticks: Array.from({ length: up - down + 1 }, (_, i) => round((down + i) * step)) };
+}

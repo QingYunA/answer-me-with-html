@@ -36,12 +36,20 @@ html[data-mode="dark"] {
 .am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }
 .am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }
 .am-ch-slice { stroke-width: 2; stroke-linejoin: round; }
-.am-ch-guide { stroke: var(--line-2, #d6dae1); stroke-width: 1.5; }
+.am-ch-guide { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 3 3; }
 
 .am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }
 .am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }
 .am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: 12px; }
 .am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: 11px; }
+/* The value labels of a highlighted row in a chart with several series take the color of their series, in a heavier weight to read on it. */
+.am-diagram .am-ch-val.am-ch-s1, .am-diagram .am-ch-val.am-ch-s2, .am-diagram .am-ch-val.am-ch-s3, .am-diagram .am-ch-val.am-ch-s4, .am-diagram .am-ch-val.am-ch-s5, .am-diagram .am-ch-val.am-ch-s6 { font-weight: 600; }
+.am-diagram .am-ch-val.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }
+.am-diagram .am-ch-val.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }
+.am-diagram .am-ch-val.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }
+.am-diagram .am-ch-val.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }
+.am-diagram .am-ch-val.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }
+.am-diagram .am-ch-val.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }
 /* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */
 .am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }
 .am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: 12px; font-variant-numeric: tabular-nums; }
