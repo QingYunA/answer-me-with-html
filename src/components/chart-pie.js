@@ -26,12 +26,14 @@ export function drawPie(data, { unit = '', dir = 'ltr', label }) {
   const lines = rows.map((r) => fitLines(r.label, LABEL_MAX, 2, FS.legend));
   const labelW = Math.max(...lines.flat().map((l) => measure(l, FS.legend)));
   const shown = values.map((v) => `${fmt(v)}${unit}`);
-  const shares = values.map((v) => percent(v, total));
+  // With unit=% the values are the shares already: no second percentage and no total.
+  const asShares = unit === '%';
+  const shares = asShares ? [] : values.map((v) => percent(v, total));
   const valueW = Math.max(...shown.map((s) => measure(s, FS.legend)));
-  const shareW = Math.max(...shares.map((s) => measure(s, FS.legend)));
+  const shareW = asShares ? 0 : Math.max(...shares.map((s) => measure(s, FS.legend)));
   const heights = lines.map((ls) => Math.max(ls.length * LH + ROW_PAD, 24));
   const legendH = heights.reduce((a, b) => a + b, 0);
-  const legendW = SW + labelW + COL_GAP + valueW + COL_GAP + shareW;
+  const legendW = SW + labelW + COL_GAP + valueW + (asShares ? 0 : COL_GAP + shareW);
 
   const H = Math.ceil(Math.max(2 * R, legendH) + 2 * PAD);
   const W = Math.ceil(PAD + 2 * R + GAP + legendW + PAD);
@@ -62,12 +64,12 @@ export function drawPie(data, { unit = '', dir = 'ltr', label }) {
     parts.push(`<rect class="am-ch-sw am-ch-s${i + 1}" x="${f(rtl ? W - lx - 10 : lx)}" y="${f(mid - 5)}" width="10" height="10" rx="2"/>`);
     parts.push(...lines[i].map((l, j) => text('am-ch-leg', X(lx + SW), first + j * LH, l, dir, ' dominant-baseline="central"')));
     parts.push(text('am-ch-num', X(valueX), mid, shown[i], dir, ' text-anchor="end" dominant-baseline="central"'));
-    parts.push(text('am-ch-num', X(shareX), mid, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
+    if (!asShares) parts.push(text('am-ch-num', X(shareX), mid, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     body.push(stepGroup(i, `am-ch-row${anyHi ? (row.hi ? ' is-hi' : ' is-dim') : ''}`, tooltip(row.label, lines[i].join(' ')), parts.join('')));
     turn += span;
     top += heights[i];
   }
-  body.push(totalText(fmt(total), unit, X(cx), cy, dir));
+  if (!asShares) body.push(totalText(fmt(total), unit, X(cx), cy, dir));
   return `${svgOpen(W, H, label, dir)}${body.join('')}</svg>`;
 }
 

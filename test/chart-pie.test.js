@@ -112,6 +112,30 @@ test('chart pie: six slices with long labels wrap to two lines and nothing leave
   assert.ok(xs.every((x) => x <= w));
 });
 
+test('chart pie: with unit=% the values are the shares: no second percentage, no total in the middle', () => {
+  const html = render('Chrome | 65\n* Safari | 18\nOther | 17', 'pie unit=%');
+  assert.deepEqual(texts(html, 'am-ch-num'), ['65%', '18%', '17%'], 'the value only, once');
+  assert.deepEqual(texts(html, 'am-ch-total'), []);
+  assert.deepEqual(texts(html, 'am-ch-leg'), ['Chrome', 'Safari', 'Other']);
+  assert.equal(slices(html).length, 3, 'the slices are drawn as before');
+  assert.deepEqual(groups(html).map((g) => g.cls), ['am-ch-row is-dim', 'am-ch-row is-hi', 'am-ch-row is-dim']);
+  assert.ok(num(html.match(/viewBox="0 0 (\d+)/)[1]) < num(render('Chrome | 65\n* Safari | 18\nOther | 17', 'pie unit=ms').match(/viewBox="0 0 (\d+)/)[1]), 'the legend is narrower without the share column');
+  // The data table has the value column only.
+  assert.match(html, /<thead><tr><td><\/td><th scope="col">Value<\/th><\/tr><\/thead>/);
+  assert.match(html, /<tr><th scope="row">Chrome<\/th><td dir="ltr">65%<\/td><\/tr>/);
+  assert.doesNotMatch(html, /Share|<td dir="ltr">\d+%<\/td><td/);
+  assert.match(render('| share\nA | 60\nB | 40', 'pie unit=%'), /<th scope="col">share<\/th><\/tr>/);
+  // Another unit, even one that contains a %, keeps the shares and the total.
+  assert.deepEqual(texts(render('A | 1\nB | 3', 'pie unit=" %"'), 'am-ch-total'), ['4 %']);
+  assert.deepEqual(texts(render('A | 1\nB | 3', 'pie unit=ms'), 'am-ch-num'), ['1ms', '25%', '3ms', '75%']);
+});
+
+test('chart pie, rtl: with unit=% the numbers are isolated and there is still no total', () => {
+  const html = render('A | 60\nB | 40', 'pie unit=%', { dir: 'rtl' });
+  assert.deepEqual(texts(html, 'am-ch-num'), [`${LRI}60%${PDI}`, `${LRI}40%${PDI}`]);
+  assert.deepEqual(texts(html, 'am-ch-total'), []);
+});
+
 // ── the donut ──
 test('chart pie: slices start at 12 o\'clock and go clockwise in the order written', () => {
   const html = render('A | 1\nB | 1\nC | 2');
@@ -176,8 +200,8 @@ test('chart pie: the share header comes from the page language', () => {
 
 // ── right-to-left ──
 test('chart pie, rtl: counterclockwise from 12 o\'clock, the donut on the right and the legend on its left, numbers left to right', () => {
-  const ltr = render('A | 1\nB | 1\nC | 2', 'pie unit=%', { dir: 'ltr' });
-  const rtl = render('A | 1\nB | 1\nC | 2', 'pie unit=%', { dir: 'rtl' });
+  const ltr = render('A | 1\nB | 1\nC | 2', 'pie unit=ms', { dir: 'ltr' });
+  const rtl = render('A | 1\nB | 1\nC | 2', 'pie unit=ms', { dir: 'rtl' });
   const w = num(ltr.match(/viewBox="0 0 (\d+)/)[1]);
   assert.match(rtl, /<svg [^>]*direction="rtl"/);
   const [l, r] = [slices(ltr), slices(rtl)];
@@ -191,7 +215,7 @@ test('chart pie, rtl: counterclockwise from 12 o\'clock, the donut on the right 
   const numbers = [...texts(rtl, 'am-ch-num'), ...texts(rtl, 'am-ch-total')];
   assert.equal(numbers.length, 7);
   assert.ok(numbers.every((t) => t.startsWith(LRI) && t.endsWith(PDI)));
-  assert.deepEqual(texts(ltr, 'am-ch-num'), ['1%', '25%', '1%', '25%', '2%', '50%']);
+  assert.deepEqual(texts(ltr, 'am-ch-num'), ['1ms', '25%', '1ms', '25%', '2ms', '50%']);
 });
 
 test('chart pie: a page in Hebrew gets a mirrored donut and the Hebrew labels', () => {

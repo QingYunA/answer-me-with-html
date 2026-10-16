@@ -28,7 +28,7 @@ Memcached  | 9   | 31
 - Types: bar (vertical bars), bar horizontal, line and pie (a donut). Each line is a label and one number for each series.
 - A first line whose values are not numbers names the series; its label cell may be empty. With more than one number on a row this line is required. bar and line take 1 to 6 series; up to ${MAX_ROWS.bar} rows for bar, ${MAX_ROWS.line} for line.
 - line: each row is a position on the horizontal axis, each series is a line with a dot on every point. With one series and up to 12 points every point carries its value; otherwise only the highlighted row does.
-- pie: one number on each row (a series name line may give one name), 0 or more, at least one above 0, up to ${MAX_ROWS.pie} slices. Slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's value and percentage; the total is in the middle.
+- pie: one number on each row (a series name line may give one name), 0 or more, at least one above 0, up to ${MAX_ROWS.pie} slices. Slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's value and percentage; the total is in the middle. With unit=% the values are the shares: no second percentage, no total.
 - Numbers are plain: an optional + or -, digits, an optional decimal point. bar and line draw a negative value below the zero line. A bar axis starts at 0; a line axis may start above 0, but starts at 0 when the smallest value is a third of the largest or less, or the values reach 0.
 - unit=% (or ms, KB) is added to the axis and the value labels as it is; unit=" ms" gives a space. The panel title is the chart title, so there is no title=.
 - * before a label highlights the row. bar: with one series its bar uses the accent color, with several it keeps its series colors, and the other rows turn gray. line: the row's points are larger and carry their value, with a thin dashed guide line (several series: the values in a column beside it); the lines keep their colors. pie: the slice keeps its color and the other slices turn gray.
@@ -124,8 +124,10 @@ function dataTable({ series, rows }, { type, unit }, words) {
   const cell = (text) => `<td dir="ltr">${esc(text)}</td>`;
   const pie = type === 'pie';
   const total = pie ? rows.reduce((sum, r) => sum + r.values[0], 0) : 0;
-  const names = pie ? [series?.[0] ?? words.value, words.share] : series;
+  // With unit=% the values of a pie are the shares already, so there is no share column.
+  const shares = pie && unit !== '%';
+  const names = pie ? [series?.[0] ?? words.value, ...(shares ? [words.share] : [])] : series;
   const head = names ? `<thead><tr><td></td>${names.map((s) => `<th scope="col">${esc(s)}</th>`).join('')}</tr></thead>` : '';
-  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v) => cell(fmt(v) + unit)).join('')}${pie ? cell(percent(r.values[0], total)) : ''}</tr>`);
+  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v) => cell(fmt(v) + unit)).join('')}${shares ? cell(percent(r.values[0], total)) : ''}</tr>`);
   return `<details class="am-ch-data${pie ? ' am-ch-data--pie' : ''}"><summary>${esc(words.data)}</summary><div class="am-table-wrap"><table>${head}<tbody>${body.join('')}</tbody></table></div></details>`;
 }

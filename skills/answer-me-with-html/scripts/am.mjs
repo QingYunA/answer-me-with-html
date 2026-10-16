@@ -8161,12 +8161,13 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
   const lines = rows.map((r) => fitLines(r.label, LABEL_MAX2, 2, FS4.legend));
   const labelW = Math.max(...lines.flat().map((l3) => measure(l3, FS4.legend)));
   const shown2 = values.map((v) => `${fmt(v)}${unit}`);
-  const shares = values.map((v) => percent(v, total));
+  const asShares = unit === "%";
+  const shares = asShares ? [] : values.map((v) => percent(v, total));
   const valueW = Math.max(...shown2.map((s) => measure(s, FS4.legend)));
-  const shareW = Math.max(...shares.map((s) => measure(s, FS4.legend)));
+  const shareW = asShares ? 0 : Math.max(...shares.map((s) => measure(s, FS4.legend)));
   const heights = lines.map((ls) => Math.max(ls.length * LH4 + ROW_PAD, 24));
   const legendH = heights.reduce((a, b) => a + b, 0);
-  const legendW = SW + labelW + COL_GAP + valueW + COL_GAP + shareW;
+  const legendW = SW + labelW + COL_GAP + valueW + (asShares ? 0 : COL_GAP + shareW);
   const H2 = Math.ceil(Math.max(2 * R4, legendH) + 2 * PAD2);
   const W2 = Math.ceil(PAD2 + 2 * R4 + GAP2 + legendW + PAD2);
   const [cx, cy] = [PAD2 + R4, H2 / 2];
@@ -8188,12 +8189,12 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
     parts.push(`<rect class="am-ch-sw am-ch-s${i + 1}" x="${f(rtl ? W2 - lx - 10 : lx)}" y="${f(mid2 - 5)}" width="10" height="10" rx="2"/>`);
     parts.push(...lines[i].map((l3, j2) => text("am-ch-leg", X3(lx + SW), first + j2 * LH4, l3, dir, ' dominant-baseline="central"')));
     parts.push(text("am-ch-num", X3(valueX), mid2, shown2[i], dir, ' text-anchor="end" dominant-baseline="central"'));
-    parts.push(text("am-ch-num", X3(shareX), mid2, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
+    if (!asShares) parts.push(text("am-ch-num", X3(shareX), mid2, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     body.push(stepGroup(i, `am-ch-row${anyHi ? row.hi ? " is-hi" : " is-dim" : ""}`, tooltip(row.label, lines[i].join(" ")), parts.join("")));
     turn += span;
     top2 += heights[i];
   }
-  body.push(totalText(fmt(total), unit, X3(cx), cy, dir));
+  if (!asShares) body.push(totalText(fmt(total), unit, X3(cx), cy, dir));
   return `${svgOpen(W2, H2, label, dir)}${body.join("")}</svg>`;
 }
 function totalText(total, unit, x2, y2, dir) {
@@ -8221,7 +8222,7 @@ Memcached  | 9   | 31
 - Types: bar (vertical bars), bar horizontal, line and pie (a donut). Each line is a label and one number for each series.
 - A first line whose values are not numbers names the series; its label cell may be empty. With more than one number on a row this line is required. bar and line take 1 to 6 series; up to ${MAX_ROWS.bar} rows for bar, ${MAX_ROWS.line} for line.
 - line: each row is a position on the horizontal axis, each series is a line with a dot on every point. With one series and up to 12 points every point carries its value; otherwise only the highlighted row does.
-- pie: one number on each row (a series name line may give one name), 0 or more, at least one above 0, up to ${MAX_ROWS.pie} slices. Slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's value and percentage; the total is in the middle.
+- pie: one number on each row (a series name line may give one name), 0 or more, at least one above 0, up to ${MAX_ROWS.pie} slices. Slices start at 12 o'clock and go clockwise in the order written. A list beside the donut shows each slice's value and percentage; the total is in the middle. With unit=% the values are the shares: no second percentage, no total.
 - Numbers are plain: an optional + or -, digits, an optional decimal point. bar and line draw a negative value below the zero line. A bar axis starts at 0; a line axis may start above 0, but starts at 0 when the smallest value is a third of the largest or less, or the values reach 0.
 - unit=% (or ms, KB) is added to the axis and the value labels as it is; unit=" ms" gives a space. The panel title is the chart title, so there is no title=.
 - * before a label highlights the row. bar: with one series its bar uses the accent color, with several it keeps its series colors, and the other rows turn gray. line: the row's points are larger and carry their value, with a thin dashed guide line (several series: the values in a column beside it); the lines keep their colors. pie: the slice keeps its color and the other slices turn gray.
@@ -8307,9 +8308,10 @@ function dataTable({ series, rows }, { type, unit }, words3) {
   const cell = (text2) => `<td dir="ltr">${esc(text2)}</td>`;
   const pie = type === "pie";
   const total = pie ? rows.reduce((sum2, r) => sum2 + r.values[0], 0) : 0;
-  const names2 = pie ? [series?.[0] ?? words3.value, words3.share] : series;
+  const shares = pie && unit !== "%";
+  const names2 = pie ? [series?.[0] ?? words3.value, ...shares ? [words3.share] : []] : series;
   const head = names2 ? `<thead><tr><td></td>${names2.map((s) => `<th scope="col">${esc(s)}</th>`).join("")}</tr></thead>` : "";
-  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v) => cell(fmt(v) + unit)).join("")}${pie ? cell(percent(r.values[0], total)) : ""}</tr>`);
+  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v) => cell(fmt(v) + unit)).join("")}${shares ? cell(percent(r.values[0], total)) : ""}</tr>`);
   return `<details class="am-ch-data${pie ? " am-ch-data--pie" : ""}"><summary>${esc(words3.data)}</summary><div class="am-table-wrap"><table>${head}<tbody>${body.join("")}</tbody></table></div></details>`;
 }
 
