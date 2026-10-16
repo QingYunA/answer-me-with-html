@@ -20,18 +20,20 @@ const errorOf = (src) => {
   return null;
 };
 
-test('ask: one choice renders radios, and the suggested option starts checked with a tag', () => {
+test('ask: one choice renders radios, and the suggested option has a tag but starts unchecked', () => {
   const { html, stats } = renderDoc(draft('```ask', ASK));
   assert.equal(stats.components.ask, 1);
   assert.match(html, /<fieldset class="am-ask" data-ask="am\d+"><legend class="am-ask-q">Which cache do we use\?<\/legend>/);
-  assert.match(html, /<input type="radio" name="am\d+" value="Redis" checked data-suggested><span class="am-ask-body"><span class="am-ask-label">Redis<\/span> <span class="am-ask-tag">suggested<\/span><small class="am-ask-note">keeps data after a restart<\/small><\/span><\/label>/);
+  assert.match(html, /<input type="radio" name="am\d+" value="Redis" data-suggested><span class="am-ask-body"><span class="am-ask-label">Redis<\/span> <span class="am-ask-tag">suggested<\/span><small class="am-ask-note">keeps data after a restart<\/small><\/span><\/label>/);
   assert.match(html, /<input type="radio" name="am\d+" value="Memcached"><span class="am-ask-body"><span class="am-ask-label">Memcached<\/span><\/span><\/label>/);
+  assert.ok(!/<input[^>]*\schecked/.test(html), 'no option starts checked');
 });
 
 test('ask: multi renders checkboxes and allows several or no suggestions', () => {
   const { html } = renderDoc(draft('```ask multi', 'What do we log?\n* Retry\n* Give up\n- Every write'));
   assert.match(html, /<fieldset class="am-ask" data-ask="am\d+" data-multi>/);
-  assert.equal(html.match(/type="checkbox"[^>]*checked data-suggested/g).length, 2);
+  assert.equal(html.match(/type="checkbox"[^>]* data-suggested/g).length, 2);
+  assert.ok(!/<input[^>]*\schecked/.test(html), 'suggested checkboxes start unchecked too');
   assert.doesNotThrow(() => renderDoc(draft('```ask multi', 'What do we log?\n- Retry\n- Give up')));
 });
 
@@ -113,8 +115,11 @@ test('replyText: changed, confirmed and untouched decisions say so', () => {
     decisions: [
       { panel: 'A', question: 'Which cache?', picked: ['Memcached'], suggested: ['Redis'], touched: true },
       { panel: 'B', question: 'Retry?', picked: ['Yes'], suggested: ['Yes'], touched: true },
-      { panel: 'B', question: 'Log what?', picked: ['Retry', 'Give up'], suggested: ['Give up', 'Retry'], touched: false },
+      { panel: 'B', question: 'Log what?', picked: ['Retry', 'Give up'], suggested: ['Give up', 'Retry'], touched: true },
       { panel: 'C', question: 'Extras?', picked: [], suggested: ['Metrics'], touched: true },
+      { panel: 'C', question: 'Which queue?', picked: [], suggested: ['SQS'], touched: false },
+      { panel: 'D', question: 'Alert on what?', picked: [], suggested: ['Errors', 'Latency'], touched: false },
+      { panel: 'D', question: 'Anything else?', picked: [], suggested: [], touched: false },
     ],
   });
   assert.equal(text, [
@@ -126,9 +131,15 @@ test('replyText: changed, confirmed and untouched decisions say so', () => {
     '2. [B] Retry?',
     '   → **Yes** _(suggestion confirmed)_',
     '3. [B] Log what?',
-    '   → **Retry**, **Give up** _(not answered; suggestion kept)_',
+    '   → **Retry**, **Give up** _(suggestion confirmed)_',
     '4. [C] Extras?',
     '   → **—** _(was: Metrics)_',
+    '5. [C] Which queue?',
+    '   → **—** _(not answered; suggested: SQS)_',
+    '6. [D] Alert on what?',
+    '   → **—** _(not answered; suggested: Errors, Latency)_',
+    '7. [D] Anything else?',
+    '   → **—** _(not answered; suggested: —)_',
     '',
   ].join('\n'));
 });

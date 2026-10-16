@@ -21,7 +21,7 @@ export default {
       button: '回复', comment: '评论', commentHint: '对这个面板的意见', title: '你的回复',
       hint: '复制后粘贴回和 Agent 的对话，它会按你的选择和意见继续。', copy: '复制回复', copyFailed: '复制失败 — 请按 Cmd/Ctrl+C', close: '关闭', suggested: '建议',
       empty: '先选择选项，或在面板上写评论。', decisions: '决定', comments: '评论',
-      confirmed: '确认了建议', untouched: '未作答，保留建议', was: '原为',
+      confirmed: '确认了建议', untouched: '未作答，建议', was: '原为',
       typed: '以 ">" 开头的行是读者输入的文字。',
       raw: '查看将复制的文本', preview: '预览',
       count: { answered: '已作答 {n} 项', comments: '评论 {n} 条', remarks: '标注 {n} 处' },

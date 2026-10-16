@@ -11,8 +11,11 @@ export function replyText({ title, decisions, comments, remarks = [], ui, rtl = 
     out.push('', `## ${ui.decisions}`);
     decisions.forEach((d, i) => {
       const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**—**';
+      // Every option starts unselected, so an ask the reader never clicked has no answer: the reply names the suggestion
+      // instead of passing it off as the reader's choice.
       const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));
-      const why = same ? (d.touched ? ui.confirmed : ui.untouched) : `${ui.was}: ${d.suggested.join(', ') || '—'}`;
+      const suggested = d.suggested.join(', ') || '—';
+      const why = !d.touched ? `${ui.untouched}: ${suggested}` : same ? ui.confirmed : `${ui.was}: ${suggested}`;
       out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);
     });
   }

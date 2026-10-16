@@ -46,7 +46,7 @@ Which cache do we use?
 ```
 ````
 
-- The first line is the question. Each option starts with `*` (the suggestion, selected at the start) or `-`. Write 2 to 6 options.
+- The first line is the question. Each option starts with `*` (the suggestion, shown with a tag; every option starts unselected) or `-`. Write 2 to 6 options.
 - One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options that start picked.
 - The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text and remark notes come back quoted with `>`.
 

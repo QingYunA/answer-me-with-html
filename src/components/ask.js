@@ -3,7 +3,7 @@ import { esc } from '../svg/text.js';
 import { ComponentError, contentLines, fields } from './error.js';
 
 // A decision the reader makes on the page. The page's Reply button collects the answers (and the panel comments) into one
-// Markdown reply that the reader pastes back to the agent. The option marked * is the agent's suggestion and starts selected.
+// Markdown reply that the reader pastes back to the agent. The option marked * is the agent's suggestion: it carries a tag, and every option starts unselected.
 const OPTION = /^([*-])\s+(.+)$/;
 
 export default {
@@ -13,11 +13,11 @@ export default {
   panelOnly: true,
   syntax: `\`\`\`ask [multi]
 The question, one sentence
-* The option you suggest | optional note   ← * marks the suggestion; it starts selected
+* The option you suggest | optional note   ← * marks the suggestion with a tag; nothing starts selected
 - Another option | optional note
 \`\`\`
 - The first line is the question. Each option starts with * or -. Write 2 to 6 options.
-- One choice: exactly one * option. multi lets the reader pick several; * marks the ones that start picked.
+- One choice: exactly one * option. multi lets the reader pick several; * marks the ones you suggest.
 - Place the ask in the panel whose content the answer changes. The Reply button turns the answers into one reply.`,
   example: '```ask\nWhich cache do we use?\n* Redis | keeps data after a restart\n- Memcached | simpler, no disk\n```',
   // The text the STE check reads: options are list items; the note reads as a second clause of the item.
@@ -48,7 +48,7 @@ The question, one sentence
     }
     const id = uid();
     const type = multi ? 'checkbox' : 'radio';
-    const items = options.map((o) => `<label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? ' checked data-suggested' : ''}><span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? 'suggested')}</span>` : ''}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ''}</span></label>`);
+    const items = options.map((o) => `<label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? ' data-suggested' : ''}><span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? 'suggested')}</span>` : ''}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ''}</span></label>`);
     return `<fieldset class="am-ask" data-ask="${id}"${multi ? ' data-multi' : ''}><legend class="am-ask-q">${mdInline(first.text)}</legend>${items.join('')}</fieldset>`;
   },
 };

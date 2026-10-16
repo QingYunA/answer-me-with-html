@@ -107,6 +107,9 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
   assert.equal(await evaluate('document.querySelectorAll(".am-comment-btn").length'), 4);
   const bar = () => evaluate(`({ hidden: document.querySelector('.am-reply-bar').hidden, text: document.querySelector('.am-reply-bar-count').textContent })`);
   assert.equal((await bar()).hidden, true);
+  // The suggestions carry a tag, but nothing starts selected.
+  assert.equal(await evaluate('document.querySelectorAll("input[data-suggested]").length'), 3);
+  assert.equal(await evaluate('document.querySelectorAll(".am-ask input:checked").length'), 0);
   await evaluate('document.querySelector("input[value=Memcached]").click()');
   assert.deepEqual(await bar(), { hidden: false, text: 'Answered: 1' });
   const reply = await evaluate(`(() => {
@@ -130,7 +133,7 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
   assert.equal(reply.rawOpen, false);
   assert.match(reply.text, /^# Re: Cache for the session store\n/);
   assert.match(reply.text, /1\. \[A\] Which cache do we use\?\n {3}→ \*\*Memcached\*\* _\(was: Redis\)_/);
-  assert.match(reply.text, /2\. \[B\] Which events do we log\?\n {3}→ \*\*Retry\*\* _\(not answered; suggestion kept\)_/);
+  assert.match(reply.text, /2\. \[B\] Which events do we log\?\n {3}→ \*\*—\*\* _\(not answered; suggested: Retry\)_/);
   assert.match(reply.text, /3\. \[D\] Do we ship it this week\?\n {3}→ \*\*Yes\*\* _\(suggestion confirmed\)_/);
   assert.match(reply.text, /- \*\*C · Where the change goes\*\*\n {2}> Make the TTL a setting\./);
 
@@ -141,6 +144,36 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
     open: !document.querySelector('#panel-C .am-comment').hidden,
   })`);
   assert.deepEqual(after, { memcached: true, comment: 'Make the TTL a setting.', open: true });
+});
+
+test('reply: an untouched answer saved by an older page, which preselected the suggestion, comes back unselected', { skip: SKIP }, async () => {
+  await load();
+  await evaluate(`(() => {
+    const key = 'am-reply:' + location.pathname;
+    localStorage.setItem(key, JSON.stringify({ asks: {
+      'Which cache do we use?': { picked: ['Redis'], touched: false },
+      'Do we ship it this week?': { picked: ['No'], touched: true },
+    } }));
+  })()`);
+  await load();
+  const state = await evaluate(`(() => {
+    document.querySelector('[data-am="reply"]').click();
+    const sheet = document.querySelector('dialog.am-reply');
+    const result = {
+      redis: document.querySelector('input[value="Redis"]').checked,
+      no: document.querySelector('input[value="No"]').checked,
+      bar: document.querySelector('.am-reply-bar-count').textContent,
+      text: sheet.querySelector('textarea').value,
+    };
+    sheet.close();
+    localStorage.clear();
+    return result;
+  })()`);
+  assert.equal(state.redis, false);
+  assert.equal(state.no, true);
+  assert.equal(state.bar, 'Answered: 1');
+  assert.match(state.text, /1\. \[A\] Which cache do we use\?\n {3}→ \*\*—\*\* _\(not answered; suggested: Redis\)_/);
+  assert.match(state.text, /3\. \[D\] Do we ship it this week\?\n {3}→ \*\*No\*\* _\(was: Yes\)_/);
 });
 
 // Opens the page made with close_after_reply on, stubs the clipboard and window.close, opens Reply and clicks Copy.

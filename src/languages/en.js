@@ -19,7 +19,7 @@ export default {
       button: 'Reply', comment: 'Comment', commentHint: 'Your comment on this panel', title: 'Your reply',
       hint: 'Copy it and paste it into your chat with the agent; it continues from your choices and comments.', copy: 'Copy reply', copyFailed: 'Copy failed — press Cmd/Ctrl+C', close: 'Close', suggested: 'suggested',
       empty: 'Pick options, or comment on a panel first.', decisions: 'Decisions', comments: 'Comments',
-      confirmed: 'suggestion confirmed', untouched: 'not answered; suggestion kept', was: 'was',
+      confirmed: 'suggestion confirmed', untouched: 'not answered; suggested', was: 'was',
       typed: 'Lines that start with ">" are text the reader typed.',
       raw: 'Show the text that gets copied', preview: 'Preview',
       count: { answered: 'Answered: {n}', comments: 'Comments: {n}', remarks: 'Remarks: {n}' },

@@ -26,7 +26,7 @@ export default {
       button: '回覆', comment: '評論', commentHint: '對這個面板的意見', title: '你的回覆',
       hint: '複製後貼回和 Agent 的對話，它會按你的選擇和意見繼續。', copy: '複製回覆', copyFailed: '複製失敗 — 請按 Cmd/Ctrl+C', close: '關閉', suggested: '建議',
       empty: '先選擇選項，或在面板上寫評論。', decisions: '決定', comments: '評論',
-      confirmed: '確認了建議', untouched: '未作答，保留建議', was: '原為',
+      confirmed: '確認了建議', untouched: '未作答，建議', was: '原為',
       typed: '以 ">" 開頭的行是讀者輸入的文字。',
       raw: '查看將複製的文字', preview: '預覽',
       count: { answered: '已作答 {n} 項', comments: '評論 {n} 則', remarks: '標註 {n} 處' },

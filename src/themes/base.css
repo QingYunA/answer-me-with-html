@@ -104,7 +104,7 @@ code, pre, kbd { font-family: var(--font-mono); }
   margin: 0; padding: 12px 14px; background: var(--fill); border: 1px solid var(--line-2);
   border-radius: var(--radius); overflow-x: auto; font-size: 12.5px; line-height: 1.5;
 }
-/* Ask: a decision the reader makes; the suggested option starts selected */
+/* Ask: a decision the reader makes; the suggested option has a tag and starts unselected like the others */
 .am-ask { margin: 10px 0; padding: 10px 12px 8px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--fill); min-width: 0; }
 /* The question floats inside the box, so a long question wraps like text instead of riding on the border */
 .am-ask-q { float: left; width: 100%; padding: 0; margin-bottom: 4px; font-weight: 600; }
