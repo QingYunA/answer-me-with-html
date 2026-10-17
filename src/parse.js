@@ -53,7 +53,7 @@ const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
 // choices can widen the allowed values of individual keys (video drafts also allow theme: 3b1b).
 export function parseDoc(source, { defaults = {}, choices = {} } = {}) {
-  const lines = String(source).replace(/\r\n?/g, '\n').split('\n');
+  const lines = String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults }, { ...CHOICES, ...choices });
   const sections = splitSections(lines, bodyStart);
   const intro = extractTitle(sections.intro, meta);

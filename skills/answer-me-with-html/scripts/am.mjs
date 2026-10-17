@@ -2446,7 +2446,7 @@ var ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 var PANEL_ID = /^([A-Z][0-9]?)\s+(?![\s\p{Ll}])(.+)$/u;
 var ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 function parseDoc(source, { defaults: defaults2 = {}, choices = {} } = {}) {
-  const lines = String(source).replace(/\r\n?/g, "\n").split("\n");
+  const lines = String(source).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults2 }, { ...CHOICES, ...choices });
   const sections = splitSections(lines, bodyStart);
   const intro = extractTitle(sections.intro, meta);

@@ -173,3 +173,14 @@ test('applyOverrides: validates values, ignores undefined, returns a new object'
   assert.throws(() => applyOverrides(meta, { theme: '3b1b' }), /Invalid theme value "3b1b"/);
   assert.equal(applyOverrides(meta, { theme: '3b1b' }, { theme: ['3b1b'] }).theme, '3b1b');
 });
+
+test('a UTF-8 BOM before a # heading still extracts the title', () => {
+  const doc = parseDoc('\uFEFF# 真实标题\n导语\n## A\nx');
+  assert.equal(doc.meta.title, '真实标题');
+  assert.equal(doc.intro[0].text.trim(), '导语');
+});
+
+test('a UTF-8 BOM before frontmatter still parses', () => {
+  const doc = parseDoc('\uFEFF---\ntitle: T\n---\n## A\nx');
+  assert.equal(doc.meta.title, 'T');
+});
