@@ -2506,7 +2506,7 @@ function splitSections(lines, start) {
     const heading = line.match(PANEL_HEADING);
     if (heading) {
       flushMd();
-      current = { ...parseHeading(heading[1]), line: i + 1, blocks: [] };
+      current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [] };
       panels.push(current);
       continue;
     }
@@ -2554,7 +2554,20 @@ function extractTitle(intro, meta) {
   return [{ ...first, text: remaining.join("\n"), line: first.line + idx + 1 }, ...rest];
 }
 function assignIds(panels) {
-  const used = new Set(panels.map((p) => p.id).filter(Boolean));
+  const used = /* @__PURE__ */ new Set();
+  const firstById = /* @__PURE__ */ new Map();
+  for (const panel of panels) {
+    if (!panel.id) continue;
+    const first = firstById.get(panel.id);
+    if (first) {
+      throw new ParseError(
+        `Duplicate panel ID "${panel.id}": "${first.heading}" (L${first.line}) and "${panel.heading}" (L${panel.line}) both declare it. Give each panel a different explicit ID, or remove one explicit ID so the panel gets an automatic ID.`,
+        panel.line
+      );
+    }
+    firstById.set(panel.id, panel);
+    used.add(panel.id);
+  }
   let code = "A".charCodeAt(0);
   const nextFree = () => {
     while (used.has(String.fromCharCode(code))) code++;

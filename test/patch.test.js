@@ -176,6 +176,21 @@ test('replacePanel: throws when the panel is missing or the draft is empty', () 
   assert.throws(() => replacePanel(SRC, '流程', '## A 一\na\n## B 二\nb\n'), /exactly one/);
 });
 
+test('two distinct explicit panel IDs render once each and patch by ID', () => {
+  const src = '---\ntitle: Explicit IDs\n---\n## A First\nalpha\n\n## B Second\nbeta\n';
+  const { html } = renderDoc(src);
+  assert.equal(html.match(/id="panel-A"/g)?.length, 1);
+  assert.equal(html.match(/id="panel-B"/g)?.length, 1);
+
+  const first = replacePanel(src, 'A', 'first updated\n');
+  assert.match(first, /## A First\nfirst updated/);
+  assert.match(first, /## B Second\nbeta/);
+
+  const second = replacePanel(src, 'B', '## B Second\nsecond updated\n');
+  assert.match(second, /## B Second\nsecond updated/);
+  assert.match(second, /## A First\nalpha/);
+});
+
 test('pageSettings: reads template, theme, mode and STE style back from the page', async () => {
   const { html } = renderDoc('---\ntemplate: doc\ntheme: shadcn\nmode: dark\n---\n## A 一\n文字\n');
   assert.deepEqual(pageSettings(html), { template: 'doc', theme: 'shadcn', mode: 'dark', style: '80' });

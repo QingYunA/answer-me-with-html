@@ -85,6 +85,38 @@ test('automatic IDs skip letters already taken explicitly', () => {
   assert.deepEqual(doc.panels.map((p) => p.id), ['B', 'A', 'C']);
 });
 
+test('explicit IDs and auto-assigned panels never collide', () => {
+  const doc = parseDoc('## A 一\na\n## 二\nb\n## B 三\nc\n## 四\nd');
+  assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
+    ['A', '一'],
+    ['C', '二'],
+    ['B', '三'],
+    ['D', '四'],
+  ]);
+});
+
+test('a normal multi-panel draft keeps A, B, C', () => {
+  const doc = parseDoc('## 一\na\n## 二\nb\n## 三\nc');
+  assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
+    ['A', '一'],
+    ['B', '二'],
+    ['C', '三'],
+  ]);
+});
+
+test('error: two panels with the same explicit ID are rejected and both headings are named', () => {
+  assert.throws(
+    () => parseDoc('---\ntitle: Dup\n---\n\n## A First\n\nalpha\n\n## A Second\n\nbeta\n'),
+    (err) => err instanceof ParseError
+      && err.line === 9
+      && /Duplicate panel ID "A"/.test(err.message)
+      && /"## A First" \(L5\)/.test(err.message)
+      && /"## A Second" \(L9\)/.test(err.message)
+      && /different explicit ID/.test(err.message)
+      && /remove one explicit ID/.test(err.message),
+  );
+});
+
 test('a title that starts with a word such as "A" or "I" keeps that word (#208)', () => {
   const doc = parseDoc('## The app asks the cache\nx\n## A miss goes to the database\ny\n## I think we should cache\nz\n## C programs leak memory\nw');
   assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [

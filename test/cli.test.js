@@ -194,6 +194,14 @@ test('cli render: a parse error gives the line number', async () => {
   assert.match(r.err, /✗ L2 Cannot parse the draft: fenced block/);
 });
 
+test('cli render: duplicate explicit panel IDs fail with the second line and a fix', async () => {
+  const r = await run(['render', '-'], { stdin: '---\ntitle: Dup\n---\n\n## A First\n\nalpha\n\n## A Second\n\nbeta\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /✗ L9 Cannot parse the draft: Duplicate panel ID "A"/);
+  assert.match(r.err, /"## A First" \(L5\).*"## A Second" \(L9\)/);
+  assert.match(r.err, /different explicit ID.*remove one explicit ID/);
+});
+
 test('cli render: style 80 prints warnings and still renders; strict refuses to render', async () => {
   const bad = '## A\nUtilize the tool.';
   const soft = await run(['render', '-'], { stdin: bad });
