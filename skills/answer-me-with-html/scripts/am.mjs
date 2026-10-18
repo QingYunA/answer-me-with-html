@@ -6992,7 +6992,7 @@ var BRACKETS = [
   { open: "{", close: "}", shape: "diamond" }
 ];
 var ARROW = /^\s*(-->|->)\s*/;
-var MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({].*)$/;
+var MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({]+[^\])}].*)$/;
 var MERMAID_SHAPES = [
   { open: "([", close: "])", write: (text2) => `(${text2})` },
   { open: "[[", close: "]]", write: (text2) => `[${text2}]` },

@@ -208,6 +208,13 @@ test('flow: a space or a leading bracket keeps a label out of the Mermaid ID che
   }
 });
 
+test('flow: empty brackets after a name are not a Mermaid node ID', () => {
+  for (const text of ['init() -> render()', 'list[] -> obj{}']) {
+    assert.deepEqual(parseFlow(text).warnings, [], text);
+    assert.match(render('flow', text), /^<figure class="am-diagram am-flow">/, text);
+  }
+});
+
 test('flow: a Mermaid node ID that is not also a node is a warning, not an error', () => {
   const m = parseFlow('A[Start] -> B[End]');
   assert.deepEqual(m.warnings.map((w) => w.line), [1, 1]);

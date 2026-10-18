@@ -23,8 +23,9 @@ const BRACKETS = [
 ];
 const ARROW = /^\s*(-->|->)\s*/;
 // Mermaid writes a node as an ID followed by its text in shape brackets, e.g. B{OK?}. flow has no node IDs, so that
-// form splits into two nodes; it is only unambiguous when the ID is also a node of its own.
-const MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({].*)$/;
+// form splits into two nodes; it is only unambiguous when the ID is also a node of its own. Mermaid always has text in the
+// brackets, so empty ones such as init() are not an ID.
+const MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({]+[^\])}].*)$/;
 // The flow brackets that mean the same as a Mermaid shape, and the closest one for the shapes flow does not have.
 // Longer openings come first.
 const MERMAID_SHAPES = [
