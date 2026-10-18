@@ -112,6 +112,124 @@ test('flow: error on an unclosed shape bracket', () => {
   throwsAt(() => render('flow', 'A -> B\n(未闭合 -> C'), 2);
 });
 
+// ── flow: Mermaid node IDs (issue #291) ──
+// flow has no node IDs: the text inside the brackets is the node's identity. A Mermaid draft writes `B{OK?}` and
+// then `B -> C`, which splits one node into two; the check reports that split instead of drawing it.
+const flowThrows = (text) => {
+  try {
+    parseFlow(text);
+    return null;
+  } catch (e) {
+    return e;
+  }
+};
+
+test('flow: a Mermaid node ID that is also a node is an error with the text to write', () => {
+  const e = flowThrows('A[Start] -> B{OK?}\nB -> C: no');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /"B" is a node on its own and also the ID of "B\{OK\?\}"/);
+  assert.match(e.message, /write the text alone: \{OK\?\}$/);
+  assert.equal(e.line, 1);
+});
+
+// The v2rayN draft from issue #291: Chinese is the input data, not prose of this repository.
+const V2RAY = [
+  'A[v2rayN 开 TUN] -> B{密码还在内存?}', // lang-ok: issue #291 fixture, Chinese node text
+  'B -> C: 不在，弹出密码框', // lang-ok: issue #291 fixture, Chinese node text
+  'B -> D: 在，先结束旧内核', // lang-ok: issue #291 fixture, Chinese node text
+  'D -> E{旧内核杀干净?}', // lang-ok: issue #291 fixture, Chinese node text
+  'E -> F: 没杀掉，10808 被占', // lang-ok: issue #291 fixture, Chinese node text
+  'E -> G: 杀掉了，随机挑 utun0-98', // lang-ok: issue #291 fixture, Chinese node text
+  'G -> H{名字被占用?}', // lang-ok: issue #291 fixture, Chinese node text
+  'H -> F: 被占用', // lang-ok: issue #291 fixture, Chinese node text
+  'H -> I: 空闲，TUN 成功', // lang-ok: issue #291 fixture, Chinese node text
+].join('\n');
+
+test('flow: the v2rayN draft from issue 291 is rejected at the split node', () => {
+  const e = flowThrows(V2RAY);
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /"B" is a node on its own and also the ID of "B\{密码还在内存\?\}"/);
+  assert.equal(e.line, 1);
+});
+
+test('flow: a Mermaid double circle is suggested as a round node', () => {
+  const e = flowThrows('A((Circle)) -> A');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /write the text alone: \(Circle\)$/);
+  assert.equal(e.line, 1);
+});
+
+test('flow: a Mermaid stadium is suggested as a round node', () => {
+  const e = flowThrows('A([Start]) -> A');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /write the text alone: \(Start\)$/);
+});
+
+test('flow: text written in brackets is not read again as a Mermaid ID', () => {
+  const m = parseFlow('(A[Start]) -> C\nA[Start] -> B\nA -> D');
+  assert.deepEqual(m.warnings, []);
+});
+
+test('flow: a Mermaid node ID cut by a colon is still reported', () => {
+  const e = flowThrows('A[v2rayN: x] -> B\nA -> C');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /write the text alone in brackets, colon included$/);
+  assert.equal(e.line, 1);
+});
+
+test('flow: a change marker does not hide a Mermaid node ID', () => {
+  const e = flowThrows('+ A[Start] -> B\n+ A -> C');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /write the text alone: \[Start\]$/);
+  assert.equal(e.line, 1);
+});
+
+test('flow: a split that only the Before view draws is an error', () => {
+  const e = flowThrows('- A[Start] -> C\nA -> B');
+  assert.ok(e instanceof ComponentError);
+  assert.match(e.message, /write the text alone: \[Start\]$/);
+});
+
+test('flow: a split that no view draws is a warning, not an error', () => {
+  const m = parseFlow('- A -> B\n+ A[Start] -> C');
+  assert.deepEqual(m.warnings.map((w) => w.line), [2]);
+  assert.match(m.warnings[0].message, /"A\[Start\]" looks like a Mermaid node ID with its text/);
+});
+
+test('flow: the error points at the first line of the bracketed node', () => {
+  const e = flowThrows('C -> D\nA[Start] -> B\nA -> E');
+  assert.ok(e instanceof ComponentError);
+  assert.equal(e.line, 2);
+});
+
+test('flow: a space or a leading bracket keeps a label out of the Mermaid ID check', () => {
+  for (const text of ['Gateway (HTTPS) -> Service', '(User) -> Gateway', '{Valid?} -> [(Database)]']) {
+    assert.deepEqual(parseFlow(text).warnings, [], text);
+  }
+});
+
+test('flow: a Mermaid node ID that is not also a node is a warning, not an error', () => {
+  const m = parseFlow('A[Start] -> B[End]');
+  assert.deepEqual(m.warnings.map((w) => w.line), [1, 1]);
+  assert.match(m.warnings[0].message, /^"A\[Start\]" looks like a Mermaid node ID with its text/);
+  assert.match(m.warnings[0].message, /the box shows "A\[Start\]"\. If you meant the text, write it alone: \[Start\]$/);
+  assert.match(m.warnings[1].message, /If you meant the text, write it alone: \[End\]$/);
+});
+
+test('flow: a Mermaid node ID cut by a colon warns when it is the only occurrence', () => {
+  const m = parseFlow('A[v2rayN: x] -> B');
+  assert.deepEqual(m.warnings.map((w) => w.line), [1]);
+  assert.match(m.warnings[0].message, /the box shows "A\[v2rayN"\. If you meant the text, write it alone in brackets, colon included$/);
+  assert.match(render('flow', 'A[v2rayN: x] -> B'), /^<figure class="am-diagram am-flow">/);
+});
+
+test('flow: an array index label gets one warning and still renders', () => {
+  const m = parseFlow('Gateway (HTTPS) -> array[0]');
+  assert.equal(m.warnings.length, 1);
+  assert.equal(m.warnings[0].line, 1);
+  assert.match(render('flow', 'Gateway (HTTPS) -> array[0]'), /^<figure class="am-diagram am-flow">/);
+});
+
 test('flow: lays out nodes whose names equal dagre reserved ids or internal group ids', () => {
   assert.match(render('flow', '\u0000 -> B'), /<svg/);
   assert.match(render('flow', '__group0 -> B\ngroup G: B'), /am-cluster/);

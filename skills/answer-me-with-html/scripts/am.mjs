@@ -6984,6 +6984,19 @@ var BRACKETS = [
   { open: "{", close: "}", shape: "diamond" }
 ];
 var ARROW = /^\s*(-->|->)\s*/;
+var MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({].*)$/;
+var MERMAID_SHAPES = [
+  { open: "([", close: "])", write: (text2) => `(${text2})` },
+  { open: "[[", close: "]]", write: (text2) => `[${text2}]` },
+  { open: "((", close: "))", write: (text2) => `(${text2})` },
+  { open: "{{", close: "}}", write: (text2) => `[${text2}]` },
+  { open: "[/", close: "/]", write: (text2) => `[${text2}]` },
+  { open: "[\\", close: "\\]", write: (text2) => `[${text2}]` },
+  { open: "[(", close: ")]", write: (text2) => `[(${text2})]` },
+  { open: "[", close: "]", write: (text2) => `[${text2}]` },
+  { open: "(", close: ")", write: (text2) => `(${text2})` },
+  { open: "{", close: "}", write: (text2) => `{${text2}}` }
+];
 var flow_default = {
   name: "flow",
   summary: "Flowchart / architecture diagram (automatic layout)",
@@ -6997,6 +7010,7 @@ A -> B & C                    \u2190 fan-out
 group Group name: B, C        \u2190 draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).
+- Mermaid node IDs are not accepted: write the text alone, [Start] rather than A[Start], and refer to it later as Start.
 - Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space:
 \`\`\`flow LR
 Client -> Gateway
@@ -7058,6 +7072,7 @@ function parseFlow(text2) {
     }
   }
   if (!nodes.size) throw new ComponentError("flow needs at least one node", 1);
+  checkMermaidIds(nodes);
   for (const grp of groups) {
     const missing = grp.members.filter((m) => !nodes.has(m));
     if (missing.length) throw new ComponentError(`group ${grp.name} refers to nodes that do not exist: ${missing.join(", ")}`, grp.line);
@@ -7067,7 +7082,37 @@ function parseFlow(text2) {
     const state = nodeState(n);
     return [id, state ? { ...n, state } : n];
   }));
-  return { nodes: settled, edges, groups, warnings: groupWarnings(groups, settled) };
+  return { nodes: settled, edges, groups, warnings: [...groupWarnings(groups, settled), ...mermaidIdWarnings(settled)] };
+}
+function checkMermaidIds(nodes) {
+  for (const n of nodes.values()) {
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
+    const id = nodes.get(m[1]);
+    if (!id || !(n.before && id.before || n.after && id.after)) continue;
+    throw new ComponentError(
+      `"${m[1]}" is a node on its own and also the ID of "${n.label}"; this block has no node IDs, so write the text alone${rewriteOf(m[2])}`,
+      n.line
+    );
+  }
+}
+function mermaidIdWarnings(nodes) {
+  const notes = [];
+  for (const n of nodes.values()) {
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
+    notes.push({
+      line: n.line,
+      message: `"${n.label}" looks like a Mermaid node ID with its text; this block has no node IDs, so the box shows "${n.label}". If you meant the text, write it alone${rewriteOf(m[2])}`
+    });
+  }
+  return notes;
+}
+function rewriteOf(rest) {
+  const shape = MERMAID_SHAPES.find((s) => rest.startsWith(s.open));
+  const close = shape ? rest.indexOf(shape.close, shape.open.length) : -1;
+  if (close === -1) return " in brackets, colon included";
+  return `: ${shape.write(rest.slice(shape.open.length, close).trim())}`;
 }
 function nodeState({ before, after, tilde }) {
   if (before && !after) return "removed";

@@ -22,6 +22,23 @@ const BRACKETS = [
   { open: '{', close: '}', shape: 'diamond' },
 ];
 const ARROW = /^\s*(-->|->)\s*/;
+// Mermaid writes a node as an ID followed by its text in shape brackets, e.g. B{OK?}. flow has no node IDs, so that
+// form splits into two nodes; it is only unambiguous when the ID is also a node of its own.
+const MERMAID_ID = /^([A-Za-z_][\w-]*)([\[({].*)$/;
+// The flow brackets that mean the same as a Mermaid shape, and the closest one for the shapes flow does not have.
+// Longer openings come first.
+const MERMAID_SHAPES = [
+  { open: '([', close: '])', write: (text) => `(${text})` },
+  { open: '[[', close: ']]', write: (text) => `[${text}]` },
+  { open: '((', close: '))', write: (text) => `(${text})` },
+  { open: '{{', close: '}}', write: (text) => `[${text}]` },
+  { open: '[/', close: '/]', write: (text) => `[${text}]` },
+  { open: '[\\', close: '\\]', write: (text) => `[${text}]` },
+  { open: '[(', close: ')]', write: (text) => `[(${text})]` },
+  { open: '[', close: ']', write: (text) => `[${text}]` },
+  { open: '(', close: ')', write: (text) => `(${text})` },
+  { open: '{', close: '}', write: (text) => `{${text}}` },
+];
 
 export default {
   name: 'flow',
@@ -36,6 +53,7 @@ A -> B & C                    ← fan-out
 group Group name: B, C        ← draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).
+- Mermaid node IDs are not accepted: write the text alone, [Start] rather than A[Start], and refer to it later as Start.
 - Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space:
 \`\`\`flow LR
 Client -> Gateway
@@ -100,6 +118,7 @@ export function parseFlow(text) {
     }
   }
   if (!nodes.size) throw new ComponentError('flow needs at least one node', 1);
+  checkMermaidIds(nodes);
   for (const grp of groups) {
     const missing = grp.members.filter((m) => !nodes.has(m));
     if (missing.length) throw new ComponentError(`group ${grp.name} refers to nodes that do not exist: ${missing.join(', ')}`, grp.line);
@@ -109,7 +128,47 @@ export function parseFlow(text) {
     const state = nodeState(n);
     return [id, state ? { ...n, state } : n];
   }));
-  return { nodes: settled, edges, groups, warnings: groupWarnings(groups, settled) };
+  return { nodes: settled, edges, groups, warnings: [...groupWarnings(groups, settled), ...mermaidIdWarnings(settled)] };
+}
+
+// A node written as an ID plus shape brackets, while that ID is also a node of its own, is a Mermaid node ID that
+// this component split in two. The message shows the line rewritten with the text alone.
+function checkMermaidIds(nodes) {
+  for (const n of nodes.values()) {
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
+    const id = nodes.get(m[1]);
+    // A change marker can put the label and its ID on opposite sides of the change, and then no view draws the split.
+    if (!id || !((n.before && id.before) || (n.after && id.after))) continue;
+    throw new ComponentError(
+      `"${m[1]}" is a node on its own and also the ID of "${n.label}"; this block has no node IDs, so write the text alone${rewriteOf(m[2])}`,
+      n.line,
+    );
+  }
+}
+
+// A Mermaid ID that no split can prove is still drawn with the ID inside the box, so it gets a warning; the page
+// still renders.
+function mermaidIdWarnings(nodes) {
+  const notes = [];
+  for (const n of nodes.values()) {
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
+    notes.push({
+      line: n.line,
+      message: `"${n.label}" looks like a Mermaid node ID with its text; this block has no node IDs, so the box shows "${n.label}". If you meant the text, write it alone${rewriteOf(m[2])}`,
+    });
+  }
+  return notes;
+}
+
+// How to write the node instead: the flow brackets that mean the same as the Mermaid shape. A bracket the parser cut
+// before its closing one (a colon ends the text) leaves no text to quote, so the message only names the brackets.
+function rewriteOf(rest) {
+  const shape = MERMAID_SHAPES.find((s) => rest.startsWith(s.open));
+  const close = shape ? rest.indexOf(shape.close, shape.open.length) : -1;
+  if (close === -1) return ' in brackets, colon included';
+  return `: ${shape.write(rest.slice(shape.open.length, close).trim())}`;
 }
 
 // Removed when the node exists only before, added when only after; on both sides it is unchanged unless a "~ Node" line marked it.
