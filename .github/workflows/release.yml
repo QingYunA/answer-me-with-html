@@ -1,0 +1,62 @@
+name: Release
+
+# A release is a version bump merged to main (see CONTRIBUTING.md, "Releasing").
+# When package.json changes on main and the tag for its version does not exist yet,
+# tag the pushed commit and publish the GitHub Release from .github/release-notes.md.
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Skip when the tag exists
+        id: tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Tag v${VERSION} already exists. Nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Release notes name the version
+        if: steps.tag.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Same rule as test/release-notes.test.js: the exact version, not part of a longer number.
+          if ! grep -Pq "(?<![\d.])${VERSION//./\\.}(?![\d]|\.\d)" .github/release-notes.md; then
+            echo "::error file=.github/release-notes.md::The notes do not mention ${VERSION}. Write the notes for this release first."
+            exit 1
+          fi
+      - name: Tag and publish
+        if: steps.tag.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "v${VERSION}" "$GITHUB_SHA"
+          git push origin "v${VERSION}"
+          gh release create "v${VERSION}" --verify-tag --title "v${VERSION}" --notes-file .github/release-notes.md

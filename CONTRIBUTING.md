@@ -73,7 +73,7 @@ A release is a version bump merged to `main`. All installs read `main`: `npx ski
 
 1. `npm run release -- <x.y.z>` writes the version to all four manifests and rebuilds the bundle. `test/install.test.js` checks that they agree.
    Then write `highlights.json` for the new version: up to 3 short lines (80 characters at most) from this release's highlights, one list for each language in `src/languages/`. The new-version popover on users' pages shows the list in the page language. `test/highlights.test.js` checks the version, the languages and the lengths.
+   Also write `.github/release-notes.md`: the notes of the GitHub Release. They are bilingual: the English notes, then a line `---`, then the same notes in Chinese, using the words of the Chinese page labels in `src/languages/zh.js` and of `docs/reference.zh-CN.md`. Keep the line `<!-- release <x.y.z> -->` at the top. `test/release-notes.test.js` checks that the notes name the version.
 2. Run `npm test` and `npm run smoke:install`, then open and merge a `chore: release <x.y.z>` PR.
-3. Tag the merge commit and publish the GitHub Release:
-   `git tag -a v<x.y.z> <sha> -m v<x.y.z> && git push origin v<x.y.z> && gh release create v<x.y.z> --verify-tag --notes-file <notes>`.
-   The notes are bilingual: the English notes, then `---`, then the same notes in Chinese, using the words of the Chinese page labels in `src/languages/zh.js` and of `docs/reference.zh-CN.md`.
+3. The release workflow (`.github/workflows/release.yml`) tags the merge commit and publishes the Release with `.github/release-notes.md`. It runs when `package.json` changes on `main` and the tag does not exist yet. Check it with `gh release view v<x.y.z>`.
+   If the workflow fails, do the same by hand: `git tag -a v<x.y.z> <sha> -m v<x.y.z> && git push origin v<x.y.z> && gh release create v<x.y.z> --verify-tag --notes-file .github/release-notes.md`.
