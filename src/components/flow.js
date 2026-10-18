@@ -89,7 +89,7 @@ export function parseFlow(text) {
     if (!prev) nodes.set(spec.id, { ...spec, ...seen, line });
     else {
       const merged = { before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde };
-      nodes.set(spec.id, { ...prev, ...merged, shape: spec.explicit ? spec.shape : prev.shape, hi: prev.hi || spec.hi });
+      nodes.set(spec.id, { ...prev, ...merged, explicit: prev.explicit || spec.explicit, shape: spec.explicit ? spec.shape : prev.shape, hi: prev.hi || spec.hi });
     }
     return spec.id;
   };

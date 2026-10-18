@@ -170,6 +170,11 @@ test('flow: text written in brackets is not read again as a Mermaid ID', () => {
   assert.deepEqual(m.warnings, []);
 });
 
+test('flow: a label written bare first and in brackets later is not read as a Mermaid ID', () => {
+  const m = parseFlow('A[Start] -> B\n(A[Start]) -> C\nA -> D');
+  assert.deepEqual(m.warnings, []);
+});
+
 test('flow: a Mermaid node ID cut by a colon is still reported', () => {
   const e = flowThrows('A[v2rayN: x] -> B\nA -> C');
   assert.ok(e instanceof ComponentError);
