@@ -419,7 +419,11 @@ function writeCache(file, samples) {
     renameSync(tmp, file);
   } catch (e) {
     if (!isDenied(e)) throw e;
-    rmSync(tmp, { force: true });
+    try {
+      rmSync(tmp, { force: true });
+    } catch (r) {
+      if (!isDenied(r)) throw r; // a folder the session may not read either: there is no temp file to remove
+    }
   }
 }
 

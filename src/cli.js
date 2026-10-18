@@ -501,7 +501,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '' })) return 1;
+  if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '', inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
 }
 
@@ -636,12 +636,17 @@ function writePage(file, html, env) {
 // and the temporary folder) gets the page in a private folder of the temporary folder instead, but only when fallback ('pages' or
 // 'videos') names the default location's folder: a page the user named with -o, or one patched in place, never moves. Returns
 // { file, notice } with the path actually written, or null after one line that says what to run instead.
-function savePage(html, file, fallback, { fail, env }) {
+// inPlace: am patch, which takes no -o, so its hint does not name -o.
+function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   const home = amHome(env);
   const inHome = resolve(file).startsWith(resolve(home) + sep);
-  const refuse = (path, e) => fail(`✗ Cannot write the page: permission denied (${e.code}) ${path}. ${inHome
-    ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename(path)}"`
-    : 'Give -o a file in a folder this session can write to'}`);
+  const hint = (path) => {
+    if (inPlace) return 'Copy the page to a folder this session can write to and patch the copy';
+    return inHome
+      ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename(path)}"`
+      : 'Give -o a file in a folder this session can write to';
+  };
+  const refuse = (path, e) => fail(`✗ Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
     writePage(file, html, env);
     return { file };
@@ -674,9 +679,9 @@ function removeEarlier(file, { fail }) {
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
 // Returns the path written, or null when the page could not be written (see savePage).
-function emit(result, file, ctx, { note = '', fallback } = {}) {
+function emit(result, file, ctx, { note = '', fallback, inPlace } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, fallback, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace }, ctx);
   if (!saved) return null;
   print(`✓ ${saved.file}`);
   if (saved.notice) print(saved.notice);

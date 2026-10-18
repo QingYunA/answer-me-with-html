@@ -205,7 +205,8 @@ test('permissions: am patch never falls back; a page it may not overwrite gives 
   const { code, err } = await run(['patch', page, '--panel', 'A', '-'], { stdin: '## A one\nNew text\n' });
   chmodSync(page, 0o600);
   assert.equal(code, 1, err);
-  assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+page\.html\. Give -o a file in a folder this session can write to$/m);
+  assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+page\.html\. Copy the page to a folder this session can write to and patch the copy$/m);
+  assert.ok(!err.includes('-o'), err);
   assert.ok(!existsSync(fallback()));
   assert.ok(!readFileSync(page, 'utf8').includes('New text'));
 });
@@ -251,6 +252,16 @@ test('permissions: a voiced video with an unwritable data directory is synthesiz
 test('permissions: a narration cache folder the session may not write to is skipped, not fatal', { skip: SKIP }, async () => {
   mkdirSync(join(home, 'cache', 'tts'), { recursive: true });
   chmodSync(join(home, 'cache', 'tts'), 0o500);
+  const voice = { name: 'fake', id: 'fake', concurrency: 1, synth: async () => new Int16Array(800) };
+  const { code, err } = await run(['video', '-'], { stdin: '---\ntitle: V\n---\n## A one\n> One line.\n', ttsProvider: voice });
+  chmodSync(join(home, 'cache', 'tts'), 0o700);
+  assert.equal(code, 0, err);
+  assert.deepEqual(readdirSync(join(home, 'cache', 'tts')), []);
+});
+
+test('permissions: a narration cache folder the session may neither read nor write is skipped too', { skip: SKIP }, async () => {
+  mkdirSync(join(home, 'cache', 'tts'), { recursive: true });
+  chmodSync(join(home, 'cache', 'tts'), 0o000);
   const voice = { name: 'fake', id: 'fake', concurrency: 1, synth: async () => new Int16Array(800) };
   const { code, err } = await run(['video', '-'], { stdin: '---\ntitle: V\n---\n## A one\n> One line.\n', ttsProvider: voice });
   chmodSync(join(home, 'cache', 'tts'), 0o700);

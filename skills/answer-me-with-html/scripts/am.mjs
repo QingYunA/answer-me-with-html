@@ -10513,7 +10513,11 @@ function writeCache(file, samples) {
     renameSync4(tmp, file);
   } catch (e) {
     if (!isDenied(e)) throw e;
-    rmSync3(tmp, { force: true });
+    try {
+      rmSync3(tmp, { force: true });
+    } catch (r) {
+      if (!isDenied(r)) throw r;
+    }
   }
 }
 function trimSilence(samples, threshold = SILENCE) {
@@ -12078,7 +12082,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "" })) return 1;
+  if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "", inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
 }
 async function cmdVideo(src, opts, ctx) {
@@ -12187,10 +12191,14 @@ function writePage(file, html, env) {
     rmSync7(tmp, { force: true });
   }
 }
-function savePage(html, file, fallback, { fail, env }) {
+function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   const home = amHome(env);
   const inHome = resolve4(file).startsWith(resolve4(home) + sep4);
-  const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename4(path)}"` : "Give -o a file in a folder this session can write to"}`);
+  const hint = (path) => {
+    if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
+    return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename4(path)}"` : "Give -o a file in a folder this session can write to";
+  };
+  const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
     writePage(file, html, env);
     return { file };
@@ -12218,9 +12226,9 @@ function removeEarlier(file, { fail }) {
     fail(`! Kept the earlier page ${file} (permission denied, ${e.code})`);
   }
 }
-function emit(result, file, ctx, { note: note2 = "", fallback } = {}) {
+function emit(result, file, ctx, { note: note2 = "", fallback, inPlace } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, fallback, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace }, ctx);
   if (!saved) return null;
   print(`\u2713 ${saved.file}`);
   if (saved.notice) print(saved.notice);
