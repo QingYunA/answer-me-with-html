@@ -13,7 +13,11 @@ key: value
 - Splits at the first colon (: or the fullwidth colon); the value may contain more colons.`,
   example: '```kv cols=2\n* Title: Simplified Technical English\nSpecification: ASD-STE100\nOwner: ASD\n```',
   render(text, { args }) {
-    const cols = Math.max(1, Math.min(Number(parseAttrs(args).cols) || 2, 6));
+    const parsed = parseAttrs(args).cols;
+    const cols = Math.max(1, Math.min(Number(parsed) || 2, 6));
+    if (parsed !== undefined && !Number.isInteger(cols)) {
+      throw new ComponentError(`kv cols must be a whole number from 1 to 6, not "${parsed}"`, 0);
+    }
     const cells = contentLines(text).map(({ text: t, line }) => {
       const wide = t.startsWith('*');
       const body = wide ? t.slice(1).trim() : t;
