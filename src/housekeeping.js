@@ -47,10 +47,11 @@ export function usage(home) {
 }
 
 // Delete pages and videos older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
-export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
+// temp: the private folder in the system temporary folder (src/home.js); its pages and videos follow the same rules.
+export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...['pages', 'videos'].flatMap((d) => walk(join(home, d)).filter((f) => all || f.mtime < cutoff)),
+    ...[home, temp].filter(Boolean).flatMap((dir) => ['pages', 'videos'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
     ...walk(join(home, 'cache')),
   ];
   if (!dryRun) {

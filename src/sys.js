@@ -2,6 +2,10 @@
 import { spawnSync } from 'node:child_process';
 import { renameSync } from 'node:fs';
 
+// The error codes of a file operation the operating system or a host sandbox refused (EROFS: a read-only file system).
+const DENIED = new Set(['EPERM', 'EACCES', 'EROFS']);
+export const isDenied = (e) => DENIED.has(e?.code);
+
 export function hasCommand(cmd) {
   return spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' }).status === 0;
 }

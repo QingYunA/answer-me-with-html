@@ -2339,6 +2339,7 @@ function checkColors(theme) {
 }
 
 // src/themes/user.js
+var DENIED = /* @__PURE__ */ new Set(["EPERM", "EACCES"]);
 function readThemeFile(file, builtinNames) {
   const name = basename(file).replace(/\.json$/i, "");
   let data;
@@ -2354,7 +2355,14 @@ function readUserThemes(home, builtinNames) {
   const themes2 = [];
   const broken = /* @__PURE__ */ new Map();
   if (!existsSync(dir)) return { themes: themes2, broken };
-  for (const f2 of readdirSync(dir).filter((x2) => x2.toLowerCase().endsWith(".json")).sort()) {
+  let files;
+  try {
+    files = readdirSync(dir);
+  } catch (e) {
+    if (!DENIED.has(e.code)) throw e;
+    return { themes: themes2, broken, warning: `Cannot read the themes folder ${dir} (${e.code}); using the built-in themes only` };
+  }
+  for (const f2 of files.filter((x2) => x2.toLowerCase().endsWith(".json")).sort()) {
     const { name, theme, errors } = readThemeFile(join(dir, f2), builtinNames);
     if (errors.length) broken.set(name, { file: `themes/${f2}`, reason: errors.join("; ") });
     else themes2.push(theme);
@@ -2373,7 +2381,7 @@ function pickTheme({ scope, template, visuals }) {
   if (scope === "video") return "blueprint";
   return template === "doc" || !visuals ? "paper" : "blueprint";
 }
-function themeSet(user = [], broken = /* @__PURE__ */ new Map()) {
+function themeSet(user = [], broken = /* @__PURE__ */ new Map(), folderWarning) {
   const all = [...ALL, ...user];
   const list2 = (scope) => all.filter((t) => t.scope.includes(scope));
   const names2 = (scope) => list2(scope).map((t) => t.name);
@@ -2394,17 +2402,17 @@ function themeSet(user = [], broken = /* @__PURE__ */ new Map()) {
     },
     // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
     embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
-    warnings: [...broken.values()].map(({ file, reason: reason2 }) => `${file} skipped: ${reason2}`)
+    warnings: [...folderWarning ? [folderWarning] : [], ...[...broken.values()].map(({ file, reason: reason2 }) => `${file} skipped: ${reason2}`)]
   });
 }
 var BUILTIN = themeSet();
 function loadThemes(home, { extra } = {}) {
-  const { themes: user, broken } = home ? readUserThemes(home, BUILTIN_NAMES) : { themes: [], broken: /* @__PURE__ */ new Map() };
-  if (!extra) return themeSet(user, broken);
+  const { themes: user, broken, warning } = home ? readUserThemes(home, BUILTIN_NAMES) : { themes: [], broken: /* @__PURE__ */ new Map() };
+  if (!extra) return themeSet(user, broken, warning);
   const one = readThemeFile(extra, BUILTIN_NAMES);
   const rest = user.filter((t) => t.name !== one.name);
-  if (one.errors.length) return themeSet(rest, new Map([...broken, [one.name, { file: extra, reason: one.errors.join("; ") }]]));
-  return themeSet([...rest, one.theme], broken);
+  if (one.errors.length) return themeSet(rest, new Map([...broken, [one.name, { file: extra, reason: one.errors.join("; ") }]]), warning);
+  return themeSet([...rest, one.theme], broken, warning);
 }
 
 // src/parse.js
@@ -9500,8 +9508,8 @@ import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as exi
 import { join as join3, dirname } from "node:path";
 
 // src/home.js
-import { mkdirSync, existsSync as existsSync2, statSync as statSync3, chmodSync } from "node:fs";
-import { homedir as homedir2 } from "node:os";
+import { mkdirSync, existsSync as existsSync2, statSync as statSync3, lstatSync, chmodSync } from "node:fs";
+import { homedir as homedir2, tmpdir } from "node:os";
 import { join as join2 } from "node:path";
 var defaultHome = () => join2(homedir2(), ".answer-me-with-html");
 function ensureHome(home) {
@@ -9509,6 +9517,34 @@ function ensureHome(home) {
   mkdirSync(home, { recursive: true, mode: 448 });
   if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
   if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+}
+var tempHome = () => join2(tmpdir(), process.getuid ? `answer-me-with-html-${process.getuid()}` : "answer-me-with-html");
+var UnsafeTempHome = class extends Error {
+  constructor(dir) {
+    super(`${dir} is not a private folder of this user`);
+    this.name = "UnsafeTempHome";
+    this.dir = dir;
+  }
+};
+function checkedTempHome({ create = false } = {}) {
+  const dir = tempHome();
+  if (create) {
+    try {
+      mkdirSync(dir, { recursive: true, mode: 448 });
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+  }
+  let info;
+  try {
+    info = lstatSync(dir);
+  } catch (e) {
+    if (e.code === "ENOENT" && !create) return null;
+    throw e;
+  }
+  const mine = process.getuid ? info.uid === process.getuid() && (info.mode & 63) === 0 : true;
+  if (!info.isDirectory() || !mine) throw new UnsafeTempHome(dir);
+  return dir;
 }
 
 // src/config.js
@@ -9900,7 +9936,8 @@ async function list(opts, { print, fail, env }, net) {
   const home = amHome(env);
   print("Built-in themes:");
   for (const t of BUILTIN.list("page")) print(`  ${t.name.padEnd(11)}${t.summary}`);
-  const { themes: usable, broken } = readUserThemes(home, BUILTIN_NAMES);
+  const { themes: usable, broken, warning } = readUserThemes(home, BUILTIN_NAMES);
+  if (warning) fail(`! ${warning}`);
   const installed = readInstalled(home);
   const rows = [...usable.map((t) => t.name), ...broken.keys()].sort();
   print(`
@@ -10119,12 +10156,14 @@ var round3 = (x2) => Math.round(x2 * 1e3) / 1e3;
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
 import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4 } from "node:fs";
-import { tmpdir } from "node:os";
+import { tmpdir as tmpdir2 } from "node:os";
 import { join as join7 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
 import { renameSync as renameSync3 } from "node:fs";
+var DENIED2 = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EROFS"]);
+var isDenied = (e) => DENIED2.has(e?.code);
 function hasCommand(cmd) {
   return spawnSync(process.platform === "win32" ? "where" : "which", [cmd], { stdio: "ignore" }).status === 0;
 }
@@ -10378,7 +10417,7 @@ function textFile(wavFile, text2) {
   return p;
 }
 async function withTemp(fn3) {
-  const dir = mkdtempSync(join7(tmpdir(), "am-tts-"));
+  const dir = mkdtempSync(join7(tmpdir2(), "am-tts-"));
   try {
     return await fn3(join7(dir, "out.wav"));
   } finally {
@@ -10417,8 +10456,8 @@ function resample(input) {
   }
   return out;
 }
-async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
-  if (cacheDir) mkdirSync3(cacheDir, { recursive: true });
+async function synthAll(texts, provider, { cacheDir: wanted, languageOf } = {}) {
+  const cacheDir = wanted && usableCache(wanted);
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
@@ -10446,16 +10485,36 @@ ${texts[i]}`;
   await Promise.all(Array.from({ length: Math.min(provider.concurrency ?? 2, texts.length) }, worker));
   return results;
 }
+function usableCache(dir) {
+  try {
+    mkdirSync3(dir, { recursive: true });
+    return dir;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return null;
+  }
+}
 function readCache(file) {
   if (!existsSync4(file)) return null;
-  const buf = readFileSync7(file);
+  let buf;
+  try {
+    buf = readFileSync7(file);
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return null;
+  }
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync4(tmp, file);
+  try {
+    writeFileSync4(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
+    renameSync4(tmp, file);
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    rmSync3(tmp, { force: true });
+  }
 }
 function trimSilence(samples, threshold = SILENCE) {
   let a = 0;
@@ -10641,7 +10700,7 @@ ${sourceTag(source)}
 // src/video/export.js
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4, writeFileSync as writeFileSync5 } from "node:fs";
-import { tmpdir as tmpdir2 } from "node:os";
+import { tmpdir as tmpdir3 } from "node:os";
 import { join as join8 } from "node:path";
 import { pathToFileURL } from "node:url";
 var ExportError = class extends Error {
@@ -10676,7 +10735,7 @@ function findChrome(env = process.env, platform = process.platform) {
 async function openPlayer(htmlFile, { env, startTimeoutMs }) {
   const chromePath = findChrome(env);
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join8(tmpdir2(), "am-export-"));
+  const tmp = mkdtempSync2(join8(tmpdir3(), "am-export-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
@@ -10902,7 +10961,7 @@ function connect(url) {
 }
 
 // src/housekeeping.js
-import { readdirSync as readdirSync2, lstatSync, rmSync as rmSync5 } from "node:fs";
+import { readdirSync as readdirSync2, lstatSync as lstatSync2, rmSync as rmSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 
 // src/update.js
@@ -11014,7 +11073,7 @@ var DIRS3 = ["pages", "videos", "cache"];
 function walk(dir) {
   let entries;
   try {
-    if (!lstatSync(dir).isDirectory()) return [];
+    if (!lstatSync2(dir).isDirectory()) return [];
     entries = readdirSync2(dir, { withFileTypes: true });
   } catch {
     return [];
@@ -11023,7 +11082,7 @@ function walk(dir) {
     const p = join9(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
-      const s = lstatSync(p);
+      const s = lstatSync2(p);
       return s.isFile() ? [{ path: p, bytes: s.size, mtime: s.mtimeMs }] : [];
     } catch {
       return [];
@@ -11038,10 +11097,10 @@ function usage2(home) {
   }));
   return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
 }
-function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now() } = {}) {
+function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...["pages", "videos"].flatMap((d) => walk(join9(home, d)).filter((f2) => all || f2.mtime < cutoff)),
+    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos"].flatMap((d) => walk(join9(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
     ...walk(join9(home, "cache"))
   ];
   if (!dryRun) {
@@ -11147,7 +11206,7 @@ import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync2, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync3, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
 import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
@@ -11216,7 +11275,7 @@ var SECRET_PATTERN = /^[0-9a-f]{64}$/;
 function loadSecret(secretFile) {
   if (secretFile === void 0) return randomBytes(32).toString("hex");
   try {
-    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync2(secretFile).isSymbolicLink()) {
+    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync3(secretFile).isSymbolicLink()) {
       throw new ServeError("--secret-file must not be a symbolic link");
     }
     const flags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
@@ -11855,7 +11914,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")} or ${join11(tempHome(), "pages")})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -11869,18 +11928,20 @@ async function cmdRender(src, opts, ctx, baseDir) {
   }
   const file = outputPath("pages", result.meta.title, opts, ctx);
   if (!file) return 2;
-  emit(result, file, ctx);
+  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages" });
+  if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
-  if (replaced && replaced !== resolve4(file)) rmSync7(replaced, { force: true });
+  if (replaced && replaced !== resolve4(written)) removeEarlier(replaced, ctx);
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
-  if (held) print(`  Not opened because of the warnings; to render again, add --replace ${file}`);
-  return finish(file, held ? { ...opts, "no-open": true } : opts, config, ctx);
+  if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
+  return finish(written, held ? { ...opts, "no-open": true } : opts, config, ctx);
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 function pagePath(arg, { env, io }) {
   const path = resolve4(io.cwd ?? process.cwd(), arg);
-  return dirname3(path) === resolve4(amHome(env), "pages") && basename4(path).endsWith(".html") ? path : false;
+  const folders = [resolve4(amHome(env), "pages"), resolve4(tempHome(), "pages")];
+  return folders.includes(dirname3(path)) && basename4(path).endsWith(".html") ? path : false;
 }
 var PATCH_HELP = `Replace one panel of a rendered page in place
 
@@ -12017,7 +12078,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  emit(result, file, ctx, video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "");
+  if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "" })) return 1;
   return finish(file, opts, config, ctx);
 }
 async function cmdVideo(src, opts, ctx) {
@@ -12037,12 +12098,13 @@ async function cmdVideo(src, opts, ctx) {
   }
   file ??= outputPath("videos", result.meta.title, opts, ctx);
   if (!file) return 2;
-  emit(result, file, ctx);
+  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "videos" });
+  if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
   for (const format of ["mp4", "webm"]) {
-    if (opts[format] && !await exportVideo(file, result.wav, format, ctx)) return 1;
+    if (opts[format] && !await exportVideo(written, result.wav, format, ctx)) return 1;
   }
-  return finish(file, opts, config, ctx);
+  return finish(written, opts, config, ctx);
 }
 function validVoice(voice, fail) {
   if (VOICES.includes(voice)) return true;
@@ -12051,10 +12113,9 @@ function validVoice(voice, fail) {
 }
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes: themes2 }) {
   const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
-  if (provider) ensureHome(amHome(env));
   const result = await renderVideo(src, {
     provider,
-    cacheDir: join11(amHome(env), "cache", "tts"),
+    cacheDir: provider ? narrationCache(amHome(env)) : void 0,
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -12062,6 +12123,15 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
     themes: themes2
   });
   return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
+}
+function narrationCache(home) {
+  try {
+    ensureHome(home);
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return void 0;
+  }
+  return join11(home, "cache", "tts");
 }
 function voiceSummary(provider, captionsOnly = []) {
   if (!provider) return "none (captions only)";
@@ -12117,10 +12187,44 @@ function writePage(file, html, env) {
     rmSync7(tmp, { force: true });
   }
 }
-function emit(result, file, { print, env }, note2 = "") {
-  writePage(file, result.html, env);
-  print(`\u2713 ${file}`);
-  const link = serveLink(amHome(env), file);
+function savePage(html, file, fallback, { fail, env }) {
+  const home = amHome(env);
+  const inHome = resolve4(file).startsWith(resolve4(home) + sep4);
+  const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename4(path)}"` : "Give -o a file in a folder this session can write to"}`);
+  try {
+    writePage(file, html, env);
+    return { file };
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    if (!(fallback && inHome)) return refuse(file, e), null;
+    const spare = join11(tempHome(), fallback, basename4(file));
+    try {
+      checkedTempHome({ create: true });
+      writePage(spare, html, env);
+      return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
+    } catch (t) {
+      if (t instanceof UnsafeTempHome) fail(`\u2717 Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
+      else if (isDenied(t)) refuse(spare, t);
+      else throw t;
+      return null;
+    }
+  }
+}
+function removeEarlier(file, { fail }) {
+  try {
+    rmSync7(file, { force: true });
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    fail(`! Kept the earlier page ${file} (permission denied, ${e.code})`);
+  }
+}
+function emit(result, file, ctx, { note: note2 = "", fallback } = {}) {
+  const { print, env } = ctx;
+  const saved = savePage(result.html, file, fallback, ctx);
+  if (!saved) return null;
+  print(`\u2713 ${saved.file}`);
+  if (saved.notice) print(saved.notice);
+  const link = serveLink(amHome(env), saved.file);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note2}`);
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
@@ -12133,6 +12237,7 @@ function emit(result, file, { print, env }, note2 = "") {
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printMathWarnings(result.stats.mathWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
+  return saved.file;
 }
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
@@ -12189,12 +12294,23 @@ function cmdClean(opts, { print, fail, env }) {
   const days = opts.days === void 0 ? CLEAN.days : Number(opts.days);
   const home = amHome(env);
   const before = usage2(home);
+  const temp = existingTempHome();
+  const tempBefore = temp && usage2(temp);
   const dry = Boolean(opts["dry-run"]);
-  const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry });
+  const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry, temp });
   const scope = opts.all ? "all pages and videos" : `pages and videos older than ${count(days, "day")}`;
   print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, "page")}, ${count(before.videos.count, "video")}, ${mb(before.cache.bytes)} voice-over cache)`);
+  if (temp) print(`Temporary folder: ${temp} (${mb(tempBefore.total)} in total: ${count(tempBefore.pages.count, "page")}, ${count(tempBefore.videos.count, "video")})`);
   print(dry ? `Would delete ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.` : `\u2713 Deleted ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
   return 0;
+}
+function existingTempHome() {
+  try {
+    return checkedTempHome();
+  } catch (e) {
+    if (e instanceof UnsafeTempHome || isDenied(e)) return null;
+    throw e;
+  }
 }
 function cmdServe(opts, { print, fail, env, io }) {
   if (opts.port !== void 0 && !(/^\d+$/.test(opts.port.trim()) && Number(opts.port) <= 65535)) {
