@@ -24,8 +24,9 @@ export function pickTheme({ scope, template, visuals }) {
   return template === 'doc' || !visuals ? 'paper' : 'blueprint';
 }
 
-// A set of themes: the built-in ones plus user themes. broken maps a skipped file's theme name to { file, reason }.
-function themeSet(user = [], broken = new Map()) {
+// A set of themes: the built-in ones plus user themes. broken maps a skipped file's theme name to { file, reason }; folderWarning
+// says why the themes folder could not be read.
+function themeSet(user = [], broken = new Map(), folderWarning) {
   const all = [...ALL, ...user];
   const list = (scope) => all.filter((t) => t.scope.includes(scope));
   const names = (scope) => list(scope).map((t) => t.name);
@@ -46,7 +47,7 @@ function themeSet(user = [], broken = new Map()) {
     },
     // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
     embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
-    warnings: [...broken.values()].map(({ file, reason }) => `${file} skipped: ${reason}`),
+    warnings: [...(folderWarning ? [folderWarning] : []), ...[...broken.values()].map(({ file, reason }) => `${file} skipped: ${reason}`)],
   });
 }
 
@@ -57,10 +58,10 @@ export const withThemes = (user) => themeSet(user);
 
 // extra: a theme file outside the home (am theme check <file>); it joins the set even when the home has a theme of that name.
 export function loadThemes(home, { extra } = {}) {
-  const { themes: user, broken } = home ? readUserThemes(home, BUILTIN_NAMES) : { themes: [], broken: new Map() };
-  if (!extra) return themeSet(user, broken);
+  const { themes: user, broken, warning } = home ? readUserThemes(home, BUILTIN_NAMES) : { themes: [], broken: new Map() };
+  if (!extra) return themeSet(user, broken, warning);
   const one = readThemeFile(extra, BUILTIN_NAMES);
   const rest = user.filter((t) => t.name !== one.name);
-  if (one.errors.length) return themeSet(rest, new Map([...broken, [one.name, { file: extra, reason: one.errors.join('; ') }]]));
-  return themeSet([...rest, one.theme], broken);
+  if (one.errors.length) return themeSet(rest, new Map([...broken, [one.name, { file: extra, reason: one.errors.join('; ') }]]), warning);
+  return themeSet([...rest, one.theme], broken, warning);
 }

@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { hasCommand } from '../sys.js';
+import { hasCommand, isDenied } from '../sys.js';
 import { baseLanguage, voiceHints } from '../language.js';
 import { estimateSeconds } from './script.js';
 
@@ -352,8 +352,8 @@ function resample(input) {
 // languageOf(text) is the language to read a line in; only a voice marked usesLanguage (the system voices) gets it, and for it the
 // language and the chosen voice are part of the cache key. The cache of the other voices (ElevenLabs, a local server) does not
 // change with the language.
-export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
-  if (cacheDir) mkdirSync(cacheDir, { recursive: true });
+export async function synthAll(texts, provider, { cacheDir: wanted, languageOf } = {}) {
+  const cacheDir = wanted && usableCache(wanted);
   const results = new Array(texts.length);
   let next = 0;
   const worker = async () => {
@@ -385,19 +385,46 @@ export async function synthAll(texts, provider, { cacheDir, languageOf } = {}) {
   return results;
 }
 
-// A corrupt cache file (empty, odd byte count) counts as a miss and is synthesized again.
+// The cache folder, or null when the session may not create it (a host sandbox): the narration is then synthesized without a cache.
+function usableCache(dir) {
+  try {
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return null;
+  }
+}
+
+// A corrupt cache file (empty, odd byte count) or one the session may not read counts as a miss and is synthesized again.
 function readCache(file) {
   if (!existsSync(file)) return null;
-  const buf = readFileSync(file);
+  let buf;
+  try {
+    buf = readFileSync(file);
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return null;
+  }
   if (!buf.length || buf.length % 2) return null;
   return new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2).slice();
 }
 
-// Write a temp file then rename, so an interruption never leaves a partial cache file.
+// Write a temp file then rename, so an interruption never leaves a partial cache file. A folder the session may not write to
+// (a host sandbox) keeps no cache file; the clip is still used.
 function writeCache(file, samples) {
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
-  renameSync(tmp, file);
+  try {
+    writeFileSync(tmp, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength));
+    renameSync(tmp, file);
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    try {
+      rmSync(tmp, { force: true });
+    } catch (r) {
+      if (!isDenied(r)) throw r; // a folder the session may not read either: there is no temp file to remove
+    }
+  }
 }
 
 // Trim leading/trailing silence so the visual pacing depends only on real speech.

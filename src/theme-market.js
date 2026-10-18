@@ -99,7 +99,8 @@ async function list(opts, { print, fail, env }, net) {
   print('Built-in themes:');
   for (const t of BUILTIN.list('page')) print(`  ${t.name.padEnd(11)}${t.summary}`);
 
-  const { themes: usable, broken } = readUserThemes(home, BUILTIN_NAMES);
+  const { themes: usable, broken, warning } = readUserThemes(home, BUILTIN_NAMES);
+  if (warning) fail(`! ${warning}`);
   const installed = readInstalled(home);
   const rows = [...usable.map((t) => t.name), ...broken.keys()].sort();
   print(`\nInstalled themes (${themesDir(home)}):`);

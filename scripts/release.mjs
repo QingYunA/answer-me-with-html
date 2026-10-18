@@ -1,6 +1,6 @@
 // First release step: write the version number into every manifest and rebuild the bundle.
 // Usage: npm run release -- 0.4.8
-// Then: commit, open a PR, merge; after the merge, tag the merge commit and create a GitHub Release (see CONTRIBUTING.md).
+// Then: write highlights.json and .github/release-notes.md, commit, open a PR, merge; the release workflow tags the merge commit and publishes the GitHub Release (see CONTRIBUTING.md).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
