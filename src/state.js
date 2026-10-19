@@ -1,4 +1,4 @@
-// state.json in the data directory: records times such as first use, last cleanup and version check.
+// state.json under a home folder: records times such as first use, last cleanup and version check.
 // Writes go to a temp file then rename, so concurrency or interruption never leaves a partial file; a bad file reads as empty state.
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';

@@ -181,7 +181,7 @@ A -> B: hello
 AM_EOF
 ````
 
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. When the session may not write there (a host sandbox that allows writes only in the workspace), `am render` and `am video` without `-o` save the page in a private folder in the system temporary folder instead (`answer-me-with-html-<uid>/pages/`; mode 0700, and a folder that is not private to your user is refused) and say so; the system may clear it. `am clean` and `--replace` cover that folder, `am serve` does not. `am patch` never moves a page. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
+Pages go to `~/.answer-me-with-html/pages/` by default. Run `am config set home <folder>` to move only the pages, videos, narration cache and update state; the folder must be an absolute path, and `~` means your home folder. Set `AM_HOME` to move the whole data directory, including `config.json` and `themes/`, and it wins over `home`. When the session may not write there (a host sandbox that allows writes only in the workspace), `am render` and `am video` without `-o` save the page in a private folder in the system temporary folder instead (`answer-me-with-html-<uid>/pages/`; mode 0700, and a folder that is not private to your user is refused) and say so; the system may clear it. `am clean` and `--replace` cover that folder, `am serve` does not. `am patch` never moves a page. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `home` or `AM_HOME` folder keeps its mode.
 
 ## Languages
 
@@ -308,7 +308,7 @@ am serve --lan        # also listen on the local network (0.0.0.0), only on a ne
 am serve --public-url https://pages.example.com   # links use this address, for a reverse proxy or tunnel that adds TLS
 ````
 
-- While it runs, `am render`, `am patch` and `am video` print a `link:` line for each page they write into `~/.answer-me-with-html/pages/` or `videos/`, and the agent gives you that link instead of a `file://` one.
+- While it runs, `am render`, `am patch` and `am video` print a `link:` line for each page they write into the output folder's `pages/` or `videos/`, and the agent gives you that link instead of a `file://` one.
 - By default the server listens on `127.0.0.1` only, and the SSH tunnel is the recommended way to reach it. There is no password and no TLS.
 - `--lan` makes the server listen on `0.0.0.0`, every IPv4 interface and not only the address in the links, so another computer on the same network can open the links. It prints every LAN address with a warning, and the links use the first one: 192.168.x.x before 10.x.x.x before 172.16-31.x.x. The connection is plain HTTP and the token in a link is a bearer secret, so anyone on that network who sees the traffic or the link can open the page. Use it only on a trusted network, behind a firewall.
 - `--public-url https://host` is for a reverse proxy or tunnel that you run in front of `am serve` and that adds TLS. It sets the address that `link:` lines start with and the `Host` name the server accepts. It does not create TLS or open any port itself. Give it an origin only, with no path. Without `--lan` the server still listens on `127.0.0.1`, so the proxy must run on the same machine, and it must pass on the original `Host` header.
@@ -330,7 +330,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | DeepSeek Harness plugin | `dsh plugin --profile <profile> up <package>`; the update notice fills in the profile and the package |
 | Claude Code plugin | In a terminal run `claude plugin update answer-me-with-html@answer-me-with-html` (or open `/plugin` → Installed → Update now), then `/reload-plugins`. To update automatically, turn on auto-update for this marketplace in `/plugin` → Marketplaces. Claude Code leaves it off for third-party marketplaces |
 
-**Cleaning up.** Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
+**Cleaning up.** Pages, videos and the narration cache build up in the output folder (`~/.answer-me-with-html/` by default). If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
 
 - `/answer-me-with-html:clean` (plugin), or say "clean up the pages", previews first and then asks.
 - `am clean` deletes pages and videos older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page and video, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
@@ -348,6 +348,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `update_check` | `on` | Check GitHub for a new version once a day and mention it. Never updates by itself |
 | `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
+| `home` | the data directory | Folder for pages, videos, the narration cache and update state. An absolute path; `~` means your home folder. `AM_HOME` wins over it |
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
 

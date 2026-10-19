@@ -181,7 +181,7 @@ A -> B: 你好
 AM_EOF
 ````
 
-页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。会话不能写入该位置时（宿主沙箱只允许写工作区），不带 `-o` 的 `am render` 和 `am video` 会改为把页面存到系统临时目录里的私有文件夹（`answer-me-with-html-<uid>/pages/`，权限 0700；不是当前用户私有的文件夹会被拒绝使用），并给出提示；系统可能会清理该文件夹。`am clean` 和 `--replace` 同样覆盖这个文件夹，`am serve` 不覆盖。`am patch` 不会改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
+页面默认保存在 `~/.answer-me-with-html/pages/`。用 `am config set home <文件夹>` 可以只改页面、视频、配音缓存和更新状态的位置；这里要写绝对路径，`~` 表示你的主文件夹。`AM_HOME` 改的是整个数据目录（包括 `config.json` 和 `themes/`），设了它就以它为准。会话不能写入该位置时（宿主沙箱只允许写工作区），不带 `-o` 的 `am render` 和 `am video` 会改为把页面存到系统临时目录里的私有文件夹（`answer-me-with-html-<uid>/pages/`，权限 0700；不是当前用户私有的文件夹会被拒绝使用），并给出提示；系统可能会清理该文件夹。`am clean` 和 `--replace` 同样覆盖这个文件夹，`am serve` 不覆盖。`am patch` 不会改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `home` 或 `AM_HOME` 文件夹保持原有权限。
 
 ## 语言
 
@@ -308,7 +308,7 @@ am serve --lan        # 同时监听局域网（0.0.0.0），只在可信网络�
 am serve --public-url https://pages.example.com   # 链接使用这个地址，用于已加上 TLS 的反向代理或隧道
 ````
 
-- 运行期间，`am render`、`am patch` 和 `am video` 写入 `~/.answer-me-with-html/pages/` 或 `videos/` 的页面会多打印一行 `link:`，Agent 会把这个链接交给你，而不是 `file://` 链接。
+- 运行期间，`am render`、`am patch` 和 `am video` 写入输出文件夹的 `pages/` 或 `videos/` 的页面会多打印一行 `link:`，Agent 会把这个链接交给你，而不是 `file://` 链接。
 - 默认服务只监听 `127.0.0.1`，推荐通过 SSH 隧道访问。没有密码，也没有 TLS。
 - `--lan` 让服务监听 `0.0.0.0`，也就是全部 IPv4 网卡，而不只是链接里的地址，同一网络里的其他电脑就能打开链接。它会打印所有局域网地址并给出警告，链接使用第一个地址：192.168.x.x 优先，其次 10.x.x.x，再其次 172.16-31.x.x。连接是明文 HTTP，链接里的令牌就是持有者凭证，同一网络里能看到流量或链接的人都能打开页面，所以只在有防火墙保护的可信网络里使用。
 - `--public-url https://host` 用于你自己放在 `am serve` 前面、并已加上 TLS 的反向代理或隧道。它决定 `link:` 行开头的地址，以及服务接受的 `Host` 名称；它不会创建 TLS，也不会自己开放任何端口。只能给出 origin，不能带路径。不加 `--lan` 时服务仍只监听 `127.0.0.1`，所以代理必须和它在同一台机器上，并且要保留原始的 `Host` 头。
@@ -330,7 +330,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | DeepSeek Harness 插件 | `dsh plugin --profile <profile> up <package>`；更新提示会自动填好 profile 和包名 |
 | Claude Code 插件 | 终端运行 `claude plugin update answer-me-with-html@answer-me-with-html`（或在 `/plugin` → Installed 里点 Update now），再 `/reload-plugins`。想自动更新，就在 `/plugin` → Marketplaces 里给这个插件市场打开自动更新。第三方插件市场默认不自动更新 |
 
-**清理**：页面、视频和配音缓存都存在 `~/.answer-me-with-html/`。目录超过 200 MB，或超过 20 MB 且 30 天没清理过，Agent 会问你要不要清理，每周最多问一次。没有你的同意，什么都不会删。
+**清理**：页面、视频和配音缓存都存在输出文件夹（默认是 `~/.answer-me-with-html/`）。目录超过 200 MB，或超过 20 MB 且 30 天没清理过，Agent 会问你要不要清理，每周最多问一次。没有你的同意，什么都不会删。
 
 - `/answer-me-with-html:clean`（插件），或者直接说"清理一下页面"：先预演，再问你。
 - `am clean`：删除 30 天前的页面和视频，清空配音缓存。`--days N` 改天数，`--all` 删除全部页面和视频，`--dry-run` 只看不删。配置和主题始终保留。如果 `pages`、`videos` 或 `cache` 本身是软链接，会被跳过：`am clean` 不会碰链接指向的文件，用量统计和清理提示也不再计入。如果这些目录无法遍历（比如没有读权限），同样会被跳过：其中的文件不计入用量统计和清理提示，显示的大小可能低于实际占用，清理也不会删除它们。
@@ -348,6 +348,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `update_check` | `on` | 每天向 GitHub 查一次新版本并提醒你，不会自己更新 |
 | `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |
+| `home` | 数据目录 | 页面、视频、配音缓存和更新状态保存的文件夹。写绝对路径，`~` 表示你的主文件夹；设了 `AM_HOME` 时以它为准 |
 
 配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
 

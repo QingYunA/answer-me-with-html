@@ -9550,7 +9550,8 @@ import { join as join6 } from "node:path";
 
 // src/config.js
 import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
-import { join as join3, dirname } from "node:path";
+import { homedir as homedir3 } from "node:os";
+import { join as join3, dirname, isAbsolute as isAbsolute3 } from "node:path";
 
 // src/home.js
 import { mkdirSync, existsSync as existsSync2, statSync as statSync3, lstatSync, chmodSync } from "node:fs";
@@ -9606,12 +9607,23 @@ var CONFIG_KEYS = Object.freeze({
   style: { type: "enum", choices: CHOICES.style, default: "80", label: "STE writing-check strictness" },
   update_check: { type: "bool", default: true, label: "Check for a new version once a day in the background and tell you (never updates by itself)" },
   close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
-  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" },
+  home: { type: "path", default: void 0, label: "Folder for pages, videos, cache and state (default: the data directory)" }
 });
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
 function amHome(env = process.env) {
   return env.AM_HOME || defaultHome();
+}
+function outputHome(env = process.env) {
+  if (env.AM_HOME) return env.AM_HOME;
+  const stored = readStored(env).stored.home;
+  if (stored === void 0) return defaultHome();
+  try {
+    return coerce2("home", stored, null);
+  } catch {
+    return defaultHome();
+  }
 }
 function configPath(env = process.env) {
   return join3(amHome(env), "config.json");
@@ -9623,6 +9635,12 @@ function configChoices(key, themes2) {
 function coerce2(key, raw, themes2) {
   const spec = CONFIG_KEYS[key];
   if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
+  if (spec.type === "path") {
+    const value = String(raw).trim();
+    const path = value === "~" ? homedir3() : value.startsWith("~/") ? join3(homedir3(), value.slice(2)) : value;
+    if (!isAbsolute3(path)) throw new ConfigError(`${key} needs an absolute path (write ~ for your home folder)`);
+    return path;
+  }
   if (spec.type === "bool") {
     if (typeof raw === "boolean") return raw;
     const v2 = String(raw).trim().toLowerCase();
@@ -11702,7 +11720,7 @@ Usage:
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
-- Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
+- Output goes to ~/.answer-me-with-html/pages/ by default (set home with am config set home <folder>, or move the whole data directory with AM_HOME).
 - A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
@@ -11963,7 +11981,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")} or ${join11(tempHome(), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(outputHome(ctx.env), "pages")} or ${join11(tempHome(), "pages")})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -11985,11 +12003,11 @@ async function cmdRender(src, opts, ctx, baseDir) {
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
   return finish(written, held ? { ...opts, "no-open": true } : opts, config, ctx);
 }
-var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
+var updateFor = (config, { env, io }) => pageUpdate(readState(outputHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 function pagePath(arg, { env, io }) {
   const path = resolve4(io.cwd ?? process.cwd(), arg);
-  const folders = [resolve4(amHome(env), "pages"), resolve4(tempHome(), "pages")];
+  const folders = [resolve4(outputHome(env), "pages"), resolve4(tempHome(), "pages")];
   return folders.includes(dirname3(path)) && basename4(path).endsWith(".html") ? path : false;
 }
 var PATCH_HELP = `Replace one panel of a rendered page in place
@@ -12164,7 +12182,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes: the
   const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
-    cacheDir: provider ? narrationCache(amHome(env)) : void 0,
+    cacheDir: provider ? narrationCache(outputHome(env)) : void 0,
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -12220,10 +12238,10 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join11(outputHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function writePage(file, html, env) {
-  const home = resolve4(amHome(env));
+  const home = resolve4(outputHome(env));
   const path = resolve4(file);
   if (path.startsWith(home + sep4)) ensureHome(home);
   mkdirSync4(dirname3(file), { recursive: true });
@@ -12237,7 +12255,7 @@ function writePage(file, html, env) {
   }
 }
 function savePage(html, file, { fallback, inPlace }, { fail, env }) {
-  const home = amHome(env);
+  const home = outputHome(env);
   const inHome = resolve4(file).startsWith(resolve4(home) + sep4);
   const hint = (path) => {
     if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
@@ -12277,7 +12295,7 @@ function emit(result, file, ctx, { note: note2 = "", fallback, inPlace } = {}) {
   if (!saved) return null;
   print(`\u2713 ${saved.file}`);
   if (saved.notice) print(saved.notice);
-  const link = serveLink(amHome(env), saved.file);
+  const link = serveLink(outputHome(env), saved.file);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note2}`);
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
@@ -12328,7 +12346,7 @@ function finish(file, opts, config, ctx) {
 function printHints(config, { env, io, print }) {
   try {
     const hints = afterRender({
-      home: amHome(env),
+      home: outputHome(env),
       env,
       config: config.values,
       current: VERSION,
@@ -12345,7 +12363,7 @@ function cmdClean(opts, { print, fail, env }) {
     return 2;
   }
   const days = opts.days === void 0 ? CLEAN.days : Number(opts.days);
-  const home = amHome(env);
+  const home = outputHome(env);
   const before = usage2(home);
   const temp = existingTempHome();
   const tempBefore = temp && usage2(temp);
@@ -12372,7 +12390,7 @@ function cmdServe(opts, { print, fail, env, io }) {
   }
   const port = opts.port === void 0 ? DEFAULT_PORT : Number(opts.port);
   const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve4(io?.cwd ?? process.cwd(), opts["secret-file"]);
-  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts["public-url"], secretFile, print, fail });
+  return runServe({ home: outputHome(env), port, lan: !!opts.lan, publicUrl: opts["public-url"], secretFile, print, fail });
 }
 function cmdLint(src, opts, { print, fail }) {
   let doc2;
@@ -12417,7 +12435,7 @@ ${e.example.replace(/^/gm, "    ")}`);
   }
   throw e;
 }
-var showValue = (v) => typeof v === "boolean" ? v ? "on" : "off" : String(v);
+var showValue = (v) => typeof v === "boolean" ? v ? "on" : "off" : v === void 0 ? "(unset)" : String(v);
 function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   const [action, key, value] = args;
   try {
@@ -12448,8 +12466,8 @@ function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   print(`Config file: ${path}`);
   for (const [k2, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k2 in stored ? "*" : " ";
-    const options = spec.type === "bool" ? "on | off" : configChoices(k2, themes2).join(" | ");
-    print(`${mark} ${k2.padEnd(19)}${showValue(values[k2]).padEnd(10)}${spec.label} (${options})`);
+    const options = spec.type === "bool" ? "on | off" : spec.type === "path" ? "an absolute path" : configChoices(k2, themes2).join(" | ");
+    print(`${mark} ${k2.padEnd(19)}${showValue(values[k2]).padEnd(9)} ${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== "0") print("Note: the AM_NO_OPEN environment variable is set and overrides the open setting.");
   print("* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]");

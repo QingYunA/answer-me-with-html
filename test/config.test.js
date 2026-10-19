@@ -1,9 +1,9 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { configPath, readConfig, setConfig, resetConfig, CONFIG_KEYS, ConfigError } from '../src/config.js';
+import { configPath, readConfig, setConfig, resetConfig, outputHome, CONFIG_KEYS, ConfigError } from '../src/config.js';
 import { renderDoc } from '../src/render.js';
 
 let home;
@@ -19,7 +19,7 @@ test('configPath: is AM_HOME/config.json', () => {
 });
 
 test('readConfig: returns the defaults when the file does not exist', () => {
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, home: undefined });
 });
 
 test('setConfig: booleans accept on/off/true/false/`开`/`关` and are written to the file', () => {
@@ -51,7 +51,7 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   setConfig('open', 'off', env);
   setConfig('theme', 'shadcn', env);
   resetConfig('open', env);
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, home: undefined });
   resetConfig(undefined, env);
   assert.equal(existsSync(configPath(env)), false);
 });
@@ -65,11 +65,55 @@ test('readConfig: falls back to the defaults with a warning when the file is bro
 
 test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, home: undefined });
 });
 
 test('CONFIG_KEYS: every key has a label', () => {
   for (const [key, spec] of Object.entries(CONFIG_KEYS)) assert.ok(spec.label, key);
+});
+
+test('home: set / reset saves an absolute path in the data directory config, and reset clears it', () => {
+  const out = join(home, 'out');
+  assert.equal(setConfig('home', out, env), out);
+  assert.equal(readConfig(env).values.home, out);
+  assert.deepEqual(JSON.parse(readFileSync(configPath(env), 'utf8')), { home: out });
+  resetConfig('home', env);
+  assert.equal(readConfig(env).values.home, undefined);
+  assert.equal(existsSync(configPath(env)), false);
+});
+
+test('home: a leading ~ is the home folder, alone or before a subfolder', () => {
+  assert.equal(setConfig('home', '~', env), homedir());
+  assert.equal(setConfig('home', '~/pages', env), join(homedir(), 'pages'));
+});
+
+test('home: a relative path is a ConfigError that asks for an absolute path', () => {
+  assert.throws(() => setConfig('home', 'pages', env), (e) => e instanceof ConfigError && /absolute path/.test(e.message));
+  assert.throws(() => setConfig('home', './pages', env), ConfigError);
+});
+
+test('outputHome: AM_HOME wins over a configured home', () => {
+  setConfig('home', join(home, 'out'), env);
+  assert.equal(outputHome(env), home);
+});
+
+test('outputHome: the configured home when AM_HOME is unset; an unset or invalid home is the data directory', () => {
+  const vars = ['HOME', 'USERPROFILE'];
+  const saved = vars.map((k) => process.env[k]);
+  const user = join(home, 'user');
+  mkdirSync(user);
+  for (const k of vars) process.env[k] = user;
+  try {
+    const data = join(user, '.answer-me-with-html');
+    assert.equal(outputHome({}), data);
+    const out = join(home, 'out');
+    setConfig('home', out, {});
+    assert.equal(outputHome({}), out);
+    writeFileSync(configPath({}), JSON.stringify({ home: 'relative/pages' }));
+    assert.equal(outputHome({}), data, 'an invalid stored value falls back to the data directory');
+  } finally {
+    vars.forEach((k, i) => { if (saved[i] === undefined) delete process.env[k]; else process.env[k] = saved[i]; });
+  }
 });
 
 test('render: config gives the defaults, explicit draft frontmatter wins', () => {

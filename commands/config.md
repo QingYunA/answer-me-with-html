@@ -1,6 +1,6 @@
 ---
-description: View or change Answer me with HTML settings — auto-open browser, default theme, light/dark, STE strictness, video voice, update notices
-argument-hint: "[open|theme|mode|style|voice|update_check|close_after_reply <value>] | reset [key]"
+description: View or change Answer me with HTML settings — auto-open browser, default theme, light/dark, STE strictness, video voice, pages folder, update notices
+argument-hint: "[open|theme|mode|style|voice|home|update_check|close_after_reply <value>] | reset [key]"
 allowed-tools: Bash(node *)
 ---
 
@@ -15,7 +15,7 @@ User arguments: `$ARGUMENTS`
 CLI: `node "${CLAUDE_PLUGIN_ROOT}/skills/answer-me-with-html/scripts/am.mjs" config …`
 
 - **No arguments**: use AskUserQuestion to let the user choose. Ask at most 4 settings at a time, these first: auto-open the browser (open), default theme (theme), light/dark (mode), writing check (style). Mark the current value in the options. After the user chooses, run `config set` for each setting.
-- **`<key> <value>`** (for example `open off`): run `config set <key> <value>` directly.
+- **`<key> <value>`** (for example `open off`): run `config set <key> <value>` directly. `home` takes an absolute folder path (`~` for your home folder) and moves only the pages, videos, narration cache and update state; `config reset home` puts them back in the data directory.
 - **`reset` or `reset <key>`**: run `config reset [key]`.
 - **Natural language** (for example "stop opening the browser"): convert it to the matching key and value, then run it.
 

@@ -21,7 +21,7 @@ import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck, pageUpdate } from './update.js';
-import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { amHome, outputHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { ensureHome, tempHome, checkedTempHome, UnsafeTempHome } from './home.js';
 import { hasCommand, renameOver, isDenied } from './sys.js';
 import { loadMath } from './math-load.js';
@@ -57,7 +57,7 @@ Usage:
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
-- Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
+- Output goes to ~/.answer-me-with-html/pages/ by default (set home with am config set home <folder>, or move the whole data directory with AM_HOME).
 - A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
@@ -320,7 +320,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   const { fail, print } = ctx;
   const replaced = opts.replace === undefined ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`✗ --replace takes a page that am render wrote (a .html file in ${join(amHome(ctx.env), 'pages')} or ${join(tempHome(), 'pages')})`);
+    fail(`✗ --replace takes a page that am render wrote (a .html file in ${join(outputHome(ctx.env), 'pages')} or ${join(tempHome(), 'pages')})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -346,15 +346,15 @@ async function cmdRender(src, opts, ctx, baseDir) {
 }
 
 // The new-version button for the page, from the version the background check last saw (src/update.js).
-const updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
+const updateFor = (config, { env, io }) => pageUpdate(readState(outputHome(env)), VERSION, io.scriptPath, env, config.values);
 
 const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 
-// The absolute path of a page, or false when arg does not name a .html file directly inside pages/ of the data directory or of the
-// temporary folder (where a page goes when the data directory is not writable). The file may be gone.
+// The absolute path of a page, or false when arg does not name a .html file directly inside pages/ of the output folder or of the
+// temporary folder (where a page goes when the output folder is not writable). The file may be gone.
 function pagePath(arg, { env, io }) {
   const path = resolve(io.cwd ?? process.cwd(), arg);
-  const folders = [resolve(amHome(env), 'pages'), resolve(tempHome(), 'pages')];
+  const folders = [resolve(outputHome(env), 'pages'), resolve(tempHome(), 'pages')];
   return folders.includes(dirname(path)) && basename(path).endsWith('.html') ? path : false;
 }
 
@@ -541,7 +541,7 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   const provider = io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
-    cacheDir: provider ? narrationCache(amHome(env)) : undefined,
+    cacheDir: provider ? narrationCache(outputHome(env)) : undefined,
     defaults: { style: config.values.style, theme: config.values.theme, mode: config.values.mode },
     overrides: { style: opts.style, theme: opts.theme, mode: opts.mode },
     previousLanguage: opts.previousLanguage,
@@ -551,8 +551,8 @@ async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
   return { ...result, voiceName: voiceSummary(provider, result.captionsOnly) };
 }
 
-// The narration cache lives in the data directory. A data directory the session may not write to gives no cache: the video is
-// still made, and a render after it synthesizes every line again.
+// The narration cache lives in the output folder. A folder the session may not write to gives no cache: the video is still made,
+// and a render after it synthesizes every line again.
 function narrationCache(home) {
   try {
     ensureHome(home);
@@ -601,7 +601,7 @@ function themeWarnings({ fail, themes }) {
   themes.warnings.forEach((w) => fail(`! ${w}`));
 }
 
-// Output path: the -o path when given, otherwise pages/ or videos/ in the data directory. io.now can inject a clock.
+// Output path: the -o path when given, otherwise pages/ or videos/ in the output folder. io.now can inject a clock.
 function outputPath(dir, title, opts, { env, io, fail }) {
   if (opts.out) {
     const file = resolve(io.cwd ?? process.cwd(), opts.out);
@@ -611,14 +611,14 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join(outputHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 
-// Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
+// Write a page. A page inside the output folder makes it private first; a page saved elsewhere (-o) leaves its folder alone.
 // A page in pages/ is written to a temp file and renamed over the old one, so am serve (src/serve.js) never reloads a half-written
 // page. Elsewhere it is written in place: a rename would replace a symlink with a plain file and drop the file's mode and hard links.
 function writePage(file, html, env) {
-  const home = resolve(amHome(env));
+  const home = resolve(outputHome(env));
   const path = resolve(file);
   if (path.startsWith(home + sep)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
@@ -634,11 +634,11 @@ function writePage(file, html, env) {
 
 // Write the page where it was planned. A session that may not write there (a host sandbox that allows writes only in the workspace
 // and the temporary folder) gets the page in a private folder of the temporary folder instead, but only when fallback ('pages' or
-// 'videos') names the default location's folder: a page the user named with -o, or one patched in place, never moves. Returns
+// 'videos') names pages/ or videos/ of the output folder: a page the user named with -o, or one patched in place, never moves. Returns
 // { file, notice } with the path actually written, or null after one line that says what to run instead.
 // inPlace: am patch, which takes no -o, so its hint does not name -o.
 function savePage(html, file, { fallback, inPlace }, { fail, env }) {
-  const home = amHome(env);
+  const home = outputHome(env);
   const inHome = resolve(file).startsWith(resolve(home) + sep);
   const hint = (path) => {
     if (inPlace) return 'Copy the page to a folder this session can write to and patch the copy';
@@ -685,8 +685,8 @@ function emit(result, file, ctx, { note = '', fallback, inPlace } = {}) {
   if (!saved) return null;
   print(`✓ ${saved.file}`);
   if (saved.notice) print(saved.notice);
-  // With am serve running, a page inside the data directory also gets an http link.
-  const link = serveLink(amHome(env), saved.file);
+  // With am serve running, a page inside the output folder also gets an http link.
+  const link = serveLink(outputHome(env), saved.file);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note}`);
   // The code the page now holds, so the user can check it before sharing the page.
@@ -751,7 +751,7 @@ function finish(file, opts, config, ctx) {
 function printHints(config, { env, io, print }) {
   try {
     const hints = afterRender({
-      home: amHome(env), env, config: config.values, current: VERSION,
+      home: outputHome(env), env, config: config.values, current: VERSION,
       scriptPath: io.scriptPath, background: Boolean(io.background),
     });
     hints.forEach((h) => print(h));
@@ -766,9 +766,9 @@ function cmdClean(opts, { print, fail, env }) {
     return 2;
   }
   const days = opts.days === undefined ? CLEAN.days : Number(opts.days);
-  const home = amHome(env);
+  const home = outputHome(env);
   const before = usage(home);
-  // The temporary folder holds pages written while the data directory was not writable. Only a folder that exists and is private.
+  // The temporary folder holds pages written while the output folder was not writable. Only a folder that exists and is private.
   const temp = existingTempHome();
   const tempBefore = temp && usage(temp);
   const dry = Boolean(opts['dry-run']);
@@ -799,7 +799,7 @@ function cmdServe(opts, { print, fail, env, io }) {
   }
   const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
   const secretFile = opts['secret-file'] === undefined ? undefined : resolve(io?.cwd ?? process.cwd(), opts['secret-file']);
-  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts['public-url'], secretFile, print, fail });
+  return runServe({ home: outputHome(env), port, lan: !!opts.lan, publicUrl: opts['public-url'], secretFile, print, fail });
 }
 
 function cmdLint(src, opts, { print, fail }) {
@@ -849,7 +849,7 @@ function reportError(e, fail) {
   throw e;
 }
 
-const showValue = (v) => (typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
+const showValue = (v) => (typeof v === 'boolean' ? (v ? 'on' : 'off') : v === undefined ? '(unset)' : String(v));
 
 function cmdConfig(args, { print, fail, env, themes }) {
   const [action, key, value] = args;
@@ -881,8 +881,8 @@ function cmdConfig(args, { print, fail, env, themes }) {
   print(`Config file: ${path}`);
   for (const [k, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k in stored ? '*' : ' ';
-    const options = spec.type === 'bool' ? 'on | off' : configChoices(k, themes).join(' | ');
-    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
+    const options = spec.type === 'bool' ? 'on | off' : spec.type === 'path' ? 'an absolute path' : configChoices(k, themes).join(' | ');
+    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(9)} ${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== '0') print('Note: the AM_NO_OPEN environment variable is set and overrides the open setting.');
   print('* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]');

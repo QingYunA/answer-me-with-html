@@ -2,7 +2,8 @@
 // Only keys the user set explicitly are saved; reads merge with defaults, and a bad file / invalid value falls back to the default, so config problems never block rendering.
 
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
+import { join, dirname, isAbsolute } from 'node:path';
 import { defaultHome, ensureHome } from './home.js';
 import { CHOICES, VOICES } from './parse.js';
 import { loadThemes, AUTO } from './themes/registry.js';
@@ -22,6 +23,7 @@ export const CONFIG_KEYS = Object.freeze({
   update_check: { type: 'bool', default: true, label: 'Check for a new version once a day in the background and tell you (never updates by itself)' },
   close_after_reply: { type: 'bool', default: false, label: 'Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)' },
   voice: { type: 'enum', choices: VOICES, default: 'auto', label: 'Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)' },
+  home: { type: 'path', default: undefined, label: 'Folder for pages, videos, cache and state (default: the data directory)' },
 });
 
 const TRUE = new Set(['on', 'true', 'yes', '1', '开', '开启', '打开']); // lang-ok: accepted Chinese input aliases
@@ -29,6 +31,19 @@ const FALSE = new Set(['off', 'false', 'no', '0', '关', '关闭']); // lang-ok:
 
 export function amHome(env = process.env) {
   return env.AM_HOME || defaultHome();
+}
+
+// Where output goes: AM_HOME (then the home setting is ignored) > the stored home > the data directory. The setting is read from
+// config.json alone, without loading themes; an invalid stored value falls back to the default like any other setting.
+export function outputHome(env = process.env) {
+  if (env.AM_HOME) return env.AM_HOME;
+  const stored = readStored(env).stored.home;
+  if (stored === undefined) return defaultHome();
+  try {
+    return coerce('home', stored, null);
+  } catch {
+    return defaultHome();
+  }
 }
 
 export function configPath(env = process.env) {
@@ -45,6 +60,12 @@ export function configChoices(key, themes) {
 function coerce(key, raw, themes) {
   const spec = CONFIG_KEYS[key];
   if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(' | ')}`);
+  if (spec.type === 'path') {
+    const value = String(raw).trim();
+    const path = value === '~' ? homedir() : value.startsWith('~/') ? join(homedir(), value.slice(2)) : value;
+    if (!isAbsolute(path)) throw new ConfigError(`${key} needs an absolute path (write ~ for your home folder)`);
+    return path;
+  }
   if (spec.type === 'bool') {
     if (typeof raw === 'boolean') return raw;
     const v = String(raw).trim().toLowerCase();
