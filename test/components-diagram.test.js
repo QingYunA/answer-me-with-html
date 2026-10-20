@@ -104,6 +104,20 @@ test('flow: LR is wider, TB is taller', () => {
   assert.ok(hTB > wTB && wLR > hLR);
 });
 
+test('flow: an edge routed around the outside keeps the margin inside the drawing', () => {
+  // dagre sizes the drawing without edge points: the long edge from the first node to the last ran above the top at y = -1.2 and was cut off.
+  const src = '共享目标 -> 看现场\n共享目标 -> 读源码\n共享目标 -> 查Call\n看现场 -> 读源码: 互相通信\n读源码 -> 查Call: 同步进展';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) {
+    const svg = render('flow', src, dir);
+    const [w, h] = viewBox(svg);
+    const points = [...svg.matchAll(/class="am-edge" d="([^"]+)"/g)].flatMap((m) => [...m[1].matchAll(/(-?[\d.]+),(-?[\d.]+)/g)]);
+    assert.ok(points.length > 0);
+    for (const [, x, y] of points) {
+      assert.ok(x >= 14 && x <= w - 14 && y >= 14 && y <= h - 14, `${dir}: ${x},${y} outside ${w}x${h}`);
+    }
+  }
+});
+
 test('flow: diamond nodes draw as a polygon, databases as a cylinder', () => {
   const svg = render('flow', '{判断?} -> [(DB)]');
   assert.match(svg, /<polygon class="am-node-shape"/);

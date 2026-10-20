@@ -313,7 +313,35 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
       insertStrip(g, side === 'top' ? top(c) + 2 : top(c) + c.height - 2, CLUSTER_LABEL_H + 3);
     }
   }
+  fitEdges(g);
   return { g, key, sizes };
+}
+
+// dagre sizes the drawing to its nodes, boxes and edge labels, not to edge points: a long edge routed around the outside of the
+// layout can run past the margin, or past the edge of the svg where it is cut off. Grow the drawing so every edge point keeps the margin too.
+function fitEdges(g) {
+  const graph = g.graph();
+  const points = g.edges().flatMap((e) => g.edge(e).points);
+  if (!points.length) return;
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const up = graph.marginy - Math.min(...ys);
+  if (up > 0) insertStrip(g, -Infinity, up);
+  const left = graph.marginx - Math.min(...xs);
+  if (left > 0) shiftRight(g, left);
+  graph.width = Math.max(graph.width, Math.max(...xs) + Math.max(left, 0) + graph.marginx);
+  graph.height = Math.max(graph.height, Math.max(...ys) + Math.max(up, 0) + graph.marginy);
+}
+
+// Move the whole drawing right by d: nodes, boxes, edge points and edge labels. The drawing gets d wider.
+function shiftRight(g, d) {
+  for (const v of g.nodes()) g.node(v).x += d;
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: p.x + d }));
+    if (edge.x !== undefined) edge.x += d;
+  }
+  g.graph().width += d;
 }
 
 // Push everything below the line y down by d: nodes, edge points, edge labels, and the boxes that start below it; a box the line

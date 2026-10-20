@@ -7322,7 +7322,30 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
       insertStrip(g, side === "top" ? top(c) + 2 : top(c) + c.height - 2, CLUSTER_LABEL_H + 3);
     }
   }
+  fitEdges(g);
   return { g, key, sizes };
+}
+function fitEdges(g) {
+  const graph = g.graph();
+  const points = g.edges().flatMap((e) => g.edge(e).points);
+  if (!points.length) return;
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const up = graph.marginy - Math.min(...ys);
+  if (up > 0) insertStrip(g, -Infinity, up);
+  const left = graph.marginx - Math.min(...xs);
+  if (left > 0) shiftRight(g, left);
+  graph.width = Math.max(graph.width, Math.max(...xs) + Math.max(left, 0) + graph.marginx);
+  graph.height = Math.max(graph.height, Math.max(...ys) + Math.max(up, 0) + graph.marginy);
+}
+function shiftRight(g, d) {
+  for (const v of g.nodes()) g.node(v).x += d;
+  for (const e of g.edges()) {
+    const edge = g.edge(e);
+    edge.points = edge.points.map((p) => ({ ...p, x: p.x + d }));
+    if (edge.x !== void 0) edge.x += d;
+  }
+  g.graph().width += d;
 }
 function insertStrip(g, y2, d) {
   for (const v of g.nodes()) {
