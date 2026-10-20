@@ -69,7 +69,7 @@
     notice = document.createElement('div');
     notice.setAttribute('role', 'status');
     notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'
-      + 'padding:8px 12px;font-size:13px;color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';
+      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';
     if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';
     // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.
     const place = () => {

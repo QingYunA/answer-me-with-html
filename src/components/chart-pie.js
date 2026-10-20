@@ -5,6 +5,7 @@ import { measure } from '../svg/text.js';
 import { f, svgOpen, mirror } from '../svg/shapes.js';
 import { fmt, percent } from './chart-scale.js';
 import { PAD, FS, LH, text, fitLines, shorten, stepGroup, tooltip } from './chart-parts.js';
+import { DRAWING } from '../themes/type-scale.js';
 
 const R = 96; // outer radius of the donut
 const R_IN = 60;
@@ -76,9 +77,9 @@ export function drawPie(data, { unit = '', dir = 'ltr', label }) {
 // The total in the hole of the donut, as large as the hole lets it be. A unit that does not fit on the line goes on a line of its own.
 function totalText(total, unit, x, y, dir) {
   const room = 1.6 * R_IN;
-  const size = (str, max) => Math.max(10, Math.min(max, Math.floor(room / measure(str, 1))));
+  const size = (str, max) => Math.max(DRAWING.totalMin, Math.min(max, Math.floor(room / measure(str, 1))));
   // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
   const one = (str, at, max) => text('am-ch-total', x, at, str, dir, ` text-anchor="middle" dominant-baseline="central" style="font-size:${size(str, max)}px"`);
-  if (!unit || measure(`${total}${unit}`, 18) <= room) return one(`${total}${unit}`, y, 22);
-  return one(total, y - 8, 22) + one(shorten(unit.trim(), room, 12), y + 12, 12);
+  if (!unit || measure(`${total}${unit}`, DRAWING.totalFit) <= room) return one(`${total}${unit}`, y, DRAWING.totalMax);
+  return one(total, y - 8, DRAWING.totalMax) + one(shorten(unit.trim(), room, DRAWING.totalUnit), y + 12, DRAWING.totalUnit);
 }

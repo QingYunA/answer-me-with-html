@@ -40,8 +40,8 @@ html[data-mode="dark"] {
 
 .am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }
 .am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }
-.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: 12px; }
-.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: 11px; }
+.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); }
+.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartTick); }
 /* The value labels of a highlighted row in a chart with several series take the color of their series, in a heavier weight to read on it. */
 .am-diagram .am-ch-val.am-ch-s1, .am-diagram .am-ch-val.am-ch-s2, .am-diagram .am-ch-val.am-ch-s3, .am-diagram .am-ch-val.am-ch-s4, .am-diagram .am-ch-val.am-ch-s5, .am-diagram .am-ch-val.am-ch-s6 { font-weight: 600; }
 .am-diagram .am-ch-val.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }
@@ -52,12 +52,12 @@ html[data-mode="dark"] {
 .am-diagram .am-ch-val.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }
 /* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */
 .am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }
-.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: 12px; font-variant-numeric: tabular-nums; }
+.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); font-variant-numeric: tabular-nums; }
 .am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }
 
 /* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */
-.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: 13px; }
-.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: 11px/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }
+.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: var(--am-fs-text); }
+.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }
 .am-ch-data summary::-webkit-details-marker { display: none; }
 .am-ch-data summary::before { content: ""; width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .15s; }
 .am-ch-data[open] summary::before { transform: rotate(90deg); }
@@ -65,8 +65,8 @@ html[data-mode="dark"] {
 html[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }
 @media (prefers-reduced-motion: reduce) { .am-ch-data summary::before { transition: none; } }
 .am-ch-data summary:hover { color: var(--ink); }
-.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
-.am-ch-data thead th { font: 11px/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: var(--am-fs-text); }
+.am-ch-data thead th { font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }
 .am-ch-data thead th::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; }
 .am-ch-data thead th:nth-child(2)::before { background: var(--series-1, var(--am-ch-1)); }
 .am-ch-data thead th:nth-child(3)::before { background: var(--series-2, var(--am-ch-2)); }

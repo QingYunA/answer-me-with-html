@@ -4,21 +4,21 @@
 .am-update { display: none; }
 .am-update:popover-open {
   display: block; position: fixed; inset-block: 52px auto; inset-inline: auto 12px; margin: 0; width: min(380px, calc(100vw - 24px));
-  padding: 14px 16px; font-size: 13px; color: var(--ink); background: var(--paper);
+  padding: 14px 16px; font-size: var(--am-fs-text); color: var(--ink); background: var(--paper);
   border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
 }
 .am-update p { margin: 0 0 8px; }
 .am-update-title { font-weight: 600; color: var(--ok); }
-.am-update-label { color: var(--ink-2); font-size: 12px; }
+.am-update-label { color: var(--ink-2); font-size: var(--am-fs-small); }
 .am-update-notes { margin: 0 0 12px; padding-inline-start: 18px; }
 .am-update-notes li { margin: 2px 0; }
-.am-update-notes code { font-size: 12px; }
+.am-update-notes code { font-size: var(--am-fs-small); }
 .am-update-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
 .am-update-row > :first-child {
-  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; padding: 6px 8px;
+  flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: var(--am-fs-small); padding: 6px 8px;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
 }
-.am-update a { color: var(--accent); font-size: 12px; }
+.am-update a { color: var(--accent); font-size: var(--am-fs-small); }
 /* A phone has no room for the words: the button keeps only its dot, and its aria-label still names the version. */
 @media (max-width: 760px) {
   .am-btn--update .am-update-text { display: none; }

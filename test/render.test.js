@@ -68,6 +68,8 @@ test('render: flow / sequence SVG styles have fallbacks when the theme context i
     const vars = [...rule.matchAll(/var\(([^)]+)\)/g)];
     assert.ok(vars.length > 0);
     for (const [, value] of vars) {
+      // The type scale sits on html, not on a theme, so losing html[data-theme] does not lose it.
+      if (value.startsWith('--am-fs-d-')) continue;
       assert.match(value, /^--[\w-]+,\s*\S/, `${selector} ${value} needs a fallback`);
     }
     // A fallback chain such as var(--node-fill, var(--paper, #ffffff)) ends in a literal: check the literal of every chain. Color and stroke-width

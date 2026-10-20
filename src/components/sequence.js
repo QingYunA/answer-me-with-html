@@ -3,8 +3,10 @@ import { esc, measure, wrap } from '../svg/text.js';
 import { f, arrowDefs, svgOpen, textLines, diagramLabel, mirror } from '../svg/shapes.js';
 import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
+import { DRAWING } from '../themes/type-scale.js';
 
-const FS = 13;
+const FS = DRAWING.node;
+const NOTE_FS = DRAWING.note;
 const LH = 16;
 const ACTOR_H = 34;
 const TOP = 8;
@@ -87,8 +89,8 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
       }
       return { ...s, lines, a, b };
     }
-    const lines = wrap(s.text, 220, 12);
-    const w = Math.max(...lines.map((l) => measure(l, 12))) + 20;
+    const lines = wrap(s.text, 220, NOTE_FS);
+    const w = Math.max(...lines.map((l) => measure(l, NOTE_FS))) + 20;
     if (s.kind === 'note' && s.over.length === 1) {
       const i = idx.get(s.over[0]);
       if (i === 0) extraLeft = Math.max(extraLeft, w / 2 - actorW[0] / 2);
@@ -140,14 +142,14 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
       const cx = (lo + hi) / 2;
       body.push(`<rect class="am-note" x="${f(cx - w / 2)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="2"/>`);
       // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
-      body.push(textLines(s.lines, cx, y + h / 2, LH, ' style="font-size:12px"', dir));
+      body.push(textLines(s.lines, cx, y + h / 2, LH, ` style="font-size:${NOTE_FS}px"`, dir));
       y += h + 16;
     } else {
-      const w = Math.max(...s.lines.map((l) => measure(l, 12))) + 20;
+      const w = Math.max(...s.lines.map((l) => measure(l, NOTE_FS))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y + 10)}" x2="${f(width - MARGIN)}" y2="${f(y + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y)}" width="${f(w)}" height="20" rx="2"/>`);
       // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ' class="am-actor-text" style="font-size:12px"', dir));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ` class="am-actor-text" style="font-size:${NOTE_FS}px"`, dir));
       y += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k}">${body.slice(start).join('')}</g>`);

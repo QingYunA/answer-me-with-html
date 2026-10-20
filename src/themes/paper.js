@@ -31,7 +31,7 @@ export default {
   css: `${serifByLanguage('--font-serif', LANGUAGE_SERIF_HEAD)}
 & .am-head h1, & .am-panel-head h2, & .am-md, & .am-intro, & .am-callout { font-family: var(--font-serif); }
 & .am-head h1 { font-weight: 600; letter-spacing: 0; }
-& .am-md p, & .am-md li, & .am-md blockquote, & .am-intro { font-size: 15.5px; line-height: 1.75; }
+& .am-md p, & .am-md li, & .am-md blockquote, & .am-intro { font-size: var(--am-fs-lead); line-height: 1.75; }
 & .am-md p { margin-bottom: 12px; }
 & .am-md table { font-family: var(--font-sans); }`,
 };

@@ -23,7 +23,7 @@ export default {
       '--warn': '#fbbf24', '--warn-bg': '#451a03', '--head-bg': '#fafafa', '--head-fg': '#18181b',
     },
   },
-  css: `& .am-panel-id { border-radius: 6px; min-width: 24px; height: 24px; margin: 9px 0 9px 14px; font-size: 12px; }
+  css: `& .am-panel-id { border-radius: 6px; min-width: 24px; height: 24px; margin: 9px 0 9px 14px; font-size: var(--am-fs-small); }
 & .am-panel-head { border-bottom-width: 1px; }
 & .am-kv { border-color: var(--line); border-radius: var(--radius); overflow: hidden; }`,
   video: {

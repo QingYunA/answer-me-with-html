@@ -8,11 +8,12 @@ import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 import { badgeSvg } from './flow.js';
+import { DRAWING } from '../themes/type-scale.js';
 
-const FS = 13;
-const FIELD_FS = 12;
-const KEY_FS = 11; // .am-cluster-label, which the key markers use
-const EDGE_FS = 11.5; // .am-edge-label text
+const FS = DRAWING.node;
+const FIELD_FS = DRAWING.field;
+const KEY_FS = DRAWING.cluster; // .am-cluster-label, which the key markers use
+const EDGE_FS = DRAWING.edge; // .am-edge-label text
 const LH = 17;
 const HEAD_LH = 20;
 const FIELD_LH = 17;

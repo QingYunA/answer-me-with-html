@@ -5,12 +5,13 @@ import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirrorLayou
 import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
+import { DRAWING } from '../themes/type-scale.js';
 
-const FS = 13;
+const FS = DRAWING.node;
 const LH = 17;
 const TEXT_MAX = 150;
-const EDGE_FS = 11.5;
-const CLUSTER_FS = 11;
+const EDGE_FS = DRAWING.edge;
+const CLUSTER_FS = DRAWING.cluster;
 const CLUSTER_LABEL_H = 15;
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
 

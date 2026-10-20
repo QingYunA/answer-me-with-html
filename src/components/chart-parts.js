@@ -5,9 +5,10 @@
 import { esc, measure, wrap } from '../svg/text.js';
 import { f } from '../svg/shapes.js';
 import { svgLine, svgNumber } from '../bidi.js';
+import { DRAWING } from '../themes/type-scale.js';
 
 export const PAD = 8;
-export const FS = { cat: 12, tick: 11, val: 11, legend: 12 }; // chart.css sets the same sizes
+export const FS = { cat: DRAWING.chartCat, tick: DRAWING.chartTick, val: DRAWING.chartVal, legend: DRAWING.chartLegend }; // the same sizes as chart.css, from themes/type-scale.js
 export const LH = 14;
 export const PLOT_H = 220;
 export const MAX_WIDTH = 880; // width the categories of a vertical chart share

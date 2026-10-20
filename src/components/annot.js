@@ -1,10 +1,11 @@
 // Sentence annotation (figure B): monospace sentence, bracket lines under annotated spans, notes wrap onto rows by horizontal position to avoid overlap.
 import { esc, measure } from '../svg/text.js';
 import { ComponentError, contentLines, fields } from './error.js';
+import { SIZES } from '../themes/type-scale.js';
 
 const SEG = /\[([^\]]+)\]\{(!?)([^}]*)\}/g;
-const TEXT_SIZE = 14;
-const NOTE_SIZE = 11;
+const TEXT_SIZE = SIZES.body;
+const NOTE_SIZE = SIZES.label;
 const NOTE_GAP = 10;
 
 export default {

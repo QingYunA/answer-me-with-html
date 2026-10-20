@@ -256,7 +256,7 @@ test('rtl: drawings, code and plain words are left as they are', () => {
 test('rtl: a horizontal timeline shrinks a long date to fit its column instead of running into the next one', () => {
   // cqi is the width of the timeline's container (.am-tl-wrap in base.css); rtl.css declares none of its own.
   assert.doesNotMatch(RTL_CSS, /container-type/);
-  assert.match(RTL_CSS, /\.am-tl-when \{ font-size: min\(15px, calc\(100cqi \/ var\(--n, 1\) \/ 6\.2\)\)/);
+  assert.match(RTL_CSS, /\.am-tl-when \{ font-size: min\(var\(--am-fs-heading\), calc\(100cqi \/ var\(--n, 1\) \/ 6\.2\)\)/);
 });
 
 test('rtl: left-to-right pages get no bdi isolates and keep the English footer', () => {

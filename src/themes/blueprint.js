@@ -28,7 +28,7 @@ export default {
   content: ""; position: absolute; inset: 18px; border: 1px solid var(--line); pointer-events: none;
 }
 & .am-ruler {
-  display: flex; position: absolute; font: 10px/1 var(--font-mono); color: var(--ink-3);
+  display: flex; position: absolute; font: var(--am-fs-tick)/1 var(--font-mono); color: var(--ink-3);
 }
 @media (max-width: 760px) {
   & .am-frame { padding: 0; border: 0; }

@@ -1,5 +1,6 @@
 // SVG layout runs in Node without real font metrics, so widths are estimated by character class.
 // Overestimating is safer than underestimating: better spare room in a node than text overflowing its border.
+import { DRAWING } from '../themes/type-scale.js';
 
 const CJK_RE = /[⺀-鿿가-힯豈-﫿︰-﹏＀-￯　-〿]/;
 const NARROW = new Set([...'iljtfrI.,:;|!\'`()[]{}']);
@@ -40,7 +41,7 @@ function charWidth(ch, mono) {
 // estimate (`bold`), used for the text a theme draws bold such as a highlighted node.
 const BOLD = 1.06;
 
-export function measure(str, size = 13, { mono = false, bold = false } = {}) {
+export function measure(str, size = DRAWING.node, { mono = false, bold = false } = {}) {
   let units = 0;
   for (const ch of String(str ?? '')) units += charWidth(ch, mono);
   return Math.round(units * size * (bold ? BOLD : 1) * 100) / 100;
