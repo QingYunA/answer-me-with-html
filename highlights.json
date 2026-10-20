@@ -1,28 +1,28 @@
 {
-  "version": "0.5.5",
+  "version": "0.5.6",
   "en": [
-    "Bar, line and pie charts: write the numbers in a `chart` block",
-    "Clear all remarks on a page with one button",
-    "`am serve --secret-file` keeps page links working after a restart"
+    "Text size: A− / A+ in the toolbar, or `am config set scale 1.2`",
+    "A suggested option no longer starts selected in a question",
+    "New catalog theme: Anthropic Clay (`am theme add anthropic-clay`)"
   ],
   "zh": [
-    "柱状图、折线图、饼图：把数字写进 `chart` 代码块",
-    "一个按钮清除页面上的所有标注",
-    "`am serve --secret-file` 让页面链接在重启后依然有效"
+    "文字大小：工具栏的 A− / A+，或 `am config set scale 1.2`",
+    "问题里的建议选项不再默认选中",
+    "新主题：陶土书院（`am theme add anthropic-clay`）"
   ],
   "zh-Hant": [
-    "長條圖、折線圖、圓餅圖：把數字寫進 `chart` 程式碼區塊",
-    "一個按鈕清除頁面上的所有標註",
-    "`am serve --secret-file` 讓頁面連結在重新啟動後依然有效"
+    "文字大小：工具列的 A− / A+，或 `am config set scale 1.2`",
+    "問題裡的建議選項不再預設選中",
+    "新主題：陶土書院（`am theme add anthropic-clay`）"
   ],
   "ja": [
-    "棒グラフ・折れ線グラフ・円グラフ：数値を `chart` ブロックに書くだけ",
-    "ボタン一つでページの注記をすべて消去",
-    "`am serve --secret-file` で再起動後もページのリンクが有効"
+    "文字サイズ：ツールバーの A− / A+、または `am config set scale 1.2`",
+    "質問の推奨オプションが最初から選択されなくなりました",
+    "新しいテーマ：Anthropic Clay（`am theme add anthropic-clay`）"
   ],
   "he": [
-    "תרשימי עמודות, קו ועוגה: כתבו את המספרים בבלוק `chart`",
-    "ניקוי כל הסימונים בדף בלחיצה אחת",
-    "`am serve --secret-file` שומר על קישורי הדפים אחרי הפעלה מחדש"
+    "גודל טקסט: A− / A+ בסרגל הכלים, או `am config set scale 1.2`",
+    "אפשרות מומלצת בשאלה כבר לא מסומנת מראש",
+    "ערכת נושא חדשה: Anthropic Clay (`am theme add anthropic-clay`)"
   ]
 }

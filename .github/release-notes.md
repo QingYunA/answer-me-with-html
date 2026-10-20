@@ -1,64 +1,59 @@
-<!-- release 0.5.5 -->
+<!-- release 0.5.6 -->
 
-## Charts
+## Text size
 
-Write the numbers in a `chart` block and the page draws the chart (#264, #251):
+Pages can now be read at a larger or smaller size (#302):
 
-````markdown
-```chart bar unit=ms
-       | p50 | p95
-* Redis     | 12  | 40
-Memcached   | 9   | 31
-Postgres    | 28  | 95
+```bash
+am config set scale 1.2    # 0.8 to 1.5, in steps of 0.05; 1 is the default
 ```
-````
 
-- `chart bar` and `chart bar horizontal`, `chart line`, and `chart pie` (a donut, up to 6 slices).
-- A first line names the series and adds a legend. `*` highlights a row: the other bars and slices turn gray, and a line marks the row with a dashed guide. `unit=` adds a unit to the axis and the values.
-- Each chart has a collapsed data table under it. Charts follow the theme and dark mode, mirror on right-to-left pages, and appear row by row in a video.
-- A theme can set its own series colors with `--series-1` … `--series-6`. See "Charts" in [docs/reference.md](https://github.com/QingYunA/answer-me-with-html/blob/main/docs/reference.md).
+- Every text size on the page grows or shrinks with the setting. Diagrams and charts grow as a whole, so their text still fits its boxes. The toolbar keeps its size.
+- **A− / A+** in the page toolbar change the size on the page itself. The browser remembers the choice for the next pages; under `am serve` it lasts for the tab.
+- On a phone the toolbar scrolls sideways, so Theme and Mode can be reached again.
+- Catalog themes follow the setting. Run `am theme update` to get the new versions.
+
+Built in four steps: #306, #307, #309, #310.
 
 ## Other changes
 
-- **Clear all remarks:** a button beside Remark removes every remark on the page after a second click. Panel comments and answers stay (#275).
-- **`am serve --secret-file <path>`** keeps the same secret across restarts, so page links still work after `am serve` starts again (#274).
-- `-o` that names a folder now gives one clear error instead of a stack trace, and a name without `.html` gets a notice (#271).
-- When the agent may write only inside the workspace, the skill renders the page there (#272).
-- In DeepSeek Harness the skill links pages by path, so the link opens (#265).
-- A copy button no longer stays on "Copied ✓" after a second click (#263).
-- Two new catalog themes: Mint Signal and Cool Cyberpunk (#252).
+- **Questions:** the suggested option in an `ask` block no longer starts selected, so a reader who skips a question does not look as if they answered it. The reply says `(not answered; suggested: X)` (#289).
+- **New catalog theme:** Anthropic Clay, a muted reading theme with light and dark modes: `am theme add anthropic-clay` (#297).
+- When the data directory cannot be written (a sandbox that allows writes only in the workspace), pages go to a private folder in the system temporary folder, with a notice (#295).
+- `flow` rejects Mermaid-style node IDs such as `A[Start]` with a clear error, instead of drawing extra nodes (#296).
+- Duplicate panel IDs are an error (#278). Panels past the 26th get `P27`, `P28` …, which a draft can also write, and the duplicate check sees them (#304).
+- A draft saved as UTF-8 with BOM keeps its `# Title` (#290).
+- `kv cols=2.5` is an error instead of a grid that silently drops to one column (#303).
+- Sequence-diagram notes and the donut total are drawn at the size they were measured for (#306).
 
-**Full list:** #252, #263, #265, #266, #270, #271, #272, #274, #275, #276, #277, #281, #282, #283, #284, #285.
+**Full list:** #278, #289, #290, #293, #295, #296, #297, #303, #304, #306, #307, #309, #310.
 
 ---
 
-## 图表
+## 文字大小
 
-把数字写进 `chart` 代码块，页面就会画出图表（#264、#251）：
+页面文字现在可以放大或缩小（#302）：
 
-````markdown
-```chart bar unit=ms
-       | p50 | p95
-* Redis     | 12  | 40
-Memcached   | 9   | 31
-Postgres    | 28  | 95
+```bash
+am config set scale 1.2    # 0.8 到 1.5，步长 0.05；默认是 1
 ```
-````
 
-- 支持 `chart bar` 和 `chart bar horizontal`（柱状图）、`chart line`（折线图）、`chart pie`（环形饼图，最多 6 块）。
-- 第一行写系列名，图上会出现图例。行首写 `*` 会高亮这一行：其他柱子和扇区变灰，折线图用一条虚线标出这一行。`unit=` 给坐标轴和数值加上单位。
-- 每张图下面有一个可以展开的数据表。图表跟随主题和深浅色，在从右往左书写的页面上镜像显示，在视频里逐行出现。
-- 主题可以用 `--series-1` 到 `--series-6` 设置自己的系列颜色，见 [docs/reference.zh-CN.md](https://github.com/QingYunA/answer-me-with-html/blob/main/docs/reference.zh-CN.md) 的"图表"一节。
+- 页面上所有文字都会跟着这个设置放大或缩小。图表整体缩放，所以图里的文字仍然放得进框里。工具栏保持原来的大小。
+- 页面工具栏的 **A− / A+** 可以直接在页面上调整。浏览器会记住你的选择，之后打开的页面也用这个大小；用 `am serve` 打开时，只在当前标签页有效。
+- 手机上的工具栏可以左右滑动，主题和模式选择又能点到了。
+- 主题市场里的主题也会跟随这个设置。运行 `am theme update` 获取新版本。
+
+分四步完成：#306、#307、#309、#310。
 
 ## 其他改动
 
-- **清除所有标注**：标注按钮旁边多了一个按钮，再点一次确认后，删除页面上的所有标注。面板评论和选项回答不受影响（#275）。
-- **`am serve --secret-file <path>`** 在重启之间沿用同一个密钥，`am serve` 重新启动后页面链接依然有效（#274）。
-- `-o` 指向一个文件夹时，现在给出一条明确的错误，不再输出调用栈；文件名没有 `.html` 时会提示（#271）。
-- agent 只能在工作区里写文件时，skill 会把页面渲染到工作区里（#272）。
-- 在 DeepSeek Harness 里，skill 用路径链接页面，点击就能打开（#265）。
-- 复制按钮连点两次后，不会再一直显示"已复制 ✓"（#263）。
-- 主题库新增两个主题：Mint Signal 和 Cool Cyberpunk（#252）。
+- **问题**：`ask` 代码块里的建议选项不再默认选中，没作答的读者不会看起来像是已经回答了。回复里写的是 `(not answered; suggested: X)`（#289）。
+- **新主题**：陶土书院（Anthropic Clay），一款色调柔和的阅读主题，支持浅色和深色：`am theme add anthropic-clay`（#297）。
+- 数据目录不能写入时（宿主沙箱只允许写工作区），页面会存到系统临时目录里的私有文件夹，并给出提示（#295）。
+- `flow` 遇到 Mermaid 风格的节点 ID（如 `A[Start]`）会给出明确的错误，不再画出多余的节点（#296）。
+- 面板 ID 重复会报错（#278）。第 26 个之后的面板编号为 `P27`、`P28`……，草稿里也可以手写，重复检查同样能发现（#304）。
+- 以带 BOM 的 UTF-8 保存的草稿，`# 标题` 不再丢失（#290）。
+- `kv cols=2.5` 会报错，不再悄悄变成单列（#303）。
+- 时序图的注释和环形图中间的总数，按测量时的字号绘制（#306）。
 
-**完整列表：** #252、#263、#265、#266、#270、#271、#272、#274、#275、#276、#277、#281、#282、#283、#284、#285。
-
+**完整列表：** #278、#289、#290、#293、#295、#296、#297、#303、#304、#306、#307、#309、#310。

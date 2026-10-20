@@ -33,7 +33,7 @@ import { parseArgs } from "node:util";
 import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7, statSync as statSync4 } from "node:fs";
 
 // src/assets.js
-var VERSION = "0.5.5";
+var VERSION = "0.5.6";
 var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
