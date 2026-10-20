@@ -167,7 +167,8 @@ test('chart pie: the total shrinks to fit the hole, and a long unit goes on a li
 
 test('chart pie: the total sets its size in a style, so the stylesheet cannot draw it at 13px', () => {
   const html = render('A | 1\nB | 3', 'pie unit=ms');
-  assert.match(html, /<text class="am-ch-total"[^>]*style="font-size:\d+px"/, 'the total carries the size chosen for the hole');
+  // "4ms" is short, so it takes the 22px cap: a fall back to the stylesheet's 13px fails here.
+  assert.match(html, /<text class="am-ch-total"[^>]*style="font-size:22px"/, 'the total carries the size chosen for the hole');
   assert.doesNotMatch(html, /<text [^>]*font-size="/, 'no SVG font-size attribute is left on the text');
 });
 
