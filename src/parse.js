@@ -47,7 +47,8 @@ const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 // A leading capital is an ID only when the title after it does not start with a lowercase letter: "## A miss goes…" and
 // "## I think…" are sentences, not ID + title (#208). The lookahead also rejects a space, so \s+ cannot backtrack past it.
-const PANEL_ID = /^([A-Z][0-9]?)\s+(?![\s\p{Ll}])(.+)$/u;
+// The ID is one capital and up to two digits: A to Z for the first 26 panels, then P27, P28 … for the ones after (#292).
+const PANEL_ID = /^([A-Z][0-9]{0,2})\s+(?![\s\p{Ll}])(.+)$/u;
 const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
@@ -193,9 +194,12 @@ function assignIds(panels) {
     used.add(panel.id);
   }
   let code = 'A'.charCodeAt(0);
+  // Past Z the ID is "P27", "P28" …, not the character the code points at, so build the ID first and test that:
+  // an explicit P27 and an automatic P27 are the same ID and must collide here, not on the page (#292).
+  const idAt = (c) => (c <= 90 ? String.fromCharCode(c) : `P${c - 64}`);
   const nextFree = () => {
-    while (used.has(String.fromCharCode(code))) code++;
-    const id = code <= 90 ? String.fromCharCode(code) : `P${code - 64}`;
+    let id = idAt(code);
+    while (used.has(id)) id = idAt(++code);
     used.add(id);
     code++;
     return id;
