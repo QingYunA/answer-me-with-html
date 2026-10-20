@@ -266,7 +266,7 @@ The agent picks a component by the shape of the information:
 | `annot` | Word-by-word notes on a sentence |
 | `kv` | Metadata, a drawing's title block |
 | `callout` | A conclusion, a tip, a warning |
-| `ask` | A decision you make on the page; the agent's suggestion starts selected |
+| `ask` | A decision you make on the page; the agent's suggestion has a tag; nothing starts selected |
 | Code block | Real code quoted from a file (`src=` `lines=`), or a sketch |
 | Table | Multi-way comparison. Write `ok` / `no` / `warn` in a cell to get ✓ ✗ ! |
 
