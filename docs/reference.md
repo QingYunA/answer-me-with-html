@@ -23,7 +23,7 @@ A -> B: label
 ```
 ````
 
-- Every `## ` heading is a panel. The letters A, B, C are optional and added for you; an ID you write yourself must be unique.
+- Every `## ` heading is a panel. The ID is optional and added for you: A to Z for the first 26 panels, then `P27`, `P28` and so on. An ID you write yourself must be unique, and it is the same ID the automatic series would give: `## P27 Title` declares `P27`, and a later automatic panel cannot also be `P27`.
 - `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. `span` is a hint: the page sizes each panel to its content, so wide tables and diagrams need no `span`. Write `span` only for a panel that must stand out. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the justified layout in a browser ignores it.
 - When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup. The page carries a Content-Security-Policy, so a script or an inline event handler in the block does not run and nothing loads from the network.
 - A placeholder such as `<host>` is shown as text. Inside a sentence only text-level tags stay (`b`, `kbd`, `sup`, `a`, `span`, `br`, `img` ...), and tags that break the page (`script`, `style`, `iframe` ...) are shown as text too. Put raw markup in an `html` or `svg` block and code in backticks. The render lists every tag it changed.
