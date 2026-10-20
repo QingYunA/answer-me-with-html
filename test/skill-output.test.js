@@ -25,3 +25,12 @@ test('skill: keep the default output, fall back to the temporary folder, and use
   assert.match(retry, /--replace .*for a page in the data directory's `pages\/` or the temporary folder's `pages\/`/);
   assert.match(retry, /page written with `-o`, reuse the same quoted `-o` HTML file path/);
 });
+
+test('skill: an unanswered ask is not agreement, in the new and the old reply wording', () => {
+  const section = skill.split('## 5. When the user pastes a reply from a page')[1]?.split('\n## 6.')[0];
+  assert.ok(section, 'reply section exists');
+  const rule = section.split('\n').find((line) => line.includes('`(not answered; suggested: X)`')) ?? '';
+  assert.match(rule, /`\(not answered; suggestion kept\)` from a page made by an older version/);
+  assert.match(rule, /it is not agreement with X/);
+  assert.match(rule, /ask about it in the chat/);
+});
