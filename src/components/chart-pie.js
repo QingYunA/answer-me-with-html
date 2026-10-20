@@ -77,7 +77,8 @@ export function drawPie(data, { unit = '', dir = 'ltr', label }) {
 function totalText(total, unit, x, y, dir) {
   const room = 1.6 * R_IN;
   const size = (str, max) => Math.max(10, Math.min(max, Math.floor(room / measure(str, 1))));
-  const one = (str, at, max) => text('am-ch-total', x, at, str, dir, ` text-anchor="middle" dominant-baseline="central" font-size="${size(str, max)}"`);
+  // style, not the SVG attribute: `.am-diagram text` sets 13px and a stylesheet wins over a presentation attribute.
+  const one = (str, at, max) => text('am-ch-total', x, at, str, dir, ` text-anchor="middle" dominant-baseline="central" style="font-size:${size(str, max)}px"`);
   if (!unit || measure(`${total}${unit}`, 18) <= room) return one(`${total}${unit}`, y, 22);
   return one(total, y - 8, 22) + one(shorten(unit.trim(), room, 12), y + 12, 12);
 }

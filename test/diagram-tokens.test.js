@@ -71,7 +71,7 @@ test('markup: node and actor labels carry their own class, so a theme never need
   const { html } = renderDoc('## A\n```flow\nA -> *B: go\n```\n```sequence\nA -> B: x\n== phase ==\n```\n```er\n*User\n  id PK\n  name string\n```\n', { theme: 'blueprint' });
   assert.match(html, /<text [^>]*class="am-node-text"[^>]*>A<\/text>/);
   assert.match(html, /<text [^>]*class="am-actor-text" font-weight="600"[^>]*>A<\/text>/);
-  assert.match(html, /<text [^>]*class="am-actor-text" font-size="12"[^>]*>phase<\/text>/, 'the box of a divider is an actor, so its text is too');
+  assert.match(html, /<text [^>]*class="am-actor-text" style="font-size:12px"[^>]*>phase<\/text>/, 'the box of a divider is an actor, so its text is too');
   assert.match(html, /class="am-er-head am-node-text"/);
   assert.match(html, /class="am-er-field am-node-text"/);
   assert.doesNotMatch(html, /<text [^>]*class="am-node-text"[^>]*>go<\/text>/, 'an edge label is not node text');

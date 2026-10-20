@@ -5067,13 +5067,13 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
       const h2 = s.lines.length * LH + 12;
       const cx = (lo + hi) / 2;
       body.push(`<rect class="am-note" x="${f(cx - w / 2)}" y="${f(y2)}" width="${f(w)}" height="${f(h2)}" rx="2"/>`);
-      body.push(textLines(s.lines, cx, y2 + h2 / 2, LH, ' font-size="12"', dir));
+      body.push(textLines(s.lines, cx, y2 + h2 / 2, LH, ' style="font-size:12px"', dir));
       y2 += h2 + 16;
     } else {
       const w = Math.max(...s.lines.map((l3) => measure(l3, 12))) + 20;
       body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y2 + 10)}" x2="${f(width - MARGIN)}" y2="${f(y2 + 10)}"/>`);
       body.push(`<rect class="am-actor" x="${f(width / 2 - w / 2)}" y="${f(y2)}" width="${f(w)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' class="am-actor-text" font-size="12"', dir));
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ' class="am-actor-text" style="font-size:12px"', dir));
       y2 += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k2}">${body.slice(start).join("")}</g>`);
@@ -8272,7 +8272,7 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
 function totalText(total, unit, x2, y2, dir) {
   const room = 1.6 * R_IN;
   const size = (str, max) => Math.max(10, Math.min(max, Math.floor(room / measure(str, 1))));
-  const one = (str, at3, max) => text("am-ch-total", x2, at3, str, dir, ` text-anchor="middle" dominant-baseline="central" font-size="${size(str, max)}"`);
+  const one = (str, at3, max) => text("am-ch-total", x2, at3, str, dir, ` text-anchor="middle" dominant-baseline="central" style="font-size:${size(str, max)}px"`);
   if (!unit || measure(`${total}${unit}`, 18) <= room) return one(`${total}${unit}`, y2, 22);
   return one(total, y2 - 8, 22) + one(shorten(unit.trim(), room, 12), y2 + 12, 12);
 }

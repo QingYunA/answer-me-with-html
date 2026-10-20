@@ -165,6 +165,12 @@ test('chart pie: the total shrinks to fit the hole, and a long unit goes on a li
   assert.deepEqual(texts(render('A | 5', 'pie unit=ms'), 'am-ch-total'), ['5ms']);
 });
 
+test('chart pie: the total sets its size in a style, so the stylesheet cannot draw it at 13px', () => {
+  const html = render('A | 1\nB | 3', 'pie unit=ms');
+  assert.match(html, /<text class="am-ch-total"[^>]*style="font-size:\d+px"/, 'the total carries the size chosen for the hole');
+  assert.doesNotMatch(html, /<text [^>]*font-size="/, 'no SVG font-size attribute is left on the text');
+});
+
 // ── highlight ──
 test('chart pie: * keeps the color of its slice and grays the others, legend swatches too', () => {
   const html = render('Chrome | 65\n* Safari | 18\nEdge | 5');

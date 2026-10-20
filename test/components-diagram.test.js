@@ -50,6 +50,13 @@ test('sequence: long message labels widen the gap between participants', () => {
   assert.ok(long > short + 100, `short=${short} long=${long}`);
 });
 
+test('sequence: a note and a divider set their 12px size in a style, so the stylesheet cannot draw them at 13px', () => {
+  const svg = render('sequence', 'A -> B: x\nnote A, B: hello\n== phase ==');
+  assert.match(svg, /<text [^>]*style="font-size:12px"[^>]*>hello<\/text>/, 'the note text carries the measured size');
+  assert.match(svg, /<text [^>]*class="am-actor-text" style="font-size:12px"[^>]*>phase<\/text>/, 'the divider text carries the measured size');
+  assert.doesNotMatch(svg, /<text [^>]*font-size="/, 'no SVG font-size attribute is left on the text');
+});
+
 test('sequence: the num argument adds step numbers', () => {
   assert.match(render('sequence', 'A -> B: x', 'num'), /class="am-step"[^>]*>1<\/text>/);
 });
