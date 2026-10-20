@@ -45,8 +45,12 @@
     };
 
     const updateButtons = () => {
-      scaleDown.disabled = value <= min;
-      scaleUp.disabled = value >= max;
+      const setUnavailable = (btn, unavailable) => {
+        if (unavailable) btn.setAttribute('aria-disabled', 'true');
+        else btn.removeAttribute('aria-disabled');
+      };
+      setUnavailable(scaleDown, value <= min);
+      setUnavailable(scaleUp, value >= max);
     };
 
     // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.
@@ -71,8 +75,14 @@
     if (inRange(saved) && saved !== value) setScale(saved);
     scaleDown.hidden = false;
     scaleUp.hidden = false;
-    scaleDown.addEventListener('click', () => setScale(value - step, true));
-    scaleUp.addEventListener('click', () => setScale(value + step, true));
+    scaleDown.addEventListener('click', () => {
+      if (scaleDown.getAttribute('aria-disabled') === 'true') return;
+      setScale(value - step, true);
+    });
+    scaleUp.addEventListener('click', () => {
+      if (scaleUp.getAttribute('aria-disabled') === 'true') return;
+      setScale(value + step, true);
+    });
   }
 
   // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size

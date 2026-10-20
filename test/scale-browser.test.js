@@ -78,7 +78,8 @@ const STATE = `(() => {
     inline: root.style.getPropertyValue('--am-scale'),
     body: parseFloat(getComputedStyle(document.body).fontSize),
     downHidden: down.hidden, upHidden: up.hidden,
-    downDisabled: down.disabled, upDisabled: up.disabled,
+    downDisabled: down.getAttribute('aria-disabled') === 'true',
+    upDisabled: up.getAttribute('aria-disabled') === 'true',
     downWidth: down.getBoundingClientRect().width, upWidth: up.getBoundingClientRect().width,
     svgWidth: svg ? Number(svg.getAttribute('width')) : null,
     svgHeight: svg ? Number(svg.getAttribute('height')) : null,
@@ -157,6 +158,15 @@ const waitFor = async (condition, what, timeout = 4000) => {
 const state = () => evaluate(STATE);
 const overflow = () => evaluate(OVERFLOW);
 const click = (name) => evaluate(`document.querySelector('[data-am="${name}"]').click()`);
+const KEYS = {
+  Enter: { key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 },
+  Tab: { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 },
+};
+const pressKey = async (name, modifiers = 0) => {
+  const key = KEYS[name];
+  await page('Input.dispatchKeyEvent', { type: 'keyDown', ...key, modifiers });
+  await page('Input.dispatchKeyEvent', { type: 'keyUp', ...key, modifiers });
+};
 const openFile = async (path, width) => {
   await setWidth(width);
   const loaded = cdp.once('Page.loadEventFired');
@@ -234,7 +244,7 @@ test('e2e scale: the buttons are visible, step the text and drawing, and stop at
   for (let i = 0; i < 9; i++) await click('scale-up');
   const max = await state();
   assert.equal(max.scale, 1.5, 'the last step is 1.5');
-  assert.equal(max.upDisabled, true, 'A+ is disabled at the top of the range');
+  assert.equal(max.upDisabled, true, 'A+ announces it is unavailable at the top of the range');
   assert.equal(max.downDisabled, false, 'A− still works at the top of the range');
 
   // The viewer fits the drawing by its viewBox, so a scale change must not break opening it.
@@ -250,13 +260,13 @@ test('e2e scale: the buttons are visible, step the text and drawing, and stop at
   assert.ok(viewer.width > 0 && viewer.height > 0 && viewer.fits, 'the drawing fits the lightbox stage');
   await evaluate("document.querySelector('.am-lightbox-close').click()");
 
-  await setWidth(PHONE);
-  // The resize handler restores the plain grid; wait for it, not just for a fixed delay.
+  // Load at the phone width: the toolbar's end is set during the page script, before the first paint.
+  await open(PHONE);
   await waitFor("getComputedStyle(document.querySelector('.am-grid')).display === 'grid' && document.querySelectorAll('.am-panel[style*=width], .am-panel[style*=flex]').length === 0", 'the phone grid');
   const phone = await overflow();
   assert.deepEqual(phone.panels, [], `no panel overflows at ${PHONE}px`);
   assert.ok(phone.page <= 0, `the page does not scroll sideways at ${PHONE}px`);
-  assert.equal((await state()).upDisabled, true, 'A+ stays disabled after the width change');
+  assert.equal((await state()).upDisabled, true, 'A+ stays unavailable after the width change');
 
   const toolbar = await evaluate(TOOLBAR);
   assert.equal(toolbar.end.reply && toolbar.end.remark && toolbar.end.copy, true, 'the toolbar opens at its end: Reply, Remark and Copy source are fully visible');
@@ -271,6 +281,41 @@ test('e2e scale: the buttons are visible, step the text and drawing, and stop at
   await page('Emulation.setEmulatedMedia', { media: 'print' });
   assert.equal(await evaluate("document.querySelector('[data-am=\"scale-down\"]').checkVisibility()"), false, 'the size buttons are hidden in print');
   await page('Emulation.setEmulatedMedia', { media: '' });
+});
+
+test('e2e scale: the end buttons keep keyboard focus and announce aria-disabled', { skip: SKIP, timeout: 120000 }, async () => {
+  const focused = (action) => evaluate(`document.activeElement === document.querySelector('[data-am="${action}"]')`);
+  const aria = (action) => evaluate(`document.querySelector('[data-am="${action}"]').getAttribute('aria-disabled')`);
+
+  await fresh(DESKTOP);
+  await evaluate("document.querySelector('[data-am=\"scale-up\"]').focus()");
+  for (let i = 0; i < 10; i++) await pressKey('Enter');
+  let s = await state();
+  assert.equal(s.scale, 1.5, 'Enter on A+ reaches the top of the range');
+  assert.equal(s.upDisabled, true, 'A+ announces it is unavailable');
+  assert.equal(await focused('scale-up'), true, 'A+ keeps keyboard focus at the top of the range');
+  assert.equal(await aria('scale-up'), 'true', 'A+ carries aria-disabled=true');
+  await pressKey('Enter');
+  assert.equal((await state()).scale, 1.5, 'one more Enter at the top changes nothing');
+  assert.equal(await focused('scale-up'), true, 'focus stays on A+ after the ignored key');
+
+  await pressKey('Tab', 8); // Shift+Tab
+  assert.equal(await focused('scale-down'), true, 'Shift+Tab moves to A−');
+  await pressKey('Enter');
+  assert.equal((await state()).scale, 1.45, 'A− lowers the scale again');
+  assert.equal((await state()).upDisabled, false, 'A+ is available again after A− lowers the scale');
+
+  await fresh(DESKTOP);
+  await evaluate("document.querySelector('[data-am=\"scale-down\"]').focus()");
+  for (let i = 0; i < 4; i++) await pressKey('Enter');
+  s = await state();
+  assert.equal(s.scale, 0.8, 'Enter on A− reaches the bottom of the range');
+  assert.equal(s.downDisabled, true, 'A− announces it is unavailable');
+  assert.equal(await focused('scale-down'), true, 'A− keeps keyboard focus at the bottom of the range');
+  assert.equal(await aria('scale-down'), 'true', 'A− carries aria-disabled=true');
+  await pressKey('Enter');
+  assert.equal((await state()).scale, 0.8, 'one more Enter at the bottom changes nothing');
+  assert.equal(await focused('scale-down'), true, 'focus stays on A− after the ignored key');
 });
 
 test('e2e scale: a reload restores the reader\'s stored choice', { skip: SKIP, timeout: 120000 }, async () => {

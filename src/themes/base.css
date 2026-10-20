@@ -18,8 +18,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 }
 .am-btn:hover { border-color: var(--ink-3); }
 .am-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.am-toolbar .am-btn:disabled { opacity: .5; cursor: default; }
-.am-toolbar .am-btn:disabled:hover { border-color: var(--line-2); }
+.am-toolbar .am-btn[aria-disabled="true"] { opacity: .5; cursor: default; }
+.am-toolbar .am-btn[aria-disabled="true"]:hover { border-color: var(--line-2); }
 /* Theme and mode lists: a label and a native select inside one button-like box */
 .am-pick {
   display: flex; align-items: center; gap: 6px; font: var(--am-fs-small)/1 var(--font-sans); color: var(--ink-2); background: var(--paper);
