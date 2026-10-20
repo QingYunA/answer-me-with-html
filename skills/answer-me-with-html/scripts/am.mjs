@@ -7327,7 +7327,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
 }
 function fitEdges(g) {
   const graph = g.graph();
-  const points = g.edges().flatMap((e) => g.edge(e).points);
+  const points = g.edges().filter((e) => e.name.startsWith("e")).flatMap((e) => g.edge(e).points);
   if (!points.length) return;
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);

@@ -318,10 +318,11 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
 }
 
 // dagre sizes the drawing to its nodes, boxes and edge labels, not to edge points: a long edge routed around the outside of the
-// layout can run past the margin, or past the edge of the svg where it is cut off. Grow the drawing so every edge point keeps the margin too.
+// layout can run past the margin, or past the edge of the svg where it is cut off. Grow the drawing so every point of a drawn
+// edge keeps the margin too. The edges that only hold room for a group name are not drawn and do not count.
 function fitEdges(g) {
   const graph = g.graph();
-  const points = g.edges().flatMap((e) => g.edge(e).points);
+  const points = g.edges().filter((e) => e.name.startsWith('e')).flatMap((e) => g.edge(e).points);
   if (!points.length) return;
   const xs = points.map((p) => p.x);
   const ys = points.map((p) => p.y);
