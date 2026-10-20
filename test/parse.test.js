@@ -127,6 +127,41 @@ test('a title that starts with a word such as "A" or "I" keeps that word (#208)'
   ]);
 });
 
+test('the 27th panel keeps the P27 form', () => {
+  const src = Array.from({ length: 28 }, (_, i) => `## Panel ${i + 1}\n\nt`).join('\n\n');
+  const ids = parseDoc(src).panels.map((p) => p.id);
+  assert.deepEqual(ids.slice(24), ['Y', 'Z', 'P27', 'P28']);
+});
+
+test('an explicit ID past Z is read as an ID (#292)', () => {
+  const doc = parseDoc('## P27 First\n\na\n\n## P28 Second\n\nb');
+  assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
+    ['P27', 'First'],
+    ['P28', 'Second'],
+  ]);
+});
+
+test('error: two panels with the same explicit ID past Z are rejected (#292)', () => {
+  assert.throws(
+    () => parseDoc('## P27 One\n\na\n\n## P27 Two\n\nb\n'),
+    (err) => err instanceof ParseError
+      && /Duplicate panel ID "P27"/.test(err.message)
+      && /"## P27 One" \(L1\)/.test(err.message)
+      && /"## P27 Two" \(L5\)/.test(err.message),
+  );
+});
+
+test('an explicit P27 stops the automatic series from handing out a second P27 (#292)', () => {
+  const rest = Array.from({ length: 27 }, (_, i) => `## Panel ${i + 1}\n\nt`).join('\n\n');
+  const ids = parseDoc(`## P27 First\n\na\n\n${rest}`).panels.map((p) => p.id);
+  assert.equal(ids[0], 'P27');
+  assert.deepEqual(ids.slice(1), [
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+    'P28',
+  ]);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
 test('a letter is still an ID before a capitalized, non-Latin or numbered title', () => {
   const doc = parseDoc('## A Where data goes\nx\n## B 三次握手\ny\n## C1 `npm` scripts\nz\n## D 2024 results {span=2}\nw');
   assert.deepEqual(doc.panels.map((p) => [p.id, p.title]), [
