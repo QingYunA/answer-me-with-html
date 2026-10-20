@@ -49,6 +49,22 @@ test('kv: a line without a colon reports its relative line number', () => {
   throwsAt(() => render('kv', 'a: 1\n\n没有冒号'), 3);
 });
 
+test('kv: a fractional cols is an error, not an invalid grid that silently renders one column', () => {
+  throwsAt(() => render('kv', 'a: 1', 'cols=2.5'), 0);
+});
+
+test('kv: a fractional cols outside 1 to 6 is an error, not clamped to a whole number', () => {
+  throwsAt(() => render('kv', 'a: 1', 'cols=-3.5'), 0);
+  throwsAt(() => render('kv', 'a: 1', 'cols=9.5'), 0);
+});
+
+test('kv: cols values that already had a fallback keep it', () => {
+  assert.match(render('kv', 'a: 1', 'cols=abc'), /--kv-cols: 2/);
+  assert.match(render('kv', 'a: 1', 'cols=0'), /--kv-cols: 2/);
+  assert.match(render('kv', 'a: 1', 'cols=-3'), /--kv-cols: 1/);
+  assert.match(render('kv', 'a: 1', 'cols=9'), /--kv-cols: 6/);
+});
+
 // ── timeline ──
 test('timeline: horizontal by default; * marks a highlight; the third column is the description', () => {
   const html = render('timeline', '1979 | 启动 | AECMA 开始研究\n*Now | 免费下载');
