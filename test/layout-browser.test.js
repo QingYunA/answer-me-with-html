@@ -208,6 +208,28 @@ tickets -> code: build it
 \`\`\``,
 };
 
+const SCALED = `---
+title: Scale 1.25
+cols: 3
+lang: en
+---
+## A Table
+| Option | Result |
+|---|---|
+| Page text | grows |
+| Drawing text | stays put |
+| Drawing box | grows |
+
+${fillerEn('B', 1)}
+
+## C Pipeline
+\`\`\`flow LR
+(Idea) -> spec: write it
+spec -> tickets: split it
+tickets -> code: build it
+\`\`\`
+`;
+
 // A page whose grid gets narrower once it is laid out (a stand-in for a scrollbar that appears with the new row heights), so the width
 // the layout was planned for never holds. And a page with an image inside the grid, whose late load changes panel heights.
 const UNSTABLE = {
@@ -341,6 +363,14 @@ before(() => {
     writeFileSync(src, text);
     special[name] = render(src, name);
   }
+  // A page rendered while the config asks for a larger text scale.
+  const scaleConfig = join(tmp, 'home', 'config.json');
+  mkdirSync(join(tmp, 'home'), { recursive: true });
+  writeFileSync(scaleConfig, JSON.stringify({ scale: 1.25 }));
+  const scaled = join(tmp, 'drafts', 'scale.en.md');
+  writeFileSync(scaled, SCALED);
+  special['scale.en'] = render(scaled, 'scale.en');
+  rmSync(scaleConfig, { force: true });
 });
 
 const launch = async () => {
@@ -463,6 +493,34 @@ test('e2e: resizing re-lays out the page, and a phone width restores one column'
     await setWidth(DESKTOP);
     await waitFor("document.querySelector('.am-grid').style.display === 'flex'", `${name} to lay out again at ${DESKTOP}px`);
     assertJustified(name, DESKTOP, await measure(), p.ids);
+  }
+});
+
+test('e2e: scale 1.25 grows page text, keeps the toolbar fixed, and no panel overflows', { skip: SKIP, timeout: 120000 }, async () => {
+  if (!cdp) await launch();
+  const p = special['scale.en'];
+  assert.ok(p, 'the scaled page rendered');
+  for (const width of [DESKTOP, TABLET, PHONE]) {
+    await open(p.file, width);
+    if (width > 760) await waitFor(SETTLED, `the scaled page to lay out at ${width}px`);
+    const m = await measure();
+    const fonts = await evaluate(`(() => ({
+      body: getComputedStyle(document.body).fontSize,
+      th: getComputedStyle(document.querySelector('.am-md th')).fontSize,
+      toolbar: getComputedStyle(document.querySelector('.am-toolbar .am-btn')).fontSize,
+    }))()`);
+    assert.equal(fonts.body, '17.5px', `body text at ${width}px`);
+    assert.equal(fonts.th, '13.75px', `th at ${width}px`);
+    assert.equal(fonts.toolbar, '12px', `toolbar button at ${width}px`);
+    const diagram = await evaluate(`(() => {
+      const svg = document.querySelector('.am-diagram > svg[role="img"]'); // the drawing, not the expand button's icon
+      const { width: w, height: h } = svg.viewBox.baseVal; // not a regex: in this template string a regex escape would lose its backslash
+      return { width: Number(svg.getAttribute('width')), height: Number(svg.getAttribute('height')), w, h };
+    })()`);
+    assert.equal(diagram.width, Math.ceil(diagram.w * 1.25), `diagram width at ${width}px`);
+    assert.equal(diagram.height, Math.ceil(diagram.h * 1.25), `diagram height at ${width}px`);
+    assert.deepEqual(m.clipped.filter((x) => x.includes('(panel, wide)')), [], `no panel overflows at ${width}px`);
+    assert.ok(m.pageOverflow <= 0, `the page does not scroll sideways at ${width}px`);
   }
 });
 

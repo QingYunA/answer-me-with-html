@@ -340,6 +340,19 @@ test('cli config: shows every setting, its current value and the config file pat
   for (const key of ['open', 'theme', 'mode', 'style']) assert.match(r.out, new RegExp(`\\b${key}\\b`));
 });
 
+test('cli config: scale prints its range and step and accepts a number', async () => {
+  const listed = await run(['config']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /\bscale\s+1\s+.*\(0\.8–1\.5, step 0\.05\)/);
+  assert.equal((await run(['config', 'set', 'scale', '1.15'])).code, 0);
+  assert.equal((await run(['config', 'get', 'scale'])).out.trim(), '1.15');
+  const bad = await run(['config', 'set', 'scale', '1.13']);
+  assert.equal(bad.code, 2);
+  assert.match(bad.err, /0\.8/);
+  assert.match(bad.err, /0\.05/);
+  await run(['config', 'reset', 'scale']);
+});
+
 test('cli config: set / get / reset, changed values are marked with *', async () => {
   assert.equal((await run(['config', 'set', 'theme', 'shadcn'])).code, 0);
   assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'shadcn');
@@ -349,6 +362,35 @@ test('cli config: set / get / reset, changed values are marked with *', async ()
   assert.equal(rendered.code, 0);
   assert.equal((await run(['config', 'reset', 'theme'])).code, 0);
   assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'auto');
+});
+
+test('cli patch: keeps the page scale even when the config scale changed', async (t) => {
+  t.after(() => run(['config', 'reset', 'scale']));
+  // An older page has no data-scale: it stays at 1 even when config now says 1.25.
+  assert.equal((await run(['render', '-', '-o', 'plain-scale.html'], { stdin: '## A\nx\n\n## B\ny\n' })).code, 0);
+  assert.doesNotMatch(readFileSync(join(dir, 'plain-scale.html'), 'utf8'), /data-scale=/);
+  assert.equal((await run(['config', 'set', 'scale', '1.25'])).code, 0);
+  assert.equal((await run(['patch', 'plain-scale.html', '--panel', 'B'], { stdin: 'z\n' })).code, 0);
+  const plain = readFileSync(join(dir, 'plain-scale.html'), 'utf8');
+  assert.doesNotMatch(plain, /data-scale=|--am-scale:/);
+
+  assert.equal((await run(['render', '-', '-o', 'scaled.html'], { stdin: '## A\nx\n\n## B\ny\n' })).code, 0);
+  assert.match(readFileSync(join(dir, 'scaled.html'), 'utf8'), /data-scale="1\.25"/);
+  assert.equal((await run(['config', 'set', 'scale', '1.5'])).code, 0);
+  const r = await run(['patch', 'scaled.html', '--panel', 'B'], { stdin: 'z\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'scaled.html'), 'utf8');
+  assert.match(html, /data-scale="1\.25"/);
+  assert.match(html, /html \{ --am-scale: 1\.25; \}/);
+});
+
+test('cli video: never takes the config scale', async (t) => {
+  assert.equal((await run(['config', 'set', 'scale', '1.25'])).code, 0);
+  t.after(() => run(['config', 'reset', 'scale']));
+  const r = await run(['video', '-', '--voice', 'off', '-o', 'scaled-video.html'], { stdin: '## A\n> Narration.\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'scaled-video.html'), 'utf8');
+  assert.doesNotMatch(html, /data-scale=|--am-scale:/);
 });
 
 test('cli config: close_after_reply decides whether a rendered or patched page closes its tab after the reply is copied', async () => {

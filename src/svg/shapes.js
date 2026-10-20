@@ -54,6 +54,16 @@ export function svgOpen(width, height, label, dir = 'ltr') {
   return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(label)}"${direction} xmlns="http://www.w3.org/2000/svg">`;
 }
 
+// The page box of each generated diagram / chart svg, scaled by the reader's text size; the viewBox keeps the drawing's own units,
+// so Node's measured text layout stays exact. Only the svgOpen shape is rewritten (width and height equal the viewBox), never
+// another svg. Raw ```svg / ```html blocks bypass the component step, and a video never scales.
+const SVG_OPEN_BOX = /<svg viewBox="0 0 (\d+) (\d+)" width="\1" height="\2"/g;
+
+export function scaleSvgBoxes(html, scale = 1) {
+  if (scale === 1) return html;
+  return String(html).replace(SVG_OPEN_BOX, (tag, w, h) => `<svg viewBox="0 0 ${w} ${h}" width="${Math.ceil(w * scale)}" height="${Math.ceil(h * scale)}"`);
+}
+
 // A right-to-left page reads a drawing from the right: mirror(width) maps an x of the left-to-right layout to its mirror image
 // (the first node or participant on the right, arrows pointing left). Text is not mirrored, only placed.
 export const mirror = (width, rtl) => (rtl ? (x) => width - x : (x) => x);

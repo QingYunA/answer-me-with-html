@@ -55,5 +55,15 @@ test('type scale: typeScaleCss scales page text and keeps the toolbar and lightb
   assert.match(css, /\.am-toolbar, \.am-lightbox-header \{/);
   assert.match(css, /\.am-toolbar, \.am-lightbox-header \{[^}]*--am-fs-body: 14px;/);
   assert.match(css, /--am-fs-d-node: 13px;/);
-  assert.match(css, /--am-ln-annotRow: calc\(17px \* var\(--am-scale, 1\)\)/);
+  assert.match(css, /--am-ln-segLine: calc\(16px \* var\(--am-scale, 1\)\)/);
+});
+
+test('type scale: a line height plus a fixed offset is a calc, not a scaled combined length', () => {
+  // The timeline rule sits at the bottom of the time label (whenHeight) plus 7px; scaling 31px as a whole drifts at large scales.
+  assert.equal('whenRule' in LINES, false);
+  assert.match(read('src/themes/base.css'), /top: calc\(var\(--am-ln-whenHeight\) \+ 7px\)/);
+  // Each annotation note row is the note line (segLine) plus 1px; 17px scaled as a whole would drift away from its line.
+  assert.equal('annotRow' in LINES, false);
+  assert.match(read('src/themes/base.css'), /var\(--rows, 0\) \* \(var\(--am-ln-segLine\) \+ 1px\)/);
+  assert.doesNotMatch(typeScaleCss(), /--am-ln-(whenRule|annotRow):/);
 });

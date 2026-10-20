@@ -19,7 +19,7 @@ test('configPath: is AM_HOME/config.json', () => {
 });
 
 test('readConfig: returns the defaults when the file does not exist', () => {
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
 });
 
 test('setConfig: booleans accept on/off/true/false/`开`/`关` and are written to the file', () => {
@@ -51,7 +51,7 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   setConfig('open', 'off', env);
   setConfig('theme', 'shadcn', env);
   resetConfig('open', env);
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
   resetConfig(undefined, env);
   assert.equal(existsSync(configPath(env)), false);
 });
@@ -65,7 +65,28 @@ test('readConfig: falls back to the defaults with a warning when the file is bro
 
 test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false });
+  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
+});
+
+test('scale: a number from 0.8 to 1.5 in steps of 0.05, stored as a number', () => {
+  assert.equal(CONFIG_KEYS.scale.type, 'number');
+  assert.equal(CONFIG_KEYS.scale.default, 1);
+  assert.equal(readConfig(env).values.scale, 1);
+  setConfig('scale', '1.15', env);
+  assert.equal(readConfig(env).values.scale, 1.15);
+  assert.equal(typeof JSON.parse(readFileSync(configPath(env), 'utf8')).scale, 'number');
+  for (const bad of ['0.5', '2', 'big', '1.13']) {
+    assert.throws(() => setConfig('scale', bad, env), (e) => e instanceof ConfigError && /0\.8/.test(e.message) && /1\.5/.test(e.message) && /0\.05/.test(e.message), bad);
+  }
+  resetConfig('scale', env);
+  assert.equal(readConfig(env).values.scale, 1);
+});
+
+test('scale: an invalid stored value falls back to 1', () => {
+  writeFileSync(configPath(env), JSON.stringify({ scale: 1.13 }));
+  assert.equal(readConfig(env).values.scale, 1);
+  writeFileSync(configPath(env), JSON.stringify({ scale: '1.25' }));
+  assert.equal(readConfig(env).values.scale, 1.25);
 });
 
 test('CONFIG_KEYS: every key has a label', () => {

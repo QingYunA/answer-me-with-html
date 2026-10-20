@@ -226,7 +226,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
 .am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
 .am-timeline--h li::before {
-  content: ""; position: absolute; top: var(--am-ln-whenRule); left: 0; right: 0; border-top: var(--bw) solid var(--line);
+  content: ""; position: absolute; top: calc(var(--am-ln-whenHeight) + 7px); left: 0; right: 0; border-top: var(--bw) solid var(--line);
 }
 .am-timeline--h li:first-child::before { inset-inline-start: 50%; }
 .am-timeline--h li:last-child::before { inset-inline-end: 50%; }
@@ -269,7 +269,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-annot-scroll { overflow-x: auto; }
 .am-annot-line {
   position: relative; display: inline-block; white-space: pre; font: var(--am-fs-body)/1.6 var(--font-mono);
-  padding-bottom: calc(var(--rows, 0) * var(--am-ln-annotRow) + var(--am-ln-annotPad));
+  padding-bottom: calc(var(--rows, 0) * (var(--am-ln-segLine) + 1px) + var(--am-ln-annotPad));
 }
 .am-annot-line--wrap { display: block; white-space: normal; padding-bottom: 10px; }
 .am-annot-line--wrap .am-seg { white-space: nowrap; }
@@ -279,7 +279,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   border: 1px solid var(--accent); border-top: 0;
 }
 .am-seg-n {
-  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * var(--am-ln-annotRow));
+  position: absolute; inset-inline-start: 0; top: calc(100% + 8px + var(--row, 0) * (var(--am-ln-segLine) + 1px));
   font: var(--am-fs-label)/var(--am-ln-segLine) var(--font-sans); color: var(--accent); white-space: nowrap;
 }
 .am-seg--err { color: var(--err); }

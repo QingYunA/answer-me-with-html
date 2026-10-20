@@ -35,11 +35,12 @@ const ownLanguageFont = (t) => fontLanguages().map((l) => block(langSelector(l, 
 // it carries the Temml styles with their font, about 20 KB, so a page without math does not. chart: the page has a chart (src/components/chart.js); it carries chart.css. update: the page has the new-version button;
 // closeAfter: the page closes its tab after the reply is copied (the close_after_reply setting). theme: the name of the theme the page is rendered with;
 // when that theme has its own font (the `font` field), the page carries the font face, and a page of another theme does not.
-export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, update = false, closeAfter = false, theme } = {}) {
+// scale: the reader's text size. It sets --am-scale after the type scale (src/themes/type-scale.js), which every page size multiplies; 1 adds nothing.
+export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, update = false, closeAfter = false, theme, scale = 1 } = {}) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const fontFace = FONT_CSS[list.find((t) => t.name === theme)?.font];
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...(fontFace ? [fontFace] : []), ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...(fontFace ? [fontFace] : []), ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page

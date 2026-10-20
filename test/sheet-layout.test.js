@@ -99,7 +99,7 @@ test('sheet: an author span larger than cols is rendered clamped to cols', () =>
 // beside a full-width panel. The browser behaviour itself is checked in test/layout-browser.test.js (AM_E2E=1).
 test('sheet: table panels get readable column widths, phones keep cells two words wide, narrow print uses one column', () => {
   const { html } = renderDoc(`---\ncols: 3\nlang: en\n---\n## A Runs\n${table(4)}\n\n## B Note\nText.\n`);
-  assert.match(html, /function comfortableWidth\(table\)/);
+  assert.match(html, /function comfortableWidth\(table, scale\)/);
   assert.match(html, /function fitTables\(\)/);
   assert.match(html, /capDiagrams\(plan\.maxScale\);\s*fitTables\(\);/);
   assert.match(html, /@media print and \(max-width: 1100px\) \{\s*\.am-grid \{ grid-template-columns: minmax\(0, 1fr\); \}\s*\.am-grid > \.am-panel \{ grid-column: auto !important; \}/);

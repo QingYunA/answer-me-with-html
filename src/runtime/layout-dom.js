@@ -12,12 +12,17 @@ if (panels.length > 1) {
   const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css
   const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns
   const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples
+  // The width floors are text sizes (px at scale 1). They take the page scale on every pass, so a runtime change of --am-scale re-plans.
   const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line
   const TABLE_COL_MIN = 96; // per table column, px
   const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line
   const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line
   const DIAGRAM_MIN = 160;
   const RESIZE_DELAY = 150;
+  const pageScale = () => {
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--am-scale'));
+    return Number.isFinite(scale) && scale > 0 ? scale : 1;
+  };
   const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';
 
   // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.
@@ -45,7 +50,7 @@ if (panels.length > 1) {
   // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and
   // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).
   const columnWidths = new Map();
-  function comfortableWidth(table) {
+  function comfortableWidth(table, scale) {
     const saved = table.getAttribute('style');
     const columns = (width) => {
       table.style.width = width;
@@ -56,7 +61,7 @@ if (panels.length > 1) {
     if (saved === null) table.removeAttribute('style');
     else table.setAttribute('style', saved);
     // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.
-    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT)));
+    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));
     columnWidths.set(table, { least, want });
     return want.reduce((sum, w) => sum + w, 0);
   }
@@ -77,6 +82,7 @@ if (panels.length > 1) {
   // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.
   // Only one panel is displayed while it is measured, so each width change lays out that panel alone.
   function measure(width) {
+    const scale = pageScale();
     grid.style.display = 'block';
     for (const el of panels) {
       el.style.display = 'none';
@@ -96,10 +102,10 @@ if (panels.length > 1) {
       const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;
       const natural = svg ? naturalWidth(svg) : 0;
       const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);
-      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t) + el.offsetWidth - t.parentElement.clientWidth);
+      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t, scale) + el.offsetWidth - t.parentElement.clientWidth);
       // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.
-      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN + el.offsetWidth - kv.clientWidth);
-      const floor = svg ? Math.max(DIAGRAM_MIN, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN, shrunk, tableCols * TABLE_COL_MIN + 34, ...tableFloors, ...kvs);
+      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN * scale + el.offsetWidth - kv.clientWidth);
+      const floor = svg ? Math.max(DIAGRAM_MIN * scale, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN * scale, shrunk, tableCols * TABLE_COL_MIN * scale + 34, ...tableFloors, ...kvs);
       const from = Math.min(width, Math.floor(floor / STEP) * STEP);
       const samples = [];
       let fits = null;

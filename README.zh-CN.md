@@ -172,7 +172,7 @@ Server -> Client: SYN-ACK
 | 任意 Agent | `/answer-me-with-html config open off`，或者直接说"别再自动弹浏览器了" |
 | 终端 | `am config` 查看，`am config set open off` 修改，`am config reset` 恢复默认 |
 
-配置项有 `open`（自动打开浏览器）、`theme`、`mode`（亮色或暗色）、`style`（写作检查）、`update_check`、`close_after_reply`（复制回复后关闭标签页）和 `voice`（视频配音）。默认值和可选值见[参考](docs/reference.zh-CN.md#配置)。
+配置项有 `open`（自动打开浏览器）、`theme`、`mode`（亮色或暗色）、`style`（写作检查）、`scale`（页面文字大小，图表跟着变大）、`update_check`、`close_after_reply`（复制回复后关闭标签页）和 `voice`（视频配音）。默认值和可选值见[参考](docs/reference.zh-CN.md#配置)。
 
 ## 高频模式（推荐）
 

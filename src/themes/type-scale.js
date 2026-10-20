@@ -1,5 +1,5 @@
 // Type scale: one source of truth for every text size a page uses. Page CSS reads --am-fs-* (page text) and --am-ln-* (a length a line
-// of text sets); --am-scale scales both, and is 1 until a later PR sets it. Drawing text stays in viewBox units under --am-fs-d-*,
+// of text sets); --am-scale scales both, and is 1 unless the reader sets a scale (the `scale` setting). Drawing text stays in viewBox units under --am-fs-d-*,
 // because Node measures the diagram at those sizes; the whole drawing box takes the factor instead.
 
 export const SCALE = Object.freeze({ min: 0.8, max: 1.5, step: 0.05 });
@@ -40,11 +40,9 @@ export const DRAWING = Object.freeze({
 
 // px lengths a line of text sets: they grow with the text they hold.
 export const LINES = Object.freeze({
-  annotRow: 17,
   annotPad: 14,
   segLine: 16,
   whenHeight: 24,
-  whenRule: 31,
   limitsTick: 16,
   treeBadge: 15,
 });
