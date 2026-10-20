@@ -18,6 +18,7 @@ export default {
     },
     theme: 'ערכת עיצוב', modeLabel: 'מצב',
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
+    scale: { down: 'הקטנת הטקסט', up: 'הגדלת הטקסט' },
     copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',
     update: { button: 'גרסה חדשה {version}', current: 'הגרסה שלכם {current}. הגרסה החדשה נמצאה כשהדף נוצר.', whatsNew: 'מה חדש בגרסה:', run: 'הריצו בטרמינל:', agent: 'או בקשו מה-Agent:', agentText: 'עדכן את answer-me-with-html', notes: 'מה חדש' },
     live: { updated: 'הדף עודכן', reload: 'רענון' },

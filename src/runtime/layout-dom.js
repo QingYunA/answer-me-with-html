@@ -214,6 +214,8 @@ if (panels.length > 1) {
   };
   justify();
   addEventListener('resize', later);
+  // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.
+  addEventListener('am-scale', later);
   addEventListener('beforeprint', () => {
     printing = true;
     toPrint();

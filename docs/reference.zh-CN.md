@@ -346,7 +346,7 @@ am serve --public-url https://pages.example.com   # 链接使用这个地址，�
 | `theme` | `auto` | 默认主题：`auto`（长文用 paper，有图表用 blueprint）、`blueprint`、`shadcn`、`paper`，或你自己的主题 |
 | `mode` | `auto` | 默认明暗：`auto`、`light` 或 `dark` |
 | `style` | `80` | 写作检查：`off`、`80`（只提醒）或 `strict`（不达标不生成） |
-| `scale` | `1` | 页面文字大小：0.8–1.5，步长 0.05。1.2 表示放大 20%；图表跟着变大 |
+| `scale` | `1` | 页面文字大小：0.8–1.5，步长 0.05。1.2 表示放大 20%；图表跟着变大。工具栏的 A− / A+ 也能调整；选择会记在这个浏览器里，并优先于这个设置，但在 `am serve` 下只在当前标签页内有效 |
 | `update_check` | `on` | 每天向 GitHub 查一次新版本并提醒你，不会自己更新 |
 | `close_after_reply` | `off` | 复制回复后 3 秒关闭页面标签页，带倒计时和「保持打开」按钮。见下方说明 |
 | `voice` | `auto` | 视频配音：`auto`（有 `ELEVENLABS_API_KEY` 用 ElevenLabs，否则用系统语音）、`elevenlabs`、`local`、`system` 或 `off` |

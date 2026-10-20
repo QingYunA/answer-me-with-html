@@ -346,7 +346,7 @@ am serve --public-url https://pages.example.com   # links use this address, for 
 | `theme` | `auto` | Default theme: `auto` (paper for long text, blueprint for diagrams), `blueprint`, `shadcn`, `paper`, or your own theme |
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
-| `scale` | `1` | Text size on the page: 0.8–1.5 in steps of 0.05. 1.2 makes text 20% larger; diagrams and charts grow with it |
+| `scale` | `1` | Text size on the page: 0.8–1.5 in steps of 0.05. 1.2 makes text 20% larger; diagrams and charts grow with it. The toolbar's A− / A+ buttons change it too; the choice is remembered in this browser and wins over this setting, but under `am serve` it lasts for the tab only |
 | `update_check` | `on` | Check GitHub for a new version once a day and mention it. Never updates by itself |
 | `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |

@@ -20,6 +20,7 @@ export default {
     },
     theme: 'テーマ', modeLabel: '表示',
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
+    scale: { down: '文字を小さく', up: '文字を大きく' },
     copy: '原稿をコピー', done: 'コピーしました ✓', copyCode: 'コピー',
     update: { button: '新バージョン {version}', current: '現在は {current}。このページの作成時に見つかりました。', whatsNew: '今回の更新：', run: 'ターミナルで実行：', agent: 'または Agent に伝える：', agentText: 'answer-me-with-html を更新して', notes: '更新内容を見る' },
     live: { updated: 'ページが更新されました', reload: '再読み込み' },

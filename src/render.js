@@ -9,6 +9,7 @@ import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
+import { SCALE } from './themes/type-scale.js';
 import { VERSION, RUNTIME_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
@@ -273,6 +274,15 @@ function lightboxShell(ui, hasDiagrams) {
 // Seconds the page waits before it closes its tab; the page shows the countdown (src/runtime/close-after-reply.js).
 const CLOSE_AFTER_SECONDS = 3;
 
+// The toolbar's text-size buttons. They carry the range from SCALE and start hidden: the runtime reads the numbers off them and
+// reveals them, so a reader without JavaScript gets no button that cannot do anything.
+function scaleButtons(ui) {
+  const range = `data-min="${SCALE.min}" data-max="${SCALE.max}" data-step="${SCALE.step}"`;
+  const button = (action, label, text) =>
+    `<button class="am-btn" type="button" data-am="${action}" ${range} aria-label="${esc(label)}" title="${esc(label)}" hidden>${text}</button>`;
+  return `${button('scale-down', ui.scale.down, 'A−')}${button('scale-up', ui.scale.up, 'A+')}`;
+}
+
 function shell({ meta, language, body, source, embedded, update, closeAfter, scale }) {
   const { ui, labelKey } = language;
   const notice = updateNotice(ui, update, labelKey);
@@ -297,6 +307,7 @@ ${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--dif
 <div class="am-toolbar"${rootCarrierAttrs(root)}>
 ${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
+${scaleButtons(ui)}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>

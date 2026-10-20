@@ -14,6 +14,89 @@
     select.addEventListener('change', () => root.setAttribute(attr, select.value));
   }
 
+  // ── Text size ─────────────────────────────
+  // A− / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow
+  // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no
+  // second copy of the numbers. A reader's choice is remembered in this browser and wins over the page's own scale; where storage
+  // is off (am serve, file://) it lasts for this tab, and the click still works.
+  const scaleDown = document.querySelector('[data-am="scale-down"]');
+  const scaleUp = document.querySelector('[data-am="scale-up"]');
+  if (scaleDown && scaleUp) {
+    const min = Number(scaleDown.dataset.min);
+    const max = Number(scaleDown.dataset.max);
+    const step = Number(scaleDown.dataset.step);
+    const storeKey = 'am-scale';
+    let value;
+
+    const inRange = (n) => Number.isFinite(n) && n >= min && n <= max;
+    const savedScale = () => {
+      try {
+        return Number(localStorage.getItem(storeKey));
+      } catch {
+        return NaN;
+      }
+    };
+    const saveScale = (n) => {
+      try {
+        localStorage.setItem(storeKey, String(n));
+      } catch {
+        // Storage may be off (am serve, file://); the size then lasts until the tab closes.
+      }
+    };
+
+    const updateButtons = () => {
+      scaleDown.disabled = value <= min;
+      scaleUp.disabled = value >= max;
+    };
+
+    // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.
+    const setScale = (next, remember = false) => {
+      value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));
+      root.style.setProperty('--am-scale', String(value));
+      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role="img"]')) {
+        const box = svg.viewBox?.baseVal;
+        if (!box || !(box.width > 0) || !(box.height > 0)) continue;
+        svg.setAttribute('width', String(Math.ceil(box.width * value)));
+        svg.setAttribute('height', String(Math.ceil(box.height * value)));
+      }
+      updateButtons();
+      if (remember) saveScale(value);
+      window.dispatchEvent(new Event('am-scale'));
+    };
+
+    // A page with no stored choice is left exactly as it was rendered: no inline variable, no svg rewrite, no extra layout pass.
+    value = parseFloat(getComputedStyle(root).getPropertyValue('--am-scale')) || 1;
+    updateButtons();
+    const saved = savedScale();
+    if (inRange(saved) && saved !== value) setScale(saved);
+    scaleDown.hidden = false;
+    scaleUp.hidden = false;
+    scaleDown.addEventListener('click', () => setScale(value - step, true));
+    scaleUp.addEventListener('click', () => setScale(value + step, true));
+  }
+
+  // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size
+  // buttons, so open at that end: Theme, Mode and A− / A+ are reached by scrolling toward the start. A reader scroll leaves the
+  // position we set, so a later resize does not pull the toolbar back.
+  if (carrier) {
+    const rtl = getComputedStyle(carrier).direction === 'rtl';
+    let lastProgrammatic = null;
+    let readerScrolled = false;
+    const scrollToEnd = () => {
+      if (carrier.scrollWidth <= carrier.clientWidth) return;
+      // Chrome keeps a right-to-left box's scrollLeft negative; the browser clamps either value to the real end.
+      carrier.scrollTo({ left: rtl ? -carrier.scrollWidth : carrier.scrollWidth });
+      lastProgrammatic = carrier.scrollLeft;
+    };
+    carrier.addEventListener('scroll', () => {
+      if (Math.abs(carrier.scrollLeft - lastProgrammatic) > 1) readerScrolled = true;
+    });
+    scrollToEnd();
+    addEventListener('resize', () => {
+      if (!readerScrolled) scrollToEnd();
+    });
+  }
+
   const copyText = async (text) => {
     try {
       await navigator.clipboard.writeText(text);

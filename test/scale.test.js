@@ -6,9 +6,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderDoc } from '../src/render.js';
+import { renderVideo } from '../src/video/render.js';
 import { readPage } from '../src/page.js';
 import { scaleSvgBoxes, svgOpen } from '../src/svg/shapes.js';
 import { minSpan } from '../src/templates/sheet.js';
+import { SCALE } from '../src/themes/type-scale.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -106,4 +108,35 @@ test('scale: every catalog theme page font size follows --am-scale', () => {
     const literal = [...bare.matchAll(/\bfont(?:-size)?\s*:\s*([^;{}]+)/g)].filter(([, value]) => /\b\d+(?:\.\d+)?px\b/.test(value));
     assert.deepEqual(literal.map(([decl]) => decl), [], file);
   }
+});
+
+test('scale: the toolbar shows a hidden A− / A+ that carry the range from SCALE', () => {
+  const html = renderDoc('---\nlang: en\n---\n## A\nText.\n').html;
+  const range = `data-min="${SCALE.min}" data-max="${SCALE.max}" data-step="${SCALE.step}"`;
+  for (const [action, label, text] of [['scale-down', 'Smaller text', 'A−'], ['scale-up', 'Larger text', 'A+']]) {
+    const button = html.match(new RegExp(`<button class="am-btn" type="button" data-am="${action}"[^>]*>[^<]*</button>`))?.[0];
+    assert.ok(button, `${action} is on the page`);
+    assert.match(button, / hidden>/, `${action} is hidden until the runtime reveals it`);
+    assert.ok(button.includes(range), `${action} carries the range`);
+    assert.ok(button.includes(`aria-label="${label}" title="${label}"`), `${action} is labelled for a reader`);
+    assert.ok(button.endsWith(`>${text}</button>`), `${action} shows ${text}`);
+  }
+});
+
+test('scale: the buttons carry the labels of the page language', () => {
+  const cases = [
+    ['zh', '缩小文字', '放大文字'],
+    ['ja', '文字を小さく', '文字を大きく'],
+    ['he', 'הקטנת הטקסט', 'הגדלת הטקסט'],
+  ];
+  for (const [lang, down, up] of cases) {
+    const html = renderDoc(`---\nlang: ${lang}\n---\n## A\nText.\n`).html;
+    assert.ok(html.includes(`aria-label="${down}"`), `${lang} names the smaller-text button`);
+    assert.ok(html.includes(`aria-label="${up}"`), `${lang} names the larger-text button`);
+  }
+});
+
+test('scale: a video page has no text-size buttons', async () => {
+  const { html } = await renderVideo('---\ntitle: Video\nlang: en\n---\n> Hello.\n\n## One\n> World.\n');
+  assert.doesNotMatch(html, /data-am="scale-(?:down|up)"/);
 });

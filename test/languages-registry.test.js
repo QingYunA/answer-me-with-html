@@ -56,3 +56,12 @@ test('languages: includes diagram viewer labels (expand, close, diagram)', () =>
     assert.equal(typeof entry.ui.diagram, 'string', `${entry.id} missing ui.diagram`);
   }
 });
+
+test('languages: every language names the toolbar text-size buttons', () => {
+  for (const entry of LANGUAGES) {
+    for (const key of ['down', 'up']) {
+      const label = entry.ui.scale?.[key];
+      assert.ok(typeof label === 'string' && label.length > 0, `${entry.id} has no ui.scale.${key}`);
+    }
+  }
+});

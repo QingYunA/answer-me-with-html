@@ -12,6 +12,7 @@ export default {
     },
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
+    scale: { down: 'Smaller text', up: 'Larger text' },
     copy: 'Copy source', done: 'Copied ✓', copyCode: 'Copy',
     update: { button: 'New version {version}', current: 'You have {current}. Found when this page was made.', whatsNew: "What's new:", run: 'Run in a terminal:', agent: 'Or tell your agent:', agentText: 'Update answer-me-with-html', notes: "See what's new" },
     live: { updated: 'Page updated', reload: 'Reload' },
