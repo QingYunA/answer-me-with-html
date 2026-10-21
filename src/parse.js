@@ -136,11 +136,22 @@ function splitSections(lines, start) {
 }
 
 // A pipe table needs a delimiter row (|---|---|) under its header, with as many cells as the header. Without one, GFM renders
-// every row as a line of text with the pipes in it, so the page shows no table. A | splits a cell unless it is escaped,
-// also inside a code span, as in GFM.
-const TABLE_ROW = /^\s*\|.*\|\s*$/;
+// every row as a line of text with the pipes in it, so the page shows no table. A | splits a cell unless an odd number of
+// backslashes comes before it, also inside a code span, as in GFM. A row indented four spaces or a tab is code, not a table.
+const TABLE_ROW = /^(?! {4}|\t)\s*\|.*\|\s*$/;
 const DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
-const cellCount = (row) => row.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).length;
+
+function cellCount(row) {
+  const text = row.trim();
+  const pipes = [];
+  let slashes = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '|' && slashes % 2 === 0) pipes.push(i);
+    slashes = text[i] === '\\' ? slashes + 1 : 0;
+  }
+  // The pipes at the start and end of a row close the outer cells; they do not start new ones.
+  return pipes.length + 1 - (pipes[0] === 0 ? 1 : 0) - (pipes.at(-1) === text.length - 1 ? 1 : 0);
+}
 
 function checkTables(lines, first) {
   lines.forEach((header, k) => {

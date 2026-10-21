@@ -200,6 +200,8 @@ test('valid tables, and pipe lines in code blocks, pass the table check', () => 
     '| a | b |\n|---|---|\n| 1 | 2 |',
     '| a | b |\n| :-- | --: |',
     '| a \\| x | b |\n|---|---|',
+    '| a \\\\| b |\n|---|---|',
+    '文本\n\n    | a | b |\n    | 1 | 2 |',
     'a | b\n--- | ---\n1 | 2',
     '文本\n| a | b |\n|---|---|',
     '| 只有一行 |',

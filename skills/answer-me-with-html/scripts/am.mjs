@@ -2539,9 +2539,18 @@ function splitSections(lines, start) {
   flushMd();
   return { intro, panels };
 }
-var TABLE_ROW = /^\s*\|.*\|\s*$/;
+var TABLE_ROW = /^(?! {4}|\t)\s*\|.*\|\s*$/;
 var DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
-var cellCount = (row) => row.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).length;
+function cellCount(row) {
+  const text2 = row.trim();
+  const pipes = [];
+  let slashes = 0;
+  for (let i = 0; i < text2.length; i++) {
+    if (text2[i] === "|" && slashes % 2 === 0) pipes.push(i);
+    slashes = text2[i] === "\\" ? slashes + 1 : 0;
+  }
+  return pipes.length + 1 - (pipes[0] === 0 ? 1 : 0) - (pipes.at(-1) === text2.length - 1 ? 1 : 0);
+}
 function checkTables(lines, first) {
   lines.forEach((header, k2) => {
     const next = lines[k2 + 1];
