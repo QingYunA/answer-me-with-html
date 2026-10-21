@@ -759,7 +759,7 @@ test('cli render: a failed stdin draft is saved verbatim under drafts/ and its p
   const { home, env } = freshHome();
   const r = await run(['render', '-'], { stdin: THREE_ERRORS, env });
   const path = r.err.match(/^ {2}draft: (.+)$/m)[1];
-  assert.ok(path.startsWith(join(home, 'drafts') + '/'), path);
+  assert.equal(dirname(path), join(home, 'drafts'));
   assert.match(basename(path), /^[^/]+-\d{8}-\d{6}\.md$/);
   assert.equal(readFileSync(path, 'utf8'), THREE_ERRORS);
 });
