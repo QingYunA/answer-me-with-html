@@ -153,10 +153,30 @@ function cellCount(row) {
   return pipes.length + 1 - (pipes[0] === 0 ? 1 : 0) - (pipes.at(-1) === text.length - 1 ? 1 : 0);
 }
 
+// Lines inside an HTML block are raw HTML, not Markdown, as CommonMark reads them: a <pre>, <script>, <style> or <textarea>
+// block runs to its closing tag; any other tag at the start of a line runs to the next blank line.
+const RAW_HTML_BLOCK = /^ {0,3}<(pre|script|style|textarea)(?=[\s>]|$)/i;
+const HTML_BLOCK = /^ {0,3}<\/?[A-Za-z][\w-]*(?=[\s/>]|$)/;
+
+function htmlLines(lines) {
+  let close = null;
+  return lines.map((line) => {
+    if (close) {
+      if (close.test(line)) close = null;
+      return true;
+    }
+    const raw = line.match(RAW_HTML_BLOCK);
+    if (raw) close = new RegExp(`</${raw[1]}>`, 'i').test(line.slice(raw[0].length)) ? null : new RegExp(`</${raw[1]}>`, 'i');
+    else if (HTML_BLOCK.test(line)) close = /^\s*$/;
+    return Boolean(raw) || close !== null;
+  });
+}
+
 function checkTables(lines, first) {
+  const html = htmlLines(lines);
   lines.forEach((header, k) => {
     const next = lines[k + 1];
-    if (!TABLE_ROW.test(header) || TABLE_ROW.test(lines[k - 1] ?? '') || next === undefined || !TABLE_ROW.test(next)) return;
+    if (html[k] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k - 1] ?? '') || next === undefined || !TABLE_ROW.test(next)) return;
     const cells = cellCount(header);
     const delimiter = `|${'---|'.repeat(cells)}`;
     if (!DELIMITER_ROW.test(next)) {

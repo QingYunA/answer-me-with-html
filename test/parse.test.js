@@ -186,6 +186,11 @@ test('error: a table without a delimiter row reports its header line and shows t
   );
 });
 
+test('error: a table after an HTML block that has ended is checked', () => {
+  assert.throws(() => parseDoc('## A\n<pre>x</pre>\n| a | b |\n| 1 | 2 |'), (err) => err instanceof ParseError && err.line === 3);
+  assert.throws(() => parseDoc('## A\n<div>\nx\n</div>\n\n| a | b |\n| 1 | 2 |'), (err) => err instanceof ParseError && err.line === 6);
+});
+
 test('error: a delimiter row with a different number of cells than the header', () => {
   assert.throws(
     () => parseDoc('## A\n| a | b |\n|---|\n| 1 | 2 |'),
@@ -205,6 +210,8 @@ test('valid tables, and pipe lines in code blocks, pass the table check', () => 
     'a | b\n--- | ---\n1 | 2',
     '文本\n| a | b |\n|---|---|',
     '| 只有一行 |',
+    '<pre>\n| a |\n| b |\n</pre>',
+    '<div>\n| a | b |\n| 1 | 2 |\n</div>',
     '```text\n| a | b |\n| 1 | 2 |\n```',
   ]) {
     assert.doesNotThrow(() => parseDoc(`## A\n${body}`), body);

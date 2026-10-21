@@ -2551,10 +2551,26 @@ function cellCount(row) {
   }
   return pipes.length + 1 - (pipes[0] === 0 ? 1 : 0) - (pipes.at(-1) === text2.length - 1 ? 1 : 0);
 }
+var RAW_HTML_BLOCK = /^ {0,3}<(pre|script|style|textarea)(?=[\s>]|$)/i;
+var HTML_BLOCK = /^ {0,3}<\/?[A-Za-z][\w-]*(?=[\s/>]|$)/;
+function htmlLines(lines) {
+  let close = null;
+  return lines.map((line) => {
+    if (close) {
+      if (close.test(line)) close = null;
+      return true;
+    }
+    const raw = line.match(RAW_HTML_BLOCK);
+    if (raw) close = new RegExp(`</${raw[1]}>`, "i").test(line.slice(raw[0].length)) ? null : new RegExp(`</${raw[1]}>`, "i");
+    else if (HTML_BLOCK.test(line)) close = /^\s*$/;
+    return Boolean(raw) || close !== null;
+  });
+}
 function checkTables(lines, first) {
+  const html = htmlLines(lines);
   lines.forEach((header, k2) => {
     const next = lines[k2 + 1];
-    if (!TABLE_ROW.test(header) || TABLE_ROW.test(lines[k2 - 1] ?? "") || next === void 0 || !TABLE_ROW.test(next)) return;
+    if (html[k2] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k2 - 1] ?? "") || next === void 0 || !TABLE_ROW.test(next)) return;
     const cells = cellCount(header);
     const delimiter = `|${"---|".repeat(cells)}`;
     if (!DELIMITER_ROW.test(next)) {
