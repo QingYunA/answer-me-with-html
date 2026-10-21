@@ -2696,7 +2696,7 @@ function coerce(key, value) {
   return value;
 }
 
-// ../../../node_modules/marked/lib/marked.esm.js
+// node_modules/marked/lib/marked.esm.js
 function I() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -5232,7 +5232,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
-// ../../../node_modules/@dagrejs/dagre/dist/dagre.esm.js
+// node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
 var In = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Sn = (e, n) => {
