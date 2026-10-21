@@ -839,6 +839,7 @@ function reportError(e, fail) {
   }
   if (e instanceof ParseError) {
     fail(`✗ ${e.line ? `L${e.line} ` : ''}Cannot parse the draft: ${e.message}`);
+    if (e.example) fail(`  Correct example:\n${e.example.replace(/^/gm, '    ')}`);
     return 1;
   }
   if (e instanceof LintError) {

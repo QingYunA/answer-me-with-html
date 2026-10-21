@@ -2430,10 +2430,11 @@ function loadThemes(home, { extra } = {}) {
 
 // src/parse.js
 var ParseError = class extends Error {
-  constructor(message, line) {
+  constructor(message, line, example) {
     super(message);
     this.name = "ParseError";
     this.line = line;
+    this.example = example;
   }
 };
 var CHOICES = Object.freeze({
@@ -2502,6 +2503,7 @@ function splitSections(lines, start) {
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l3) => l3.trim())) {
+      checkTables(mdBuf.lines, mdBuf.line);
       current.blocks.push({ type: "md", text: mdBuf.lines.join("\n"), line: mdBuf.line });
     }
     mdBuf = null;
@@ -2536,6 +2538,32 @@ function splitSections(lines, start) {
   }
   flushMd();
   return { intro, panels };
+}
+var TABLE_ROW = /^\s*\|.*\|\s*$/;
+var DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+var cellCount = (row) => row.trim().replace(/^\|/, "").replace(/(?<!\\)\|$/, "").split(/(?<!\\)\|/).length;
+function checkTables(lines, first) {
+  lines.forEach((header, k2) => {
+    const next = lines[k2 + 1];
+    if (!TABLE_ROW.test(header) || TABLE_ROW.test(lines[k2 - 1] ?? "") || next === void 0 || !TABLE_ROW.test(next)) return;
+    const cells = cellCount(header);
+    const delimiter = `|${"---|".repeat(cells)}`;
+    if (!DELIMITER_ROW.test(next)) {
+      throw new ParseError(
+        `table has no delimiter row: put ${delimiter} on the line under the header row`,
+        first + k2,
+        [header.trim(), delimiter, next.trim()].join("\n")
+      );
+    }
+    if (cellCount(next) !== cells) {
+      const row = lines[k2 + 2];
+      throw new ParseError(
+        `the table header has ${cells} cells but its delimiter row has ${cellCount(next)}: write one --- per header cell`,
+        first + k2,
+        [header.trim(), delimiter, ...row !== void 0 && TABLE_ROW.test(row) ? [row.trim()] : []].join("\n")
+      );
+    }
+  });
 }
 function findFenceClose(lines, openIdx, marker) {
   const closeRe = new RegExp(`^${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
@@ -8540,11 +8568,11 @@ var WIDE_TABLE_COLS = 4;
 var TABLE_COLS_PER_SPAN = 2;
 var DIAGRAM_PX_PER_SPAN = 560;
 var CELL_SEP = /(?<!\\)\|/;
-var DELIMITER_ROW = /^\|[\s:|-]+\|?$/;
+var DELIMITER_ROW2 = /^\|[\s:|-]+\|?$/;
 function tableColumns(blocks) {
   const counts = blocks.filter((b) => b.type === "md").flatMap((b) => {
     const lines = b.text.split("\n").map((l3) => l3.trim());
-    return lines.flatMap((l3, i) => l3.startsWith("|") && DELIMITER_ROW.test(lines[i + 1] ?? "") ? [l3.split(CELL_SEP).length - 2] : []);
+    return lines.flatMap((l3, i) => l3.startsWith("|") && DELIMITER_ROW2.test(lines[i + 1] ?? "") ? [l3.split(CELL_SEP).length - 2] : []);
   });
   return Math.max(0, ...counts);
 }
@@ -12533,6 +12561,8 @@ ${e.example.replace(/^/gm, "    ")}`);
   }
   if (e instanceof ParseError) {
     fail(`\u2717 ${e.line ? `L${e.line} ` : ""}Cannot parse the draft: ${e.message}`);
+    if (e.example) fail(`  Correct example:
+${e.example.replace(/^/gm, "    ")}`);
     return 1;
   }
   if (e instanceof LintError) {

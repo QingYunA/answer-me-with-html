@@ -179,6 +179,36 @@ test('error: an unclosed fenced block reports its start line', () => {
   );
 });
 
+test('error: a table without a delimiter row reports its header line and shows the fix', () => {
+  assert.throws(
+    () => parseDoc('## A\n文本\n\n| 事 | 影响 |\n| 误提交 | 混进了 PR |'),
+    (err) => err instanceof ParseError && err.line === 4 && /delimiter row/.test(err.message) && err.example === '| 事 | 影响 |\n|---|---|\n| 误提交 | 混进了 PR |',
+  );
+});
+
+test('error: a delimiter row with a different number of cells than the header', () => {
+  assert.throws(
+    () => parseDoc('## A\n| a | b |\n|---|\n| 1 | 2 |'),
+    (err) => err instanceof ParseError && err.line === 2 && /2 cells.*1/.test(err.message) && err.example.startsWith('| a | b |\n|---|---|'),
+  );
+  // A | inside a code span still splits a cell, as in GFM: the header has 3 cells.
+  assert.throws(() => parseDoc('## A\n| a | `x|y` |\n|---|---|'), (err) => err instanceof ParseError && err.line === 2);
+});
+
+test('valid tables, and pipe lines in code blocks, pass the table check', () => {
+  for (const body of [
+    '| a | b |\n|---|---|\n| 1 | 2 |',
+    '| a | b |\n| :-- | --: |',
+    '| a \\| x | b |\n|---|---|',
+    'a | b\n--- | ---\n1 | 2',
+    '文本\n| a | b |\n|---|---|',
+    '| 只有一行 |',
+    '```text\n| a | b |\n| 1 | 2 |\n```',
+  ]) {
+    assert.doesNotThrow(() => parseDoc(`## A\n${body}`), body);
+  }
+});
+
 test('error: unclosed frontmatter', () => {
   assert.throws(() => parseDoc('---\ntitle: x\n## A'), (err) => err instanceof ParseError && err.line === 1);
 });

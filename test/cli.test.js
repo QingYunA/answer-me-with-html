@@ -194,6 +194,13 @@ test('cli render: a parse error gives the line number', async () => {
   assert.match(r.err, /✗ L2 Cannot parse the draft: fenced block/);
 });
 
+test('cli render: a table without a delimiter row fails with the header line and a correct example', async () => {
+  const r = await run(['render', '-'], { stdin: '## A\n| 位置 | 删了什么 |\n| staging 库 | 整库重建 |\n' });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /✗ L2 Cannot parse the draft: table has no delimiter row: put \|---\|---\| on the line under the header row/);
+  assert.match(r.err, /Correct example:\n {4}\| 位置 \| 删了什么 \|\n {4}\|---\|---\|\n {4}\| staging 库 \| 整库重建 \|/);
+});
+
 test('cli render: duplicate explicit panel IDs fail with the second line and a fix', async () => {
   const r = await run(['render', '-'], { stdin: '---\ntitle: Dup\n---\n\n## A First\n\nalpha\n\n## A Second\n\nbeta\n' });
   assert.equal(r.code, 1);

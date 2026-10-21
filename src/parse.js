@@ -4,10 +4,11 @@
 import { themeNames, AUTO } from './themes/registry.js';
 
 export class ParseError extends Error {
-  constructor(message, line) {
+  constructor(message, line, example) {
     super(message);
     this.name = 'ParseError';
     this.line = line;
+    this.example = example;
   }
 }
 
@@ -95,6 +96,7 @@ function splitSections(lines, start) {
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l) => l.trim())) {
+      checkTables(mdBuf.lines, mdBuf.line);
       current.blocks.push({ type: 'md', text: mdBuf.lines.join('\n'), line: mdBuf.line });
     }
     mdBuf = null;
@@ -131,6 +133,37 @@ function splitSections(lines, start) {
   }
   flushMd();
   return { intro, panels };
+}
+
+// A pipe table needs a delimiter row (|---|---|) under its header, with as many cells as the header. Without one, GFM renders
+// every row as a line of text with the pipes in it, so the page shows no table. A | splits a cell unless it is escaped,
+// also inside a code span, as in GFM.
+const TABLE_ROW = /^\s*\|.*\|\s*$/;
+const DELIMITER_ROW = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+const cellCount = (row) => row.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '').split(/(?<!\\)\|/).length;
+
+function checkTables(lines, first) {
+  lines.forEach((header, k) => {
+    const next = lines[k + 1];
+    if (!TABLE_ROW.test(header) || TABLE_ROW.test(lines[k - 1] ?? '') || next === undefined || !TABLE_ROW.test(next)) return;
+    const cells = cellCount(header);
+    const delimiter = `|${'---|'.repeat(cells)}`;
+    if (!DELIMITER_ROW.test(next)) {
+      throw new ParseError(
+        `table has no delimiter row: put ${delimiter} on the line under the header row`,
+        first + k,
+        [header.trim(), delimiter, next.trim()].join('\n'),
+      );
+    }
+    if (cellCount(next) !== cells) {
+      const row = lines[k + 2];
+      throw new ParseError(
+        `the table header has ${cells} cells but its delimiter row has ${cellCount(next)}: write one --- per header cell`,
+        first + k,
+        [header.trim(), delimiter, ...(row !== undefined && TABLE_ROW.test(row) ? [row.trim()] : [])].join('\n'),
+      );
+    }
+  });
 }
 
 function findFenceClose(lines, openIdx, marker) {
