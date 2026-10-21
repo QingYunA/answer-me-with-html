@@ -2506,6 +2506,8 @@ function parseFrontmatter(lines, base, allowed) {
   }
   const meta = { ...base };
   for (const [key, { value, line }] of Object.entries(entries)) {
+    const fraction = fractionalCount(key, value, line);
+    if (fraction) throw fraction;
     if (allowed[key] && !allowed[key].includes(String(value))) {
       throw new ParseError(`Invalid ${key} value "${value}". Choose one of: ${allowed[key].join(" | ")}`, line);
     }
@@ -2547,6 +2549,7 @@ function splitSections(lines, start, errors) {
     if (heading) {
       flushMd();
       current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [] };
+      errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1)).filter(Boolean));
       panels.push(current);
       continue;
     }
@@ -2690,6 +2693,12 @@ function stripLineComment(line) {
     if (c === "#" && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
   }
   return line;
+}
+var COUNT_KEYS = /* @__PURE__ */ new Set(["cols", "span", "rows"]);
+function fractionalCount(key, value, line) {
+  if (!COUNT_KEYS.has(key) || typeof value !== "string" || !value.trim()) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
 }
 function coerce(key, value) {
   if (NUMERIC_KEYS.has(key) && /^\d+$/.test(value)) return Number(value);

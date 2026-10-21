@@ -37,6 +37,29 @@ test('frontmatter: uses the defaults when absent', () => {
   );
 });
 
+test('error: a fractional cols, span or rows is rejected where it is read (#308)', () => {
+  for (const value of ['2.5', '-3.5', '9.5', '.5']) {
+    assert.throws(
+      () => parseDoc(`---\ntitle: x\ncols: ${value}\n---\n## A\nbody`),
+      (err) => err instanceof ParseError && err.line === 3 && err.message === `cols must be a whole number, not "${value}"`,
+    );
+  }
+  // Every fractional span and rows of the draft is reported in one parse.
+  assert.throws(
+    () => parseDoc('## A {span=2.5}\na\n## B {rows=1.5}\nb'),
+    (err) => err.errors?.length === 2
+      && err.errors[0].line === 1 && err.errors[0].message === 'span must be a whole number, not "2.5"'
+      && err.errors[1].line === 3 && err.errors[1].message === 'rows must be a whole number, not "1.5"',
+  );
+});
+
+test('a whole, out-of-range or non-numeric cols, span or rows keeps its fallback (#308)', () => {
+  for (const value of ['3', 'abc', '0', '-2', '999999', '2.0']) {
+    assert.doesNotThrow(() => parseDoc(`---\ncols: ${value}\n---\n## A {span=${value} rows=${value}}\nbody`), value);
+  }
+  assert.doesNotThrow(() => parseDoc('## A {span}\nbody'));
+});
+
 test('panel split: explicit ID, title, attributes, line number', () => {
   const doc = parseDoc(SAMPLE);
   assert.equal(doc.panels.length, 2);
