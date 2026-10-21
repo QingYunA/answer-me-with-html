@@ -1,59 +1,53 @@
-<!-- release 0.5.6 -->
+<!-- release 0.5.7 -->
 
-## Text size
+## Fix a draft in place
 
-Pages can now be read at a larger or smaller size (#302):
+When a draft has errors, `am render` now lists every one of them at once, in line order, instead of stopping at the first (#314):
 
-```bash
-am config set scale 1.2    # 0.8 to 1.5, in steps of 0.05; 1 is the default
+```
+✗ L6 [flow] flow: unclosed shape bracket, missing )
+✗ L9 Cannot parse the draft: table has no delimiter row: put |---|---| on the line under the header row
+✗ L14 [flow] flow: unclosed shape bracket, missing )
+✗ 3 errors in the draft; no page was written
+  draft: ~/.answer-me-with-html/drafts/My-page-20261021-104551.md
 ```
 
-- Every text size on the page grows or shrinks with the setting. Diagrams and charts grow as a whole, so their text still fits its boxes. The toolbar keeps its size.
-- **A− / A+** in the page toolbar change the size on the page itself. The browser remembers the choice for the next pages; under `am serve` it lasts for the tab.
-- On a phone the toolbar scrolls sideways, so Theme and Mode can be reached again.
-- Catalog themes follow the setting. Run `am theme update` to get the new versions.
-
-Built in four steps: #306, #307, #309, #310.
+- A draft sent on stdin (`am render -`) that fails, or renders with warnings, is saved under `drafts/` in the data directory, and its path is printed. Every `L<line>` matches that file.
+- The agent changes only the flagged lines in that file and runs `am render <path>`, instead of writing the whole draft again. Once it renders with no warnings, the saved draft is deleted.
+- `am clean` removes old drafts the same way as old pages.
+- Frontmatter errors and an unclosed fence still stop at once, because nothing after them can be read.
 
 ## Other changes
 
-- **Questions:** the suggested option in an `ask` block no longer starts selected, so a reader who skips a question does not look as if they answered it. The reply says `(not answered; suggested: X)` (#289).
-- **New catalog theme:** Anthropic Clay, a muted reading theme with light and dark modes: `am theme add anthropic-clay` (#297).
-- When the data directory cannot be written (a sandbox that allows writes only in the workspace), pages go to a private folder in the system temporary folder, with a notice (#295).
-- `flow` rejects Mermaid-style node IDs such as `A[Start]` with a clear error, instead of drawing extra nodes (#296).
-- Duplicate panel IDs are an error (#278). Panels past the 26th get `P27`, `P28` …, which a draft can also write, and the duplicate check sees them (#304).
-- A draft saved as UTF-8 with BOM keeps its `# Title` (#290).
-- `kv cols=2.5` is an error instead of a grid that silently drops to one column (#303).
-- Sequence-diagram notes and the donut total are drawn at the size they were measured for (#306).
+- **Tables:** a table with no `|---|` row under its header, or with a different number of cells in that row, is an error with a corrected example, instead of rows of text full of pipes (#313).
+- **Layout:** a fractional `cols`, `span` or `rows` (such as `cols: 2.5`) is an error, instead of invalid CSS that took the whole sheet down to one column (#315).
+- **Diagrams:** a long `flow` edge routed around the outside of the layout is no longer cut off at the edge of the drawing (#312).
 
-**Full list:** #278, #289, #290, #293, #295, #296, #297, #303, #304, #306, #307, #309, #310.
+**Full list:** #312, #313, #314, #315.
 
 ---
 
-## 文字大小
+## 在原文件里修草稿
 
-页面文字现在可以放大或缩小（#302）：
+草稿有错误时，`am render` 现在按行号一次列出全部错误，不再遇到第一处就停（#314）：
 
-```bash
-am config set scale 1.2    # 0.8 到 1.5，步长 0.05；默认是 1
+```
+✗ L6 [flow] flow: unclosed shape bracket, missing )
+✗ L9 Cannot parse the draft: table has no delimiter row: put |---|---| on the line under the header row
+✗ L14 [flow] flow: unclosed shape bracket, missing )
+✗ 3 errors in the draft; no page was written
+  draft: ~/.answer-me-with-html/drafts/My-page-20261021-104551.md
 ```
 
-- 页面上所有文字都会跟着这个设置放大或缩小。图表整体缩放，所以图里的文字仍然放得进框里。工具栏保持原来的大小。
-- 页面工具栏的 **A− / A+** 可以直接在页面上调整。浏览器会记住你的选择，之后打开的页面也用这个大小；用 `am serve` 打开时，只在当前标签页有效。
-- 手机上的工具栏可以左右滑动，主题和模式选择又能点到了。
-- 主题市场里的主题也会跟随这个设置。运行 `am theme update` 获取新版本。
-
-分四步完成：#306、#307、#309、#310。
+- 从 stdin 传入的草稿（`am render -`）渲染失败或有警告时，会保存到数据目录的 `drafts/` 里，并打印路径。报错里的每个 `L<行号>` 都对应这个文件。
+- agent 只改这个文件里报错的行，再运行 `am render <路径>`，不用把整份草稿重写一遍。渲染成功且没有警告后，保存的草稿会被删除。
+- `am clean` 会像清理旧页面一样清理旧草稿。
+- frontmatter 错误和未闭合的代码块仍然立即停下，因为后面的内容已经无法读取。
 
 ## 其他改动
 
-- **问题**：`ask` 代码块里的建议选项不再默认选中，没作答的读者不会看起来像是已经回答了。回复里写的是 `(not answered; suggested: X)`（#289）。
-- **新主题**：陶土书院（Anthropic Clay），一款色调柔和的阅读主题，支持浅色和深色：`am theme add anthropic-clay`（#297）。
-- 数据目录不能写入时（宿主沙箱只允许写工作区），页面会存到系统临时目录里的私有文件夹，并给出提示（#295）。
-- `flow` 遇到 Mermaid 风格的节点 ID（如 `A[Start]`）会给出明确的错误，不再画出多余的节点（#296）。
-- 面板 ID 重复会报错（#278）。第 26 个之后的面板编号为 `P27`、`P28`……，草稿里也可以手写，重复检查同样能发现（#304）。
-- 以带 BOM 的 UTF-8 保存的草稿，`# 标题` 不再丢失（#290）。
-- `kv cols=2.5` 会报错，不再悄悄变成单列（#303）。
-- 时序图的注释和环形图中间的总数，按测量时的字号绘制（#306）。
+- **表格**：表头下面缺少 `|---|` 分隔行，或分隔行的列数和表头不一致，会报错并给出改正后的示例，不再输出成一行行带竖线的文字（#313）。
+- **布局**：`cols`、`span`、`rows` 写成小数（如 `cols: 2.5`）会报错，不再写出无效的 CSS 让整个面板网格变成一列（#315）。
+- **图表**：`flow` 图里绕到外侧的长连线，不再在图的边缘被裁掉（#312）。
 
-**完整列表：** #278、#289、#290、#293、#295、#296、#297、#303、#304、#306、#307、#309、#310。
+**完整列表：** #312、#313、#314、#315。

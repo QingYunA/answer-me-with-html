@@ -1,28 +1,28 @@
 {
-  "version": "0.5.6",
+  "version": "0.5.7",
   "en": [
-    "Text size: A− / A+ in the toolbar, or `am config set scale 1.2`",
-    "A suggested option no longer starts selected in a question",
-    "New catalog theme: Anthropic Clay (`am theme add anthropic-clay`)"
+    "Every draft error is listed at once; a stdin draft is kept for line edits",
+    "A table with no |---| row is an error instead of plain text",
+    "Long flow edges are no longer cut off at the edge of the diagram"
   ],
   "zh": [
-    "文字大小：工具栏的 A− / A+，或 `am config set scale 1.2`",
-    "问题里的建议选项不再默认选中",
-    "新主题：陶土书院（`am theme add anthropic-clay`）"
+    "草稿错误一次列全；stdin 草稿会保存下来，只改出错的行",
+    "表格缺少 |---| 分隔行时报错，不再输出成一行行竖线",
+    "flow 图里绕到外侧的长连线不再被裁掉"
   ],
   "zh-Hant": [
-    "文字大小：工具列的 A− / A+，或 `am config set scale 1.2`",
-    "問題裡的建議選項不再預設選中",
-    "新主題：陶土書院（`am theme add anthropic-clay`）"
+    "草稿錯誤一次列全；stdin 草稿會保存下來，只改出錯的行",
+    "表格缺少 |---| 分隔行時報錯，不再輸出成一行行豎線",
+    "flow 圖裡繞到外側的長連線不再被裁掉"
   ],
   "ja": [
-    "文字サイズ：ツールバーの A− / A+、または `am config set scale 1.2`",
-    "質問の推奨オプションが最初から選択されなくなりました",
-    "新しいテーマ：Anthropic Clay（`am theme add anthropic-clay`）"
+    "下書きのエラーを一度にすべて表示し、stdin の下書きを保存して該当行だけ直せます",
+    "表に |---| の区切り行がないとエラーになり、テキストのまま出力されません",
+    "flow 図で外側を回る長い線が切れなくなりました"
   ],
   "he": [
-    "גודל טקסט: A− / A+ בסרגל הכלים, או `am config set scale 1.2`",
-    "אפשרות מומלצת בשאלה כבר לא מסומנת מראש",
-    "ערכת נושא חדשה: Anthropic Clay (`am theme add anthropic-clay`)"
+    "כל שגיאות הטיוטה מוצגות בבת אחת; טיוטה מ-stdin נשמרת לתיקון שורות",
+    "טבלה בלי שורת |---| היא שגיאה, ולא טקסט רגיל",
+    "קווים ארוכים בתרשים flow כבר לא נחתכים בשולי התרשים"
   ]
 }
