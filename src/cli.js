@@ -362,7 +362,8 @@ function draftTitle(src) {
   return m?.[1] ?? '';
 }
 
-// The absolute path of the saved draft, or null when neither the data directory nor the temporary folder can be written.
+// The absolute path of the saved draft, or null when neither the data directory nor the temporary folder can take it. Saving is a side
+// step: a page may already be written, so any file-system error only moves on to the next folder.
 function saveDraft(src, { env, io }) {
   const name = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
   const home = amHome(env);
@@ -372,8 +373,8 @@ function saveDraft(src, { env, io }) {
       const dir = folder();
       mkdirSync(dir, { recursive: true });
       return writeNew(dir, name, src);
-    } catch (e) {
-      if (!(isDenied(e) || e instanceof UnsafeTempHome)) throw e;
+    } catch {
+      // Try the next folder.
     }
   }
   return null;
@@ -403,8 +404,7 @@ function keepDraft(result, src, from, ctx) {
     try {
       rmSync(from.file, { force: true });
     } catch (e) {
-      if (!isDenied(e)) throw e;
-      ctx.fail(`! Kept the draft ${from.file} (permission denied, ${e.code})`);
+      ctx.fail(`! Kept the draft ${from.file} (${e.code ?? e.message})`);
     }
   }
 }

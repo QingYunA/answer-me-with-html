@@ -31,7 +31,7 @@ test('skill: errors are read all at once and fixed in the saved draft, not in a 
   assert.match(read, /lists every error of the draft at once, in line order/);
   assert.match(read, /`  draft: <path>`/);
   assert.match(read, /Change only the flagged lines in that file with your file-edit tool; do not send a new heredoc/);
-  assert.match(read, /`am render <path>` \(add `--replace <page path>` when a page was written\)/);
+  assert.match(read, /`am render <path>`; when a page was written, add `--replace` or reuse `-o` as the rule on rendering again below says/);
   assert.match(read, /Retry at most 2 rounds/);
 });
 

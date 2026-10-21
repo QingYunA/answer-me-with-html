@@ -12219,8 +12219,7 @@ function saveDraft(src, { env, io }) {
       const dir = folder();
       mkdirSync4(dir, { recursive: true });
       return writeNew(dir, name, src);
-    } catch (e) {
-      if (!(isDenied(e) || e instanceof UnsafeTempHome)) throw e;
+    } catch {
     }
   }
   return null;
@@ -12245,8 +12244,7 @@ function keepDraft(result, src, from, ctx) {
     try {
       rmSync7(from.file, { force: true });
     } catch (e) {
-      if (!isDenied(e)) throw e;
-      ctx.fail(`! Kept the draft ${from.file} (permission denied, ${e.code})`);
+      ctx.fail(`! Kept the draft ${from.file} (${e.code ?? e.message})`);
     }
   }
 }

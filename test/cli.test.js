@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main, oldNodeHint } from '../src/cli.js';
+import { tempHome } from '../src/home.js';
 
 let dir;
 before(() => { dir = mkdtempSync(join(tmpdir(), 'am-test-')); });
@@ -816,6 +817,29 @@ test('cli render: a stdin draft with STE warnings is saved and the page is still
   assert.match(r.out, /STE 1 warning/);
   const path = r.out.match(/^ {2}draft: (.+)$/m)[1];
   assert.equal(readFileSync(path, 'utf8'), src);
+  assert.equal(readdirSync(join(home, 'pages')).length, 1);
+});
+
+test('cli render: a draft that cannot be saved does not fail a render that wrote its page', async () => {
+  const { home, env } = freshHome();
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, 'drafts'), 'a file where the drafts folder goes');
+  // The fallback is the temporary folder: point it at this test's folder, with a file in the way there too.
+  const tmp = mkdtempSync(join(dir, 'tmp-'));
+  const saved = Object.fromEntries(['TMPDIR', 'TEMP', 'TMP'].map((k) => [k, process.env[k]]));
+  Object.assign(process.env, { TMPDIR: tmp, TEMP: tmp, TMP: tmp });
+  let r;
+  try {
+    writeFileSync(tempHome(), 'a file where the temporary folder goes');
+    r = await run(['render', '-'], { stdin: '## A\nUtilize the tool.', env });
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+  assert.equal(r.code, 0, r.err);
+  assert.doesNotMatch(r.out, /draft: /);
   assert.equal(readdirSync(join(home, 'pages')).length, 1);
 });
 
