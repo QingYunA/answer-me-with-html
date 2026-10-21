@@ -1,6 +1,6 @@
 // Draft → single-file HTML. Pipeline: parse → STE lint → render panels (markdown / components / raw) → apply template → inline CSS and runtime.
 
-import { parseDoc, ParseError, applyOverrides, CHOICES } from './parse.js';
+import { parseDocLoose, ParseError, raiseAll, applyOverrides, CHOICES } from './parse.js';
 import { md, collectHtmlNotes } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
@@ -47,7 +47,7 @@ export class LintError extends Error {
 // scale: the reader's text size (src/themes/type-scale.js); 1 is the default, so it adds nothing to the page.
 export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update, closeAfter = false, scale = 1 } = {}) {
   const choices = { theme: themes.choices('page') };
-  const parsed = parseDoc(source, { defaults, choices });
+  const { doc: parsed, errors } = parseDocLoose(source, { defaults, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
   if (meta.template === 'video') throw new ParseError('template: video is a video draft; render it with am video', 0);
   const problem = themes.problem(meta.theme, 'page');
@@ -57,15 +57,22 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
 
   const language = resolveLanguage({ declared: doc.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc.meta.style === 'off' ? [] : lintDoc(doc, language);
-  if (doc.meta.style === 'strict' && warnings.length) throw new LintError(warnings);
+  if (doc.meta.style === 'strict' && warnings.length) {
+    raiseAll(errors); // the draft errors come first: they have to be fixed anyway
+    throw new LintError(warnings);
+  }
 
   const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
-  const loose = doc.intro.find((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
-  if (loose) throw new RenderError(`${loose.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: loose.line, component: loose.lang, example: COMPONENTS.get(loose.lang).example });
-  const introHtml = renderBlocks(doc.intro, ctx);
+  const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
+  // A panel-only component in the intro is an error of its own, and the block renders nothing.
+  const loose = doc.intro.filter((b) => b.type === 'fence' && COMPONENTS.get(b.lang)?.panelOnly);
+  for (const b of loose) {
+    errors.push(new RenderError(`${b.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: b.line, component: b.lang, example: COMPONENTS.get(b.lang).example }));
+  }
+  const introHtml = renderBlocks(doc.intro.filter((b) => !loose.includes(b)), ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
+  raiseAll(errors);
   const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language });
   // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).
   const body = language.dir === 'rtl' ? isolateLtrRuns(page) : page;
@@ -78,15 +85,28 @@ function hasVisuals({ intro, panels }) {
   return [...intro, ...panels.flatMap((p) => p.blocks)].some((b) => b.type === 'fence' && (COMPONENTS.has(b.lang) || RAW_LANGS.has(b.lang)));
 }
 
+// ctx.errors: an array that collects the RenderError of each block, so one run finds every broken block; a failing block renders
+// nothing and the next one goes on. Without it the first error throws. The caller throws what was collected (raiseAll in src/parse.js).
 export function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
-    const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)), { math: !ctx.video });
-    noteHtml(b, notes.filter((n) => !n.math), ctx);
-    noteMath(b, notes.filter((n) => n.math), ctx);
-    const out = embedImages(b, result, ctx);
-    noteRemoteImages(b, out, ctx);
-    return out;
+    if (!ctx.errors) return renderBlock(b, ctx);
+    try {
+      return renderBlock(b, ctx);
+    } catch (err) {
+      if (!(err instanceof RenderError)) throw err;
+      ctx.errors.push(err);
+      return '';
+    }
   }).join('\n');
+}
+
+function renderBlock(b, ctx) {
+  const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)), { math: !ctx.video });
+  noteHtml(b, notes.filter((n) => !n.math), ctx);
+  noteMath(b, notes.filter((n) => n.math), ctx);
+  const out = embedImages(b, result, ctx);
+  noteRemoteImages(b, out, ctx);
+  return out;
 }
 
 // Each remote image of one block, with the draft line that names it. The page blocks remote content (src/csp.js), so the image would be blank.

@@ -713,3 +713,118 @@ test('render / patch: a newer version in state.json puts the new-version button 
     rmSync(join(dir, 'state.json'), { force: true });
   }
 });
+
+// ── every draft error at once, and the kept draft ──
+
+const THREE_ERRORS = [
+  '## A 一', '```flow', 'A -> (未闭合 -> C', '```', '', // L1-L5
+  '## B 二', '| a | b |', '| 1 | 2 |', '', // L6-L9
+  '## C 三', '```flow', 'X -> (又一个 -> Y', '```', '', // L10-L14
+].join('\n');
+
+function freshHome() {
+  const home = mkdtempSync(join(dir, 'home-'));
+  return { home, env: { AM_HOME: home } };
+}
+
+test('cli render: every draft error is listed in line order, with a summary, and no page is written', async () => {
+  const { home, env } = freshHome();
+  const r = await run(['render', '-'], { stdin: THREE_ERRORS, env });
+  assert.equal(r.code, 1);
+  const lines = [...r.err.matchAll(/^✗ L(\d+) /gm)].map((m) => Number(m[1]));
+  assert.deepEqual(lines, [3, 7, 12]);
+  assert.match(r.err, /\[flow\].*\n {2}Correct example:[^]*Full syntax: am help flow[^]*✗ L7 Cannot parse the draft: table has no delimiter row[^]*✗ L12 \[flow\]/);
+  assert.match(r.err, /✗ 3 errors in the draft; no page was written/);
+  assert.ok(!existsSync(join(home, 'pages')), 'no page');
+});
+
+test('cli render: a single draft error prints as before, without a summary', async () => {
+  const { env } = freshHome();
+  const r = await run(['render', '-'], { stdin: '## A\n```flow\nA -> (未闭合 -> C\n```\n', env });
+  assert.equal(r.code, 1);
+  assert.doesNotMatch(r.err, /errors in the draft/);
+});
+
+test('cli render: errors past 20 are folded into a count', async () => {
+  const { env } = freshHome();
+  const blocks = Array.from({ length: 23 }, () => '```flow\nA -> (x -> B\n```\n').join('\n');
+  const r = await run(['render', '-'], { stdin: `## A\n${blocks}`, env });
+  assert.equal(r.code, 1);
+  assert.equal([...r.err.matchAll(/^✗ L\d+ /gm)].length, 20);
+  assert.match(r.err, /… 3 more/);
+  assert.match(r.err, /✗ 23 errors in the draft/);
+});
+
+test('cli render: a failed stdin draft is saved verbatim under drafts/ and its path is printed', async () => {
+  const { home, env } = freshHome();
+  const r = await run(['render', '-'], { stdin: THREE_ERRORS, env });
+  const path = r.err.match(/^ {2}draft: (.+)$/m)[1];
+  assert.ok(path.startsWith(join(home, 'drafts') + '/'), path);
+  assert.match(basename(path), /^[^/]+-\d{8}-\d{6}\.md$/);
+  assert.equal(readFileSync(path, 'utf8'), THREE_ERRORS);
+});
+
+test('cli render: a strict STE failure and a fatal parse error with a line keep the stdin draft too', async () => {
+  const { home, env } = freshHome();
+  const strict = await run(['render', '-', '--style', 'strict'], { stdin: '## A\nUtilize the tool.', env });
+  assert.equal(strict.code, 1);
+  assert.match(strict.err, /^ {2}draft: /m);
+  const fatal = await run(['render', '-'], { stdin: '## A\n```flow\nA -> B', env });
+  assert.match(fatal.err, /^ {2}draft: /m);
+  assert.equal(readdirSync(join(home, 'drafts')).length, 2);
+});
+
+test('cli render: an error without a draft line (an empty draft, a bad option) saves nothing', async () => {
+  const { home, env } = freshHome();
+  await run(['render', '-', '--theme', 'nope'], { stdin: '## A\ntext', env });
+  assert.ok(!existsSync(join(home, 'drafts')));
+});
+
+test('cli render: a failed draft given as a file argument is not copied and prints no draft line', async () => {
+  const { home, env } = freshHome();
+  const file = join(dir, 'broken-file.md');
+  writeFileSync(file, THREE_ERRORS);
+  const r = await run(['render', file], { env });
+  assert.equal(r.code, 1);
+  assert.doesNotMatch(r.err, /^ {2}draft: /m);
+  assert.ok(!existsSync(join(home, 'drafts')));
+});
+
+test('cli render: a draft in drafts/ is deleted once it renders with no warnings, and kept while it has warnings', async () => {
+  const { home, env } = freshHome();
+  const clean = await run(['render', '-'], { stdin: THREE_ERRORS.replace('(未闭合 -> C', 'B -> C').replace('(又一个 -> Y', 'X -> Y').replace('| 1 | 2 |', '|---|---|\n| 1 | 2 |'), env });
+  assert.equal(clean.code, 0, clean.err);
+  assert.ok(!existsSync(join(home, 'drafts')), 'a clean render from stdin saves nothing');
+
+  const draft = join(home, 'drafts', 'x-20260101-000000.md');
+  mkdirSync(join(home, 'drafts'), { recursive: true });
+  writeFileSync(draft, '## A\nUtilize the tool.');
+  const warned = await run(['render', draft], { env });
+  assert.equal(warned.code, 0);
+  assert.ok(existsSync(draft), 'warnings keep the draft');
+  writeFileSync(draft, GOOD);
+  const ok = await run(['render', draft], { env });
+  assert.equal(ok.code, 0, ok.err);
+  assert.ok(!existsSync(draft), 'a clean render deletes the draft');
+});
+
+test('cli render: a stdin draft with STE warnings is saved and the page is still written', async () => {
+  const { home, env } = freshHome();
+  const src = '## A\nUtilize the tool.';
+  const r = await run(['render', '-'], { stdin: src, env });
+  assert.equal(r.code, 0);
+  assert.match(r.out, /STE 1 warning/);
+  const path = r.out.match(/^ {2}draft: (.+)$/m)[1];
+  assert.equal(readFileSync(path, 'utf8'), src);
+  assert.equal(readdirSync(join(home, 'pages')).length, 1);
+});
+
+test('cli video: a failed stdin video draft is saved under drafts/ as well', async () => {
+  const { home, env } = freshHome();
+  const src = '---\ntitle: V\n---\n## A\n| a | b |\n| 1 | 2 |\n> 一句。\n';
+  const r = await run(['video', '-', '--voice', 'off'], { stdin: src, env });
+  assert.equal(r.code, 1);
+  const path = r.err.match(/^ {2}draft: (.+)$/m)[1];
+  assert.equal(readFileSync(path, 'utf8'), src);
+  assert.ok(path.startsWith(join(home, 'drafts')));
+});

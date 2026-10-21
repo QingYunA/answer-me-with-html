@@ -2437,6 +2437,17 @@ var ParseError = class extends Error {
     this.example = example;
   }
 };
+var DraftErrors = class extends Error {
+  constructor(errors) {
+    super(`${errors.length} errors in the draft`);
+    this.name = "DraftErrors";
+    this.errors = [...errors].sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+  }
+};
+function raiseAll(errors) {
+  if (errors.length === 1) throw errors[0];
+  if (errors.length) throw new DraftErrors(errors);
+}
 var CHOICES = Object.freeze({
   template: ["sheet", "doc", "video"],
   theme: [AUTO, ...themeNames("page")],
@@ -2467,13 +2478,19 @@ var PANEL_HEADING = /^##\s+(.+?)\s*$/;
 var ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 var PANEL_ID = /^([A-Z][0-9]{0,2})\s+(?![\s\p{Ll}])(.+)$/u;
 var ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
-function parseDoc(source, { defaults: defaults2 = {}, choices = {} } = {}) {
+function parseDoc(source, options) {
+  const { doc: doc2, errors } = parseDocLoose(source, options);
+  raiseAll(errors);
+  return doc2;
+}
+function parseDocLoose(source, { defaults: defaults2 = {}, choices = {} } = {}) {
   const lines = String(source).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults2 }, { ...CHOICES, ...choices });
-  const sections = splitSections(lines, bodyStart);
+  const errors = [];
+  const sections = splitSections(lines, bodyStart, errors);
   const intro = extractTitle(sections.intro, meta);
   const panels = assignIds(sections.panels);
-  return { meta, intro, panels };
+  return { doc: { meta, intro, panels }, errors };
 }
 function parseFrontmatter(lines, base, allowed) {
   if (lines[0]?.trim() !== "---") return { meta: { ...base }, bodyStart: 0 };
@@ -2496,14 +2513,14 @@ function parseFrontmatter(lines, base, allowed) {
   }
   return { meta, bodyStart: end + 1 };
 }
-function splitSections(lines, start) {
+function splitSections(lines, start, errors) {
   const intro = [];
   const panels = [];
   let current = { blocks: intro };
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l3) => l3.trim())) {
-      checkTables(mdBuf.lines, mdBuf.line);
+      errors.push(...checkTables(mdBuf.lines, mdBuf.line));
       current.blocks.push({ type: "md", text: mdBuf.lines.join("\n"), line: mdBuf.line });
     }
     mdBuf = null;
@@ -2568,26 +2585,27 @@ function htmlLines(lines) {
 }
 function checkTables(lines, first) {
   const html = htmlLines(lines);
-  lines.forEach((header, k2) => {
+  return lines.flatMap((header, k2) => {
     const next = lines[k2 + 1];
-    if (html[k2] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k2 - 1] ?? "") || next === void 0 || !TABLE_ROW.test(next)) return;
+    if (html[k2] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k2 - 1] ?? "") || next === void 0 || !TABLE_ROW.test(next)) return [];
     const cells = cellCount(header);
     const delimiter = `|${"---|".repeat(cells)}`;
     if (!DELIMITER_ROW.test(next)) {
-      throw new ParseError(
+      return [new ParseError(
         `table has no delimiter row: put ${delimiter} on the line under the header row`,
         first + k2,
         [header.trim(), delimiter, next.trim()].join("\n")
-      );
+      )];
     }
     if (cellCount(next) !== cells) {
       const row = lines[k2 + 2];
-      throw new ParseError(
+      return [new ParseError(
         `the table header has ${cells} cells but its delimiter row has ${cellCount(next)}: write one --- per header cell`,
         first + k2,
         [header.trim(), delimiter, ...row !== void 0 && TABLE_ROW.test(row) ? [row.trim()] : []].join("\n")
-      );
+      )];
     }
+    return [];
   });
 }
 function findFenceClose(lines, openIdx, marker) {
@@ -2678,7 +2696,7 @@ function coerce(key, value) {
   return value;
 }
 
-// node_modules/marked/lib/marked.esm.js
+// ../../../node_modules/marked/lib/marked.esm.js
 function I() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -5214,7 +5232,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
-// node_modules/@dagrejs/dagre/dist/dagre.esm.js
+// ../../../node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
 var In = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Sn = (e, n) => {
@@ -9495,7 +9513,7 @@ var LintError = class extends Error {
 };
 function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = BUILTIN, previousLanguage, baseDir, codeDir, knownImages, knownCode, update: update2, closeAfter = false, scale = 1 } = {}) {
   const choices = { theme: themes2.choices("page") };
-  const parsed = parseDoc(source, { defaults: defaults2, choices });
+  const { doc: parsed, errors } = parseDocLoose(source, { defaults: defaults2, choices });
   const meta = applyOverrides(parsed.meta, overrides, { ...CHOICES, ...choices });
   if (meta.template === "video") throw new ParseError("template: video is a video draft; render it with am video", 0);
   const problem = themes2.problem(meta.theme, "page");
@@ -9503,14 +9521,20 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   const doc2 = { ...parsed, meta: meta.theme === AUTO ? { ...meta, theme: pickTheme({ scope: "page", template: meta.template, visuals: hasVisuals(parsed) }) } : meta };
   const language = resolveLanguage({ declared: doc2.meta.lang, previous: previousLanguage, text: source });
   const warnings = doc2.meta.style === "off" ? [] : lintDoc(doc2, language);
-  if (doc2.meta.style === "strict" && warnings.length) throw new LintError(warnings);
+  if (doc2.meta.style === "strict" && warnings.length) {
+    raiseAll(errors);
+    throw new LintError(warnings);
+  }
   const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
-  const ctx = { seq: 0, stats, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
-  const loose = doc2.intro.find((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
-  if (loose) throw new RenderError(`${loose.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: loose.line, component: loose.lang, example: COMPONENTS.get(loose.lang).example });
-  const introHtml = renderBlocks(doc2.intro, ctx);
+  const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
+  const loose = doc2.intro.filter((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
+  for (const b of loose) {
+    errors.push(new RenderError(`${b.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: b.line, component: b.lang, example: COMPONENTS.get(b.lang).example }));
+  }
+  const introHtml = renderBlocks(doc2.intro.filter((b) => !loose.includes(b)), ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
+  raiseAll(errors);
   const page = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui, language });
   const body = language.dir === "rtl" ? isolateLtrRuns(page) : page;
   const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update: update2, closeAfter, scale });
@@ -9521,13 +9545,23 @@ function hasVisuals({ intro, panels }) {
 }
 function renderBlocks(blocks, ctx) {
   return blocks.map((b) => {
-    const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), { math: !ctx.video });
-    noteHtml(b, notes.filter((n) => !n.math), ctx);
-    noteMath(b, notes.filter((n) => n.math), ctx);
-    const out = embedImages(b, result, ctx);
-    noteRemoteImages(b, out, ctx);
-    return out;
+    if (!ctx.errors) return renderBlock(b, ctx);
+    try {
+      return renderBlock(b, ctx);
+    } catch (err) {
+      if (!(err instanceof RenderError)) throw err;
+      ctx.errors.push(err);
+      return "";
+    }
   }).join("\n");
+}
+function renderBlock(b, ctx) {
+  const { result, notes } = collectHtmlNotes(() => b.type === "md" ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx), { math: !ctx.video });
+  noteHtml(b, notes.filter((n) => !n.math), ctx);
+  noteMath(b, notes.filter((n) => n.math), ctx);
+  const out = embedImages(b, result, ctx);
+  noteRemoteImages(b, out, ctx);
+  return out;
 }
 function noteRemoteImages(block2, html, ctx) {
   if (!ctx.stats.htmlWarnings) return;
@@ -10798,7 +10832,9 @@ async function renderVideo(source, { provider = null, cacheDir, defaults: defaul
   const flat = [...timeline.title.beats, ...timeline.scenes.flatMap((s) => s.beats)];
   const wav2 = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, dir: language.dir, video: true }, language.videoUi);
+  const errors = [];
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, errors, ui: language.ui, dir: language.dir, video: true }, language.videoUi);
+  raiseAll(errors);
   const html = shell2({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav: wav2, voice: wav2 ? provider.voice : void 0, source, embedded: themes2.embedFor(meta.theme, "video") });
   return { html, wav: wav2, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }
@@ -11286,7 +11322,7 @@ async function fetchJson(fetchImpl, url) {
 // src/housekeeping.js
 var CLEAN = Object.freeze({
   days: 30,
-  // am clean deletes pages and videos older than 30 days by default
+  // am clean deletes pages, videos and drafts older than 30 days by default
   bigBytes: 200 * 2 ** 20,
   // notify at once above 200 MB
   staleDays: 30,
@@ -11327,7 +11363,7 @@ function usage2(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos"].flatMap((d) => walk(join9(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
+    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join9(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
     ...walk(join9(home, "cache"))
   ];
   if (!dryRun) {
@@ -11347,7 +11383,7 @@ function cleanHint(state, use, now = Date.now()) {
   const pages = `${use.pages.count} page${use.pages.count === 1 ? "" : "s"}`;
   const parts = `${pages} ${mb(use.pages.bytes)}, videos ${mb(use.videos.bytes)}, voice-over cache ${mb(use.cache.bytes)}`;
   const when = state.lastClean ? `last cleaned ${days} days ago` : "never cleaned";
-  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages and videos older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
+  return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages, videos and drafts older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
 }
 function afterRender({ home, env, config, current, scriptPath, background, now = Date.now() }) {
   let state = readState(home);
@@ -11871,7 +11907,7 @@ Usage:
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am serve  [--port 8765] [--lan] [--public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
-  am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
+  am clean  [--days 30] [--all] [--dry-run]       delete old pages, videos and saved drafts, and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
   am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
@@ -12074,11 +12110,11 @@ ${USAGE}`);
   const ctx = { print, fail, env, io, themes: themes2 };
   switch (cmd) {
     case "render":
-      return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
+      return withSource(arg, io, fail, (src, baseDir, from) => cmdRender(src, opts, ctx, baseDir, from));
     case "patch":
       return cmdPatch(arg, rest[0], opts, ctx);
     case "video":
-      return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
+      return withSource(arg, io, fail, (src, _baseDir, from) => cmdVideo(src, opts, ctx, from));
     case "lint":
       return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case "config":
@@ -12119,7 +12155,7 @@ async function withSource(arg, io, fail, fn3) {
     fail("\u2717 The draft is empty");
     return 2;
   }
-  return fn3(src, arg === "-" ? cwd : dirname3(resolve4(cwd, arg)));
+  return fn3(src, arg === "-" ? cwd : dirname3(resolve4(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve4(cwd, arg) });
 }
 async function readStream(stream) {
   const chunks = [];
@@ -12137,7 +12173,7 @@ function shouldOpen(opts, env, config) {
   if (env.CI) return false;
   return config.open !== false;
 }
-async function cmdRender(src, opts, ctx, baseDir) {
+async function cmdRender(src, opts, ctx, baseDir, from) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
@@ -12151,7 +12187,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   try {
     result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
   } catch (e) {
-    return reportError(e, fail);
+    return reportDraftError(e, src, from, ctx);
   }
   const file = outputPath("pages", result.meta.title, opts, ctx);
   if (!file) return 2;
@@ -12159,11 +12195,73 @@ async function cmdRender(src, opts, ctx, baseDir) {
   if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
   if (replaced && replaced !== resolve4(written)) removeEarlier(replaced, ctx);
+  keepDraft(result, src, from, ctx);
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
   return finish(written, held ? { ...opts, "no-open": true } : opts, config, ctx);
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
+var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
+var draftsDir = (home) => join11(resolve4(home), "drafts");
+function draftTitle(src) {
+  const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
+  return m?.[1] ?? "";
+}
+function saveDraft(src, { env, io }) {
+  const name = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
+  const home = amHome(env);
+  const folders = [() => {
+    ensureHome(home);
+    return draftsDir(home);
+  }, () => draftsDir(checkedTempHome({ create: true }))];
+  for (const folder of folders) {
+    try {
+      const dir = folder();
+      mkdirSync4(dir, { recursive: true });
+      return writeNew(dir, name, src);
+    } catch (e) {
+      if (!(isDenied(e) || e instanceof UnsafeTempHome)) throw e;
+    }
+  }
+  return null;
+}
+function writeNew(dir, name, text2) {
+  for (let n = 1; ; n++) {
+    const file = join11(dir, n === 1 ? name : name.replace(/\.md$/, `-${n}.md`));
+    try {
+      writeFileSync7(file, text2, { flag: "wx" });
+      return file;
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+    }
+  }
+}
+function keepDraft(result, src, from, ctx) {
+  const warned = hasWarnings(result);
+  if (from?.stdin && warned) {
+    const saved = saveDraft(src, ctx);
+    if (saved) ctx.print(`  draft: ${saved}`);
+  } else if (from?.file && !warned && isKeptDraft(from.file, ctx)) {
+    try {
+      rmSync7(from.file, { force: true });
+    } catch (e) {
+      if (!isDenied(e)) throw e;
+      ctx.fail(`! Kept the draft ${from.file} (permission denied, ${e.code})`);
+    }
+  }
+}
+function isKeptDraft(path, { env }) {
+  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname3(path)) && basename4(path).endsWith(".md");
+}
+var isDraftError = (e) => e instanceof DraftErrors || e instanceof RenderError || e instanceof LintError || e instanceof ParseError && e.line > 0;
+function reportDraftError(e, src, from, ctx) {
+  const code = reportError(e, ctx.fail);
+  if (from?.stdin && isDraftError(e)) {
+    const saved = saveDraft(src, ctx);
+    if (saved) ctx.fail(`  draft: ${saved}`);
+  }
+  return code;
+}
 var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 function pagePath(arg, { env, io }) {
   const path = resolve4(io.cwd ?? process.cwd(), arg);
@@ -12308,7 +12406,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "", inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
 }
-async function cmdVideo(src, opts, ctx) {
+async function cmdVideo(src, opts, ctx, from) {
   const { fail, print } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
@@ -12319,7 +12417,7 @@ async function cmdVideo(src, opts, ctx) {
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
   } catch (e) {
-    if (!(e instanceof TtsError)) return reportError(e, fail);
+    if (!(e instanceof TtsError)) return reportDraftError(e, src, from, ctx);
     fail(`\u2717 Voice-over failed: ${e.message}. Add --voice off for captions only`);
     return 1;
   }
@@ -12328,6 +12426,7 @@ async function cmdVideo(src, opts, ctx) {
   const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "videos" });
   if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
+  keepDraft(result, src, from, ctx);
   for (const format of ["mp4", "webm"]) {
     if (opts[format] && !await exportVideo(written, result.wav, format, ctx)) return 1;
   }
@@ -12529,7 +12628,7 @@ function cmdClean(opts, { print, fail, env }) {
   const tempBefore = temp && usage2(temp);
   const dry = Boolean(opts["dry-run"]);
   const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry, temp });
-  const scope = opts.all ? "all pages and videos" : `pages and videos older than ${count(days, "day")}`;
+  const scope = opts.all ? "all pages, videos and drafts" : `pages, videos and drafts older than ${count(days, "day")}`;
   print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, "page")}, ${count(before.videos.count, "video")}, ${mb(before.cache.bytes)} voice-over cache)`);
   if (temp) print(`Temporary folder: ${temp} (${mb(tempBefore.total)} in total: ${count(tempBefore.pages.count, "page")}, ${count(tempBefore.videos.count, "video")})`);
   print(dry ? `Would delete ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Run without --dry-run to delete.` : `\u2713 Deleted ${count(r.files, "file")}, freeing ${mb(r.bytes)} (${scope} + voice-over cache). Settings were kept.`);
@@ -12576,20 +12675,30 @@ function printWarnings(warnings, print, style) {
   warnings.slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  ${formatWarning(w)}`));
   if (warnings.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${warnings.length - MAX_LISTED_WARNINGS} more; run am lint to see all`);
 }
-function reportError(e, fail) {
+function reportItem(e, fail) {
   if (e instanceof RenderError) {
     fail(`\u2717 L${e.line} [${e.component}] ${e.message}`);
     if (e.example) fail(`  Correct example:
 ${e.example.replace(/^/gm, "    ")}`);
     fail(`  Full syntax: am help ${e.component}`);
-    return 1;
+    return true;
   }
   if (e instanceof ParseError) {
     fail(`\u2717 ${e.line ? `L${e.line} ` : ""}Cannot parse the draft: ${e.message}`);
     if (e.example) fail(`  Correct example:
 ${e.example.replace(/^/gm, "    ")}`);
+    return true;
+  }
+  return false;
+}
+function reportError(e, fail) {
+  if (e instanceof DraftErrors) {
+    e.errors.slice(0, MAX_LISTED_WARNINGS).forEach((item) => reportItem(item, fail));
+    if (e.errors.length > MAX_LISTED_WARNINGS) fail(`  \u2026 ${e.errors.length - MAX_LISTED_WARNINGS} more`);
+    fail(`\u2717 ${e.errors.length} errors in the draft; no page was written`);
     return 1;
   }
+  if (reportItem(e, fail)) return 1;
   if (e instanceof LintError) {
     fail(`\u2717 ${e.message}; no page was written:`);
     e.warnings.forEach((w) => fail(`  ${formatWarning(w)}`));

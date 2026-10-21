@@ -336,3 +336,14 @@ test('usage / clean: skip dangling symlinks without throwing', (t) => {
   assert.equal(usage(home).pages.count, 1);
   assert.equal(clean(home, { now: NOW }).files, 1);
 });
+
+test('clean: drafts older than the limit go the same way as pages; --all removes every draft; --dry-run keeps them', () => {
+  const old = file('drafts/old-20260101-000000.md', 10, 40);
+  const fresh = file('drafts/new-20260101-000000.md', 10, 1);
+  assert.deepEqual(clean(home, { dryRun: true, now: NOW }), { files: 1, bytes: 10 });
+  assert.ok(existsSync(old));
+  assert.deepEqual(clean(home, { now: NOW }), { files: 1, bytes: 10 });
+  assert.ok(!existsSync(old) && existsSync(fresh));
+  assert.deepEqual(clean(home, { all: true, now: NOW }), { files: 1, bytes: 10 });
+  assert.ok(!existsSync(fresh));
+});

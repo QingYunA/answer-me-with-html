@@ -6,7 +6,7 @@ import { VERSION } from './assets.js';
 import { join, resolve, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
-import { parseDoc, ParseError, CHOICES, VOICES } from './parse.js';
+import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
 import { resolveLanguage } from './language.js';
 import { COMPONENTS } from './components/index.js';
@@ -48,7 +48,7 @@ Usage:
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am serve  [--port 8765] [--lan] [--public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
-  am clean  [--days 30] [--all] [--dry-run]       delete old pages, old videos and the voice-over cache
+  am clean  [--days 30] [--all] [--dry-run]       delete old pages, videos and saved drafts, and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
   am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
@@ -257,9 +257,9 @@ export async function main(argv, io = {}) {
   const themes = loadThemes(amHome(env));
   const ctx = { print, fail, env, io, themes };
   switch (cmd) {
-    case 'render': return withSource(arg, io, fail, (src, baseDir) => cmdRender(src, opts, ctx, baseDir));
+    case 'render': return withSource(arg, io, fail, (src, baseDir, from) => cmdRender(src, opts, ctx, baseDir, from));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
-    case 'video': return withSource(arg, io, fail, (src) => cmdVideo(src, opts, ctx));
+    case 'video': return withSource(arg, io, fail, (src, _baseDir, from) => cmdVideo(src, opts, ctx, from));
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
@@ -292,7 +292,8 @@ async function withSource(arg, io, fail, fn) {
     return 2;
   }
   // Relative image paths are read from the draft file's folder, or from the current folder for a draft on stdin.
-  return fn(src, arg === '-' ? cwd : dirname(resolve(cwd, arg)));
+  // from says where the draft came from: a stdin draft is kept in drafts/ when it needs fixing (keepDraft below), a file is not.
+  return fn(src, arg === '-' ? cwd : dirname(resolve(cwd, arg)), arg === '-' ? { stdin: true } : { file: resolve(cwd, arg) });
 }
 
 async function readStream(stream) {
@@ -316,7 +317,7 @@ export function shouldOpen(opts, env, config) {
   return config.open !== false;
 }
 
-async function cmdRender(src, opts, ctx, baseDir) {
+async function cmdRender(src, opts, ctx, baseDir, from) {
   const { fail, print } = ctx;
   const replaced = opts.replace === undefined ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
@@ -330,7 +331,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   try {
     result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
   } catch (e) {
-    return reportError(e, fail);
+    return reportDraftError(e, src, from, ctx);
   }
   const file = outputPath('pages', result.meta.title, opts, ctx);
   if (!file) return 2;
@@ -339,6 +340,7 @@ async function cmdRender(src, opts, ctx, baseDir) {
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   // Delete the earlier attempt only now: a render that fails above keeps it.
   if (replaced && replaced !== resolve(written)) removeEarlier(replaced, ctx);
+  keepDraft(result, src, from, ctx);
   // A page with STE, code or math warnings is likely to be rendered again, so it opens only when --open asks for it.
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
@@ -347,6 +349,82 @@ async function cmdRender(src, opts, ctx, baseDir) {
 
 // The new-version button for the page, from the version the background check last saw (src/update.js).
 const updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
+
+// Any note that asks the author to fix the draft: STE, code, math, diagram and raw-HTML warnings.
+const hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
+
+// A draft that needs fixing is edited in a file, and the line numbers of every message must match that file. A draft read from stdin
+// is saved verbatim in drafts/ of the data directory and its path is printed; a draft given as a file already is that file.
+const draftsDir = (home) => join(resolve(home), 'drafts');
+
+function draftTitle(src) {
+  const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
+  return m?.[1] ?? '';
+}
+
+// The absolute path of the saved draft, or null when neither the data directory nor the temporary folder can be written.
+function saveDraft(src, { env, io }) {
+  const name = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
+  const home = amHome(env);
+  const folders = [() => { ensureHome(home); return draftsDir(home); }, () => draftsDir(checkedTempHome({ create: true }))];
+  for (const folder of folders) {
+    try {
+      const dir = folder();
+      mkdirSync(dir, { recursive: true });
+      return writeNew(dir, name, src);
+    } catch (e) {
+      if (!(isDenied(e) || e instanceof UnsafeTempHome)) throw e;
+    }
+  }
+  return null;
+}
+
+// Write a file that does not exist yet: a second draft in the same second gets -2, -3 … before the extension.
+function writeNew(dir, name, text) {
+  for (let n = 1; ; n++) {
+    const file = join(dir, n === 1 ? name : name.replace(/\.md$/, `-${n}.md`));
+    try {
+      writeFileSync(file, text, { flag: 'wx' });
+      return file;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+  }
+}
+
+// After a render that wrote a page: a stdin draft with warnings is saved for the fix-and-render-again round; a draft file in drafts/
+// that renders clean is deleted (the page keeps the source in #am-source).
+function keepDraft(result, src, from, ctx) {
+  const warned = hasWarnings(result);
+  if (from?.stdin && warned) {
+    const saved = saveDraft(src, ctx);
+    if (saved) ctx.print(`  draft: ${saved}`);
+  } else if (from?.file && !warned && isKeptDraft(from.file, ctx)) {
+    try {
+      rmSync(from.file, { force: true });
+    } catch (e) {
+      if (!isDenied(e)) throw e;
+      ctx.fail(`! Kept the draft ${from.file} (permission denied, ${e.code})`);
+    }
+  }
+}
+
+// A .md file directly inside drafts/ of the data directory or of the temporary folder.
+function isKeptDraft(path, { env }) {
+  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname(path)) && basename(path).endsWith('.md');
+}
+
+// Errors that name a place in the draft: a stdin draft is saved so the agent edits only the flagged lines.
+const isDraftError = (e) => e instanceof DraftErrors || e instanceof RenderError || e instanceof LintError || (e instanceof ParseError && e.line > 0);
+
+function reportDraftError(e, src, from, ctx) {
+  const code = reportError(e, ctx.fail);
+  if (from?.stdin && isDraftError(e)) {
+    const saved = saveDraft(src, ctx);
+    if (saved) ctx.fail(`  draft: ${saved}`);
+  }
+  return code;
+}
 
 const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 
@@ -505,7 +583,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   return finish(file, opts, config, ctx);
 }
 
-async function cmdVideo(src, opts, ctx) {
+async function cmdVideo(src, opts, ctx, from) {
   const { fail, print } = ctx;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
@@ -516,7 +594,7 @@ async function cmdVideo(src, opts, ctx) {
   try {
     result = await buildVideo(src, voice, opts, config, ctx);
   } catch (e) {
-    if (!(e instanceof TtsError)) return reportError(e, fail);
+    if (!(e instanceof TtsError)) return reportDraftError(e, src, from, ctx);
     fail(`✗ Voice-over failed: ${e.message}. Add --voice off for captions only`);
     return 1;
   }
@@ -525,6 +603,7 @@ async function cmdVideo(src, opts, ctx) {
   const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'videos' });
   if (!written) return 1;
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
+  keepDraft(result, src, from, ctx);
   for (const format of ['mp4', 'webm']) {
     if (opts[format] && !(await exportVideo(written, result.wav, format, ctx))) return 1;
   }
@@ -773,7 +852,7 @@ function cmdClean(opts, { print, fail, env }) {
   const tempBefore = temp && usage(temp);
   const dry = Boolean(opts['dry-run']);
   const r = clean(home, { days, all: Boolean(opts.all), dryRun: dry, temp });
-  const scope = opts.all ? 'all pages and videos' : `pages and videos older than ${count(days, 'day')}`;
+  const scope = opts.all ? 'all pages, videos and drafts' : `pages, videos and drafts older than ${count(days, 'day')}`;
   print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, 'page')}, ${count(before.videos.count, 'video')}, ${mb(before.cache.bytes)} voice-over cache)`);
   if (temp) print(`Temporary folder: ${temp} (${mb(tempBefore.total)} in total: ${count(tempBefore.pages.count, 'page')}, ${count(tempBefore.videos.count, 'video')})`);
   print(dry
@@ -830,18 +909,30 @@ function printWarnings(warnings, print, style) {
   if (warnings.length > MAX_LISTED_WARNINGS) print(`  … ${warnings.length - MAX_LISTED_WARNINGS} more; run am lint to see all`);
 }
 
-function reportError(e, fail) {
+// Print one draft error in its format; false when e is not one.
+function reportItem(e, fail) {
   if (e instanceof RenderError) {
     fail(`✗ L${e.line} [${e.component}] ${e.message}`);
     if (e.example) fail(`  Correct example:\n${e.example.replace(/^/gm, '    ')}`);
     fail(`  Full syntax: am help ${e.component}`);
-    return 1;
+    return true;
   }
   if (e instanceof ParseError) {
     fail(`✗ ${e.line ? `L${e.line} ` : ''}Cannot parse the draft: ${e.message}`);
     if (e.example) fail(`  Correct example:\n${e.example.replace(/^/gm, '    ')}`);
+    return true;
+  }
+  return false;
+}
+
+function reportError(e, fail) {
+  if (e instanceof DraftErrors) {
+    e.errors.slice(0, MAX_LISTED_WARNINGS).forEach((item) => reportItem(item, fail));
+    if (e.errors.length > MAX_LISTED_WARNINGS) fail(`  … ${e.errors.length - MAX_LISTED_WARNINGS} more`);
+    fail(`✗ ${e.errors.length} errors in the draft; no page was written`);
     return 1;
   }
+  if (reportItem(e, fail)) return 1;
   if (e instanceof LintError) {
     fail(`✗ ${e.message}; no page was written:`);
     e.warnings.forEach((w) => fail(`  ${formatWarning(w)}`));

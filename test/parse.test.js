@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDoc, ParseError, applyOverrides } from '../src/parse.js';
+import { parseDoc, parseDocLoose, ParseError, DraftErrors, applyOverrides } from '../src/parse.js';
 
 const SAMPLE = `---
 template: sheet
@@ -257,4 +257,24 @@ test('a UTF-8 BOM before a # heading still extracts the title', () => {
 test('a UTF-8 BOM before frontmatter still parses', () => {
   const doc = parseDoc('\uFEFF---\ntitle: T\n---\n## A\nx');
   assert.equal(doc.meta.title, 'T');
+});
+
+test('error: every broken table is reported in one parse, in line order', () => {
+  assert.throws(
+    () => parseDoc('## A\n| a | b |\n| 1 | 2 |\n\n## B\n| x | y |\n|---|\n| 1 | 2 |\n'),
+    (err) => err instanceof DraftErrors
+      && err.errors.map((e) => e.line).join() === '2,6'
+      && err.errors.every((e) => e instanceof ParseError && e.example),
+  );
+});
+
+test('parseDocLoose: returns the document and the collected table errors', () => {
+  const { doc, errors } = parseDocLoose('## A\n| a | b |\n| 1 | 2 |\n');
+  assert.equal(doc.panels.length, 1);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].line, 2);
+});
+
+test('error: an unclosed fence still stops at once, even after a broken table', () => {
+  assert.throws(() => parseDocLoose('## A\n| a | b |\n| 1 | 2 |\n```flow\nA -> B'), (err) => err instanceof ParseError && err.line === 4);
 });

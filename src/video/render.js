@@ -9,7 +9,7 @@ import { esc } from '../svg/text.js';
 import { VERSION, VIDEO_JS, VIDEO_EXPORT_JS, VIDEO_MUX_JS } from '../assets.js';
 import { rootTag, audioTag, sourceTag } from '../page.js';
 import { parseVideo, buildTimeline, estimateSeconds, allBeats } from './script.js';
-import { CHOICES, ParseError, applyOverrides } from '../parse.js';
+import { CHOICES, ParseError, raiseAll, applyOverrides } from '../parse.js';
 import { cspMeta } from '../csp.js';
 import { synthAll, mixTrack, SAMPLE_RATE } from './tts.js';
 
@@ -40,7 +40,9 @@ export async function renderVideo(source, { provider = null, cacheDir, defaults 
   const wav = clips?.some(Boolean) ? mixTrack(clips, flat.map((b) => b.start), timeline.duration) : null;
 
   const stats = { panels: video.scenes.length, components: {}, componentWarnings: [], htmlWarnings: [] };
-  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, ui: language.ui, dir: language.dir, video: true }, language.videoUi);
+  const errors = [];
+  const scenesHtml = renderScenes(video, meta, timeline, { seq: 0, stats, errors, ui: language.ui, dir: language.dir, video: true }, language.videoUi);
+  raiseAll(errors);
   const html = shell({ meta, language, scenesHtml, data: playerData(video, meta, timeline), wav, voice: wav ? provider.voice : undefined, source, embedded: themes.embedFor(meta.theme, 'video') });
   return { html, wav, warnings, stats, meta, language, duration: timeline.duration, beats: beats.length, captionsOnly };
 }

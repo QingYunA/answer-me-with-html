@@ -26,6 +26,15 @@ test('skill: keep the default output, fall back to the temporary folder, and use
   assert.match(retry, /page written with `-o`, reuse the same quoted `-o` HTML file path/);
 });
 
+test('skill: errors are read all at once and fixed in the saved draft, not in a new heredoc', () => {
+  const read = skill.split('4. Read the output:')[1]?.split('\n5. Reply')[0] ?? '';
+  assert.match(read, /lists every error of the draft at once, in line order/);
+  assert.match(read, /`  draft: <path>`/);
+  assert.match(read, /Change only the flagged lines in that file with your file-edit tool; do not send a new heredoc/);
+  assert.match(read, /`am render <path>` \(add `--replace <page path>` when a page was written\)/);
+  assert.match(read, /Retry at most 2 rounds/);
+});
+
 test('skill: an unanswered ask is not agreement, in the new and the old reply wording', () => {
   const section = skill.split('## 5. When the user pastes a reply from a page')[1]?.split('\n## 6.')[0];
   assert.ok(section, 'reply section exists');

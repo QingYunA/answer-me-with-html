@@ -12,6 +12,22 @@ export class ParseError extends Error {
   }
 }
 
+// Several problems of one draft, found in one run and sorted by line. Each item is a ParseError or a RenderError, printed one by one
+// (reportError in src/cli.js). A draft with a single problem throws that problem itself (raiseAll).
+export class DraftErrors extends Error {
+  constructor(errors) {
+    super(`${errors.length} errors in the draft`);
+    this.name = 'DraftErrors';
+    this.errors = [...errors].sort((a, b) => (a.line ?? 0) - (b.line ?? 0));
+  }
+}
+
+// Throw nothing for no errors, the error itself for one, and DraftErrors for several.
+export function raiseAll(errors) {
+  if (errors.length === 1) throw errors[0];
+  if (errors.length) throw new DraftErrors(errors);
+}
+
 export const CHOICES = Object.freeze({
   template: ['sheet', 'doc', 'video'],
   theme: [AUTO, ...themeNames('page')],
@@ -54,13 +70,23 @@ const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
 // choices can widen the allowed values of individual keys (video drafts also allow theme: 3b1b).
-export function parseDoc(source, { defaults = {}, choices = {} } = {}) {
+export function parseDoc(source, options) {
+  const { doc, errors } = parseDocLoose(source, options);
+  raiseAll(errors);
+  return doc;
+}
+
+// Like parseDoc, but a broken table does not stop the parse: every table error comes back in errors next to the document, so the
+// caller can add what it finds later (renderDoc adds the component errors). Other errors still throw at once, since nothing
+// sensible follows them (frontmatter, an unclosed fence, a duplicate panel ID).
+export function parseDocLoose(source, { defaults = {}, choices = {} } = {}) {
   const lines = String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults }, { ...CHOICES, ...choices });
-  const sections = splitSections(lines, bodyStart);
+  const errors = [];
+  const sections = splitSections(lines, bodyStart, errors);
   const intro = extractTitle(sections.intro, meta);
   const panels = assignIds(sections.panels);
-  return { meta, intro, panels };
+  return { doc: { meta, intro, panels }, errors };
 }
 
 function parseFrontmatter(lines, base, allowed) {
@@ -89,14 +115,14 @@ function parseFrontmatter(lines, base, allowed) {
   return { meta, bodyStart: end + 1 };
 }
 
-function splitSections(lines, start) {
+function splitSections(lines, start, errors) {
   const intro = [];
   const panels = [];
   let current = { blocks: intro };
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l) => l.trim())) {
-      checkTables(mdBuf.lines, mdBuf.line);
+      errors.push(...checkTables(mdBuf.lines, mdBuf.line));
       current.blocks.push({ type: 'md', text: mdBuf.lines.join('\n'), line: mdBuf.line });
     }
     mdBuf = null;
@@ -172,28 +198,30 @@ function htmlLines(lines) {
   });
 }
 
+// Every table problem of one Markdown block, as ParseErrors.
 function checkTables(lines, first) {
   const html = htmlLines(lines);
-  lines.forEach((header, k) => {
+  return lines.flatMap((header, k) => {
     const next = lines[k + 1];
-    if (html[k] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k - 1] ?? '') || next === undefined || !TABLE_ROW.test(next)) return;
+    if (html[k] || !TABLE_ROW.test(header) || TABLE_ROW.test(lines[k - 1] ?? '') || next === undefined || !TABLE_ROW.test(next)) return [];
     const cells = cellCount(header);
     const delimiter = `|${'---|'.repeat(cells)}`;
     if (!DELIMITER_ROW.test(next)) {
-      throw new ParseError(
+      return [new ParseError(
         `table has no delimiter row: put ${delimiter} on the line under the header row`,
         first + k,
         [header.trim(), delimiter, next.trim()].join('\n'),
-      );
+      )];
     }
     if (cellCount(next) !== cells) {
       const row = lines[k + 2];
-      throw new ParseError(
+      return [new ParseError(
         `the table header has ${cells} cells but its delimiter row has ${cellCount(next)}: write one --- per header cell`,
         first + k,
         [header.trim(), delimiter, ...(row !== undefined && TABLE_ROW.test(row) ? [row.trim()] : [])].join('\n'),
-      );
+      )];
     }
+    return [];
   });
 }
 
