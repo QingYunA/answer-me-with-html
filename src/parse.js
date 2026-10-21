@@ -107,7 +107,7 @@ function parseFrontmatter(lines, base, allowed) {
 
   const meta = { ...base };
   for (const [key, { value, line }] of Object.entries(entries)) {
-    const fraction = fractionalCount(key, value, line);
+    const fraction = fractionalCount(key, value, line, META_COUNTS);
     if (fraction) throw fraction;
     if (allowed[key] && !allowed[key].includes(String(value))) {
       throw new ParseError(`Invalid ${key} value "${value}". Choose one of: ${allowed[key].join(' | ')}`, line);
@@ -153,7 +153,7 @@ function splitSections(lines, start, errors) {
     if (heading) {
       flushMd();
       current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [] };
-      errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1)).filter(Boolean));
+      errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1, PANEL_COUNTS)).filter(Boolean));
       panels.push(current);
       continue;
     }
@@ -327,11 +327,13 @@ function stripLineComment(line) {
 
 // A count the page writes into CSS (cols, span, rows) must be whole: repeat(2.5, …) and span 2.5 are invalid, so the browser drops
 // the declaration and the layout falls apart (#308). Text, 0 and whole numbers out of range keep the fallback and clamping of the
-// templates. Returns the ParseError for a fractional count, or null.
-const COUNT_KEYS = new Set(['cols', 'span', 'rows']);
+// templates. Each count is checked only where the page reads it: cols in the frontmatter, span and rows in a panel heading (any other
+// frontmatter key is shown as written in the meta line). Returns the ParseError for a fractional count, or null.
+const META_COUNTS = new Set(['cols']);
+const PANEL_COUNTS = new Set(['span', 'rows']);
 
-function fractionalCount(key, value, line) {
-  if (!COUNT_KEYS.has(key) || typeof value !== 'string' || !value.trim()) return null;
+function fractionalCount(key, value, line, keys) {
+  if (!keys.has(key) || typeof value !== 'string' || !value.trim()) return null;
   const n = Number(value);
   return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
 }

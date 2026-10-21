@@ -111,7 +111,7 @@ template: sheet     # sheet board (default, one-screen overview) | doc linear ex
 theme: auto         # auto (default): paper for doc or text-only drafts, blueprint with diagrams | blueprint | shadcn | paper | a theme the user made (am list shows it)
 title: Title
 subtitle: One-line summary     # optional
-cols: 3             # most columns in a sheet row, default 3
+cols: 3             # most columns in a sheet row (a whole number), default 3
 source: RFC 9293    # any other key is shown in the page header's meta line
 ---
 Lead: one or two sentences with the core conclusion (optional).

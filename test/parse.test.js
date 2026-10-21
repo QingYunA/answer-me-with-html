@@ -58,6 +58,8 @@ test('a whole, out-of-range or non-numeric cols, span or rows keeps its fallback
     assert.doesNotThrow(() => parseDoc(`---\ncols: ${value}\n---\n## A {span=${value} rows=${value}}\nbody`), value);
   }
   assert.doesNotThrow(() => parseDoc('## A {span}\nbody'));
+  // Each count is checked only where the page reads it: span and rows in the frontmatter are meta text, cols in a heading is an attribute.
+  assert.doesNotThrow(() => parseDoc('---\nspan: 2.5\nrows: 1.5\n---\n## A {cols=2.5}\nbody'));
 });
 
 test('panel split: explicit ID, title, attributes, line number', () => {

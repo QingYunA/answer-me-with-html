@@ -2506,7 +2506,7 @@ function parseFrontmatter(lines, base, allowed) {
   }
   const meta = { ...base };
   for (const [key, { value, line }] of Object.entries(entries)) {
-    const fraction = fractionalCount(key, value, line);
+    const fraction = fractionalCount(key, value, line, META_COUNTS);
     if (fraction) throw fraction;
     if (allowed[key] && !allowed[key].includes(String(value))) {
       throw new ParseError(`Invalid ${key} value "${value}". Choose one of: ${allowed[key].join(" | ")}`, line);
@@ -2549,7 +2549,7 @@ function splitSections(lines, start, errors) {
     if (heading) {
       flushMd();
       current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [] };
-      errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1)).filter(Boolean));
+      errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1, PANEL_COUNTS)).filter(Boolean));
       panels.push(current);
       continue;
     }
@@ -2694,9 +2694,10 @@ function stripLineComment(line) {
   }
   return line;
 }
-var COUNT_KEYS = /* @__PURE__ */ new Set(["cols", "span", "rows"]);
-function fractionalCount(key, value, line) {
-  if (!COUNT_KEYS.has(key) || typeof value !== "string" || !value.trim()) return null;
+var META_COUNTS = /* @__PURE__ */ new Set(["cols"]);
+var PANEL_COUNTS = /* @__PURE__ */ new Set(["span", "rows"]);
+function fractionalCount(key, value, line, keys) {
+  if (!keys.has(key) || typeof value !== "string" || !value.trim()) return null;
   const n = Number(value);
   return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
 }
