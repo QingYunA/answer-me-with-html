@@ -511,7 +511,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
     server.once('error', (e) => fail(e.code === 'EADDRINUSE'
       ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`)
       : tail && e.code === 'EADDRNOTAVAIL'
-        ? new ServeError(`Cannot listen on ${listenHost}: Tailscale in userspace-networking mode has no interface for it. Use --lan, or run \`tailscale serve --bg ${port}\` and am serve --public-url https://<machine>.<tailnet>.ts.net`)
+        ? new ServeError(`Cannot listen on ${listenHost}: Tailscale in userspace-networking mode has no interface for it. For tailnet devices, run \`tailscale serve --bg ${port}\` and am serve --public-url https://<machine>.<tailnet>.ts.net; --lan reaches only the local network`)
         : e));
     server.listen(port, listenHost, done);
   });
