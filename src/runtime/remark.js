@@ -259,6 +259,25 @@
     const el = blockAt(e.target);
     if (el) open(el);
   };
+  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block
+  // that already had a tabindex keeps it; only the ones the mode added lose it again.
+  const pickKey = (e) => {
+    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;
+    e.preventDefault();
+    open(e.target);
+  };
+  const focusable = (on) => {
+    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys
+    for (const el of keyMap().keys()) {
+      if (on && !el.hasAttribute('tabindex')) {
+        el.tabIndex = 0;
+        el.setAttribute('data-am-pick', '');
+      } else if (!on && el.hasAttribute('data-am-pick')) {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('data-am-pick');
+      }
+    }
+  };
   const setMode = (on) => {
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', String(on));
@@ -266,6 +285,8 @@
     document.body[toggle]('click', pick);
     document.body[toggle]('mouseover', track);
     document.body[toggle]('mouseout', track);
+    document.body[toggle]('keydown', pickKey);
+    focusable(on);
     if (!on) {
       track({ type: 'mouseout', relatedTarget: null });
       close(false);

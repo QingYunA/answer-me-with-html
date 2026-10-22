@@ -36,7 +36,7 @@ Every page has a **Reply** button. The reader comments on any panel (the speech-
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
-The popover works from the keyboard. Its tags are numbered: `1`–`4` pick one and move the focus to the note (inside the note, digits are text). Until a tag is picked, Save stays off and the popover says so. `Ctrl` / `⌘` + `Enter` saves. Closing the popover without Save (`Esc` or a click outside) keeps its tag and note as a draft for that block until the page reloads; **Clear all remarks** drops drafts too.
+While remark mode is on, `Tab` also reaches every block, and `Enter` or `Space` opens its popover. The popover works from the keyboard. Its tags are numbered: `1`–`4` pick one and move the focus to the note (inside the note, digits are text). Until a tag is picked, Save stays off and the popover says so. `Ctrl` / `⌘` + `Enter` saves. Closing the popover without Save (`Esc` or a click outside) keeps its tag and note as a draft for that block until the page reloads; **Clear all remarks** drops drafts too.
 
 For a decision the reader must make, write an `ask` block in the panel it changes:
 

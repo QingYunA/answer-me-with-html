@@ -526,6 +526,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-btn--remark-clear { color: var(--err); }
 .am-btn--remark-clear.is-armed { background: var(--err-bg); border-color: var(--err); }
 .am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }
+[data-am-pick]:focus { outline: none; }
+[data-am-pick]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 :is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }
 :is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }
 :is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }

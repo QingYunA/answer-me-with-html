@@ -508,3 +508,37 @@ test('remark popover: a popover closed without Save keeps a draft, and Clear all
     afterClear: { kind: '', note: '' },
   });
 });
+
+test('remark: with the mode on, Tab reaches each block and Enter or Space opens its popover; turning it off removes the tab stops', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-pick-block', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    const para = at('p', ${JSON.stringify(p.first)});
+    const item = at('li', ${JSON.stringify(p.last)});
+    const before = para.hasAttribute('tabindex');
+    btn.click();
+    const on = { para: para.tabIndex, item: item.tabIndex, title: document.querySelector('.am-head h1').hasAttribute('tabindex') };
+    para.focus();
+    key('Enter', {}, para);
+    const byEnter = { open: shown(pop), focusInside: pop.contains(document.activeElement) };
+    key('Escape', {}, note());
+    const back = document.activeElement === para;
+    item.focus();
+    key(' ', {}, item);
+    const bySpace = shown(pop);
+    key('3'); note().value = 'from the keyboard';
+    key('Enter', { ctrlKey: true }, note());
+    const saved = { kind: item.dataset.kind, focus: document.activeElement === item };
+    btn.click();
+    return { before, on, byEnter, back, bySpace, saved, off: [para, item].some((el) => el.hasAttribute('tabindex') || el.hasAttribute('data-am-pick')) };
+  })()`);
+  assert.deepEqual(state, {
+    before: false,
+    on: { para: 0, item: 0, title: false },
+    byEnter: { open: true, focusInside: true },
+    back: true,
+    bySpace: true,
+    saved: { kind: 'question', focus: true },
+    off: false,
+  });
+});
