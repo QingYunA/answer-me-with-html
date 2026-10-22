@@ -2706,7 +2706,7 @@ function coerce(key, value) {
   return value;
 }
 
-// ../../../node_modules/marked/lib/marked.esm.js
+// node_modules/marked/lib/marked.esm.js
 function I() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -5242,7 +5242,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
-// ../../../node_modules/@dagrejs/dagre/dist/dagre.esm.js
+// node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
 var In = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Sn = (e, n) => {
@@ -11876,6 +11876,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const allowedHosts = [...addresses, ...publicOrigin ? [new URL(publicOrigin).host] : [], ...tail ? [tail.address] : []];
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
+  if (tail && !secretFile) ensureHome(home);
   const secret = loadSecret(secretFile ?? (tail ? join10(home, "serve-secret") : void 0));
   const live = liveStreams(home);
   const server = createServer(handler(home, secret, allowedHosts, live));
@@ -11922,7 +11923,7 @@ async function runServe({ home, port, lan = false, publicUrl, secretFile, tailsc
     process.once("exit", () => removeInfo(home, srv.secret, srv.port));
     if (srv.tailscale) {
       print(`Serving pages on ${srv.baseUrl} on your tailnet only (Ctrl-C to stop). am render prints a link for each page.`);
-      print(`Links stay valid across restarts. Delete ${srv.secretPath} to revoke every link.`);
+      print(`Links stay valid across restarts. To revoke every link, stop the server, delete ${srv.secretPath} and start it again.`);
     } else if (lan) {
       print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print("WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.");

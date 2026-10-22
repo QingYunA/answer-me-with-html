@@ -61,7 +61,8 @@ test('tailscale mode: MagicDNS link, exact Host allowlist, persistent secret', a
       assert.equal(await fetch(srv.port, path, host), 404, host);
     }
     const secretPath = join(home, 'serve-secret');
-    assert.equal(statSync(secretPath).mode & 0o777, 0o600);
+    if (process.platform !== 'win32') assert.equal(statSync(secretPath).mode & 0o777, 0o600);
+    else assert.ok(statSync(secretPath).isFile());
     const secret = readFileSync(secretPath, 'utf8');
     await srv.close();
     srv = await startServer(opts);
@@ -99,4 +100,16 @@ test('tailscale status: a missing CLI, a failed command and output that is not J
     /tailscale status failed: failed to connect to local tailscaled$/);
   assert.throws(() => readTailscaleStatus(() => ({ status: 0, stdout: 'not json' })), /Cannot parse/);
   assert.deepEqual(readTailscaleStatus(() => ({ status: 0, stdout: '{"BackendState":"Running"}' })), { BackendState: 'Running' });
+});
+
+test('tailscale mode: creates a missing home before its default secret file', async () => {
+  const parent = mkdtempSync(join(tmpdir(), 'am-ts-test-'));
+  const home = join(parent, 'home');
+  const srv = await startServer({ home, port: 0, tailscale: true, tailscaleStatus: () => status(), bindHost: '127.0.0.1' });
+  try {
+    assert.ok(statSync(join(home, 'serve-secret')).isFile());
+  } finally {
+    await srv.close();
+    rmSync(parent, { recursive: true, force: true });
+  }
 });

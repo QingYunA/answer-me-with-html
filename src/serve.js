@@ -503,6 +503,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   // The tailnet address stays the same, so its links last across restarts unless --secret-file names another file.
+  if (tail && !secretFile) ensureHome(home); // the default secret file lives in home, which may not exist yet
   const secret = loadSecret(secretFile ?? (tail ? join(home, 'serve-secret') : undefined));
   const live = liveStreams(home);
   const server = createServer(handler(home, secret, allowedHosts, live));
@@ -557,7 +558,7 @@ export async function runServe({ home, port, lan = false, publicUrl, secretFile,
     process.once('exit', () => removeInfo(home, srv.secret, srv.port));
     if (srv.tailscale) {
       print(`Serving pages on ${srv.baseUrl} on your tailnet only (Ctrl-C to stop). am render prints a link for each page.`);
-      print(`Links stay valid across restarts. Delete ${srv.secretPath} to revoke every link.`);
+      print(`Links stay valid across restarts. To revoke every link, stop the server, delete ${srv.secretPath} and start it again.`);
     } else if (lan) {
       print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print('WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.');
