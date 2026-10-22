@@ -54,10 +54,10 @@ test('tailscale mode: MagicDNS link, exact Host allowlist, persistent secret', a
     assert.equal(readServeInfo(home).host, '127.0.0.1');
     const link = pageLink(srv, 'pages', 'test.html');
     const path = new URL(link).pathname;
-    for (const host of [`box.tail1234.ts.net:${srv.port}`, '100.64.0.5:1234', 'localhost']) {
+    for (const host of [`box.tail1234.ts.net:${srv.port}`, 'box.tail1234.ts.net', '100.64.0.5:1234', 'localhost']) {
       assert.equal(await fetch(srv.port, path, host), 200, host);
     }
-    for (const host of [`box.tail1234.ts.net:${srv.port + 1}`, 'box.tail1234.ts.net', 'attacker.example', '100.64.0.6']) {
+    for (const host of [`box.tail1234.ts.net:${srv.port + 1}`, 'attacker.example', '100.64.0.6']) {
       assert.equal(await fetch(srv.port, path, host), 404, host);
     }
     const secretPath = join(home, 'serve-secret');

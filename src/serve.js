@@ -499,7 +499,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   if (tailscale && (lan || publicOrigin)) throw new ServeError('--tailscale cannot be combined with --lan or --public-url');
   const tail = tailscale ? tailscaleTarget(tailscaleStatus ? tailscaleStatus() : readTailscaleStatus()) : null;
   const listenHost = tail ? bindHost ?? tail.address : lan ? LAN_BIND : HOST;
-  const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : []), ...(tail ? [tail.address] : [])];
+  const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : []), ...(tail ? [tail.address, tail.host] : [])]; // a bare MagicDNS host is what a browser sends on port 80
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   // The tailnet address stays the same, so its links last across restarts unless --secret-file names another file.
@@ -517,7 +517,7 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   });
   const actual = server.address().port;
   if (tail) allowedHosts.push(`${tail.host}:${actual}`); // port 0 is known only now; the handler reads the same array
-  const baseUrl = publicOrigin ?? (tail ? `http://${tail.host}:${actual}` : `http://${lan ? addresses[0] : HOST}:${actual}`);
+  const baseUrl = publicOrigin ?? (tail ? new URL(`http://${tail.host}:${actual}`).origin : `http://${lan ? addresses[0] : HOST}:${actual}`);
   try {
     writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl, ...(tail ? { host: listenHost } : {}) });
   } catch (e) {
