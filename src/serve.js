@@ -7,9 +7,10 @@
 
 import { createServer } from 'node:http';
 import { connect, isIP } from 'node:net';
+import { spawnSync } from 'node:child_process';
 import { networkInterfaces, uptime } from 'node:os';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, renameSync, rmSync, watch, lstatSync, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, rmSync, watch, lstatSync, existsSync, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from 'node:fs';
 import { lstat, realpath, readFile, stat } from 'node:fs/promises';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { ensureHome } from './home.js';
@@ -70,6 +71,35 @@ export function publicUrlOrigin(input) {
   if (url.username || url.password || url.pathname !== '/' || url.search || url.hash
     || !url.hostname || url.hostname === LAN_BIND) throw error();
   return url.origin;
+}
+
+// The Tailscale CLI: on PATH, or the macOS app's bundled binary. TAILSCALE_BE_CLI keeps the app binary from starting its GUI.
+const TAILSCALE_APP = '/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+
+// run is a test seam: it takes the command and returns what spawnSync returns.
+export function readTailscaleStatus(run = (cmd) => spawnSync(cmd, ['status', '--json'], { encoding: 'utf8', timeout: 5000, env: { ...process.env, TAILSCALE_BE_CLI: '1' } })) {
+  let result = run('tailscale');
+  if (result.error?.code === 'ENOENT' && process.platform === 'darwin' && existsSync(TAILSCALE_APP)) result = run(TAILSCALE_APP);
+  if (result.error?.code === 'ENOENT') {
+    throw new ServeError('--tailscale needs the tailscale CLI: install Tailscale (https://tailscale.com/download) and make sure `tailscale` is on PATH');
+  }
+  if (result.error || result.status !== 0) {
+    const why = result.error?.message ?? (result.stderr || '').trim().split('\n')[0] ?? '';
+    throw new ServeError(`tailscale status failed${why ? `: ${why}` : ''}`);
+  }
+  try { return JSON.parse(result.stdout); } catch { throw new ServeError('Cannot parse the output of tailscale status --json'); }
+}
+
+// This machine's tailnet address and the host name that links use: the MagicDNS name when it is on, else the address.
+export function tailscaleTarget(status) {
+  const state = status?.BackendState;
+  if (state !== 'Running') {
+    throw new ServeError(`Tailscale is not running (state: ${state ?? 'unknown'}); run \`tailscale up\` first`);
+  }
+  const address = (status.Self?.TailscaleIPs ?? []).find((ip) => isIP(ip) === 4);
+  if (!address) throw new ServeError('This machine has no Tailscale IPv4 address; check `tailscale status`');
+  const dns = typeof status.Self?.DNSName === 'string' ? status.Self.DNSName.replace(/\.$/, '') : '';
+  return { address, host: status.CurrentTailnet?.MagicDNSEnabled === true && dns ? dns : address };
 }
 
 // A fixed public hostname is matched exactly. LAN IPs may carry a port chosen by
@@ -208,7 +238,9 @@ export function readServeInfo(home) {
       || (typeof info.baseUrl === 'string' && publicUrlOrigin(info.baseUrl) === info.baseUrl);
     const ok = info && Number.isInteger(info.port) && typeof info.secret === 'string' && info.secret.length > 0
       && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
-    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
+    // host: where the server listens, when that is not loopback (--tailscale); older files have none.
+    const host = isIP(info.host) ? info.host : undefined;
+    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl, host } : null;
   } catch {
     return null;
   }
@@ -445,9 +477,9 @@ function handler(home, secret, allowedHosts, live) {
 }
 
 // Whether something accepts connections on the port: a recorded server whose pid was reused by another process does not.
-function listening(port, timeout = 500) {
+function listening(port, host = HOST, timeout = 500) {
   return new Promise((done) => {
-    const socket = connect({ host: HOST, port });
+    const socket = connect({ host, port });
     const end = (up) => { socket.destroy(); done(up); };
     socket.setTimeout(timeout, () => end(false));
     socket.once('connect', () => end(true));
@@ -455,30 +487,38 @@ function listening(port, timeout = 500) {
   });
 }
 
-// Default: loopback only. LAN listening and the public link origin are explicit opt-ins.
-export async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile }) {
+// Default: loopback only. LAN listening, the Tailscale address and the public link origin are explicit opt-ins.
+// tailscaleStatus and bindHost are test seams: the parsed `tailscale status --json`, and the address to listen on instead of the tailnet one.
+export async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost }) {
   const addresses = lan ? (lanAddresses ?? lanIPv4Addresses()) : [];
   if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4
     || address === LAN_BIND || address.startsWith('127.')))) {
     throw new ServeError('--lan needs at least one active non-loopback IPv4 interface');
   }
   const publicOrigin = publicUrl === undefined ? null : publicUrlOrigin(publicUrl);
-  const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : [])];
+  if (tailscale && (lan || publicOrigin)) throw new ServeError('--tailscale cannot be combined with --lan or --public-url');
+  const tail = tailscale ? tailscaleTarget(tailscaleStatus ? tailscaleStatus() : readTailscaleStatus()) : null;
+  const listenHost = tail ? bindHost ?? tail.address : lan ? LAN_BIND : HOST;
+  const allowedHosts = [...addresses, ...(publicOrigin ? [new URL(publicOrigin).host] : []), ...(tail ? [tail.address] : [])];
   const running = readServeInfo(home);
-  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
-  const secret = loadSecret(secretFile);
+  if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
+  // The tailnet address stays the same, so its links last across restarts unless --secret-file names another file.
+  const secret = loadSecret(secretFile ?? (tail ? join(home, 'serve-secret') : undefined));
   const live = liveStreams(home);
   const server = createServer(handler(home, secret, allowedHosts, live));
   await new Promise((done, fail) => {
     server.once('error', (e) => fail(e.code === 'EADDRINUSE'
       ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`)
-      : e));
-    server.listen(port, lan ? LAN_BIND : HOST, done);
+      : tail && e.code === 'EADDRNOTAVAIL'
+        ? new ServeError(`Cannot listen on ${listenHost}: Tailscale in userspace-networking mode has no interface for it. Use --lan, or run \`tailscale serve --bg ${port}\` and am serve --public-url https://<machine>.<tailnet>.ts.net`)
+        : e));
+    server.listen(port, listenHost, done);
   });
   const actual = server.address().port;
-  const baseUrl = publicOrigin ?? `http://${lan ? addresses[0] : HOST}:${actual}`;
+  if (tail) allowedHosts.push(`${tail.host}:${actual}`); // port 0 is known only now; the handler reads the same array
+  const baseUrl = publicOrigin ?? (tail ? `http://${tail.host}:${actual}` : `http://${lan ? addresses[0] : HOST}:${actual}`);
   try {
-    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl, ...(tail ? { host: listenHost } : {}) });
   } catch (e) {
     // Do not leave a possibly LAN-exposed listener open if its secret cannot be persisted.
     server.closeAllConnections();
@@ -495,14 +535,14 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
     });
     return closed;
   };
-  return { port: actual, secret, close, baseUrl, addresses, lan };
+  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join(home, 'serve-secret') : secretFile };
 }
 
 // am serve: run in the foreground until Ctrl-C / SIGTERM / SIGHUP. Resolves with the exit code.
-export async function runServe({ home, port, lan = false, publicUrl, secretFile, print, fail }) {
+export async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port, lan, publicUrl, secretFile });
+    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`✗ ${e.message}`);
@@ -515,7 +555,10 @@ export async function runServe({ home, port, lan = false, publicUrl, secretFile,
     process.once('SIGTERM', stop);
     process.once('SIGHUP', stop); // the SSH session or terminal that runs the server closed
     process.once('exit', () => removeInfo(home, srv.secret, srv.port));
-    if (lan) {
+    if (srv.tailscale) {
+      print(`Serving pages on ${srv.baseUrl} on your tailnet only (Ctrl-C to stop). am render prints a link for each page.`);
+      print(`Links stay valid across restarts. Delete ${srv.secretPath} to revoke every link.`);
+    } else if (lan) {
       print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print('WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.');
       for (const address of srv.addresses) print(`LAN address: http://${address}:${srv.port}`);

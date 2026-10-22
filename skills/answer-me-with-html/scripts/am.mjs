@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync6, rmSync as rmSync7, statSync as statSync4 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync7, rmSync as rmSync7, statSync as statSync4 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.7";
@@ -2706,7 +2706,7 @@ function coerce(key, value) {
   return value;
 }
 
-// node_modules/marked/lib/marked.esm.js
+// ../../../node_modules/marked/lib/marked.esm.js
 function I() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
@@ -5242,7 +5242,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
-// node_modules/@dagrejs/dagre/dist/dagre.esm.js
+// ../../../node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
 var In = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Sn = (e, n) => {
@@ -11477,9 +11477,10 @@ ${text2.replace(/^\n+/, "")}`;
 // src/serve.js
 import { createServer } from "node:http";
 import { connect as connect2, isIP } from "node:net";
+import { spawnSync as spawnSync3 } from "node:child_process";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync3, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync3, existsSync as existsSync6, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
 import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
@@ -11517,6 +11518,33 @@ function publicUrlOrigin(input) {
   }
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash || !url.hostname || url.hostname === LAN_BIND) throw error();
   return url.origin;
+}
+var TAILSCALE_APP = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+function readTailscaleStatus(run2 = (cmd) => spawnSync3(cmd, ["status", "--json"], { encoding: "utf8", timeout: 5e3, env: { ...process.env, TAILSCALE_BE_CLI: "1" } })) {
+  let result = run2("tailscale");
+  if (result.error?.code === "ENOENT" && process.platform === "darwin" && existsSync6(TAILSCALE_APP)) result = run2(TAILSCALE_APP);
+  if (result.error?.code === "ENOENT") {
+    throw new ServeError("--tailscale needs the tailscale CLI: install Tailscale (https://tailscale.com/download) and make sure `tailscale` is on PATH");
+  }
+  if (result.error || result.status !== 0) {
+    const why = result.error?.message ?? (result.stderr || "").trim().split("\n")[0] ?? "";
+    throw new ServeError(`tailscale status failed${why ? `: ${why}` : ""}`);
+  }
+  try {
+    return JSON.parse(result.stdout);
+  } catch {
+    throw new ServeError("Cannot parse the output of tailscale status --json");
+  }
+}
+function tailscaleTarget(status) {
+  const state = status?.BackendState;
+  if (state !== "Running") {
+    throw new ServeError(`Tailscale is not running (state: ${state ?? "unknown"}); run \`tailscale up\` first`);
+  }
+  const address = (status.Self?.TailscaleIPs ?? []).find((ip) => isIP(ip) === 4);
+  if (!address) throw new ServeError("This machine has no Tailscale IPv4 address; check `tailscale status`");
+  const dns = typeof status.Self?.DNSName === "string" ? status.Self.DNSName.replace(/\.$/, "") : "";
+  return { address, host: status.CurrentTailnet?.MagicDNSEnabled === true && dns ? dns : address };
 }
 function hostAllowed(host, additional) {
   if (LOOPBACK_HOST.test(host ?? "")) return true;
@@ -11620,7 +11648,8 @@ function readServeInfo(home) {
     const info = JSON.parse(readFileSync8(infoPath(home), "utf8"));
     const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
     const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
-    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl } : null;
+    const host = isIP(info.host) ? info.host : void 0;
+    return ok ? { pid: info.pid, port: info.port, secret: info.secret, baseUrl: info.baseUrl, host } : null;
   } catch {
     return null;
   }
@@ -11823,9 +11852,9 @@ function handler(home, secret, allowedHosts, live) {
     }
   };
 }
-function listening(port, timeout = 500) {
+function listening(port, host = HOST, timeout = 500) {
   return new Promise((done) => {
-    const socket = connect2({ host: HOST, port });
+    const socket = connect2({ host, port });
     const end = (up) => {
       socket.destroy();
       done(up);
@@ -11835,26 +11864,30 @@ function listening(port, timeout = 500) {
     socket.once("error", () => end(false));
   });
 }
-async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile }) {
+async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost }) {
   const addresses = lan ? lanAddresses ?? lanIPv4Addresses() : [];
   if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4 || address === LAN_BIND || address.startsWith("127.")))) {
     throw new ServeError("--lan needs at least one active non-loopback IPv4 interface");
   }
   const publicOrigin = publicUrl === void 0 ? null : publicUrlOrigin(publicUrl);
-  const allowedHosts = [...addresses, ...publicOrigin ? [new URL(publicOrigin).host] : []];
+  if (tailscale && (lan || publicOrigin)) throw new ServeError("--tailscale cannot be combined with --lan or --public-url");
+  const tail = tailscale ? tailscaleTarget(tailscaleStatus ? tailscaleStatus() : readTailscaleStatus()) : null;
+  const listenHost = tail ? bindHost ?? tail.address : lan ? LAN_BIND : HOST;
+  const allowedHosts = [...addresses, ...publicOrigin ? [new URL(publicOrigin).host] : [], ...tail ? [tail.address] : []];
   const running = readServeInfo(home);
-  if (running && await listening(running.port)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
-  const secret = loadSecret(secretFile);
+  if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
+  const secret = loadSecret(secretFile ?? (tail ? join10(home, "serve-secret") : void 0));
   const live = liveStreams(home);
   const server = createServer(handler(home, secret, allowedHosts, live));
   await new Promise((done, fail) => {
-    server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : e));
-    server.listen(port, lan ? LAN_BIND : HOST, done);
+    server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : tail && e.code === "EADDRNOTAVAIL" ? new ServeError(`Cannot listen on ${listenHost}: Tailscale in userspace-networking mode has no interface for it. Use --lan, or run \`tailscale serve --bg ${port}\` and am serve --public-url https://<machine>.<tailnet>.ts.net`) : e));
+    server.listen(port, listenHost, done);
   });
   const actual = server.address().port;
-  const baseUrl = publicOrigin ?? `http://${lan ? addresses[0] : HOST}:${actual}`;
+  if (tail) allowedHosts.push(`${tail.host}:${actual}`);
+  const baseUrl = publicOrigin ?? (tail ? `http://${tail.host}:${actual}` : `http://${lan ? addresses[0] : HOST}:${actual}`);
   try {
-    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl });
+    writeInfo(home, { pid: process.pid, port: actual, secret, startedAt: Date.now(), baseUrl, ...tail ? { host: listenHost } : {} });
   } catch (e) {
     server.closeAllConnections();
     await new Promise((done) => server.close(done));
@@ -11870,12 +11903,12 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
     });
     return closed;
   };
-  return { port: actual, secret, close, baseUrl, addresses, lan };
+  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join10(home, "serve-secret") : secretFile };
 }
-async function runServe({ home, port, lan = false, publicUrl, secretFile, print, fail }) {
+async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port, lan, publicUrl, secretFile });
+    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`\u2717 ${e.message}`);
@@ -11887,7 +11920,10 @@ async function runServe({ home, port, lan = false, publicUrl, secretFile, print,
     process.once("SIGTERM", stop);
     process.once("SIGHUP", stop);
     process.once("exit", () => removeInfo(home, srv.secret, srv.port));
-    if (lan) {
+    if (srv.tailscale) {
+      print(`Serving pages on ${srv.baseUrl} on your tailnet only (Ctrl-C to stop). am render prints a link for each page.`);
+      print(`Links stay valid across restarts. Delete ${srv.secretPath} to revoke every link.`);
+    } else if (lan) {
       print(`Serving pages on ${LAN_BIND}:${srv.port} (Ctrl-C to stop). am render prints a link for each page.`);
       print("WARNING: --lan exposes this port on every IPv4 interface, without built-in TLS. A page link is a secret: use a trusted LAN or an HTTPS reverse proxy.");
       for (const address of srv.addresses) print(`LAN address: http://${address}:${srv.port}`);
@@ -11916,7 +11952,7 @@ Usage:
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
-  am serve  [--port 8765] [--lan] [--public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network); am render then prints a link:
+  am serve  [--port 8765] [--lan | --tailscale | --public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network; --tailscale: on your tailnet only); am render then prints a link:
   am clean  [--days 30] [--all] [--dry-run]       delete old pages, videos and saved drafts, and the voice-over cache
   am theme check <name|file.json> [--no-open]     check a theme's colors and contrast, and render specimen pages
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
@@ -12096,6 +12132,7 @@ async function main(argv, io = {}) {
         days: { type: "string" },
         port: { type: "string" },
         lan: { type: "boolean" },
+        tailscale: { type: "boolean" },
         "public-url": { type: "string" },
         "secret-file": { type: "string" },
         all: { type: "boolean" },
@@ -12655,9 +12692,13 @@ function cmdServe(opts, { print, fail, env, io }) {
     fail("\u2717 --port needs a number from 0 to 65535 (0 picks a free port)");
     return 2;
   }
+  if (opts.tailscale && (opts.lan || opts["public-url"] !== void 0)) {
+    fail("\u2717 --tailscale cannot be combined with --lan or --public-url");
+    return 2;
+  }
   const port = opts.port === void 0 ? DEFAULT_PORT : Number(opts.port);
   const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve4(io?.cwd ?? process.cwd(), opts["secret-file"]);
-  return runServe({ home: amHome(env), port, lan: !!opts.lan, publicUrl: opts["public-url"], secretFile, print, fail });
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts["public-url"], secretFile, print, fail });
 }
 function cmdLint(src, opts, { print, fail }) {
   let doc2;
@@ -12792,7 +12833,7 @@ function cmdTheme(action, target, opts, ctx) {
   let errors = [];
   if (!isFile && getTheme(name)) {
     theme = getTheme(name);
-  } else if (existsSync6(path)) {
+  } else if (existsSync7(path)) {
     ({ theme, errors } = readThemeFile(path, themeNames("video")));
   } else {
     fail(`\u2717 No theme named "${target}": ${path} does not exist`);

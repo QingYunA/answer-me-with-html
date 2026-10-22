@@ -307,14 +307,19 @@ am serve              # http://127.0.0.1:8765，Ctrl-C 停止；--port N 改端�
 ssh -L 8765:127.0.0.1:8765 user@host   # 在你自己的电脑上运行，然后在浏览器里打开链接
 am serve --lan        # 同时监听局域网（0.0.0.0），只在可信网络里使用
 am serve --public-url https://pages.example.com   # 链接使用这个地址，用于已加上 TLS 的反向代理或隧道
+am serve --tailscale  # 只监听 Tailscale 地址；tailnet 内的任何设备都能打开链接
 ````
 
 - 运行期间，`am render`、`am patch` 和 `am video` 写入 `~/.answer-me-with-html/pages/` 或 `videos/` 的页面会多打印一行 `link:`，Agent 会把这个链接交给你，而不是 `file://` 链接。
 - 默认服务只监听 `127.0.0.1`，推荐通过 SSH 隧道访问。没有密码，也没有 TLS。
 - `--lan` 让服务监听 `0.0.0.0`，也就是全部 IPv4 网卡，而不只是链接里的地址，同一网络里的其他电脑就能打开链接。它会打印所有局域网地址并给出警告，链接使用第一个地址：192.168.x.x 优先，其次 10.x.x.x，再其次 172.16-31.x.x。连接是明文 HTTP，链接里的令牌就是持有者凭证，同一网络里能看到流量或链接的人都能打开页面，所以只在有防火墙保护的可信网络里使用。
 - `--public-url https://host` 用于你自己放在 `am serve` 前面、并已加上 TLS 的反向代理或隧道。它决定 `link:` 行开头的地址，以及服务接受的 `Host` 名称；它不会创建 TLS，也不会自己开放任何端口。只能给出 origin，不能带路径。不加 `--lan` 时服务仍只监听 `127.0.0.1`，所以代理必须和它在同一台机器上，并且要保留原始的 `Host` 头。
+- `--tailscale` 只监听这台机器的 Tailscale IPv4 地址（不是 `0.0.0.0`，也不是 `127.0.0.1`），所以只有你 tailnet 里的设备能连上。链接以 MagicDNS 名称开头（`http://<机器名>.<tailnet>.ts.net:<端口>`），MagicDNS 关闭时用 Tailscale 地址。连接是明文 `http://`，但 tailnet 内的流量由 WireGuard 加密。它读取 `tailscale status --json`，不会改动任何 Tailscale 配置。需要 `tailscale` CLI 在 `PATH` 里（macOS 上也可以用 App 自带的 CLI），并且 Tailscale 已登录、正在运行。不能与 `--lan` 或 `--public-url` 同用。链接在重启后仍然有效：密钥保存在 `~/.answer-me-with-html/serve-secret`，所以手机上的书签不会失效；删除该文件即可让所有链接失效。如果监听时报 "cannot assign requested address"（Tailscale 的 userspace-networking 模式没有网卡），改用 `--lan`，或下面的 HTTPS 做法。
+- `--secret-file <路径>` 把链接密钥存在文件里，而不是每次启动都新生成，所以链接在重启后仍然有效。文件内容是 64 个小写十六进制字符，只有你自己能读（权限 0600）；文件不存在时会自动创建。组或其他用户可读的文件会被 `am serve` 拒绝。
+- 已开启 HTTPS 证书的 tailnet 上用 HTTPS：运行 `tailscale serve --bg 8765`，再运行 `am serve --public-url https://<机器名>.<tailnet>.ts.net`。`tailscale serve` 会原样传递 `.ts.net` 的 `Host`，这正是 `--public-url` 接受的名称。开启 HTTPS 会把你的机器名公布到证书透明度（Certificate Transparency）日志里（[详情](https://tailscale.com/kb/1153/enabling-https)）。`tailscale serve --https=443 off` 可以撤销。
+- 在手机上，`http(s)` 链接里的 Reply 作答和评论只保留到标签页关闭，而且手机浏览器会丢弃后台标签页：切换应用之前先复制回复。
 - 不加这些参数时，服务只响应 `localhost`、`127.0.0.1` 和 `[::1]`，请求其他主机名或 IP 一律返回 404。不要把这个端口暴露到公网。
-- 链接按页面区分：每个链接只带这一页的令牌，打不开别的页面；服务重启后所有旧链接失效。服务不列目录，只提供 `.html` 文件。
+- 链接按页面区分：每个链接只带这一页的令牌，打不开别的页面；服务重启后所有旧链接失效，除非密钥存在文件里（`--tailscale`、`--secret-file`）。服务不列目录，只提供 `.html` 文件。
 - 把链接当作这一页的密码：能连到这个端口、又拿到链接的人都能打开页面，包括同一台机器上的其他用户。不要把链接发给别人。
 - 给隧道单独用一个本地端口。不要复用曾经打开过其他服务或其他主机页面的端口：那些页面可能在浏览器里为这个地址留下了 service worker，之后在这个端口上打开的页面它都能看到。
 - 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、批注和标注只保留到关闭页面为止，关闭前请先复制回复。
