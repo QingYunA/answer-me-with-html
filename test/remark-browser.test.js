@@ -433,3 +433,112 @@ test('remark: with localStorage blocked the page still loads, and a mark lasts u
     await send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }
 });
+
+// The popover works without a mouse: 1–4 pick a kind (not while typing the note), Ctrl / Cmd + Enter saves, and a popover closed
+// without Save keeps its kind and note as a draft.
+const KEY_JS = `
+  const key = (k, mods = {}, target = document.activeElement) =>
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...mods }));
+  const need = () => !pop.querySelector('.am-remark-need').hidden;
+  const pressed = () => pop.querySelector('.am-remark-kind[aria-pressed="true"]')?.dataset.kind ?? '';
+  const note = () => pop.querySelector('textarea');
+`;
+
+test('remark popover: a hint shows until a tag is picked, 1–4 pick a tag, and digits in the note stay text', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-pick', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    btn.click();
+    at('p', ${JSON.stringify(p.first)}).click();
+    const first = { need: need(), hint: pop.querySelector('.am-remark-need').textContent, save: pop.querySelector('.am-remark-actions .am-btn').disabled, numbers: [...pop.querySelectorAll('.am-remark-kind')].map((b) => b.dataset.n) };
+    key('3');
+    const picked = { kind: pressed(), need: need(), save: pop.querySelector('.am-remark-actions .am-btn').disabled, inNote: document.activeElement === note() };
+    const typed = key('1', {}, note());
+    return { first, picked, typedIsText: typed, kindAfterTyping: pressed() };
+  })()`);
+  assert.deepEqual(state, {
+    first: { need: true, hint: p.lang.ui.remark.need, save: true, numbers: ['1', '2', '3', '4'] },
+    picked: { kind: 'question', need: false, save: false, inNote: true },
+    typedIsText: true,
+    kindAfterTyping: 'question',
+  });
+});
+
+test('remark popover: Ctrl / Cmd + Enter saves once a tag is picked, and does nothing before', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-save', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    btn.click();
+    const para = at('p', ${JSON.stringify(p.first)});
+    para.click();
+    note().focus();
+    note().value = 'shorter';
+    key('Enter', { ctrlKey: true }, note());
+    const noKind = { open: shown(pop), marked: para.classList.contains('am-mark') };
+    pop.querySelector('[data-kind="suggestion"]').click();
+    key('Enter', { metaKey: true }, note());
+    return { noKind, saved: { open: shown(pop), kind: para.dataset.kind, stored: stored()[0]?.note } };
+  })()`);
+  assert.deepEqual(state, { noKind: { open: true, marked: false }, saved: { open: false, kind: 'suggestion', stored: 'shorter' } });
+});
+
+test('remark popover: a popover closed without Save keeps a draft, and Clear all remarks drops it', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-draft', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    btn.click();
+    const saved = at('p', ${JSON.stringify(p.first)});
+    const drafted = at('li', ${JSON.stringify(p.last)});
+    drafted.click(); key('4'); note().value = 'risky';
+    key('Escape', {}, note());
+    const closed = { open: shown(pop), marked: drafted.classList.contains('am-mark') };
+    drafted.click();
+    const back = { kind: pressed(), note: note().value, need: need() };
+    key('Escape', {}, note());
+    mark(saved, 'keep', '');
+    const clear = document.querySelector('.am-btn--remark-clear');
+    clear.click(); clear.click();
+    drafted.click();
+    const afterClear = { kind: pressed(), note: note().value };
+    return { closed, back, afterClear };
+  })()`);
+  assert.deepEqual(state, {
+    closed: { open: false, marked: false },
+    back: { kind: 'concern', note: 'risky', need: false },
+    afterClear: { kind: '', note: '' },
+  });
+});
+
+test('remark: with the mode on, Tab reaches each block and Enter or Space opens its popover; turning it off removes the tab stops', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-pick-block', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    const para = at('p', ${JSON.stringify(p.first)});
+    const item = at('li', ${JSON.stringify(p.last)});
+    const before = para.hasAttribute('tabindex');
+    btn.click();
+    const on = { para: para.tabIndex, item: item.tabIndex, title: document.querySelector('.am-head h1').hasAttribute('tabindex') };
+    para.focus();
+    key('Enter', {}, para);
+    const byEnter = { open: shown(pop), focusInside: pop.contains(document.activeElement) };
+    key('Escape', {}, note());
+    const back = document.activeElement === para;
+    item.focus();
+    key(' ', {}, item);
+    const bySpace = shown(pop);
+    key('3'); note().value = 'from the keyboard';
+    key('Enter', { ctrlKey: true }, note());
+    const saved = { kind: item.dataset.kind, focus: document.activeElement === item };
+    btn.click();
+    return { before, on, byEnter, back, bySpace, saved, off: [para, item].some((el) => el.hasAttribute('tabindex') || el.hasAttribute('data-am-pick')) };
+  })()`);
+  assert.deepEqual(state, {
+    before: false,
+    on: { para: 0, item: 0, title: false },
+    byEnter: { open: true, focusInside: true },
+    back: true,
+    bySpace: true,
+    saved: { kind: 'question', focus: true },
+    off: false,
+  });
+});

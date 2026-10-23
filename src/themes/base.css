@@ -526,6 +526,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-btn--remark-clear { color: var(--err); }
 .am-btn--remark-clear.is-armed { background: var(--err-bg); border-color: var(--err); }
 .am-remark-hover { outline: 1px dashed var(--ink-3); outline-offset: 2px; cursor: pointer; }
+[data-am-pick]:focus { outline: none; }
+[data-am-pick]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 :is(.am-mark, .am-remark-kind)[data-kind="suggestion"] { --mark: var(--warn); --mark-bg: var(--warn-bg); }
 :is(.am-mark, .am-remark-kind)[data-kind="keep"] { --mark: var(--ok); --mark-bg: var(--ok-bg); }
 :is(.am-mark, .am-remark-kind)[data-kind="question"] { --mark: var(--accent); --mark-bg: var(--accent-bg); }
@@ -554,4 +556,6 @@ table.am-mark { background: none; }
 .am-remark-pop textarea { font: var(--am-fs-text)/1.5 var(--font-sans); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 6px 8px; resize: vertical; }
 .am-remark-actions { display: flex; gap: 6px; }
 .am-remark-actions .am-btn:disabled { opacity: .5; cursor: default; }
+.am-remark-need { align-self: center; color: var(--ink-3); font-size: var(--am-fs-small); }
+.am-remark-kind::before { content: attr(data-n); margin-inline-end: 5px; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--am-fs-label); }
 @media print { .am-remark-pop { display: none !important; } }

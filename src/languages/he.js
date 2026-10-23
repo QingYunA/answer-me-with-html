@@ -11,7 +11,7 @@ export default {
   },
   ui: {
     remark: {
-      button: 'סימון',
+      button: 'סימון', need: 'בחרו תגית כדי לשמור',
       hint: 'הערה (אופציונלי)', save: 'שמירה', remove: 'הסרה', clear: 'ניקוי כל הסימונים', clearConfirm: 'לחצו שוב כדי לנקות {n} סימונים',
       section: 'סימונים',
       kinds: { suggestion: 'הצעה', keep: 'להשאיר', question: 'שאלה', concern: 'חשש' },

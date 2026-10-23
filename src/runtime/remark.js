@@ -64,6 +64,8 @@
   };
   // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.
   const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));
+  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).
+  const drafts = new Map();
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'am-btn am-btn--remark-clear';
@@ -93,6 +95,8 @@
     }
     for (const el of document.querySelectorAll('.am-mark')) unpaint(el);
     marks.clear();
+    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.
+    drafts.clear();
     try {
       localStorage.removeItem(storeKey);
     } catch {
@@ -140,7 +144,8 @@
   clearBtn.hidden = marks.size === 0;
   if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));
 
-  // The popover edits one block. Save stays off until a kind is picked.
+  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1–4 pick a kind from the keyboard and
+  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.
   const pop = document.createElement('div');
   pop.className = 'am-remark-pop';
   pop.hidden = true;
@@ -149,8 +154,11 @@
   document.body.append(pop);
   let opener = null;
   let anchor = null;
+  let keepDraft = null;
   const close = (restoreFocus) => {
     if (pop.hidden) return;
+    keepDraft?.();
+    keepDraft = null;
     pop.hidden = true;
     if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();
   };
@@ -167,14 +175,22 @@
   const open = (el) => {
     const key = keyMap().get(el);
     const mark = marks.get(key);
-    let kind = mark?.kind ?? '';
+    const draft = drafts.get(key);
+    let kind = draft?.kind ?? mark?.kind ?? '';
     opener = document.activeElement;
     anchor = el;
 
-    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });
+    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });
     note.setAttribute('aria-label', ui.hint);
     const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });
+    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });
+    keepDraft = () => {
+      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });
+      else drafts.delete(key);
+    };
+    const done = () => { drafts.delete(key); keepDraft = null; };
     keep.addEventListener('click', () => {
+      done();
       const saved = { key, kind, note: note.value.trim() };
       marks.set(key, saved);
       save();
@@ -186,6 +202,7 @@
     if (mark) {
       const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });
       drop.addEventListener('click', () => {
+        done();
         marks.delete(key);
         save();
         unpaint(el);
@@ -193,17 +210,34 @@
       });
       actions.append(drop);
     }
-    const kindBtns = KINDS.map((k) => {
+    const choose = (k) => {
+      kind = k;
+      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));
+      keep.disabled = false;
+      need.hidden = true;
+    };
+    const kindBtns = KINDS.map((k, i) => {
       const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });
       kb.dataset.kind = k;
+      kb.dataset.n = i + 1;
       kb.setAttribute('aria-pressed', String(k === kind));
-      kb.addEventListener('click', () => {
-        kind = k;
-        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));
-        keep.disabled = false;
-      });
+      kb.addEventListener('click', () => choose(k));
       return kb;
     });
+    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind
+    // only while the focus is outside the note.
+    pop.onkeydown = (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {
+        e.preventDefault();
+        if (!keep.disabled) keep.click();
+        return;
+      }
+      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;
+      e.preventDefault();
+      choose(KINDS[Number(e.key) - 1]);
+      note.focus();
+    };
+    actions.append(need);
     pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);
     pop.firstChild.append(...kindBtns);
     pop.hidden = false;
@@ -225,6 +259,25 @@
     const el = blockAt(e.target);
     if (el) open(el);
   };
+  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block
+  // that already had a tabindex keeps it; only the ones the mode added lose it again.
+  const pickKey = (e) => {
+    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;
+    e.preventDefault();
+    open(e.target);
+  };
+  const focusable = (on) => {
+    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys
+    for (const el of keyMap().keys()) {
+      if (on && !el.hasAttribute('tabindex')) {
+        el.tabIndex = 0;
+        el.setAttribute('data-am-pick', '');
+      } else if (!on && el.hasAttribute('data-am-pick')) {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('data-am-pick');
+      }
+    }
+  };
   const setMode = (on) => {
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', String(on));
@@ -232,6 +285,8 @@
     document.body[toggle]('click', pick);
     document.body[toggle]('mouseover', track);
     document.body[toggle]('mouseout', track);
+    document.body[toggle]('keydown', pickKey);
+    focusable(on);
     if (!on) {
       track({ type: 'mouseout', relatedTarget: null });
       close(false);

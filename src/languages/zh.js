@@ -7,7 +7,7 @@ export default {
   voice: { say: 'zh_CN', espeak: 'cmn' },
   ui: {
     remark: {
-      button: '标注',
+      button: '标注', need: '选择标签后才能保存',
       hint: '批注（可选）', save: '保存', remove: '删除', clear: '清除所有标注', clearConfirm: '再次点击以清除 {n} 条标注',
       section: '标注',
       kinds: { suggestion: '建议', keep: '保留', question: '疑问', concern: '关注' },

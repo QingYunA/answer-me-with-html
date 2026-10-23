@@ -95,7 +95,7 @@ test('the page script sends remarks through replyText and has no second string j
 
 test('every language file labels the remark button, the popover, clear action and the four kinds', () => {
   for (const { id, ui } of LANGUAGES) {
-    for (const key of ['button', 'hint', 'save', 'remove', 'clear', 'clearConfirm', 'section']) assert.ok(ui.remark[key], `${id} misses remark.${key}`);
+    for (const key of ['button', 'need', 'hint', 'save', 'remove', 'clear', 'clearConfirm', 'section']) assert.ok(ui.remark[key], `${id} misses remark.${key}`);
     for (const kind of KINDS) assert.ok(ui.remark.kinds[kind], `${id} misses the ${kind} label`);
   }
 });
