@@ -37,6 +37,8 @@ Produce a page if any of these is true:
 
 Otherwise answer in plain text. When unsure: the more the question "needs a picture to understand", the more it calls for a page.
 
+Automatic pages are for replies to the user. An internal report returned to another agent is not one: when a parent agent or a coordinator delegated the work — research, implementation, review, a progress report — return the text or structure it asked for, with the findings and the evidence, and render no page. The parent consolidates and decides whether the consolidated answer gets a page. A subagent renders only when its task explicitly asks for a page or a video; delegation alone never authorizes a video. Judge this by who receives the reply and what was asked for, not by the host or agent name.
+
 ### Always-on mode
 
 If the context contains the `[answer-me-with-html always-on]` reminder (the user added the always-on rule to a rules file such as `CLAUDE.md` or `AGENTS.md`), the bar is lower:
@@ -46,6 +48,7 @@ If the context contains the `[answer-me-with-html always-on]` reminder (the user
 - For everyday conclusions use a small page with 2–4 panels: one callout with the conclusion, plus one table or one diagram. Do not add panels just to fill space.
 - Render with `--no-open`, so no browser window interrupts the user. The user opens the page by clicking the path at the end of the reply.
 - Order: render the page first, then write the text reply. The reply is the last thing in the turn, with the page link on its last line (see step 5). Do not write the reply and then call `am render`.
+- Always-on mode still only covers replies to the user. A delegated report that inherits the rule is an internal report: return the text or structure the parent asked for, in full, and render no page — a page is made only when the delegated task explicitly asks for one.
 - Produce no page for small talk, one or two sentences with no conclusion, pure command output, or when the user asks for plain text.
 
 ## 2. Workflow (one Bash call)
