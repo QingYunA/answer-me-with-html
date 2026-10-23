@@ -40,3 +40,13 @@ test('always-on rule: both README snippets exclude internal agent-to-agent repor
   assert.match(zh, /子 Agent 向父 Agent 汇报/);
   assert.match(zh, /不要生成页面/);
 });
+
+// The website's "copy prompt" button carries the same rule; it drifted from the README before (#324).
+test('always-on rule: the website copies match the README snippets word for word', () => {
+  for (const [lang, readme] of [['en', 'README.md'], ['zh', 'README.zh-CN.md']]) {
+    const snippet = read(readme).split('\n').find((l) => l.includes(MARKER)).replace(/^> /, '');
+    const site = read(`site/i18n/${lang}.js`).split('\n').find((l) => l.startsWith('const ALWAYS_RULE = '));
+    const rule = site.slice("const ALWAYS_RULE = '".length, -"';".length).replace(/\\'/g, "'");
+    assert.equal(rule, snippet, lang);
+  }
+});

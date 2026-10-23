@@ -14,32 +14,37 @@ const section = (start, end) => {
 
 const step1 = section('## 1. Decide: produce a page or not', '## 2. Workflow');
 const alwaysOn = section('### Always-on mode', '## 2. Workflow');
+const step5 = section('5. Reply in the terminal', '\n## ');
 
-// The audience boundary is the whole point of #320: a delegated report is not a user reply, so it
-// gets the findings the parent asked for rather than a two-line answer plus a page link.
-test('step 1: an internal report to another agent renders no page', () => {
+// One test per acceptance scenario of #320: a delegated report is not a user reply, so it gets the
+// findings the parent asked for rather than a two-line answer plus a page link.
+test('#320 scenario 1: a delegated research report returns findings and renders no page', () => {
   assert.match(step1, /An internal report returned to another agent is not one/);
-  assert.match(step1, /render no page/);
-  assert.match(step1, /return the text or structure it asked for/);
+  assert.match(step1, /delegated research, implementation, a review or a progress report, return the text or structure it asked for, with the findings and the evidence\. Render no page\./);
 });
 
-test('step 1: a page is allowed only when the delegated task explicitly asks for one', () => {
-  assert.match(step1, /explicitly asks for a page or a video/);
-  assert.match(step1, /delegation alone never authorizes a video/);
+test('#320 scenario 2: an inherited always-on rule does not make a page for a review report', () => {
+  assert.match(alwaysOn, /internal-report rule of step 1 applies here too/);
+  assert.match(alwaysOn, /inherits the always-on rule renders no page/);
 });
 
-test('step 1: the decision is the audience and the request, not the host or agent name', () => {
-  assert.match(step1, /not by the host or agent name/);
-});
-
-// Always-on inherits the same boundary; without this an inherited rule re-renders every subagent reply.
-test('always-on: the internal-report exception is carried there too', () => {
-  assert.match(alwaysOn, /internal report/);
-  assert.match(alwaysOn, /render no page/);
-  assert.match(alwaysOn, /explicitly asks for one/);
-});
-
-test('always-on: user-facing triggers are still there', () => {
+test('#320 scenario 3: the parent\'s reply to the user keeps the normal page rules', () => {
+  assert.match(step1, /Its reply to the user follows the normal rules of this section/);
   assert.match(alwaysOn, /attach a page/);
   assert.match(alwaysOn, /Do not skip it because "the answer is short"/);
+});
+
+test('#320 scenario 4: a page the parent asked for comes back with the verification details', () => {
+  assert.match(step1, /explicitly asks for a page, render it, and return the page path together with the verification details/);
+  assert.match(step5, /If a parent agent asked for the page, also return the verification details it asked for/);
+});
+
+test('#320 scenario 5: delegation alone never starts a video', () => {
+  assert.match(step1, /A video needs an explicit video request; delegation alone never authorizes one/);
+  assert.match(SKILL, /Use only when the user explicitly asks for a video/);
+});
+
+test('#320: the audience is judged by recipient and request, and the description is for user replies', () => {
+  assert.match(step1, /not by the host or agent name/);
+  assert.match(SKILL.split('\n---')[0], /proactively and liberally in replies to the user/);
 });
