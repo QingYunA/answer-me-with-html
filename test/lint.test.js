@@ -87,6 +87,15 @@ utilize = 1
   assert.deepEqual(lint(src), []);
 });
 
+test('quotations are evidence: their text is not checked, the draft around them is', () => {
+  const quote = '"We utilize the legacy cache in order to leverage the old pool and this sentence is deliberately long enough to break the limit."';
+  assert.deepEqual(rules(lint(`## A\nThe reviewer wrote: ${quote}`)), []);
+  assert.deepEqual(rules(lint(`## A\nUtilize the tool. The reviewer wrote: ${quote}`)), ['word']);
+  assert.deepEqual(rules(lint('## A\n他说：「我们进行优化，综上所述，这一步至关重要，而且尽快登陆系统。」')), [], 'CJK quotes are skipped too');
+  assert.deepEqual(rules(lint(`## A\n"One. Two. Three. Four. Five. Six. Seven."`)), [], 'sentences inside a quote do not count for paragraph-length');
+  assert.deepEqual(rules(lint('## A\n1. The valve is closed by the operator: "the pump is started by hand".')), ['passive'], 'the step around the quote is still checked');
+});
+
 test('status cells followed by inline code agree with the render: no rows skipped, ok/warn prefix stripped', () => {
   const ws = lint('## A\n| a |\n|---|\n| no Commence with `utilize()`. |\n| ok Commence with `utilize()`. |\n| warn Commence with **care**. |');
   assert.deepEqual(ws.map((w) => [w.line, w.suggestion]), [[5, 'start'], [6, 'start']]);
