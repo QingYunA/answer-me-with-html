@@ -21,11 +21,23 @@ You write only the **content draft** (extended Markdown). The `am` CLI does all 
 
 Reply to the user, and write the draft, in the user's language.
 
+## Where the bundled files are
+
+Every command in this file, and in the files under `references/`, writes the skill directory as `$SKILL_DIR`. Resolve it once, before the first command of the turn:
+
+```bash
+SKILL_DIR="${CLAUDE_SKILL_DIR}"   # Claude Code fills this in automatically
+[ -f "$SKILL_DIR/scripts/am.mjs" ] || SKILL_DIR="<absolute path of the directory containing this SKILL.md>"
+test -f "$SKILL_DIR/scripts/am.mjs" || { echo "SKILL_DIR is not this skill's directory"; ls -d ~/.agents/skills/answer-me-with-html ~/.claude/skills/answer-me-with-html 2>/dev/null; }
+```
+
+Hosts other than Claude Code leave `${CLAUDE_SKILL_DIR}` empty rather than failing, so `"$SKILL_DIR/scripts/am.mjs"` becomes `/scripts/am.mjs` and node reports `Cannot find module '/your/project/scripts/am.mjs'`. On those hosts write the absolute path into the second line yourself; the `test -f` is there so an empty `SKILL_DIR` stops you instead of producing that error. The directory is the one holding this `SKILL.md` and `scripts/`: `~/.agents/skills/answer-me-with-html` after `npx skills add`, `~/.claude/skills/answer-me-with-html` for a Claude Code skill install, and the plugin's `skills/answer-me-with-html` for a plugin install. When the host printed a "Base directory for this skill" line (DeepSeek Harness), that path is this directory. If the user installed `am` globally (`npm i -g answer-me-with-html`), `am` on its own is equivalent.
+
 ## 0. When the user wants to change settings
 
 Arguments for this call: `$ARGUMENTS`
 
-When the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `${CLAUDE_SKILL_DIR}/references/settings.md` and follow it. That turn produces no page.
+When the arguments start with `config`, `clean` or `update`, or the user asks to change a setting, clean up pages or update this skill: read `$SKILL_DIR/references/settings.md` and follow it. That turn produces no page.
 
 ## 1. Decide: produce a page or not
 
@@ -50,13 +62,7 @@ If the context contains the `[answer-me-with-html always-on]` reminder (the user
 
 ## 2. Workflow (one Bash call)
 
-The CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+. If `node` is not found or is older than v20, tell the user, show them the exact command to install the Node.js LTS (macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`, otherwise nvm, which adds lines to the shell profile), and run it only after they agree, then check `node --version` again. If they say no or it still fails, stop and tell them. Below, `am` always means:
-
-```bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs"
-```
-
-In Claude Code, the path above is replaced with this skill's directory automatically. If you see the variable unreplaced (other agents), replace it with the absolute path of the directory that contains this SKILL.md. When the skill was loaded with a "Base directory for this skill" line (DeepSeek Harness), that path is this directory. If the user installed the `am` command globally, you can also use `am` directly.
+The CLI is bundled in this skill's directory: `scripts/am.mjs`, a single file with no dependencies to install; it needs only Node.js 20+. If `node` is not found or is older than v20, tell the user, show them the exact command to install the Node.js LTS (macOS `brew install node`, Windows `winget install OpenJS.NodeJS.LTS`, otherwise nvm, which adds lines to the shell profile), and run it only after they agree, then check `node --version` again. If they say no or it still fails, stop and tell them. Below, `am` always means `node "$SKILL_DIR/scripts/am.mjs"`, with `SKILL_DIR` resolved once at the top of this file.
 
 Keep the default output; it needs no flag. If the session cannot write to `~/.answer-me-with-html/pages` (a sandbox that allows writes only in the workspace), the CLI saves the page in a private folder in the system temporary folder and says so on a `!` line; the system may clear that folder. Add `-o "<absolute-workspace-path>/.tmp/answers/topic.html"` to `render -` before the heredoc only when the user wants the page in the workspace or the render fails with `Cannot write the page`. `-o` names an HTML file, not a folder; the CLI creates missing parent directories. Use `AM_HOME` only when the whole data directory must move.
 
@@ -66,7 +72,7 @@ Keep the default output; it needs no flag. If the session cannot write to `~/.an
 3. Render in one go with a heredoc:
 
 ````bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" render - <<'AM_EOF'
+node "$SKILL_DIR/scripts/am.mjs" render - <<'AM_EOF'
 ---
 title: Title
 ---
@@ -95,7 +101,7 @@ AM_EOF
 When a page already exists and only one panel needs to change, do not rewrite the whole page. Take the source draft from the HTML's `#am-source`, replace only the matching `##` section, and overwrite the page in place:
 
 ````bash
-node "${CLAUDE_SKILL_DIR}/scripts/am.mjs" patch page.html --panel "Panel title" <<'AM_EOF'
+node "$SKILL_DIR/scripts/am.mjs" patch page.html --panel "Panel title" <<'AM_EOF'
 ## A Panel title
 New content
 AM_EOF
@@ -195,4 +201,4 @@ Every sentence on the page gives the reader one fact they need. The idea comes f
 
 Use only when the user explicitly asks for a video ("make a video", "explain it as a video", "3b1b style", "explainer video"). Do not produce a video unasked in always-on mode either.
 
-Before you write a video draft, read `${CLAUDE_SKILL_DIR}/references/video.md` and follow it.
+Before you write a video draft, read `$SKILL_DIR/references/video.md` and follow it.

@@ -32,7 +32,7 @@ test('install: script paths referenced by commands and SKILL.md exist', () => {
     }
   }
   const skill = readFileSync(join(ROOT, 'skills/answer-me-with-html/SKILL.md'), 'utf8');
-  for (const [, rel] of skill.matchAll(/\$\{CLAUDE_SKILL_DIR\}\/([\w./-]+)/g)) {
+  for (const [, rel] of skill.matchAll(/\$(?:SKILL_DIR|\{CLAUDE_SKILL_DIR\})\/([\w./-]+)/g)) {
     assert.ok(existsSync(join(ROOT, 'skills/answer-me-with-html', rel)), rel);
   }
 });
