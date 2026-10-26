@@ -1,28 +1,23 @@
 {
-  "version": "0.5.8",
+  "version": "0.5.9",
   "en": [
-    "Doc pages get an outline rail beside the body; outline: picks the side",
-    "am serve --tailscale opens page links from a phone on your tailnet",
-    "Remarks work from the keyboard; quotations skip the writing check"
+    "A component written as :::callout is an error that shows the ``` syntax",
+    "The website has a changelog: answer-me-with-html.com/changelog/"
   ],
   "zh": [
-    "doc 页面的目录改成正文旁的导轨，outline: 选择放在哪一侧",
-    "am serve --tailscale：tailnet 里的手机也能打开页面链接",
-    "标注可以全程用键盘完成；引号里的文字不再参与写作检查"
+    "把组件写成 :::callout 会报错，并给出正确的 ``` 写法",
+    "网站新增更新日志：answer-me-with-html.com/zh/changelog/"
   ],
   "zh-Hant": [
-    "doc 頁面的目錄改成正文旁的導軌，outline: 選擇放在哪一側",
-    "am serve --tailscale：tailnet 裡的手機也能開啟頁面連結",
-    "標註可以全程用鍵盤完成；引號裡的文字不再參與寫作檢查"
+    "把元件寫成 :::callout 會報錯，並給出正確的 ``` 寫法",
+    "網站新增更新日誌：answer-me-with-html.com/zh/changelog/"
   ],
   "ja": [
-    "doc ページの目次が本文横のレールに。outline: で左右を選べます",
-    "am serve --tailscale で tailnet 内のスマホからページを開けます",
-    "注記をキーボードだけで付けられます。引用文は文章チェックの対象外です"
+    ":::callout と書いたコンポーネントはエラーになり、``` の書き方を示します",
+    "サイトに更新履歴ページ：answer-me-with-html.com/changelog/"
   ],
   "he": [
-    "בדפי doc תוכן העניינים הוא פס צר לצד הטקסט; outline: בוחר את הצד",
-    "am serve --tailscale פותח קישורים לדפים מהטלפון ברשת ה-tailnet",
-    "אפשר לסמן בעזרת המקלדת בלבד; ציטוטים לא נבדקים בבדיקת הכתיבה"
+    "רכיב שנכתב כ-:::callout הוא שגיאה שמציגה את התחביר הנכון עם ```",
+    "באתר יש עכשיו יומן שינויים: answer-me-with-html.com/changelog/"
   ]
 }
