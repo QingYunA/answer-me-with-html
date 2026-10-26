@@ -48,3 +48,9 @@ test('#320: the audience is judged by recipient and request, and the description
   assert.match(step1, /not by the host or agent name/);
   assert.match(SKILL.split('\n---')[0], /proactively and liberally in replies to the user/);
 });
+
+// Review on #324: the always-on bullet and step 5 must agree with step 1's explicit-page case.
+test('#320 review: always-on keeps the explicit-page exception, and the line limit is for user replies', () => {
+  assert.match(alwaysOn, /renders no page, unless the delegated task explicitly asks for one/);
+  assert.match(step5, /The 2–3 line limit is for replies to the user/);
+});
