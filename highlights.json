@@ -1,28 +1,28 @@
 {
-  "version": "0.5.7",
+  "version": "0.5.8",
   "en": [
-    "Every draft error is listed at once; a stdin draft is kept for line edits",
-    "A table with no |---| row is an error instead of plain text",
-    "Long flow edges are no longer cut off at the edge of the diagram"
+    "Doc pages get an outline rail beside the body; outline: picks the side",
+    "am serve --tailscale opens page links from a phone on your tailnet",
+    "Remarks work from the keyboard; quotations skip the writing check"
   ],
   "zh": [
-    "草稿错误一次列全；stdin 草稿会保存下来，只改出错的行",
-    "表格缺少 |---| 分隔行时报错，不再输出成一行行竖线",
-    "flow 图里绕到外侧的长连线不再被裁掉"
+    "doc 页面的目录改成正文旁的导轨，outline: 选择放在哪一侧",
+    "am serve --tailscale：tailnet 里的手机也能打开页面链接",
+    "标注可以全程用键盘完成；引号里的文字不再参与写作检查"
   ],
   "zh-Hant": [
-    "草稿錯誤一次列全；stdin 草稿會保存下來，只改出錯的行",
-    "表格缺少 |---| 分隔行時報錯，不再輸出成一行行豎線",
-    "flow 圖裡繞到外側的長連線不再被裁掉"
+    "doc 頁面的目錄改成正文旁的導軌，outline: 選擇放在哪一側",
+    "am serve --tailscale：tailnet 裡的手機也能開啟頁面連結",
+    "標註可以全程用鍵盤完成；引號裡的文字不再參與寫作檢查"
   ],
   "ja": [
-    "下書きのエラーを一度にすべて表示し、stdin の下書きを保存して該当行だけ直せます",
-    "表に |---| の区切り行がないとエラーになり、テキストのまま出力されません",
-    "flow 図で外側を回る長い線が切れなくなりました"
+    "doc ページの目次が本文横のレールに。outline: で左右を選べます",
+    "am serve --tailscale で tailnet 内のスマホからページを開けます",
+    "注記をキーボードだけで付けられます。引用文は文章チェックの対象外です"
   ],
   "he": [
-    "כל שגיאות הטיוטה מוצגות בבת אחת; טיוטה מ-stdin נשמרת לתיקון שורות",
-    "טבלה בלי שורת |---| היא שגיאה, ולא טקסט רגיל",
-    "קווים ארוכים בתרשים flow כבר לא נחתכים בשולי התרשים"
+    "בדפי doc תוכן העניינים הוא פס צר לצד הטקסט; outline: בוחר את הצד",
+    "am serve --tailscale פותח קישורים לדפים מהטלפון ברשת ה-tailnet",
+    "אפשר לסמן בעזרת המקלדת בלבד; ציטוטים לא נבדקים בבדיקת הכתיבה"
   ]
 }

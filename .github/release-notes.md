@@ -1,53 +1,47 @@
-<!-- release 0.5.7 -->
+<!-- release 0.5.8 -->
 
-## Fix a draft in place
+## An outline rail on doc pages
 
-When a draft has errors, `am render` now lists every one of them at once, in line order, instead of stopping at the first (#314):
+A `doc` page with 3 or more panels no longer gives its table of contents a column of its own, or a block above the body on a phone. The contents become a rail beside the body: one short tick per section (#332).
 
-```
-✗ L6 [flow] flow: unclosed shape bracket, missing )
-✗ L9 Cannot parse the draft: table has no delimiter row: put |---|---| on the line under the header row
-✗ L14 [flow] flow: unclosed shape bracket, missing )
-✗ 3 errors in the draft; no page was written
-  draft: ~/.answer-me-with-html/drafts/My-page-20261021-104551.md
-```
+- Hover a tick to see its title. Dwell on the rail, or click or tap it, to open the full list. The section you are reading is marked as you scroll.
+- `outline: left` or `outline: right` in the frontmatter picks the side; the default is `right`. On a right-to-left page the sides mirror.
+- Arrow keys move through the list and Esc closes it. Without JavaScript the list still opens and the links still jump. Print hides the rail.
+- On a 390px phone, a 24-section page now starts its body right under the title, instead of at y=889px.
+- Doc pages are narrower (916px instead of 1120px) and centred, so the title and the body line up.
 
-- A draft sent on stdin (`am render -`) that fails, or renders with warnings, is saved under `drafts/` in the data directory, and its path is printed. Every `L<line>` matches that file.
-- The agent changes only the flagged lines in that file and runs `am render <path>`, instead of writing the whole draft again. Once it renders with no warnings, the saved draft is deleted.
-- `am clean` removes old drafts the same way as old pages.
-- Frontmatter errors and an unclosed fence still stop at once, because nothing after them can be read.
+## Pages on your phone over Tailscale
+
+`am serve --tailscale` listens only on this machine's Tailscale address, so the `link:` lines open from a phone or another device on your tailnet, with no SSH and no change to your Tailscale settings. Links survive a restart; delete `~/.answer-me-with-html/serve-secret` to revoke them all (#323).
 
 ## Other changes
 
-- **Tables:** a table with no `|---|` row under its header, or with a different number of cells in that row, is an error with a corrected example, instead of rows of text full of pipes (#313).
-- **Layout:** a fractional `cols`, `span` or `rows` (such as `cols: 2.5`) is an error, instead of invalid CSS that took the whole sheet down to one column (#315).
-- **Diagrams:** a long `flow` edge routed around the outside of the layout is no longer cut off at the edge of the drawing (#312).
+- **Remarks:** the remark popover works from the keyboard: `1`–`4` pick a tag, `Ctrl`/`⌘` + `Enter` saves, and a popover closed without saving keeps its draft. In remark mode, `Tab` reaches every block and `Enter` or `Space` opens its popover (#321).
+- **Writing check:** a quotation (`"…"`, `“…”`, `「…」`, `『…』`, `«…»`, `„…“`) is someone else's words, so the check skips it, as it already skips strikethrough. A page that quotes a requirement verbatim no longer fails `style: strict` (#331).
+- **Skill:** automatic pages are for replies to the user. A subagent's report back to its parent agent returns text and evidence instead of a page, unless the task asked for a page (#324).
+- **Skill:** when a page has asks and the host can ask questions (Claude Code's AskUserQuestion), the agent writes the reply with the page link first, then asks, so the user can open the page before answering (#317).
 
-**Full list:** #312, #313, #314, #315.
+**Full list:** #317, #321, #323, #324, #331, #332.
 
 ---
 
-## 在原文件里修草稿
+## doc 页面的目录导轨
 
-草稿有错误时，`am render` 现在按行号一次列出全部错误，不再遇到第一处就停（#314）：
+3 个及以上面板的 `doc` 页面，目录不再单独占一列，手机上也不再排在正文前面。目录变成正文旁的一条导轨：每个章节一道短刻度（#332）。
 
-```
-✗ L6 [flow] flow: unclosed shape bracket, missing )
-✗ L9 Cannot parse the draft: table has no delimiter row: put |---|---| on the line under the header row
-✗ L14 [flow] flow: unclosed shape bracket, missing )
-✗ 3 errors in the draft; no page was written
-  draft: ~/.answer-me-with-html/drafts/My-page-20261021-104551.md
-```
+- 悬停刻度可以看到章节标题。在导轨上停留，或者点击、轻点它，会展开完整目录。滚动时会标出正在阅读的章节。
+- 在 frontmatter 里写 `outline: left` 或 `outline: right` 选择导轨放在哪一侧，默认是 `right`。从右到左的页面左右镜像。
+- 方向键在目录里移动，Esc 关闭。没有 JavaScript 时目录照样能展开、链接照样能跳转。打印时隐藏导轨。
+- 在 390px 宽的手机上，24 个章节的页面现在紧接着标题就是正文，原来要到 y=889px 才开始。
+- doc 页面变窄（916px，原来是 1120px）并且居中，标题和正文对齐。
 
-- 从 stdin 传入的草稿（`am render -`）渲染失败或有警告时，会保存到数据目录的 `drafts/` 里，并打印路径。报错里的每个 `L<行号>` 都对应这个文件。
-- agent 只改这个文件里报错的行，再运行 `am render <路径>`，不用把整份草稿重写一遍。渲染成功且没有警告后，保存的草稿会被删除。
-- `am clean` 会像清理旧页面一样清理旧草稿。
-- frontmatter 错误和未闭合的代码块仍然立即停下，因为后面的内容已经无法读取。
+## 通过 Tailscale 在手机上看页面
+
+`am serve --tailscale` 只监听这台机器的 Tailscale 地址，所以 tailnet 里的手机或其他设备可以直接打开 `link:` 那一行的链接，不需要 SSH，也不改动 Tailscale 设置。链接在重启后仍然有效；删除 `~/.answer-me-with-html/serve-secret` 可以让所有链接失效（#323）。
 
 ## 其他改动
 
-- **表格**：表头下面缺少 `|---|` 分隔行，或分隔行的列数和表头不一致，会报错并给出改正后的示例，不再输出成一行行带竖线的文字（#313）。
-- **布局**：`cols`、`span`、`rows` 写成小数（如 `cols: 2.5`）会报错，不再写出无效的 CSS 让整个面板网格变成一列（#315）。
-- **图表**：`flow` 图里绕到外侧的长连线，不再在图的边缘被裁掉（#312）。
-
-**完整列表：** #312、#313、#314、#315。
+- **标注：** 标注弹窗可以全程用键盘操作：`1`–`4` 选标签，`Ctrl`/`⌘` + `Enter` 保存，没保存就关掉的弹窗会保留草稿。标注模式下，`Tab` 能走到每个块，`Enter` 或 `Space` 打开它的弹窗（#321）。
+- **写作检查：** 引号里的文字（`"…"`、`“…”`、`「…」`、`『…』`、`«…»`、`„…“`）是别人的原话，检查会跳过，和删除线一样。原样引用需求的页面不会再因为 `style: strict` 而无法生成（#331）。
+- **Skill：** 自动生成页面只用于给用户的回复。子代理交回给父代理的报告返回文字和证据，不做页面，除非任务明确要求页面（#324）。
+- **Skill：** 页面里有提问、并且宿主可以提问（Claude Code 的 AskUserQuestion）时，agent 先写带页面链接的回复，再提问，用户可以先打开页面再作答（#317）。
