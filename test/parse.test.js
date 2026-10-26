@@ -303,3 +303,19 @@ test('parseDocLoose: returns the document and the collected table errors', () =>
 test('error: an unclosed fence still stops at once, even after a broken table', () => {
   assert.throws(() => parseDocLoose('## A\n| a | b |\n| 1 | 2 |\n```flow\nA -> B'), (err) => err instanceof ParseError && err.line === 4);
 });
+
+test('error: a component written as a ::: fence is reported with a fenced example, with other draft errors in one run', () => {
+  const src = '## A\n:::callout ok Title\nIt works.\n:::\n\n| a | b |\n| 1 | 2 |\n\n## B\n:::flow LR\nA -> B\n:::';
+  assert.throws(
+    () => parseDoc(src),
+    (err) => err instanceof DraftErrors
+      && err.errors.map((e) => e.line).join() === '2,6,10'
+      && err.errors[0].tag === 'fence' && /not :::callout/.test(err.errors[0].message) && err.errors[0].example.startsWith('```callout')
+      && /not :::flow/.test(err.errors[2].message) && err.errors[2].example.startsWith('```flow'),
+  );
+});
+
+test('a ::: line with an unknown name, a bare :::, or inside a code block is not an error', () => {
+  assert.doesNotThrow(() => parseDoc('## A\n:::note\ntext\n:::\n'));
+  assert.doesNotThrow(() => parseDoc('## A\n```markdown\n:::callout\nIt works.\n:::\n```'));
+});

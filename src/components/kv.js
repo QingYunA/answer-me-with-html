@@ -1,7 +1,7 @@
 import { mdInline } from '../markdown.js';
 import { esc } from '../svg/text.js';
 import { ComponentError, contentLines } from './error.js';
-import { parseAttrs } from '../parse.js';
+import { parseAttrs } from '../attrs.js';
 
 export default {
   name: 'kv',

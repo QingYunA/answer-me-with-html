@@ -2,13 +2,18 @@
 // Structure splitting only, no rendering. All line numbers are 1-based source-file lines, for error messages and the STE lint.
 
 import { themeNames, AUTO } from './themes/registry.js';
+import { COMPONENTS } from './components/index.js';
+import { parseAttrs, coerce, unquote } from './attrs.js';
+
+export { parseAttrs };
 
 export class ParseError extends Error {
-  constructor(message, line, example) {
+  constructor(message, line, example, tag) {
     super(message);
     this.name = 'ParseError';
     this.line = line;
     this.example = example;
+    this.tag = tag;
   }
 }
 
@@ -60,7 +65,6 @@ const DEFAULT_META = Object.freeze({
   title: '',
 });
 
-const NUMERIC_KEYS = new Set(['cols', 'span']);
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
@@ -68,7 +72,6 @@ const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 // "## I think…" are sentences, not ID + title (#208). The lookahead also rejects a space, so \s+ cannot backtrack past it.
 // The ID is one capital and up to two digits: A to Z for the first 26 panels, then P27, P28 … for the ones after (#292).
 const PANEL_ID = /^([A-Z][0-9]{0,2})\s+(?![\s\p{Ll}])(.+)$/u;
-const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
 // choices can widen the allowed values of individual keys (video drafts also allow theme: 3b1b).
@@ -126,7 +129,7 @@ function splitSections(lines, start, errors) {
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l) => l.trim())) {
-      errors.push(...checkTables(mdBuf.lines, mdBuf.line));
+      errors.push(...checkTables(mdBuf.lines, mdBuf.line), ...checkColonFences(mdBuf.lines, mdBuf.line));
       current.blocks.push({ type: 'md', text: mdBuf.lines.join('\n'), line: mdBuf.line });
     }
     mdBuf = null;
@@ -203,6 +206,20 @@ function htmlLines(lines) {
   });
 }
 
+// `:::callout` is the admonition syntax of VitePress, Docusaurus and Pandoc; a component here is a fenced code block. The colon
+// fence would render as plain text, so a known component name after `:::` is an error. An unknown name or a bare `:::` stays text.
+const COLON_FENCE = /^ {0,3}:{3,}\s*([A-Za-z][\w-]*)(?![\w-])/;
+
+function checkColonFences(lines, first) {
+  return lines.flatMap((line, k) => {
+    const name = line.match(COLON_FENCE)?.[1].toLowerCase();
+    const component = name && COMPONENTS.get(name);
+    return component
+      ? [new ParseError(`write a component as a fenced code block, not :::${name}`, first + k, component.example, 'fence')]
+      : [];
+  });
+}
+
 // Every table problem of one Markdown block, as ParseErrors.
 function checkTables(lines, first) {
   const html = htmlLines(lines);
@@ -252,14 +269,6 @@ function parseHeading(text) {
     : { id: null, title: rest.trim(), attrs };
 }
 
-export function parseAttrs(text) {
-  const attrs = {};
-  for (const m of text.matchAll(ATTR_TOKEN)) {
-    attrs[m[1]] = m[2] === undefined ? true : coerce(m[1], unquote(m[2]));
-  }
-  return attrs;
-}
-
 function extractTitle(intro, meta) {
   if (meta.title || intro[0]?.type !== 'md') return intro;
   const [first, ...rest] = intro;
@@ -304,11 +313,6 @@ function assignIds(panels) {
   return panels.map((p) => (p.id ? p : { ...p, id: nextFree() }));
 }
 
-function unquote(v) {
-  const s = v.trim();
-  return /^(["']).*\1$/.test(s) ? s.slice(1, -1) : s;
-}
-
 // Strip an unquoted trailing # comment; a # inside quotes is kept (title: "Issue #123").
 function stripLineComment(line) {
   let quote = '';
@@ -338,9 +342,4 @@ function fractionalCount(key, value, line, keys) {
   if (!keys.has(key) || typeof value !== 'string' || !value.trim()) return null;
   const n = Number(value);
   return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
-}
-
-function coerce(key, value) {
-  if (NUMERIC_KEYS.has(key) && /^\d+$/.test(value)) return Number(value);
-  return value;
 }

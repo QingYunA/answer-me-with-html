@@ -2,7 +2,7 @@
 // This file reads the table and writes the data table under the drawing; chart-bar.js, chart-line.js and chart-pie.js draw it.
 import { esc } from '../svg/text.js';
 import { diagramLabel } from '../svg/shapes.js';
-import { parseAttrs } from '../parse.js';
+import { parseAttrs } from '../attrs.js';
 import { ComponentError, contentLines, fields } from './error.js';
 import { drawBars } from './chart-bar.js';
 import { drawLines } from './chart-line.js';

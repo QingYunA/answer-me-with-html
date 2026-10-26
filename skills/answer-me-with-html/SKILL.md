@@ -138,6 +138,8 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 
 ## 4. Choose components by the shape of the information
 
+Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````), never as a `:::flow` block.
+
 | Shape of the information | Component | Minimal syntax |
 |---|---|---|
 | What connects to what, architecture, decision branches | `flow [LR]` | `A -> B: label`, `A --> C` dashed, `A -> B & C` fan-out, `{decision?}` `(start)` `[(database)]`, `*emphasis`, `group name: A, B`, no node IDs: `{OK?}`, not `B{OK?}` |
