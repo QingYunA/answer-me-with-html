@@ -69,8 +69,10 @@
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'am-btn am-btn--remark-clear';
-  clearBtn.hidden = true;
   clearBtn.textContent = ui.clear;
+  // Clear all drops saved marks and drafts, so it shows while either exists.
+  const toClear = () => marks.size + drafts.size;
+  const showClear = () => { clearBtn.hidden = toClear() === 0; };
   btn.insertAdjacentElement('afterend', clearBtn);
   let clearTimer = null;
   let clearArmed = false;
@@ -80,12 +82,12 @@
     clearArmed = false;
     clearBtn.classList.remove('is-armed');
     clearBtn.textContent = ui.clear;
-    clearBtn.hidden = marks.size === 0;
+    showClear();
   };
   const armClear = () => {
     clearArmed = true;
     clearBtn.classList.add('is-armed');
-    clearBtn.textContent = ui.clearConfirm.replace('{n}', marks.size);
+    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());
     clearTimer = setTimeout(resetClear, 4000);
   };
   clearBtn.addEventListener('click', () => {
@@ -113,7 +115,7 @@
     }
     // The reply bar (reply.js) shows the number of marks.
     document.dispatchEvent(new Event('am-remark-change'));
-    clearBtn.hidden = marks.size === 0;
+    showClear();
   };
 
   const chip = (el, mark) => {
@@ -141,7 +143,7 @@
     el.classList.remove('am-mark');
     delete el.dataset.kind;
   };
-  clearBtn.hidden = marks.size === 0;
+  showClear();
   if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));
 
   // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1–4 pick a kind from the keyboard and
@@ -187,8 +189,9 @@
     keepDraft = () => {
       if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });
       else drafts.delete(key);
+      showClear();
     };
-    const done = () => { drafts.delete(key); keepDraft = null; };
+    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };
     keep.addEventListener('click', () => {
       done();
       const saved = { key, kind, note: note.value.trim() };

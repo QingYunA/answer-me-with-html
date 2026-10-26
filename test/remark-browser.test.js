@@ -509,6 +509,39 @@ test('remark popover: a popover closed without Save keeps a draft, and Clear all
   });
 });
 
+test('remark popover: Clear all remarks shows while only a draft exists, and hides when the draft is gone', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await load(render('keys-draft-clear', draftOf(p)));
+  const state = await evaluate(`(() => { ${PAGE_JS} ${KEY_JS}
+    const clear = document.querySelector('.am-btn--remark-clear');
+    btn.click();
+    const before = clear.hidden;
+    const drafted = at('li', ${JSON.stringify(p.last)});
+    drafted.click(); key('4');
+    key('Escape', {}, note());
+    const draftOnly = { hidden: clear.hidden, marks: stored().length };
+    clear.click();
+    const armed = clear.textContent;
+    clear.click();
+    const cleared = clear.hidden;
+    // A draft saved, then its mark removed: no mark and no draft remain.
+    drafted.click(); key('2');
+    key('Escape', {}, note());
+    drafted.click();
+    pop.querySelector('.am-remark-actions .am-btn').click();
+    drafted.click();
+    [...pop.querySelectorAll('.am-remark-actions .am-btn')].find((b) => b.textContent === ${JSON.stringify(p.lang.ui.remark.remove)}).click();
+    return { before, draftOnly, armed, cleared, afterRemove: clear.hidden };
+  })()`);
+  assert.deepEqual(state, {
+    before: true,
+    draftOnly: { hidden: false, marks: 0 },
+    armed: p.lang.ui.remark.clearConfirm.replace('{n}', 1),
+    cleared: true,
+    afterRemove: true,
+  });
+});
+
 test('remark: with the mode on, Tab reaches each block and Enter or Space opens its popover; turning it off removes the tab stops', { skip: SKIP }, async () => {
   const p = PAGES.en;
   await load(render('keys-pick-block', draftOf(p)));
