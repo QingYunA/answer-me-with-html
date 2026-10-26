@@ -2,7 +2,7 @@ name: Release
 
 # A release is a version bump merged to main (see CONTRIBUTING.md, "Releasing").
 # When package.json changes on main and the tag for its version does not exist yet,
-# tag the pushed commit and publish the GitHub Release from .github/release-notes.md.
+# tag the pushed commit and publish the GitHub Release from changelog/<version>.md.
 
 on:
   push:
@@ -44,15 +44,20 @@ jobs:
           else
             echo "tag=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Release notes start with the version marker
+      - name: Release notes exist and start with the version marker
         if: steps.state.outputs.release == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           # Same rule as test/release-notes.test.js.
-          if [[ "$(head -n 1 .github/release-notes.md)" != "<!-- release ${VERSION} -->" ]]; then
-            echo "::error file=.github/release-notes.md::The first line must be <!-- release ${VERSION} -->. Write the notes for this release first."
+          file="changelog/${VERSION}.md"
+          if [[ ! -f "$file" ]]; then
+            echo "::error::${file} is missing. Write the notes for this release first."
+            exit 1
+          fi
+          if [[ ! "$(head -n 1 "$file")" =~ ^"<!-- release ${VERSION} "[0-9]{4}-[0-9]{2}-[0-9]{2}" -->"$ ]]; then
+            echo "::error file=${file}::The first line must be <!-- release ${VERSION} YYYY-MM-DD -->."
             exit 1
           fi
       - name: Tag
@@ -69,4 +74,4 @@ jobs:
         if: steps.state.outputs.release == 'false'
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: gh release create "v${VERSION}" --verify-tag --title "v${VERSION}" --notes-file .github/release-notes.md
+        run: gh release create "v${VERSION}" --verify-tag --title "v${VERSION}" --notes-file "changelog/${VERSION}.md"
