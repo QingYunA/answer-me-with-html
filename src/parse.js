@@ -8,12 +8,11 @@ import { parseAttrs, coerce, unquote } from './attrs.js';
 export { parseAttrs };
 
 export class ParseError extends Error {
-  constructor(message, line, example, tag) {
+  constructor(message, line, example) {
     super(message);
     this.name = 'ParseError';
     this.line = line;
     this.example = example;
-    this.tag = tag;
   }
 }
 
@@ -66,6 +65,12 @@ const DEFAULT_META = Object.freeze({
 });
 
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
+// `:::name args` is the admonition syntax of VitePress and Docusaurus; with a component name it is an alias of the fenced block.
+const COLON_OPEN = /^ {0,3}(:{3,})\s*([A-Za-z][\w-]*)(?:\s+(.*?))?\s*$/;
+const COLON_CLOSE = /^ {0,3}(:{3,})\s*$/;
+// A fence indented by one to three spaces is still code in Markdown, though only a fence at column 0 opens a block here; a `:::`
+// line inside one stays text.
+const INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 // A leading capital is an ID only when the title after it does not start with a lowercase letter: "## A miss goes…" and
@@ -129,14 +134,31 @@ function splitSections(lines, start, errors) {
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l) => l.trim())) {
-      errors.push(...checkTables(mdBuf.lines, mdBuf.line), ...checkColonFences(mdBuf.lines, mdBuf.line));
+      errors.push(...checkTables(mdBuf.lines, mdBuf.line));
       current.blocks.push({ type: 'md', text: mdBuf.lines.join('\n'), line: mdBuf.line });
     }
     mdBuf = null;
   };
 
+  let indented = null;
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
+    const mark = line.match(INDENTED_FENCE)?.[1];
+    if (indented) {
+      if (mark && mark[0] === indented[0] && mark.length >= indented.length && !line.trim().slice(mark.length)) indented = null;
+    } else if (mark) {
+      indented = mark;
+    }
+    const colon = indented ? null : line.match(COLON_OPEN);
+    const colonName = colon?.[2].toLowerCase();
+    if (colon && COMPONENTS.has(colonName)) {
+      flushMd();
+      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
+      current.blocks.push({ type: 'fence', lang: colonName, args: (colon[3] ?? '').trim(), text: lines.slice(i + 1, close).join('\n'), line: i + 1 });
+      i = close;
+      continue;
+    }
     const fence = line.match(FENCE_OPEN);
     if (fence) {
       flushMd();
@@ -203,34 +225,6 @@ function htmlLines(lines) {
     if (raw) close = new RegExp(`</${raw[1]}>`, 'i').test(line.slice(raw[0].length)) ? null : new RegExp(`</${raw[1]}>`, 'i');
     else if (HTML_BLOCK.test(line)) close = /^\s*$/;
     return Boolean(raw) || close !== null;
-  });
-}
-
-// `:::callout` is the admonition syntax of VitePress, Docusaurus and Pandoc; a component here is a fenced code block. The colon
-// fence would render as plain text, so a known component name after `:::` is an error. An unknown name or a bare `:::` stays text.
-const COLON_FENCE = /^ {0,3}:{3,}\s*([A-Za-z][\w-]*)(?![\w-])/;
-
-// A fence indented by one to three spaces is still code in Markdown, though the block splitter only opens fences at column 0;
-// lines inside one are skipped, so a `:::flow` quoted in an indented code block is not an error.
-const INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
-
-function checkColonFences(lines, first) {
-  let fence = null;
-  return lines.flatMap((line, k) => {
-    const mark = line.match(INDENTED_FENCE)?.[1];
-    if (fence) {
-      if (mark && mark[0] === fence[0] && mark.length >= fence.length && !line.trim().slice(mark.length)) fence = null;
-      return [];
-    }
-    if (mark) {
-      fence = mark;
-      return [];
-    }
-    const name = line.match(COLON_FENCE)?.[1].toLowerCase();
-    const component = name && COMPONENTS.get(name);
-    return component
-      ? [new ParseError(`write a component as a fenced code block, not :::${name}`, first + k, component.example, 'fence')]
-      : [];
   });
 }
 

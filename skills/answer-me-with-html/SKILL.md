@@ -138,7 +138,7 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 
 ## 4. Choose components by the shape of the information
 
-Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````), never as a `:::flow` block.
+Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); a `:::flow` … `:::` block is accepted too.
 
 | Shape of the information | Component | Minimal syntax |
 |---|---|---|

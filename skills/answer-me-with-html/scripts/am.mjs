@@ -8363,12 +8363,11 @@ var RAW_LANGS = /* @__PURE__ */ new Set(["html", "svg"]);
 
 // src/parse.js
 var ParseError = class extends Error {
-  constructor(message, line, example, tag) {
+  constructor(message, line, example) {
     super(message);
     this.name = "ParseError";
     this.line = line;
     this.example = example;
-    this.tag = tag;
   }
 };
 var DraftErrors = class extends Error {
@@ -8409,6 +8408,9 @@ var DEFAULT_META = Object.freeze({
   title: ""
 });
 var FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
+var COLON_OPEN = /^ {0,3}(:{3,})\s*([A-Za-z][\w-]*)(?:\s+(.*?))?\s*$/;
+var COLON_CLOSE = /^ {0,3}(:{3,})\s*$/;
+var INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
 var PANEL_HEADING = /^##\s+(.+?)\s*$/;
 var ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 var PANEL_ID = /^([A-Z][0-9]{0,2})\s+(?![\s\p{Ll}])(.+)$/u;
@@ -8456,13 +8458,30 @@ function splitSections(lines, start, errors) {
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l3) => l3.trim())) {
-      errors.push(...checkTables(mdBuf.lines, mdBuf.line), ...checkColonFences(mdBuf.lines, mdBuf.line));
+      errors.push(...checkTables(mdBuf.lines, mdBuf.line));
       current.blocks.push({ type: "md", text: mdBuf.lines.join("\n"), line: mdBuf.line });
     }
     mdBuf = null;
   };
+  let indented = null;
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
+    const mark = line.match(INDENTED_FENCE)?.[1];
+    if (indented) {
+      if (mark && mark[0] === indented[0] && mark.length >= indented.length && !line.trim().slice(mark.length)) indented = null;
+    } else if (mark) {
+      indented = mark;
+    }
+    const colon = indented ? null : line.match(COLON_OPEN);
+    const colonName = colon?.[2].toLowerCase();
+    if (colon && COMPONENTS.has(colonName)) {
+      flushMd();
+      const close = lines.findIndex((l3, k2) => k2 > i && l3.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
+      current.blocks.push({ type: "fence", lang: colonName, args: (colon[3] ?? "").trim(), text: lines.slice(i + 1, close).join("\n"), line: i + 1 });
+      i = close;
+      continue;
+    }
     const fence = line.match(FENCE_OPEN);
     if (fence) {
       flushMd();
@@ -8518,25 +8537,6 @@ function htmlLines(lines) {
     if (raw) close = new RegExp(`</${raw[1]}>`, "i").test(line.slice(raw[0].length)) ? null : new RegExp(`</${raw[1]}>`, "i");
     else if (HTML_BLOCK.test(line)) close = /^\s*$/;
     return Boolean(raw) || close !== null;
-  });
-}
-var COLON_FENCE = /^ {0,3}:{3,}\s*([A-Za-z][\w-]*)(?![\w-])/;
-var INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
-function checkColonFences(lines, first) {
-  let fence = null;
-  return lines.flatMap((line, k2) => {
-    const mark = line.match(INDENTED_FENCE)?.[1];
-    if (fence) {
-      if (mark && mark[0] === fence[0] && mark.length >= fence.length && !line.trim().slice(mark.length)) fence = null;
-      return [];
-    }
-    if (mark) {
-      fence = mark;
-      return [];
-    }
-    const name = line.match(COLON_FENCE)?.[1].toLowerCase();
-    const component = name && COMPONENTS.get(name);
-    return component ? [new ParseError(`write a component as a fenced code block, not :::${name}`, first + k2, component.example, "fence")] : [];
   });
 }
 function checkTables(lines, first) {
@@ -12816,7 +12816,7 @@ ${e.example.replace(/^/gm, "    ")}`);
     return true;
   }
   if (e instanceof ParseError) {
-    fail(`\u2717 ${e.line ? `L${e.line} ` : ""}${e.tag ? `[${e.tag}]` : "Cannot parse the draft:"} ${e.message}`);
+    fail(`\u2717 ${e.line ? `L${e.line} ` : ""}Cannot parse the draft: ${e.message}`);
     if (e.example) fail(`  Correct example:
 ${e.example.replace(/^/gm, "    ")}`);
     return true;

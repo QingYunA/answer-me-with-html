@@ -923,7 +923,7 @@ function reportItem(e, fail) {
     return true;
   }
   if (e instanceof ParseError) {
-    fail(`✗ ${e.line ? `L${e.line} ` : ''}${e.tag ? `[${e.tag}]` : 'Cannot parse the draft:'} ${e.message}`);
+    fail(`✗ ${e.line ? `L${e.line} ` : ''}Cannot parse the draft: ${e.message}`);
     if (e.example) fail(`  Correct example:\n${e.example.replace(/^/gm, '    ')}`);
     return true;
   }
