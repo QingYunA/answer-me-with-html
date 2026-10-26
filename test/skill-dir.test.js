@@ -6,51 +6,57 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SKILL = 'skills/answer-me-with-html';
 const read = (p) => readFileSync(`${ROOT}/${p}`, 'utf8');
+const skillFiles = () => [
+  `${SKILL}/SKILL.md`,
+  ...readdirSync(`${ROOT}/${SKILL}/references`).map((f) => `${SKILL}/references/${f}`),
+];
 const skill = read(`${SKILL}/SKILL.md`);
 
-// `${CLAUDE_SKILL_DIR}` is replaced by Claude Code only. Other hosts (opencode, Copilot, Continue)
-// leave it empty, so a command written as "${CLAUDE_SKILL_DIR}/scripts/am.mjs" runs node on
-// /scripts/am.mjs and fails with Cannot find module. The skill resolves $SKILL_DIR once instead, and
-// these tests pin that every command goes through it.
+// `${CLAUDE_SKILL_DIR}` is substituted by Claude Code in the text of SKILL.md, so every command in the
+// skill spells it out and runs there unchanged. Other hosts leave the token as it stands, and no shell
+// variable can carry the path for them: the Bash tool keeps nothing from one call to the next and a
+// file-read tool never expands a variable. So the skill tells those hosts to write the absolute path
+// into every command instead of defining one, and these tests pin that shape.
 
-test('skill dir: SKILL.md resolves $SKILL_DIR from the host variable, with a guard', () => {
-  assert.match(skill, /SKILL_DIR="\$\{CLAUDE_SKILL_DIR\}"/);
-  assert.match(skill, /\[ -f "\$SKILL_DIR\/scripts\/am\.mjs" \] \|\| SKILL_DIR="/,
-    'a host that does not fill the variable must be forced to write the path out');
-  assert.match(skill, /test -f "\$SKILL_DIR\/scripts\/am\.mjs" \|\| \{/,
-    'an empty or wrong SKILL_DIR has to fail loudly instead of running /scripts/am.mjs');
-});
-
-test('skill dir: the resolution rule comes before the first command that uses it', () => {
-  const rule = skill.indexOf('SKILL_DIR="${CLAUDE_SKILL_DIR}"');
-  assert.ok(rule > 0, 'the resolution rule is missing');
-  const firstUse = skill.search(/node "\$SKILL_DIR\/scripts\/am\.mjs"/);
-  assert.ok(firstUse > rule, 'a command uses $SKILL_DIR before the rule that defines it');
-  for (const rel of ['references/settings.md', 'references/video.md']) {
-    assert.ok(skill.indexOf(rel) === -1 || skill.indexOf(rel) > rule,
-      `${rel} is referenced before $SKILL_DIR is resolved`);
-  }
-});
-
-test('skill dir: no file still invokes the CLI through the unreplaced host variable', () => {
-  const files = [`${SKILL}/SKILL.md`, ...readdirSync(`${ROOT}/${SKILL}/references`).map((f) => `${SKILL}/references/${f}`)];
-  for (const file of files) {
+test('skill dir: no file defines a path variable that has to outlive one call', () => {
+  for (const file of skillFiles()) {
     const body = read(file);
-    // The resolution rule itself is the only place the host variable may appear.
-    const stripped = body.replace('SKILL_DIR="${CLAUDE_SKILL_DIR}"', '').replace(/`\$\{CLAUDE_SKILL_DIR\}`/g, '');
-    const bad = stripped.match(/\$\{CLAUDE_SKILL_DIR\}\/[^\s`"]+/g) || [];
-    assert.deepEqual(bad, [], `${file} runs a path that only Claude Code substitutes: ${bad.join(', ')}`);
+    assert.doesNotMatch(body, /\bSKILL_DIR=/, `${file} assigns a shell variable for the skill directory`);
+    assert.doesNotMatch(body, /\$SKILL_DIR\b/, `${file} reads a shell variable for the skill directory`);
   }
 });
 
-test('skill dir: every file the skill tells you to read or run exists', () => {
-  const files = [`${SKILL}/SKILL.md`, ...readdirSync(`${ROOT}/${SKILL}/references`).map((f) => `${SKILL}/references/${f}`)];
-  let checked = 0;
-  for (const file of files) {
-    for (const [, rel] of read(file).matchAll(/\$SKILL_DIR\/([\w./-]+)/g)) {
-      checked += 1;
-      assert.ok(existsSync(`${ROOT}/${SKILL}/${rel}`), `${file}: $SKILL_DIR/${rel} does not exist`);
+test('skill dir: every command spells out the host variable instead of a relative path', () => {
+  let commands = 0;
+  for (const file of skillFiles()) {
+    for (const line of read(file).split('\n')) {
+      if (!/^\s*node\s/.test(line)) continue;
+      commands += 1;
+      assert.ok(line.includes('${CLAUDE_SKILL_DIR}/scripts/am.mjs'),
+        `${file} runs node on a path that is not the host variable: ${line.trim()}`);
     }
   }
-  assert.ok(checked >= 4, `only ${checked} $SKILL_DIR paths found; the commands must go through the variable`);
+  assert.ok(commands >= 3, `only ${commands} node commands found; the skill must keep them in the file`);
+});
+
+test('skill dir: the other-host rule is firm, comes before the first command, and is checked once', () => {
+  const rule = skill.indexOf('in place of `${CLAUDE_SKILL_DIR}`');
+  assert.ok(rule > 0, 'the rule for hosts that do not substitute the token is missing');
+  assert.match(skill, /test -f <that directory>\/scripts\/am\.mjs/,
+    'the rule has to give the one check that proves the directory is this skill\'s');
+  assert.match(skill, /keeps no variable from one call to the next/,
+    'the rule has to say why a variable cannot carry the path, or an agent will define one anyway');
+  const firstCommand = skill.search(/^\s*node\s+\S+\s+(render|patch|video)\b/m);
+  assert.ok(firstCommand > rule, 'a command comes before the rule that tells other hosts how to run it');
+});
+
+test('skill dir: every file the skill names through the token exists', () => {
+  let checked = 0;
+  for (const file of skillFiles()) {
+    for (const [, rel] of read(file).matchAll(/\$\{CLAUDE_SKILL_DIR\}\/([\w./-]+)/g)) {
+      checked += 1;
+      assert.ok(existsSync(`${ROOT}/${SKILL}/${rel}`), `${file}: ${rel} does not exist`);
+    }
+  }
+  assert.ok(checked >= 4, `only ${checked} paths found through the token; the references must keep them`);
 });
