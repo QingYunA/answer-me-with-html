@@ -99,7 +99,11 @@ after(async () => {
       chrome.kill();
     });
   }
-  if (tmp) rmSync(tmp, { recursive: true, force: true });
+  try {
+    if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  } catch (e) {
+    console.warn(`Could not remove ${tmp}: ${e.message}`);
+  }
 });
 
 test('outline: Enter opens the list, arrows move between links, Esc closes and returns to the rail', { skip: SKIP }, async () => {
