@@ -466,12 +466,48 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 }
 
 /* ── doc template ────────────────────────── */
-.am-doc { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
-.am-doc-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
-.am-doc-layout--notoc { grid-template-columns: minmax(0, 1fr); max-width: 860px; }
-.am-toc { position: sticky; top: 24px; font-size: var(--am-fs-text); }
-.am-toc a { display: block; color: var(--ink-2); text-decoration: none; padding: 4px 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }
-.am-toc a:hover { color: var(--ink); border-inline-start-color: var(--accent); }
+.am-doc { max-width: 916px; margin: 0 auto; padding: 40px 28px 64px; }
+.am-doc-layout { position: relative; }
+/* The outline rail: a zero-height sticky strip whose child hangs 8px outside the body on the chosen side. "start" and "end" are
+   logical, so the rail mirrors on a right-to-left page. data-flow says which way the label and the list open: "out" away from the
+   body, "in" over it (src/runtime/outline.js picks it from the room left in the viewport; the markup starts with "in"). */
+.am-toc { position: sticky; top: 72px; height: 0; z-index: 20; font-size: var(--am-fs-text); }
+.am-outline { position: absolute; top: 0; inset-inline-start: calc(100% + 8px); }
+.am-toc[data-side="start"] .am-outline { inset-inline-start: auto; inset-inline-end: calc(100% + 8px); }
+.am-outline > summary { display: block; width: 16px; list-style: none; cursor: pointer; border-radius: 4px; }
+.am-outline > summary::-webkit-details-marker { display: none; }
+.am-outline > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-ticks { display: flex; flex-direction: column; max-height: calc(100vh - 100px); }
+.am-tick { position: relative; display: block; font-style: normal; flex: 0 1 9px; min-height: 2px; }
+.am-tick::before { content: ""; position: absolute; inset-inline: 3px; top: 50%; height: 2px; margin-top: -1px; border-radius: 1px; background: var(--ink-3); opacity: .55; }
+.am-tick:hover::before, .am-tick.is-peek::before { background: var(--ink); opacity: 1; }
+.am-tick.is-current::before { inset-inline: 0; height: 3px; margin-top: -1.5px; background: var(--accent); opacity: 1; }
+.am-tick::after {
+  content: attr(data-title); display: none; position: absolute; top: 50%; transform: translateY(-50%); z-index: 1; pointer-events: none;
+  max-width: min(240px, calc(100vw - 48px)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 3px 8px; font-size: var(--am-fs-small); color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0, 0, 0, .12);
+}
+.am-tick:hover::after, .am-tick.is-peek::after { display: block; }
+.am-outline[open] .am-tick::after { display: none; }
+.am-outline-list {
+  position: absolute; top: -6px; z-index: 2; margin: 0; padding: 6px; list-style: none;
+  width: min(240px, calc(100vw - 48px)); max-height: calc(100vh - 96px); overflow-y: auto;
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, .14);
+}
+.am-outline-list a { display: block; padding: 5px 8px; color: var(--ink-2); text-decoration: none; border-radius: 4px; border-inline-start: 2px solid transparent; }
+.am-outline-list a:hover { color: var(--ink); background: var(--line-2); }
+.am-outline-list a[aria-current="true"] { color: var(--ink); font-weight: 600; border-inline-start-color: var(--accent); }
+.am-outline-list a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Opens toward inline-end: end rail flowing out, start rail flowing in. Otherwise toward inline-start. */
+.am-toc[data-side="end"][data-flow="out"] .am-tick::after, .am-toc[data-side="start"][data-flow="in"] .am-tick::after,
+.am-toc[data-side="end"][data-flow="out"] .am-outline-list, .am-toc[data-side="start"][data-flow="in"] .am-outline-list { inset-inline-start: calc(100% + 6px); }
+.am-toc[data-side="start"][data-flow="out"] .am-tick::after, .am-toc[data-side="end"][data-flow="in"] .am-tick::after,
+.am-toc[data-side="start"][data-flow="out"] .am-outline-list, .am-toc[data-side="end"][data-flow="in"] .am-outline-list { inset-inline-end: calc(100% + 6px); }
+@media (prefers-reduced-motion: no-preference) {
+  .am-outline[open] .am-outline-list { animation: am-outline-in .14s ease-out; }
+  .am-tick::before { transition: inset-inline .12s, height .12s, opacity .12s; }
+}
+@keyframes am-outline-in { from { opacity: 0; } to { opacity: 1; } }
 .am-doc-body > .am-panel + .am-panel { margin-top: 20px; }
 
 /* ── Responsive and print ─────────────────────────── */
@@ -491,8 +527,11 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-head { padding-inline-end: 0; }
   .am-grid { grid-template-columns: minmax(0, 1fr); }
   .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
-  .am-doc-layout { grid-template-columns: minmax(0, 1fr); }
-  .am-toc { position: static; }
+  /* The rail hugs the viewport edge inside a strip of its own, so it never covers text and never pushes the body down. */
+  .am-doc-layout--rail-end { padding-inline-end: 18px; }
+  .am-doc-layout--rail-start { padding-inline-start: 18px; }
+  .am-toc[data-side="end"] .am-outline { inset-inline-start: auto; inset-inline-end: -17px; }
+  .am-toc[data-side="start"] .am-outline { inset-inline-end: auto; inset-inline-start: -17px; }
   .am-tree-cols { grid-template-columns: minmax(0, 1fr); }
   /* Tables and diagrams keep their size: the wrapper scrolls horizontally when they overflow. A cell is never narrower than about
      two short words, so a phone does not stack them one per line. On wider screens the sheet layout (src/runtime/layout-dom.js)
@@ -506,7 +545,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 @media print {
-  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
 }

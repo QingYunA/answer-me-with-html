@@ -115,7 +115,7 @@ AM_EOF
 
 ```markdown
 ---
-template: sheet     # sheet board (default, one-screen overview) | doc linear explanation (read step by step)
+template: sheet     # sheet board (default, one-screen overview) | doc linear explanation (read step by step; with 3+ sections it gets an outline rail, `outline: left | right`, default right)
 theme: auto         # auto (default): paper for doc or text-only drafts, blueprint with diagrams | blueprint | shadcn | paper | a theme the user made (am list shows it)
 title: Title
 subtitle: One-line summary     # optional

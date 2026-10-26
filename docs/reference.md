@@ -6,11 +6,12 @@
 
 ````markdown
 ---
-template: sheet        # sheet = grid of panels (default), doc = one column with a table of contents
+template: sheet        # sheet = grid of panels (default), doc = one column with an outline rail
 theme: auto            # auto (default) picks paper for long text, blueprint for diagrams; or blueprint, shadcn, paper, your own theme
 title: Page title
 subtitle: One line
 cols: 3                # columns for sheet (a whole number)
+outline: right         # doc with 3 or more sections: the side of the outline rail, left or right (default right)
 source: RFC 9293       # any other field shows under the title
 ---
 A sentence or two with the main point.
@@ -27,6 +28,7 @@ A -> B: label
 - `span=2` makes a panel two columns wide, `rows=2` makes it two rows tall, and `bare` removes its title bar. `span` and `rows` are whole numbers; a fraction such as `span=2.5` is an error. `span` is a hint: the page sizes each panel to its content, so wide tables and diagrams need no `span`. Write `span` only for a panel that must stand out. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the justified layout in a browser ignores it.
 - When no component fits, use a ```` ```html ```` or ```` ```svg ```` block to embed raw markup. The page carries a Content-Security-Policy, so a script or an inline event handler in the block does not run and nothing loads from the network.
 - A placeholder such as `<host>` is shown as text. Inside a sentence only text-level tags stay (`b`, `kbd`, `sup`, `a`, `span`, `br`, `img` ...), and tags that break the page (`script`, `style`, `iframe` ...) are shown as text too. Put raw markup in an `html` or `svg` block and code in backticks. The render lists every tag it changed.
+- A `doc` page with 3 or more panels gets an outline rail: one short tick per section beside the body, on the side `outline:` names (`left` or `right`, default `right`; on a right-to-left page the sides mirror). Hover or focus a tick to see its title; dwell on the rail, or click or tap it, to open the full list; the current section is marked as you scroll. Arrow keys move through the list and Esc closes it. Without JavaScript the list still opens and the links still jump. Print hides the rail.
 
 Full syntax for a component: `am help <component>`.
 
@@ -200,7 +202,7 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the table of contents and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the outline rail (`left` and `right` mirror) and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
 
 | Script in the text | Detected as |
 | :--- | :--- |

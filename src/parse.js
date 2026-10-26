@@ -33,6 +33,7 @@ export const CHOICES = Object.freeze({
   theme: [AUTO, ...themeNames('page')],
   style: ['off', '80', 'strict'],
   mode: ['auto', 'light', 'dark'],
+  outline: ['left', 'right'],
 });
 
 // Command-line arguments override draft and config settings: validates values, returns a new meta without changing the original. Keys with undefined values are ignored.
@@ -54,6 +55,7 @@ const DEFAULT_META = Object.freeze({
   theme: AUTO,
   style: '80',
   mode: 'auto',
+  outline: 'right',
   cols: 3,
   title: '',
 });

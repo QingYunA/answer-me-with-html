@@ -216,18 +216,18 @@ const A11Y_DRAFT = (a, b, c) => `---\ntemplate: doc\n---\n## A ${a}\n\`\`\`flow\
 
 test('render: aria-labels of diagrams and the table of contents follow the page language', () => {
   const en = renderDoc(A11Y_DRAFT('The request path', 'The handshake between them', 'Notes on what happens')).html;
-  assert.match(en, /<nav class="am-toc" aria-label="Contents">/);
+  assert.match(en, /<nav class="am-toc" aria-label="Contents"[^>]*>/);
   assert.match(en, /aria-label="Flowchart: Client, Server"/);
   assert.match(en, /aria-label="Sequence diagram: Client, Server"/);
 
   const zh = renderDoc(A11Y_DRAFT('请求从客户端发出的路径', '客户端和服务器之间的握手过程', '关于整个过程的补充说明和注意事项')).html;
-  assert.match(zh, /<nav class="am-toc" aria-label="目录">/);
+  assert.match(zh, /<nav class="am-toc" aria-label="目录"[^>]*>/);
   assert.match(zh, /aria-label="流程图：Client、Server"/);
   assert.match(zh, /aria-label="时序图：Client、Server"/);
 
   const ja = renderDoc(A11Y_DRAFT('クライアントから出るリクエストの流れ', 'クライアントとサーバーのあいだのハンドシェイクの手順', 'この流れについてのほかのメモと注意点')).html;
   assert.match(ja, /<html lang="ja"/);
-  assert.match(ja, /<nav class="am-toc" aria-label="目次">/);
+  assert.match(ja, /<nav class="am-toc" aria-label="目次"[^>]*>/);
   assert.match(ja, /aria-label="フローチャート：Client、Server"/);
   assert.match(ja, /aria-label="シーケンス図：Client、Server"/);
 });
@@ -671,4 +671,26 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
   const backdrop = lb.querySelector('.am-lightbox-backdrop');
   backdrop.click();
   assert.equal(lb.hasAttribute('hidden'), true, 'lightbox closes on backdrop click');
+});
+
+// The outline rail of a doc page (#319).
+const RAIL = (frontmatter, count = 3) => `---\ntemplate: doc\n${frontmatter}---\n${Array.from({ length: count }, (_, i) => `## ${'ABCD'[i]} Part ${i + 1}\nx`).join('\n')}`;
+
+test('render: a doc page with 3 or more panels has an outline rail on the right by default', () => {
+  const { html } = renderDoc(RAIL(''));
+  assert.match(html, /<nav class="am-toc" aria-label="Contents" data-side="end"[^>]*><details class="am-outline"><summary/);
+  assert.match(html, /<a href="#panel-B">B · Part 2<\/a>/);
+  assert.equal(html.match(/class="am-tick"/g).length, 3, 'one tick per section');
+  assert.match(html, /am-doc-layout am-doc-layout--rail-end/);
+});
+
+test('render: outline: left puts the rail on the inline-start side; an invalid value is an error', () => {
+  assert.match(renderDoc(RAIL('outline: left\n')).html, /data-side="start"/);
+  assert.match(renderDoc(RAIL('outline: right\n')).html, /data-side="end"/);
+  assert.throws(() => renderDoc(RAIL('outline: middle\n')), (e) => e instanceof ParseError && /Invalid outline value "middle".*left \| right/.test(e.message));
+});
+
+test('render: a doc page with fewer than 3 panels has no rail, and outline is not shown in the meta line', () => {
+  assert.doesNotMatch(renderDoc(RAIL('outline: left\n', 2)).html, /<nav class="am-toc"/);
+  assert.doesNotMatch(renderDoc(RAIL('outline: left\n')).html, /<div class="am-head-meta">/);
 });

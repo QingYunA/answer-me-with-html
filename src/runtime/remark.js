@@ -10,7 +10,7 @@
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
   // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.
-  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';
+  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';
   // A click on these does what it always did.
   const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';
   const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));
