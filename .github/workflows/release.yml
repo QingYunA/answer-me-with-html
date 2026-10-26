@@ -60,6 +60,11 @@ jobs:
             echo "::error file=${file}::The first line must be <!-- release ${VERSION} YYYY-MM-DD -->."
             exit 1
           fi
+          day="$(head -n 1 "$file" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')"
+          if [[ "$(date -u -d "$day" +%F 2>/dev/null)" != "$day" ]]; then
+            echo "::error file=${file}::${day} is not a real date."
+            exit 1
+          fi
       - name: Tag
         if: steps.state.outputs.release == 'false' && steps.state.outputs.tag == 'false'
         env:
