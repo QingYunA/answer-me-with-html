@@ -11,7 +11,8 @@ on:
 jobs:
   test:
     # 单元测试 + 健壮性测试：Linux 跑三个 Node 版本，macOS / Windows 各跑一个（用户主要在 macOS 上用）。
-    # full 格子（ubuntu / Node 22）还跑只需跑一次的检查：bundle、覆盖率、examples、网站、HTML snapshot、真实安装。
+    # The full entry (ubuntu / Node 22) also runs the checks needed only once: bundle, coverage, examples, website,
+    # HTML snapshot and the real install.
     name: test (${{ matrix.os }}, ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -70,7 +71,7 @@ jobs:
           cat snapshot.txt
           { echo "### HTML snapshot against $BASE"; echo '```'; cat snapshot.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" = different ]; then echo "::warning::The rendered HTML differs from $BASE. Call out the difference in the PR, or fix it."; fi
-      # 真实安装冒烟测试：npx skills add、claude plugin install、hook 输出、插件清单校验（自带临时 HOME）。
+      # Real install smoke test: npx skills add, claude plugin install, hook output, plugin manifest checks (in a temporary HOME).
       - name: Install smoke test
         if: ${{ matrix.full }}
         run: npm run smoke:install
