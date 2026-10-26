@@ -42,8 +42,8 @@ test('skill dir: every command spells out the host variable instead of a relativ
 test('skill dir: the other-host rule is firm, comes before the first command, and is checked once', () => {
   const rule = skill.indexOf('in place of `${CLAUDE_SKILL_DIR}`');
   assert.ok(rule > 0, 'the rule for hosts that do not substitute the token is missing');
-  assert.match(skill, /test -f <that directory>\/scripts\/am\.mjs/,
-    'the rule has to give the one check that proves the directory is this skill\'s');
+  assert.match(skill, /test -f "<that directory>\/scripts\/am\.mjs"/,
+    'the rule has to give the one check that proves the directory is this skill\'s, quoted so a path with a space works');
   assert.match(skill, /keeps no variable from one call to the next/,
     'the rule has to say why a variable cannot carry the path, or an agent will define one anyway');
   const firstCommand = skill.search(/^\s*node\s+\S+\s+(render|patch|video)\b/m);
