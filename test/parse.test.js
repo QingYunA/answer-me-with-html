@@ -318,4 +318,6 @@ test('error: a component written as a ::: fence is reported with a fenced exampl
 test('a ::: line with an unknown name, a bare :::, or inside a code block is not an error', () => {
   assert.doesNotThrow(() => parseDoc('## A\n:::note\ntext\n:::\n'));
   assert.doesNotThrow(() => parseDoc('## A\n```markdown\n:::callout\nIt works.\n:::\n```'));
+  assert.doesNotThrow(() => parseDoc('## A\n  ```markdown\n  :::flow\n  A -> B\n  :::\n  ```\nAfter.'), 'a fence indented by up to three spaces');
+  assert.throws(() => parseDoc('## A\n  ```\n  code\n  ```\n:::callout\nx\n:::'), ParseError, 'the check resumes after the indented fence closes');
 });

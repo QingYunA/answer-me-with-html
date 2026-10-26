@@ -210,8 +210,22 @@ function htmlLines(lines) {
 // fence would render as plain text, so a known component name after `:::` is an error. An unknown name or a bare `:::` stays text.
 const COLON_FENCE = /^ {0,3}:{3,}\s*([A-Za-z][\w-]*)(?![\w-])/;
 
+// A fence indented by one to three spaces is still code in Markdown, though the block splitter only opens fences at column 0;
+// lines inside one are skipped, so a `:::flow` quoted in an indented code block is not an error.
+const INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
+
 function checkColonFences(lines, first) {
+  let fence = null;
   return lines.flatMap((line, k) => {
+    const mark = line.match(INDENTED_FENCE)?.[1];
+    if (fence) {
+      if (mark && mark[0] === fence[0] && mark.length >= fence.length && !line.trim().slice(mark.length)) fence = null;
+      return [];
+    }
+    if (mark) {
+      fence = mark;
+      return [];
+    }
     const name = line.match(COLON_FENCE)?.[1].toLowerCase();
     const component = name && COMPONENTS.get(name);
     return component
