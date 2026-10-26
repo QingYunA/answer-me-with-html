@@ -12,7 +12,7 @@ A `doc` page with 3 or more panels no longer gives its table of contents a colum
 
 ## Pages on your phone over Tailscale
 
-`am serve --tailscale` listens only on this machine's Tailscale address, so the `link:` lines open from a phone or another device on your tailnet, with no SSH and no change to your Tailscale settings. Links survive a restart; delete `~/.answer-me-with-html/serve-secret` to revoke them all (#323).
+`am serve --tailscale` listens only on this machine's Tailscale address, so the `link:` lines open from a phone or another device on your tailnet, with no SSH and no change to your Tailscale settings. Links survive a restart; to revoke them all, stop the server, delete `~/.answer-me-with-html/serve-secret` and start it again (#323).
 
 ## Other changes
 
@@ -37,7 +37,7 @@ A `doc` page with 3 or more panels no longer gives its table of contents a colum
 
 ## 通过 Tailscale 在手机上看页面
 
-`am serve --tailscale` 只监听这台机器的 Tailscale 地址，所以 tailnet 里的手机或其他设备可以直接打开 `link:` 那一行的链接，不需要 SSH，也不改动 Tailscale 设置。链接在重启后仍然有效；删除 `~/.answer-me-with-html/serve-secret` 可以让所有链接失效（#323）。
+`am serve --tailscale` 只监听这台机器的 Tailscale 地址，所以 tailnet 里的手机或其他设备可以直接打开 `link:` 那一行的链接，不需要 SSH，也不改动 Tailscale 设置。链接在重启后仍然有效；要让所有链接失效，先停掉服务，删除 `~/.answer-me-with-html/serve-secret`，再重新启动（#323）。
 
 ## 其他改动
 
