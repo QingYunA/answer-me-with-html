@@ -467,6 +467,8 @@ export default {
   f_why: 'Karpathy 发过<a href="https://x.com/karpathy/status/2105819303471976479">一条推文</a>，大意是 LLM 干的活越来越多，人反而越来越难跟上它的输出；比起一大段文字，一张图、一页网页要好读得多。直接让 Agent 写 HTML 也行，就是慢：大半时间花在每次都差不多的 CSS 上，流程图的坐标还得模型自己猜。所以这个项目把这些活从模型手里拿走了：模型只写内容，排版、配色、画图都交给 CLI。',
   f_source: '源码',
   f_community: '社区',
+  f_support: '支持',
+  f_afdian: '爱发电',
   f_drawn: '本站',
   f_drawn_v: '用它自己的 blueprint 主题画成。没有框架，不下载字体。只用 Umami 做匿名的访问和点击统计，不用 cookie。',
 

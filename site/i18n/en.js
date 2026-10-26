@@ -445,6 +445,8 @@ export default {
   f_why: 'Andrej Karpathy <a href="https://x.com/karpathy/status/2105819303471976479">posted</a> that as LLMs do more of the work, keeping up with their output becomes the hard part. A diagram or a web page is far easier to take in than a long block of text. Asking agents for HTML works, but it is slow: most of the wait is CSS that is nearly the same every time, and SVG coordinates the model has to guess. So the model writes content, and the CLI handles layout, color and drawing.',
   f_source: 'Source',
   f_community: 'Community',
+  f_support: 'Support',
+  f_afdian: 'Afdian',
   f_drawn: 'Drawn with',
   f_drawn_v: 'its own blueprint theme. No frameworks, no font downloads. Anonymous visit and click counts with Umami, no cookies.',
 
