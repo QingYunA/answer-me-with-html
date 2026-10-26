@@ -61,7 +61,8 @@
   });
   box.addEventListener('pointerleave', () => {
     clearTimeout(dwell);
-    if (byHover) leave = setTimeout(() => setOpen(false), 250);
+    // A link the keyboard moved into keeps the list open; focusout closes it once the focus leaves the nav.
+    if (byHover) leave = setTimeout(() => { if (!nav.contains(document.activeElement)) setOpen(false); }, 250);
   });
   sum.addEventListener('click', (e) => {
     clearTimeout(dwell);

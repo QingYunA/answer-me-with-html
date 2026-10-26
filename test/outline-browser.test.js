@@ -159,6 +159,24 @@ test('outline: dwelling on the rail with a mouse opens the list', { skip: SKIP }
   await until('document.querySelector(".am-outline").open', 'the dwell');
 });
 
+test('outline: a list opened by hover stays open while a link has the keyboard focus', { skip: SKIP }, async () => {
+  await open('right');
+  const c = center(await rect('.am-outline > summary'));
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y });
+  await until('document.querySelector(".am-outline").open', 'the dwell');
+  await evaluate('document.querySelector(".am-outline-list a").focus()');
+  await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 20, y: 600 });
+  await new Promise((r) => setTimeout(r, 600));
+  assert.equal(await isOpen(), true, 'the focused list stays open after the pointer leaves');
+});
+
+test('outline: the toolbar and the reply bar stay above the rail', { skip: SKIP }, async () => {
+  await open('right');
+  const z = await evaluate('[".am-toc", ".am-toolbar", ".am-reply-bar"].map((s) => document.querySelector(s) && Number(getComputedStyle(document.querySelector(s)).zIndex))');
+  assert.ok(z[0] < z[1], `rail ${z[0]} below toolbar ${z[1]}`);
+  if (z[2] !== null) assert.ok(z[0] < z[2], `rail ${z[0]} below reply bar ${z[2]}`);
+});
+
 test('outline: the list opens away from the body when there is room and over it at the screen edge', { skip: SKIP }, async () => {
   for (const [name, side] of [['right', 'right'], ['left', 'left']]) {
     for (const width of [320, 390, 768, 1024, 1440, 1920]) {

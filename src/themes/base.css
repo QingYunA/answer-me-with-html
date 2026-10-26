@@ -471,7 +471,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* The outline rail: a zero-height sticky strip whose child hangs 8px outside the body on the chosen side. "start" and "end" are
    logical, so the rail mirrors on a right-to-left page. data-flow says which way the label and the list open: "out" away from the
    body, "in" over it (src/runtime/outline.js picks it from the room left in the viewport; the markup starts with "in"). */
-.am-toc { position: sticky; top: 72px; height: 0; z-index: 20; font-size: var(--am-fs-text); }
+/* Above panels and the diagram expand button (2), below the fixed toolbar and reply bar (10). */
+.am-toc { position: sticky; top: 72px; height: 0; z-index: 5; font-size: var(--am-fs-text); }
 .am-outline { position: absolute; top: 0; inset-inline-start: calc(100% + 8px); }
 .am-toc[data-side="start"] .am-outline { inset-inline-start: auto; inset-inline-end: calc(100% + 8px); }
 .am-outline > summary { display: block; width: 16px; list-style: none; cursor: pointer; border-radius: 4px; }
