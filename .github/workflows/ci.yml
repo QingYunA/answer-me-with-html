@@ -8,34 +8,46 @@ on:
     - cron: '17 3 * * 1'   # 每周一跑一次：上游 skills CLI / Claude Code 变化导致安装失败时尽早发现
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     # 单元测试 + 健壮性测试：Linux 跑三个 Node 版本，macOS / Windows 各跑一个（用户主要在 macOS 上用）。
+    # The full entry (ubuntu / Node 22) also runs the checks needed only once: bundle, coverage, examples, website,
+    # HTML snapshot and the real install.
+    name: test (${{ matrix.os }}, ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        node: [20, 22, 24]
         include:
-          - os: macos-latest
-            node: 22
-          - os: windows-latest
-            node: 22
+          - { os: ubuntu-latest, node: 22, full: true }
+          - { os: ubuntu-latest, node: 20 }
+          - { os: ubuntu-latest, node: 24 }
+          - { os: macos-latest, node: 22 }
+          - { os: windows-latest, node: 22 }
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The snapshot step compares with the PR base.
+          fetch-depth: ${{ matrix.full && '0' || '1' }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - name: Bundle is up to date
-        shell: bash
-        run: npm run build && git diff --exit-code skills/answer-me-with-html/scripts/am.mjs
       - run: npm test
+        if: ${{ !matrix.full }}
+      - name: Bundle is up to date
+        if: ${{ matrix.full }}
+        run: npm run build && git diff --exit-code skills/answer-me-with-html/scripts/am.mjs
+      - name: Tests with coverage thresholds (lines 85, functions 85, branches 80)
+        if: ${{ matrix.full }}
+        run: npm run coverage
       - name: Render examples with the bundled CLI
-        shell: bash
+        if: ${{ matrix.full }}
         run: |
           set -euo pipefail
           export AM_NO_UPDATE_CHECK=1 AM_HOME="$RUNNER_TEMP/am-home"
@@ -47,37 +59,14 @@ jobs:
               *) node "$AM" render "$f" --no-open -o "out/$name.html" ;;
             esac
           done
-
-  site:
-    # The project website builds: browser engine bundle, prerendered examples and both language pages.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci && npm run site
-
-  snapshot:
-    # Refactors keep the HTML byte-identical (CONTRIBUTING.md). The job reports the comparison with the PR base
-    # in its summary and does not fail: an intended difference is called out in the PR instead.
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+      # The project website builds: browser engine bundle, prerendered examples and both language pages.
+      - name: Build the website
+        if: ${{ matrix.full && github.event_name == 'pull_request' }}
+        run: npm run site
+      # Refactors keep the HTML byte-identical (CONTRIBUTING.md). The step reports the comparison with the PR base
+      # in the job summary and does not fail: an intended difference is called out in the PR instead.
       - name: Compare the rendered HTML with the PR base
-        shell: bash
+        if: ${{ matrix.full && github.event_name == 'pull_request' }}
         env:
           BASE: origin/${{ github.base_ref }}
         run: |
@@ -85,19 +74,10 @@ jobs:
           cat snapshot.txt
           { echo "### HTML snapshot against $BASE"; echo '```'; cat snapshot.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           if [ "$status" = different ]; then echo "::warning::The rendered HTML differs from $BASE. Call out the difference in the PR, or fix it."; fi
-
-  coverage:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Coverage thresholds (lines 85, functions 85, branches 80)
-        run: npm run coverage
+      # Real install smoke test: npx skills add, claude plugin install, hook output, plugin manifest checks (in a temporary HOME).
+      - name: Install smoke test
+        if: ${{ matrix.full }}
+        run: npm run smoke:install
 
   video:
     # 视频端到端：espeak-ng 配音 + 无头 Chrome 逐帧 + ffmpeg 编码，确认播放页脚本在真实浏览器里能跑完。
@@ -123,14 +103,3 @@ jobs:
           ffprobe -v error -show_entries stream=codec_type,width,height -of csv=p=0 out/video.mp4 | tee probe.txt
           grep -q 'video,1920,1080' probe.txt
           grep -q 'audio' probe.txt
-
-  install:
-    # 真实安装冒烟测试：npx skills add、claude plugin install、hook 输出、插件清单校验。
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: npm run smoke:install
