@@ -1,23 +1,18 @@
 {
-  "version": "0.5.9",
+  "version": "0.5.10",
   "en": [
-    "A component written as :::callout is an error that shows the ``` syntax",
-    "The website has a changelog: answer-me-with-html.com/changelog/"
+    "Write a component as a :::callout … ::: block too; it renders like ```"
   ],
   "zh": [
-    "把组件写成 :::callout 会报错，并给出正确的 ``` 写法",
-    "网站新增更新日志：answer-me-with-html.com/zh/changelog/"
+    "组件也可以写成 :::callout … ::: 块，渲染结果和 ``` 写法相同"
   ],
   "zh-Hant": [
-    "把元件寫成 :::callout 會報錯，並給出正確的 ``` 寫法",
-    "網站新增更新日誌：answer-me-with-html.com/zh/changelog/"
+    "元件也可以寫成 :::callout … ::: 區塊，渲染結果和 ``` 寫法相同"
   ],
   "ja": [
-    ":::callout と書いたコンポーネントはエラーになり、``` の書き方を示します",
-    "サイトに更新履歴ページ：answer-me-with-html.com/changelog/"
+    "コンポーネントは :::callout … ::: でも書け、``` と同じ表示になります"
   ],
   "he": [
-    "רכיב שנכתב כ-:::callout הוא שגיאה שמציגה את התחביר הנכון עם ```",
-    "באתר יש עכשיו יומן שינויים: answer-me-with-html.com/changelog/"
+    "אפשר לכתוב רכיב גם כבלוק :::callout … :::, והוא מוצג כמו ```"
   ]
 }
