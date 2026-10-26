@@ -6,7 +6,7 @@ AI agents are welcome. If one wrote this change or this description, name it, an
 
 ## Summary
 
-<!-- What changes, and why. Link the issue: Fixes #123 -->
+<!-- What changes, and why. Link the issue if there is one (a feature needs an accepted issue): Fixes #123 -->
 
 ## Test plan
 

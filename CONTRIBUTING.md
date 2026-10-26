@@ -17,14 +17,15 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 ## Pull requests
 
-- **Open an issue first, and wait for a maintainer to accept it.** Describe the problem and the change you plan; for new syntax, show the syntax. An issue is accepted when a maintainer agrees in a comment or labels it `ready-for-human`. Then open the PR and link the issue (`Fixes #123`). Only typo and broken-link fixes may skip the issue, and so may a PR that only adds a catalog theme (see [Theme catalog](#theme-catalog)). We close a PR without an accepted issue, and you can reopen it once the issue is accepted.
+- **Fixes need no issue first.** A bug fix (with the steps that reproduce the bug), a docs change, a typo or broken-link fix, a test, or a PR that only adds a catalog theme (see [Theme catalog](#theme-catalog)) can go straight to a PR. Link the issue if there is one (`Fixes #123`).
+- **Features need an accepted issue first.** A new feature, new draft syntax, a new page interaction, or a change to existing behaviour starts as an issue: describe the problem and the change you plan; for new syntax, show the syntax. Wait for a maintainer to accept it, in a comment or with the label `ready-for-human`, then open the PR and link the issue. We close a feature PR without an accepted issue, and you can reopen it once the issue is accepted.
 - One topic per PR. Commit messages follow Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`, `chore:`).
 - Write the PR description in English: what changed, why, and how you verified it.
 - `npm test` must pass and the bundle must be rebuilt.
 
 ### Reviewing a contributor PR (maintainers)
 
-1. Check that the PR links an accepted issue. If it does not, close it with a link to "Pull requests" above.
+1. If the PR adds a feature, new syntax, a new page interaction or changes existing behaviour, check that it links an accepted issue. If it does not, close it with a link to "Pull requests" above. A fix, docs, test or theme PR needs no issue.
 2. Check out the PR head in a separate worktree: `git fetch origin pull/<n>/head:pr-<n> && git worktree add /tmp/pr-<n> pr-<n>`.
 3. Review the diff against the PR base (`git diff origin/main...pr-<n>`), never against your current branch.
 4. In the worktree: `npm ci`, `npm run build` (the bundle must not change), `npm test`, and `npm run snapshot` when `src/` changed. CI runs all of these; when you review without a checkout, read the CI results and the snapshot in the `test (ubuntu-latest, 22)` job summary instead.
