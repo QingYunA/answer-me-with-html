@@ -807,3 +807,34 @@ textarea.ed-input { height: auto; padding: 8px 10px; line-height: 1.5; resize: v
   .topbar, .crosshair, .pg-actions, .toast { display: none; }
   body { background: #fff; }
 }
+
+/* ── Changelog ──────────────────────────────────────────── */
+.cl { display: flex; flex-direction: column; gap: 24px; align-items: start; }
+.cl-toc { width: 100%; }
+.cl-toc summary { cursor: pointer; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); padding: 8px 0; }
+.cl-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: 13px/1.6 var(--mono); }
+.cl-list { min-width: 0; width: 100%; max-width: 78ch; }
+.cl-version { padding-bottom: 28px; margin-bottom: 28px; border-bottom: 1px solid var(--line-2); scroll-margin-top: calc(var(--topbar-h) + 16px); }
+.cl-version:last-child { border-bottom: 0; margin-bottom: 0; }
+.cl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 14px; }
+.cl-head h2 { margin: 0; font-size: clamp(22px, 2.4vw, 28px); letter-spacing: -0.02em; }
+.cl-link { font-size: 14px; text-decoration: none; }
+.cl-release { font-size: 12px; margin-left: auto; }
+.cl-note { margin: 0 0 12px; }
+.cl-notes h3 { margin: 22px 0 8px; font-size: 18px; letter-spacing: -0.01em; }
+.cl-notes h4 { margin: 16px 0 6px; font-size: 15px; }
+.cl-notes p { margin: 0 0 12px; }
+.cl-notes ul, .cl-notes ol { margin: 0 0 12px; padding-left: 1.4em; }
+.cl-notes li { margin: 4px 0; }
+.cl-notes li > p { margin: 0; }
+.cl-notes pre { overflow-x: auto; padding: 12px 14px; background: var(--code-bg); border: 1px solid var(--line-2); font-size: 13px; }
+.cl-notes pre code { padding: 0; border: 0; background: none; }
+.cl-notes code { overflow-wrap: anywhere; }
+@media (min-width: 960px) {
+  .cl { flex-direction: row; gap: clamp(24px, 4vw, 56px); }
+  .cl-list { flex: 1; }
+  .cl-toc { order: 2; position: sticky; top: calc(var(--topbar-h) + 16px); width: 150px; flex: none; max-height: calc(100vh - var(--topbar-h) - 32px); overflow-y: auto; }
+  .cl-toc summary { pointer-events: none; list-style: none; border-bottom: 1px solid var(--line-2); margin-bottom: 8px; }
+  .cl-toc summary::-webkit-details-marker { display: none; }
+  .cl-toc ul { flex-direction: column; gap: 2px; }
+}

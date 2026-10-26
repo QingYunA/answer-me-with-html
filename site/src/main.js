@@ -299,8 +299,9 @@ function heroFallback() {
   $('.demo-status', demo).textContent = UI.fallback;
   $('.demo-note', demo).innerHTML = UI.fallbackNote;
 }
-const pageScript = { catalog: './catalog.js', theme: './theme.js', editor: './editor.js' }[root.dataset.page] ?? './playground.js';
-idle(() => import(pageScript).catch((err) => {
+const pageScript = { catalog: './catalog.js', theme: './theme.js', editor: './editor.js', changelog: null }[root.dataset.page] ?? './playground.js';
+// The changelog page has no script of its own.
+if (pageScript) idle(() => import(pageScript).catch((err) => {
   console.error(`${pageScript} failed to load`, err);
   heroFallback();
 }), { timeout: 900 });

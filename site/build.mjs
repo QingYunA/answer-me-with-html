@@ -5,6 +5,7 @@
 // - prerender/: example pages and videos rendered by the bundled CLI.
 // - themes/<name>/preview.html and zh/themes/<name>/preview.html: the TCP sample page in each catalog theme, rendered by the bundled CLI, so the theme wall loads no engine.
 // - index.html (English) and zh/index.html (Chinese): site/template.html filled from site/i18n/en.js and site/i18n/zh.js.
+// - changelog/ (English) and zh/changelog/ (Chinese): site/template-changelog.html with a section for each changelog/<x.y.z>.md (site/changelog.mjs).
 // - themes/ (English) and zh/themes/ (Chinese): the theme wall, site/template-themes.html filled the same way, with a card for each theme of the catalog.
 // - themes/<name>/ and zh/themes/<name>/: one page for each theme, site/template-theme.html.
 // - themes/new/ and zh/themes/new/: the theme editor, site/template-editor.html, made interactive by assets/editor.js.
@@ -21,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { inlineAssets } from '../scripts/inline-assets.mjs';
 import { PREVIEW_CSS } from './src/chrome.js';
+import { changelogHtml, readChangelog } from './changelog.mjs';
 import { catalogIndex, detailValues, readCatalog, wallHtml } from './catalog.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -49,6 +51,11 @@ const PAGES = [
   { lang: 'en', htmlLang: 'en', out: 'index.html', alt: 'zh/', path: '' },
   { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/index.html', alt: '../', path: 'zh/' },
 ];
+// The changelog (site/template-changelog.html): changelog/*.md at the repository root, drawn by site/changelog.mjs.
+const CHANGELOG_PAGES = [
+  { lang: 'en', htmlLang: 'en', out: 'changelog/index.html', alt: '../zh/changelog/', path: 'changelog/' },
+  { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/changelog/index.html', alt: '../../changelog/', path: 'zh/changelog/' },
+];
 const THEME_PAGES = [
   { lang: 'en', htmlLang: 'en', out: 'themes/index.html', alt: '../zh/themes/', path: 'themes/' },
   { lang: 'zh', htmlLang: 'zh-CN', out: 'zh/themes/index.html', alt: '../../themes/', path: 'zh/themes/' },
@@ -63,7 +70,7 @@ const themePages = (name) => [
   { lang: 'en', htmlLang: 'en', out: `themes/${name}/index.html`, alt: `../../zh/themes/${name}/`, path: `themes/${name}/` },
   { lang: 'zh', htmlLang: 'zh-CN', out: `zh/themes/${name}/index.html`, alt: `../../../themes/${name}/`, path: `zh/themes/${name}/` },
 ];
-export const pageGroups = (catalog) => [PAGES, THEME_PAGES, EDITOR_PAGES, ...catalog.map((e) => themePages(e.name))];
+export const pageGroups = (catalog) => [PAGES, THEME_PAGES, EDITOR_PAGES, CHANGELOG_PAGES, ...catalog.map((e) => themePages(e.name))];
 // The sample page of the theme previews: the playground's TCP draft in each language, drawn light (the page flips to dark by data-mode).
 const THEME_SAMPLES = [['en', 'site/presets/tcp.md', 'themes'], ['zh', 'site/presets/tcp.zh.md', 'zh/themes']];
 // Markup the templates share, in site/partials/<name>.html, used in a template as {{PARTIAL_<NAME>}}.
@@ -289,6 +296,8 @@ async function writePages(dist, version, catalog, groups) {
   const themes = read('template-themes.html');
   const detail = read('template-theme.html');
   const editor = read('template-editor.html');
+  const changelog = read('template-changelog.html');
+  const notes = readChangelog(join(ROOT, 'changelog'));
   const partials = Object.fromEntries(PARTIALS.map((n) => [n, read(`partials/${n}.html`).text.trimEnd()]));
   const langs = [...new Set(groups.flat().map((p) => p.lang))];
   const dicts = Object.fromEntries(await Promise.all(langs.map(async (l) => [l, await loadDictionary(l)])));
@@ -300,6 +309,10 @@ async function writePages(dist, version, catalog, groups) {
     ...fillGroup(home, partials, PAGES, shared, () => ({ BRAND_HREF: '#top' }), problems),
     ...fillGroup(themes, partials, THEME_PAGES, shared, (p, base) => ({ BRAND_HREF: base, THEME_WALL: wallHtml(catalog, dicts[p.lang], p.lang) }), problems),
     ...fillGroup(editor, partials, EDITOR_PAGES, shared, (p, base) => ({ BRAND_HREF: base, BACK_HREF: '../' }), problems),
+    ...fillGroup(changelog, partials, CHANGELOG_PAGES, shared, (p, base) => {
+      const { toc, sections } = changelogHtml(notes, p.lang, dicts[p.lang], REPO);
+      return { BRAND_HREF: base, CHANGELOG_TOC: toc, CHANGELOG_SECTIONS: sections };
+    }, problems),
     ...catalog.flatMap((entry) => {
       const group = themePages(entry.name);
       return fillGroup(detail, partials, group, shared, (p, base) => ({ BRAND_HREF: base, BACK_HREF: '../', PATH_EN: group[0].path, PATH_ZH: group[1].path, ...detailValues(entry, dicts[p.lang], p.lang, SITE_URL) }), problems);

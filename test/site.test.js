@@ -133,8 +133,8 @@ test('site build: both pages carry the visit counter for the site domain only', 
 test('site build: sitemap.xml lists every page with the head alternates and robots.txt points at it', { skip: !existsSync(join(ROOT, 'site/dist/sitemap.xml')) }, () => {
   const sitemap = read(join(ROOT, 'site/dist/sitemap.xml'));
   const urls = sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(urls.length, 6 + NAMES.length * 2);
-  const pairs = [['', 'zh/'], ['themes/', 'zh/themes/'], ['themes/new/', 'zh/themes/new/'], ...NAMES.map((n) => [`themes/${n}/`, `zh/themes/${n}/`])];
+  assert.equal(urls.length, 8 + NAMES.length * 2);
+  const pairs = [['', 'zh/'], ['themes/', 'zh/themes/'], ['themes/new/', 'zh/themes/new/'], ['changelog/', 'zh/changelog/'], ...NAMES.map((n) => [`themes/${n}/`, `zh/themes/${n}/`])];
   for (const [en, zh] of pairs) {
     for (const page of [en, zh]) {
       const url = urls.find((u) => u.includes(`<loc>${SITE_URL}${page}</loc>`));
@@ -339,4 +339,15 @@ test('site i18n: no key is written twice in a dictionary, and both languages hav
   const used = [...read(join(ROOT, 'site/src/editor.js')).matchAll(/\bT\.(\w+)|T\[`(g)_\$\{/g)].map((m) => m[1]).filter(Boolean);
   for (const k of used) assert.ok(k in ui.en.ed, `editor.js reads T.${k}`);
   for (const g of ['surface', 'text', 'accent', 'status']) assert.ok(`g_${g}` in ui.en.ed, g);
+});
+
+test('site build: the changelog pages have a section for every changelog file, newest first, and the alternates', { skip: !existsSync(join(ROOT, 'site/dist/changelog/index.html')) }, () => {
+  const versions = readdirSync(join(ROOT, 'changelog')).map((f) => f.replace(/\.md$/, '')).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  for (const [page, canonical] of [['changelog/index.html', 'changelog/'], ['zh/changelog/index.html', 'zh/changelog/']]) {
+    const html = read(join(ROOT, 'site/dist', page));
+    assert.deepEqual([...html.matchAll(/<section class="cl-version" id="v([\d-]+)"/g)].map((m) => m[1].replaceAll('-', '.')), versions, page);
+    assert.ok(html.includes(`<link rel="canonical" href="${SITE_URL}${canonical}">`), `${page}: canonical`);
+    assert.ok(html.includes(`hreflang="zh-CN" href="${SITE_URL}zh/changelog/"`), `${page}: hreflang`);
+    assert.ok(!/\{\{/.test(html), `${page}: unfilled placeholder`);
+  }
 });

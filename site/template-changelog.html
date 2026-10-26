@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="{{LANG}}" data-base="{{BASE}}" data-version="{{VERSION}}" data-page="changelog">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{cl_meta_title}}</title>
+<meta name="description" content="{{cl_meta_desc}}">
+<link rel="canonical" href="{{CANONICAL}}">
+<link rel="alternate" hreflang="en" href="{{SITE_URL}}changelog/">
+<link rel="alternate" hreflang="zh-CN" href="{{SITE_URL}}zh/changelog/">
+<link rel="alternate" hreflang="x-default" href="{{SITE_URL}}changelog/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Answer me with HTML">
+<meta property="og:title" content="{{cl_meta_title}}">
+<meta property="og:description" content="{{cl_meta_desc}}">
+<meta property="og:url" content="{{CANONICAL}}">
+<meta property="og:locale" content="{{og_locale}}">
+<meta property="og:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta property="og:image:alt" content="{{og_image_alt}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{cl_meta_title}}">
+<meta name="twitter:description" content="{{cl_meta_desc}}">
+<meta name="twitter:image" content="{{SITE_URL}}images/{{og_image}}">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#081322" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="{{BASE}}favicon.svg" type="image/svg+xml">
+<script defer src="{{STATS_SCRIPT}}" data-website-id="{{STATS_WEBSITE_ID}}" data-domains="answer-me-with-html.com"></script>
+{{PARTIAL_BOOT}}
+<link rel="stylesheet" href="{{BASE}}assets/style.css">
+<link rel="modulepreload" href="{{BASE}}assets/main.js">
+<script type="module" src="{{BASE}}assets/main.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">{{skip}}</a>
+
+<header class="topbar">
+  <div class="topbar-in">
+{{PARTIAL_BRAND}}
+    <nav class="nav" aria-label="{{nav_label}}">
+      <a href="{{BASE}}">{{nav_home}}</a>
+      <a href="{{BASE}}#playground">{{nav_playground}}</a>
+      <a href="{{BASE}}#install">{{nav_install}}</a>
+      <a href="{{BASE}}themes/">{{nav_catalog}}</a>
+      <a href="{{BASE}}changelog/" aria-current="true">{{nav_changelog}}</a>
+    </nav>
+{{PARTIAL_TOOLS}}
+  </div>
+</header>
+
+<main id="main">
+
+<section class="sheet" aria-labelledby="cl-title">
+  <header class="sheet-head">
+    <span class="sheet-id" aria-hidden="true">C</span>
+    <h1 id="cl-title">{{cl_title}}</h1>
+  </header>
+  <p class="sheet-lede">{{cl_lede}}</p>
+  <div class="cl">
+    <nav class="cl-toc" aria-label="{{cl_toc}}">
+      <details id="cl-toc">
+        <summary class="mono">{{cl_toc}}</summary>
+        <ul>
+{{CHANGELOG_TOC}}
+        </ul>
+      </details>
+    </nav>
+    <div class="cl-list">
+{{CHANGELOG_SECTIONS}}
+    </div>
+  </div>
+</section>
+
+</main>
+
+{{PARTIAL_FOOTER}}
+
+<script>
+(function () {
+  var d = document.getElementById('cl-toc'), q = matchMedia('(min-width: 960px)');
+  function sync() { d.open = q.matches; }
+  sync();
+  q.addEventListener('change', sync);
+})();
+</script>
+<div class="toast mono" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="site-ui">{{ui_json}}</script>
+</body>
+</html>

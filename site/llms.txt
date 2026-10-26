@@ -11,3 +11,7 @@
 
 - [README](https://github.com/QingYunA/answer-me-with-html#readme): what it does, install and use
 - [Reference](https://raw.githubusercontent.com/QingYunA/answer-me-with-html/main/docs/reference.md): the draft format, every component, settings and themes
+
+## Changes
+
+- [Changelog](https://answer-me-with-html.com/changelog/): the release notes of every version, newest first
