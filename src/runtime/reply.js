@@ -9,6 +9,26 @@ const COMMENT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none
 if (replyBtn) {
   const ui = JSON.parse(replyBtn.dataset.ui);
   const storeKey = `am-reply:${location.pathname}`;
+  // A page served by `am serve` runs without localStorage and the phone may discard its tab, so it keeps the answers on the
+  // server: data-am-save names the write route and data-am-state carries what the server already holds for this page version.
+  const serve = (() => {
+    const { amSave: save, amState: state } = document.body?.dataset ?? {};
+    if (!save) return null;
+    try {
+      return { save, restored: state ? JSON.parse(state) : null };
+    } catch {
+      return { save, restored: null };
+    }
+  })();
+  let saveTimer = null;
+  // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.
+  const saveSoon = (patch) => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
+        .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before
+    }, 400);
+  };
   const panels = [...document.querySelectorAll('.am-panel')];
   const asks = [...document.querySelectorAll('.am-ask')];
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
@@ -25,6 +45,7 @@ if (replyBtn) {
   let stuck = null;
 
   const load = () => {
+    if (serve?.restored?.reply) return serve.restored.reply;
     try {
       return JSON.parse(localStorage.getItem(storeKey)) || {};
     } catch {
@@ -41,6 +62,7 @@ if (replyBtn) {
     } catch {
       // Storage may be off (private window, file:// policy); answers then last until the page closes.
     }
+    if (serve) saveSoon({ reply: state });
   };
   const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);
   const panelOf = (el) => {

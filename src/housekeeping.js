@@ -1,6 +1,6 @@
 // Data-directory maintenance: usage stats, am clean, cleanup notice; after a render, collects the cleanup and update notices.
 // Notices are printed only for the Agent (one line starting with "! "), which asks the user whether to act; the CLI never deletes automatically.
-import { readdirSync, lstatSync, rmSync } from 'node:fs';
+import { readdirSync, lstatSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
@@ -48,17 +48,27 @@ export function usage(home) {
 
 // Delete pages, videos and kept drafts (src/cli.js keepDraft) older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
 // temp: the private folder in the system temporary folder (src/home.js); its pages, videos and drafts follow the same rules.
+// The reply state of a served page (src/serve.js, serve-state/) goes with its page: a state whose page is gone cannot be restored.
 export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
     ...[home, temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
     ...walk(join(home, 'cache')),
   ];
+  const states = walk(join(home, 'serve-state')).filter((f) => {
+    if (all || f.mtime < cutoff) return true;
+    try {
+      const file = JSON.parse(readFileSync(f.path, 'utf8'))?.file;
+      return typeof file !== 'string' || !lstatSync(join(home, 'pages', file)).isFile();
+    } catch {
+      return true;
+    }
+  });
   if (!dryRun) {
-    for (const f of victims) rmSync(f.path, { force: true });
+    for (const f of [...victims, ...states]) rmSync(f.path, { force: true });
     writeState(home, { lastClean: now, lastCleanHint: null });
   }
-  return { files: victims.length, bytes: sum(victims) };
+  return { files: victims.length + states.length, bytes: sum(victims) + sum(states) };
 }
 
 export const mb = (bytes) => (bytes < 2 ** 20 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 2 ** 20).toFixed(bytes < 10 * 2 ** 20 ? 1 : 0)} MB`);

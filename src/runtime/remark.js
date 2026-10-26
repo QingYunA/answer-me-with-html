@@ -7,6 +7,25 @@
   const ui = JSON.parse(btn.dataset.ui);
   const KINDS = ['suggestion', 'keep', 'question', 'concern'];
   const storeKey = `am-remark:${location.pathname}`;
+  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the
+  // same record as the answers (reply.js), so a re-opened page finds them again.
+  const serve = (() => {
+    const { amSave: save, amState: state } = document.body?.dataset ?? {};
+    if (!save) return null;
+    try {
+      return { save, restored: state ? JSON.parse(state) : null };
+    } catch {
+      return { save, restored: null };
+    }
+  })();
+  let saveTimer = null;
+  const saveSoon = (patch) => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
+        .catch(() => {});
+    }, 400);
+  };
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
   // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.
@@ -55,6 +74,8 @@
   };
 
   const load = () => {
+    const restored = serve?.restored?.remark;
+    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));
     try {
       const saved = JSON.parse(localStorage.getItem(storeKey));
       return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];
@@ -104,6 +125,7 @@
     } catch {
       // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.
     }
+    if (serve) saveSoon({ remark: [] });
     resetClear();
     document.dispatchEvent(new Event('am-remark-change'));
   });
@@ -113,6 +135,7 @@
     } catch {
       // Storage may be off (private window, a sandboxed page); marks then last until the page closes.
     }
+    if (serve) saveSoon({ remark: [...marks.values()] });
     // The reply bar (reply.js) shows the number of marks.
     document.dispatchEvent(new Event('am-remark-change'));
     showClear();

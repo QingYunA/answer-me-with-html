@@ -322,12 +322,12 @@ am serve --tailscale  # 只监听 Tailscale 地址；tailnet 内的任何设备�
 - `--tailscale` 只监听这台机器的 Tailscale IPv4 地址（不是 `0.0.0.0`，也不是 `127.0.0.1`），所以只有你 tailnet 里的设备能连上。链接以 MagicDNS 名称开头（`http://<机器名>.<tailnet>.ts.net:<端口>`），MagicDNS 关闭时用 Tailscale 地址。连接是明文 `http://`，但 tailnet 内的流量由 WireGuard 加密。它读取 `tailscale status --json`，不会改动任何 Tailscale 配置。需要 `tailscale` CLI 在 `PATH` 里（macOS 上也可以用 App 自带的 CLI），并且 Tailscale 已登录、正在运行。不能与 `--lan` 或 `--public-url` 同用。链接在重启后仍然有效：密钥保存在 `~/.answer-me-with-html/serve-secret`，所以手机上的书签不会失效；要让所有链接失效，先停掉服务，删除该文件，再重新启动。如果监听时报 "cannot assign requested address"（Tailscale 的 userspace-networking 模式没有网卡），tailnet 设备请用下面的 HTTPS 做法；`--lan` 只能让同一局域网的设备访问。
 - `--secret-file <路径>` 把链接密钥存在文件里，而不是每次启动都新生成，所以链接在重启后仍然有效。文件内容是 64 个小写十六进制字符，只有你自己能读（权限 0600）；文件不存在时会自动创建。组或其他用户可读的文件会被 `am serve` 拒绝。
 - 已开启 HTTPS 证书的 tailnet 上用 HTTPS：运行 `tailscale serve --bg 8765`，再运行 `am serve --public-url https://<机器名>.<tailnet>.ts.net`。`tailscale serve` 会原样传递 `.ts.net` 的 `Host`，这正是 `--public-url` 接受的名称。开启 HTTPS 会把你的机器名公布到证书透明度（Certificate Transparency）日志里（[详情](https://tailscale.com/kb/1153/enabling-https)）。`tailscale serve --https=443 off` 可以撤销。
-- 在手机上，`http(s)` 链接里的 Reply 作答和评论只保留到标签页关闭，而且手机浏览器会丢弃后台标签页：切换应用之前先复制回复。
+- 在手机上，`http(s)` 链接里的 Reply 作答、评论和批注会边输入边存到服务端，所以浏览器丢弃的标签页、或者重启过的 `am serve`，再打开同一条链接时仍然能看到它们。它们存在 `~/.answer-me-with-html/serve-state/`（每页一个文件，以页面 token 的哈希命名，只能通过该 token 读到），页面重新渲染后丢弃，`am clean` 随页面一起删除。从 `file://` 打开的页面仍像以前一样存在浏览器的本地存储里。
 - 不加这些参数时，服务只响应 `localhost`、`127.0.0.1` 和 `[::1]`，请求其他主机名或 IP 一律返回 404。不要把这个端口暴露到公网。
 - 链接按页面区分：每个链接只带这一页的令牌，打不开别的页面；服务重启后所有旧链接失效，除非密钥存在文件里（`--tailscale`、`--secret-file`）。服务不列目录，只提供 `.html` 文件。
 - 把链接当作这一页的密码：能连到这个端口、又拿到链接的人都能打开页面，包括同一台机器上的其他用户。不要把链接发给别人。
 - 给隧道单独用一个本地端口。不要复用曾经打开过其他服务或其他主机页面的端口：那些页面可能在浏览器里为这个地址留下了 service worker，之后在这个端口上打开的页面它都能看到。
-- 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、批注和标注只保留到关闭页面为止，关闭前请先复制回复。
+- 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、评论和批注会边输入边存到服务端，关掉页面再打开同一条链接就能看到（见下面的 `am serve`）。
 - 页面文件变了（比如 `am patch` 之后，或重新渲染到同一个文件），打开着的页面会自动刷新，并停在原来的滚动位置。如果你已经在页面上做了选择、写了批注或做了标注，页面不会自动刷新，而是显示「页面已更新 · 刷新」，让你先复制回复。这是服务在发送页面时加上的，文件本身不变：用 `file://` 打开的页面不会自动刷新。页面用自己链接里的令牌监听 `/e/<令牌>/<文件>`，这个连接只传「已变化」，不传页面内容。
 
 ## 更新与清理
@@ -363,7 +363,7 @@ am serve --tailscale  # 只监听 Tailscale 地址；tailnet 内的任何设备�
 
 配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
 
-`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面只在标签页关闭前保留你的作答，所以开启后作答会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
+`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面会把作答存在服务端，所以开启后作答不会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
 
 ## 少一点主动
 

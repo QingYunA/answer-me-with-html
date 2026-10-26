@@ -3,11 +3,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
+import { startServer, pageLink } from '../src/serve.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHROME = findChrome();
@@ -304,4 +305,53 @@ test('reply: with the clipboard API refused, the bottom bar still puts the reply
 test('reply: with the clipboard API refused, the sheet still puts the reply on the clipboard', { skip: SKIP }, async () => {
   const r = await copyForReal(`() => { document.querySelector('[data-am="reply"]').click(); return document.querySelector('dialog.am-reply [data-act="copy"]'); }`);
   assert.deepEqual(r, { label: 'Copied ✓', clipboard: '# Re:' });
+});
+
+test('reply: a served page keeps the answers across a server restart', { skip: SKIP }, async () => {
+  const home = join(tmp, 'serve-home');
+  mkdirSync(join(home, 'pages'), { recursive: true });
+  const draft = join(tmp, 'served.md');
+  writeFileSync(draft, DRAFT);
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', join(home, 'pages', 'served.html'), '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
+  });
+  const navigate = async (url) => {
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.navigate', { url });
+    await loaded;
+  };
+  const until = async (check) => {
+    for (let i = 0; i < 60; i += 1) {
+      if (await check()) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
+  };
+  const secretFile = join(tmp, 'serve-secret');
+  let srv = await startServer({ home, port: 0, secretFile });
+  try {
+    await navigate(pageLink(srv, 'pages', 'served.html'));
+    await evaluate(`(() => {
+      document.querySelector('input[value="Memcached"]').click();
+      document.querySelector('#panel-C .am-comment-btn').click();
+      const box = document.querySelector('#panel-C .am-comment textarea');
+      box.value = 'Survives the restart.';
+      box.dispatchEvent(new Event('input'));
+      return true;
+    })()`);
+    assert.ok(await until(() => {
+      try {
+        return readdirSync(join(home, 'serve-state')).length === 1;
+      } catch {
+        return false;
+      }
+    }), 'the page saved its answers to the server');
+    await srv.close();
+    srv = await startServer({ home, port: 0, secretFile });
+    await navigate(pageLink(srv, 'pages', 'served.html'));
+    assert.equal(await evaluate('document.querySelector("input[value=Memcached]").checked'), true, 'the answer is back');
+    assert.equal(await evaluate('document.querySelector("#panel-C .am-comment textarea").value'), 'Survives the restart.');
+  } finally {
+    await srv.close();
+  }
 });
