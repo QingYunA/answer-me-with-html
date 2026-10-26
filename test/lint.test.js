@@ -94,6 +94,8 @@ test('quotations are evidence: their text is not checked, the draft around them 
   assert.deepEqual(rules(lint('## A\n他说：「我们进行优化，综上所述，这一步至关重要，而且尽快登陆系统。」')), [], 'CJK quotes are skipped too');
   assert.deepEqual(rules(lint(`## A\n"One. Two. Three. Four. Five. Six. Seven."`)), [], 'sentences inside a quote do not count for paragraph-length');
   assert.deepEqual(rules(lint('## A\n1. The valve is closed by the operator: "the pump is started by hand".')), ['passive'], 'the step around the quote is still checked');
+  assert.deepEqual(rules(lint('## A\n“Utilize the tool “quoted text” here.')), ['word'], 'an unbalanced opening quote does not hide the prose before a later pair');
+  assert.deepEqual(rules(lint('## A\n`"` Utilize the tool. `"`')), ['word'], 'quote marks inside inline code do not pair with each other across prose');
 });
 
 test('status cells followed by inline code agree with the render: no rows skipped, ok/warn prefix stripped', () => {

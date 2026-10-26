@@ -71,10 +71,12 @@ export function lintDoc(doc, language) {
 }
 
 // A quoted span is evidence, not the draft's own prose: drop it before the rules run. Single quotes stay, because they are usually apostrophes.
-const QUOTED = /"[^"\n]*"|“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|«[^»\n]*»|„[^“\n]*“/g;
+// A span never runs past a second opening mark, so an unbalanced opening quote does not swallow the prose before a later pair.
+const QUOTED = /"[^"\n]*"|“[^“”\n]*”|「[^「」\n]*」|『[^『』\n]*』|«[^«»\n]*»|„[^„“\n]*“/g;
 
 function clean(text) {
-  return stripMath(text.replace(QUOTED, '').replace(/~~[^~]*~~/g, '').replace(/`[^`]*`/g, ''))
+  // Inline code goes first, so a quote mark inside code never pairs with one in the prose.
+  return stripMath(text.replace(/~~[^~]*~~/g, '').replace(/`[^`]*`/g, '').replace(QUOTED, ''))
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, '')

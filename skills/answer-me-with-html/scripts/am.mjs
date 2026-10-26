@@ -8854,9 +8854,9 @@ function lintDoc(doc2, language) {
   }
   return warnings;
 }
-var QUOTED = /"[^"\n]*"|“[^”\n]*”|「[^」\n]*」|『[^』\n]*』|«[^»\n]*»|„[^“\n]*“/g;
+var QUOTED = /"[^"\n]*"|“[^“”\n]*”|「[^「」\n]*」|『[^『』\n]*』|«[^«»\n]*»|„[^„“\n]*“/g;
 function clean(text2) {
-  return stripMath(text2.replace(QUOTED, "").replace(/~~[^~]*~~/g, "").replace(/`[^`]*`/g, "")).replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/<[^>]+>/g, "").replace(/[*_]{1,3}/g, "");
+  return stripMath(text2.replace(/~~[^~]*~~/g, "").replace(/`[^`]*`/g, "").replace(QUOTED, "")).replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/<[^>]+>/g, "").replace(/[*_]{1,3}/g, "");
 }
 function lintMarkdown(text2, startLine, out, family) {
   let para = null;
