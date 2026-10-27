@@ -12404,8 +12404,8 @@ Usage:
   am patch <html-file> --panel <title> -
 
 - Reads the source draft from the hidden <textarea id="am-source"> in <html-file>.
-- --panel matches a ## section's title, its letter ID, or "ID title".
-- The new draft comes from stdin or from --from / a second file argument: it may include the ## heading or only the panel body.
+- --panel matches a ## section's title, its letter ID, or "ID title". An explicit ID (## B Title) stays the same when the title changes; an automatic ID moves when a panel before it is added or removed.
+- The new draft comes from stdin or from --from / a second file argument: it may include the ## heading or only the panel body. A new ## heading renames the panel.
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;

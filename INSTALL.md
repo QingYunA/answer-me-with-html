@@ -77,6 +77,10 @@ npx -y skills add QingYunA/answer-me-with-html -g -y -a <your agent name>
 
 You know which agent you are. Use the name that `npx -y skills add --help` documents for it. For Claude Code it is `claude-code`. If the installer does not know your name, do not guess and do not ask me: stop this step and put the error in the report, with the "Manual install" link from the README.
 
+There is no npm package: `npm install answer-me-with-html` does not work. The command above is the only way to install the skill.
+
+With `-a '*'` (all agents), the installer ends with lines such as `Failed to install 2 - Eve: Eve does not support global skill installation`. That is expected: those agents were skipped, and the skill is still installed. Step 4 decides whether the install works.
+
 This installs the skill only. It works the same way, but there are no slash commands. Settings are changed with `/answer-me-with-html config` (note the space), or `am config` in a terminal. Codex and Cursor have their own plugin systems, but this repository does not ship a plugin for them yet. Do not try to install one.
 
 ### DeepSeek Harness (DSH)
@@ -129,5 +133,7 @@ Send one message. Keep it to these lines:
 | The same instructions appear twice | The skill and the plugin are both installed. Report it; do not remove either. |
 | `node: command not found`, or Node older than 20 | Go back to Step 1 and offer to install it. |
 | `npx` cannot reach the network | Report it, with the "Manual install" link from the README. |
+| `Failed to install N - <agent>: <agent> does not support global skill installation` | Not a failure. With `-a '*'` the installer skips agents that have no global skills. If Step 4 prints a version, the install works. |
+| `npm install answer-me-with-html` returns 404 | There is no npm package. Install with `npx -y skills add` (Step 3). |
 
 EXECUTE NOW: complete the TODO list above to achieve: `am --version` prints a version number and the agent can see the skill. Do not ask me anything except the Node.js question in Step 1; send the final report.
