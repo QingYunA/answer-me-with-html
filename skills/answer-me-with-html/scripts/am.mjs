@@ -43,6 +43,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 code, pre, kbd { font-family: var(--font-mono); }
+/* Korean is written with spaces between words, so break lines at the spaces, not between syllables. A word longer than the line still breaks. */
+:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+:lang(ko) pre, :lang(ko) code { word-break: normal; }
 
 /* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .am-toolbar {
@@ -232,7 +235,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 }
 
 /* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.am-status { white-space: nowrap; font-weight: 500; }
+/* A long note wraps beside its icon, so it does not push the table past a narrow panel. */
+.am-status { display: inline-flex; font-weight: 500; }
+.am-status-icon { flex: none; }
 .am-status--ok { color: var(--ok); }
 .am-status--no { color: var(--err); }
 .am-status--warn { color: var(--warn); }
