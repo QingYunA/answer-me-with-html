@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, mkdirSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -112,6 +112,14 @@ test('cli export: a PDF path that is the input page is refused', { skip: typeof 
   assert.equal(readFileSync(join(dir, 'same-page.html'), 'utf8'), html, 'a hard link does not overwrite the page');
 });
 
+test('cli export: a PDF named like one of the PNG slices is refused', { skip: typeof WebSocket === 'undefined' && 'needs Node 22 (built-in WebSocket)' }, async () => {
+  writeFileSync(join(dir, 'clash.html'), '<html><body><p>clash</p></body></html>');
+  const r = await run(['export', 'clash.html', '--pdf', 'shots/clash-1.png', '--png', 'shots']);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /has the name of a PNG slice/);
+  assert.ok(!existsSync(join(dir, 'shots')), 'nothing is written');
+});
+
 test('cli export: a missing or non-HTML input exits 2', async () => {
   const missing = await run(['export', 'nope.html', '--pdf', 'out.pdf']);
   assert.equal(missing.code, 2);
@@ -157,6 +165,17 @@ Plain text in the first panel.
 Ask -> Reply: answer
 \`\`\`
 `;
+
+test('e2e: a PNG slice path that links to the page is refused, and the page is kept', { skip: SKIP || (process.platform === 'win32' && 'symlinks need privileges on Windows'), timeout: 120000 }, async () => {
+  const { html } = renderDoc(DRAFT);
+  writeFileSync(join(dir, 'linked.html'), html);
+  mkdirSync(join(dir, 'linked-png'), { recursive: true });
+  symlinkSync(join(dir, 'linked.html'), join(dir, 'linked-png', 'linked-1.png'));
+  const r = await run(['export', 'linked.html', '--png', 'linked-png'], { env: { AM_CHROME: CHROME } });
+  assert.equal(r.code, 1, r.err);
+  assert.match(r.err, /is the input page/);
+  assert.equal(readFileSync(join(dir, 'linked.html'), 'utf8'), html, 'the page is not overwritten');
+});
 
 test('e2e: am export writes an A4 PDF and PNG slices at 2400 px wide', { skip: SKIP, timeout: 120000 }, async () => {
   const { html } = renderDoc(DRAFT);

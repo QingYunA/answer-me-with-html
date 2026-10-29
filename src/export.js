@@ -3,7 +3,7 @@
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
 
@@ -59,6 +59,10 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
   // The page holds the source draft in #am-source, so writing the PDF over it would lose the draft.
   if (pdf && existsSync(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
+  }
+  // A PDF named like a PNG slice in the --png folder would be overwritten by that slice.
+  if (pdf && png && resolve(dirname(pdf)) === resolve(png) && new RegExp(`^${escapeRe(sliceName(file))}-\\d+\\.png$`).test(basename(pdf))) {
+    throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
   if (!chrome) throw new ExportError('No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable');
@@ -148,7 +152,7 @@ async function writePngSlices(page, htmlFile, folder) {
   }
 
   const cuts = slicePoints(layout.height, layout.boxes, MAX_SLICE);
-  const name = basename(htmlFile).replace(/\.html?$/i, '') || 'page';
+  const name = sliceName(htmlFile);
   const bounds = [0, ...cuts, layout.height];
   const written = [];
   for (let i = 1; i < bounds.length; i++) {
@@ -162,6 +166,8 @@ async function writePngSlices(page, htmlFile, folder) {
       clip: { x: 0, y: top, width: VIEWPORT, height, scale: 1 },
     });
     const file = join(folder, `${name}-${i}.png`);
+    // A slice path that is a link to the page would write PNG bytes over the page.
+    if (existsSync(file) && sameFile(file, htmlFile)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync(file, Buffer.from(data, 'base64'));
     } catch (e) {
@@ -184,6 +190,10 @@ const settle = (page) => page.evaluate(`(async () => {
 export function isHtmlPage(file) {
   return /\.html?$/i.test(file) && statSync(file, { throwIfNoEntry: false })?.isFile() === true;
 }
+
+// The PNG slices of page.html are page-1.png, page-2.png ...
+const sliceName = (htmlFile) => basename(htmlFile).replace(/\.html?$/i, '') || 'page';
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // The same file on disk: a symlink or a hard link to the page is the page, so compare the device and inode, not the path.
 const sameFile = (a, b) => {

@@ -205,7 +205,7 @@ am export page.html --pdf page.pdf --png out/
 - `--pdf`：按页面自己的 `@media print` 规则印成 A4，保留背景色，不加页眉页脚。
 - `--png`：用屏幕媒体、1200 CSS px 宽、2 倍像素（2400 px）渲染，隐藏工具栏、回复和批注按钮、新版本提示等交互部件，再切成每张不超过 1800 CSS px 高的切片。切口落在面板之间的空隙里；高过 1800 CSS px 的面板会按上限切开，文字可能分到两张 PNG 里。目录不存在时会创建。
 - 两个参数至少要给一个。页面必须是已存在的 `.html` 文件。
-- 需要 Chrome / Chromium / Edge，和 `am video --mp4` / `--webm` 一样；不在常见位置时用 `AM_CHROME` 指定。
+- 需要 Chrome / Chromium / Edge 和 Node.js 22 或更新版本（内置 `WebSocket`），和 `am video --mp4` / `--webm` 一样；不在常见位置时用 `AM_CHROME` 指定。
 - PDF 或 PNG 是图片：页面上的回复、批注、主题切换和 Before/After 切换在图片里都不能用。
 
 ## 语言
