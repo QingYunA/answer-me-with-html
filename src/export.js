@@ -2,7 +2,7 @@
 // file:// URL in the system Chrome (no npm dependency), printed with its own @media print rules, and captured in screen
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
-import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
@@ -57,7 +57,7 @@ function gapCut(start, target, boxes) {
 export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {} } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('Export needs Node.js 22 or later (built-in WebSocket)');
   // The page holds the source draft in #am-source, so writing the PDF over it would lose the draft.
-  if (pdf && existsSync(pdf) && realpathSync(pdf) === realpathSync(file)) {
+  if (pdf && existsSync(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -184,5 +184,12 @@ const settle = (page) => page.evaluate(`(async () => {
 export function isHtmlPage(file) {
   return /\.html?$/i.test(file) && statSync(file, { throwIfNoEntry: false })?.isFile() === true;
 }
+
+// The same file on disk: a symlink or a hard link to the page is the page, so compare the device and inode, not the path.
+const sameFile = (a, b) => {
+  const x = statSync(a);
+  const y = statSync(b);
+  return x.dev === y.dev && x.ino === y.ino;
+};
 
 const isPath = (value) => value.includes('/') || value.includes('\\');

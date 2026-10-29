@@ -11365,7 +11365,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, mkdirSync as mkdirSync4, realpathSync as realpathSync3, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
 import { basename as basename3, dirname as dirname2, join as join10 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
@@ -11402,7 +11402,7 @@ function gapCut(start, target, boxes) {
 async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
 } } = {}) {
   if (typeof WebSocket === "undefined") throw new ExportError("Export needs Node.js 22 or later (built-in WebSocket)");
-  if (pdf && existsSync6(pdf) && realpathSync3(pdf) === realpathSync3(file)) {
+  if (pdf && existsSync6(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -11519,6 +11519,11 @@ var settle2 = (page) => page.evaluate(`(async () => {
 function isHtmlPage(file) {
   return /\.html?$/i.test(file) && statSync4(file, { throwIfNoEntry: false })?.isFile() === true;
 }
+var sameFile = (a, b) => {
+  const x2 = statSync4(a);
+  const y2 = statSync4(b);
+  return x2.dev === y2.dev && x2.ino === y2.ino;
+};
 var isPath = (value) => value.includes("/") || value.includes("\\");
 
 // src/housekeeping.js

@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -104,6 +104,12 @@ test('cli export: a PDF path that is the input page is refused', { skip: typeof 
   assert.equal(r.code, 1);
   assert.match(r.err, /is the input page/);
   assert.equal(readFileSync(join(dir, 'same-page.html'), 'utf8'), html, 'the page is not overwritten');
+  // A hard link has its own path but shares the page's inode, so writing the PDF there would replace the page too.
+  linkSync(join(dir, 'same-page.html'), join(dir, 'same-page-link.pdf'));
+  const linked = await run(['export', 'same-page.html', '--pdf', 'same-page-link.pdf']);
+  assert.equal(linked.code, 1);
+  assert.match(linked.err, /is the input page/);
+  assert.equal(readFileSync(join(dir, 'same-page.html'), 'utf8'), html, 'a hard link does not overwrite the page');
 });
 
 test('cli export: a missing or non-HTML input exits 2', async () => {
