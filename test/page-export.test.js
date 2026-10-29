@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -72,6 +72,40 @@ test('cli export: no --pdf or --png is a usage error', async () => {
   assert.equal(r.out, '');
 });
 
+test('cli export: an empty --pdf or --png value exits 2', async () => {
+  for (const flag of ['--pdf=', '--png=']) {
+    const r = await run(['export', 'page.html', flag]);
+    assert.equal(r.code, 2);
+    assert.match(r.err, new RegExp(`${flag.slice(0, -1)} needs a path`));
+    assert.equal(r.out, '');
+  }
+});
+
+test('cli export: an unreadable page path exits 2 with a readable error', { skip: (process.platform === 'win32' || process.getuid?.() === 0) ? 'needs a non-root POSIX user' : false }, async () => {
+  const locked = join(dir, 'locked');
+  mkdirSync(locked);
+  writeFileSync(join(locked, 'page.html'), '<html><body></body></html>');
+  chmodSync(locked, 0o000);
+  try {
+    const r = await run(['export', 'locked/page.html', '--pdf', 'out.pdf']);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /Cannot read the page locked\/page\.html/);
+    assert.doesNotMatch(r.err, /Internal error/);
+    assert.equal(r.out, '');
+  } finally {
+    chmodSync(locked, 0o700);
+  }
+});
+
+test('cli export: a PDF path that is the input page is refused', { skip: typeof WebSocket === 'undefined' && 'needs Node 22 (built-in WebSocket)' }, async () => {
+  const html = '<html><body><p>source</p></body></html>';
+  writeFileSync(join(dir, 'same-page.html'), html);
+  const r = await run(['export', 'same-page.html', '--pdf', 'same-page.html']);
+  assert.equal(r.code, 1);
+  assert.match(r.err, /is the input page/);
+  assert.equal(readFileSync(join(dir, 'same-page.html'), 'utf8'), html, 'the page is not overwritten');
+});
+
 test('cli export: a missing or non-HTML input exits 2', async () => {
   const missing = await run(['export', 'nope.html', '--pdf', 'out.pdf']);
   assert.equal(missing.code, 2);
@@ -126,6 +160,10 @@ test('e2e: am export writes an A4 PDF and PNG slices at 2400 px wide', { skip: S
 
   const pdf = readFileSync(join(dir, 'out/export-test.pdf'));
   assert.equal(pdf.subarray(0, 4).toString(), '%PDF', 'the PDF starts with %PDF');
+  const mediaBox = pdf.toString('latin1').match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/);
+  assert.ok(mediaBox, 'the PDF has a MediaBox');
+  assert.ok(Math.abs(Number(mediaBox[1]) - 595.28) < 1, `A4 width, got ${mediaBox[1]}`);
+  assert.ok(Math.abs(Number(mediaBox[2]) - 841.89) < 1, `A4 height, got ${mediaBox[2]}`);
 
   const pngs = readdirSync(join(dir, 'png'))
     .filter((f) => f.endsWith('.png'))
@@ -140,4 +178,10 @@ test('e2e: am export writes an A4 PDF and PNG slices at 2400 px wide', { skip: S
   }
   assert.match(r.out, /✓ .*export-test\.pdf/);
   assert.match(r.out, /✓ .*export-test-1\.png/);
+
+  writeFileSync(join(dir, 'empty.html'), '<!doctype html><html><body></body></html>');
+  const empty = await run(['export', 'empty.html', '--png', 'empty-png'], { env: { AM_CHROME: CHROME } });
+  assert.equal(empty.code, 1);
+  assert.match(empty.err, /The page is empty/);
+  assert.equal(existsSync(join(dir, 'empty-png')), false, 'no PNG folder for an empty page');
 });

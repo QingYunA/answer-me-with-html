@@ -11067,6 +11067,7 @@ var ExportError = class extends Error {
 };
 var CDP_TIMEOUT_MS = 3e4;
 var CHROME_START_TIMEOUT_MS = 2e4;
+var LOAD_TIMEOUT_MS = 3e4;
 var CHROME_PATHS = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -11080,11 +11081,15 @@ var CHROME_PATHS = {
   ],
   linux: ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "microsoft-edge"]
 };
+function chromePaths(platform = process.platform, env = process.env) {
+  const list2 = [...CHROME_PATHS[platform] ?? CHROME_PATHS.linux];
+  if (platform === "win32" && env.LOCALAPPDATA) list2.push(`${env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`);
+  return list2;
+}
 function findChrome(env = process.env, platform = process.platform) {
   const custom = env.AM_CHROME || env.CHROME_PATH;
   if (custom) return custom;
-  const list2 = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
-  return list2.find((p) => p.includes("/") || p.includes("\\") ? existsSync5(p) : hasCommand(p)) ?? null;
+  return chromePaths(platform, env).find((p) => p.includes("/") || p.includes("\\") ? existsSync5(p) : hasCommand(p)) ?? null;
 }
 async function openPage(url, {
   env = process.env,
@@ -11141,7 +11146,7 @@ async function openPage(url, {
     await page("Page.enable");
     const loaded = cdp.once("Page.loadEventFired");
     await page("Page.navigate", { url });
-    await loaded;
+    await waitForLoad(loaded);
     const evaluate = async (expression) => {
       const r = await page("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
       if (r.exceptionDetails) throw new ExportError(`${scriptError}: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
@@ -11152,6 +11157,15 @@ async function openPage(url, {
     await close();
     throw e;
   }
+}
+function waitForLoad(loaded, timeoutMs = LOAD_TIMEOUT_MS) {
+  let timer;
+  return Promise.race([
+    loaded,
+    new Promise((_2, reject) => {
+      timer = setTimeout(() => reject(new ExportError(`The page did not finish loading within ${timeoutMs / 1e3} seconds`)), timeoutMs);
+    })
+  ]).finally(() => clearTimeout(timer));
 }
 function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
   return new Promise((resolve5, reject) => {
@@ -11351,7 +11365,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync6, mkdirSync as mkdirSync4, realpathSync as realpathSync3, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
 import { basename as basename3, dirname as dirname2, join as join10 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
@@ -11388,6 +11402,9 @@ function gapCut(start, target, boxes) {
 async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
 } } = {}) {
   if (typeof WebSocket === "undefined") throw new ExportError("Export needs Node.js 22 or later (built-in WebSocket)");
+  if (pdf && existsSync6(pdf) && realpathSync3(pdf) === realpathSync3(file)) {
+    throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
+  }
   const chrome = findChrome(env);
   if (!chrome) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
   if (isPath(chrome) && !existsSync6(chrome)) {
@@ -11424,6 +11441,8 @@ async function writePdf(page, file) {
   await settle2(page);
   const { data } = await page.page("Page.printToPDF", {
     printBackground: true,
+    // Part of the agreed contract: a page's own @page rules win. A page written by am has no @page size, so it prints
+    // on the A4 paper below; an html fence that sets @page is the author's explicit choice.
     preferCSSPageSize: true,
     displayHeaderFooter: false,
     paperWidth: 8.27,
@@ -11453,13 +11472,14 @@ async function writePngSlices(page, htmlFile, folder) {
       return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
     };
     return {
+      empty: document.body.children.length === 0 && !document.body.textContent.trim(),
       height: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)),
       boxes: [...document.querySelectorAll('.am-head, .am-panel')]
         .filter((el) => el.getClientRects().length)
         .map(box),
     };
   })()`);
-  if (!layout4.height) throw new ExportError("The page is empty: there is nothing to export");
+  if (layout4.empty) throw new ExportError("The page is empty: there is nothing to export");
   try {
     mkdirSync4(folder, { recursive: true });
     if (!statSync4(folder).isDirectory()) throw new Error("not a folder");
@@ -12598,7 +12618,8 @@ Usage:
 - The page must be an existing .html file, opened as a file:// URL; am export does not change it.
 - --pdf writes an A4 PDF with the page's own print rules (@media print), background colors, no header and no footer.
 - --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
-  A cut falls in a horizontal gap, never through a panel; the toolbar, the reply and remark controls and the new-version notice are left out.
+  A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
+  The toolbar, the reply and remark controls and the new-version notice are left out.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
@@ -12742,6 +12763,11 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
 }
 async function cmdExport(arg, opts, ctx) {
   const { fail, print, env, io } = ctx;
+  const empty = opts.pdf === "" ? "--pdf" : opts.png === "" ? "--png" : null;
+  if (empty) {
+    fail(`\u2717 ${empty} needs a path`);
+    return 2;
+  }
   if (opts.pdf === void 0 && opts.png === void 0) {
     fail("\u2717 export needs --pdf <file.pdf> or --png <dir>\n\n  am export <page.html> --pdf <file.pdf> | --png <dir>");
     return 2;
@@ -12752,7 +12778,14 @@ async function cmdExport(arg, opts, ctx) {
   }
   const cwd = io.cwd ?? process.cwd();
   const file = resolve4(cwd, arg);
-  if (!isHtmlPage(file)) {
+  let isPage;
+  try {
+    isPage = isHtmlPage(file);
+  } catch (e) {
+    fail(`\u2717 Cannot read the page ${arg}: ${e.message}`);
+    return 2;
+  }
+  if (!isPage) {
     fail(`\u2717 ${arg} is not an existing .html file: am export takes a page am render wrote`);
     return 2;
   }

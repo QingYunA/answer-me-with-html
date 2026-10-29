@@ -11,6 +11,7 @@ export class ExportError extends Error {}
 
 const CDP_TIMEOUT_MS = 30000;
 const CHROME_START_TIMEOUT_MS = 20000;
+const LOAD_TIMEOUT_MS = 30000;   // a page that waits forever on a subresource becomes a readable failure
 
 const CHROME_PATHS = {
   darwin: [
@@ -26,11 +27,18 @@ const CHROME_PATHS = {
   linux: ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'microsoft-edge'],
 };
 
+// The candidate paths for a platform. Windows also has a per-user Chrome under %LOCALAPPDATA%; the system-wide
+// Program Files paths stay first. Pure, so the Windows list is testable on any platform.
+export function chromePaths(platform = process.platform, env = process.env) {
+  const list = [...(CHROME_PATHS[platform] ?? CHROME_PATHS.linux)];
+  if (platform === 'win32' && env.LOCALAPPDATA) list.push(`${env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`);
+  return list;
+}
+
 export function findChrome(env = process.env, platform = process.platform) {
   const custom = env.AM_CHROME || env.CHROME_PATH;
   if (custom) return custom;
-  const list = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
-  return list.find((p) => (p.includes('/') || p.includes('\\') ? existsSync(p) : hasCommand(p))) ?? null;
+  return chromePaths(platform, env).find((p) => (p.includes('/') || p.includes('\\') ? existsSync(p) : hasCommand(p))) ?? null;
 }
 
 // Start Chrome with a throwaway profile and open one page in it. Every caller exports one page, so this owns the target,
@@ -85,9 +93,10 @@ export async function openPage(url, {
     if (width) await page('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor, mobile: false });
     if (media) await page('Emulation.setEmulatedMedia', { media });
     await page('Page.enable');
+    // about:blank is already loaded, and Page.enable does not replay its load event, so this waiter is the navigation's.
     const loaded = cdp.once('Page.loadEventFired');
     await page('Page.navigate', { url });
-    await loaded;
+    await waitForLoad(loaded);
     const evaluate = async (expression) => {
       const r = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
       if (r.exceptionDetails) throw new ExportError(`${scriptError}: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
@@ -98,6 +107,19 @@ export async function openPage(url, {
     await close();
     throw e;
   }
+}
+
+// Resolve when the page's load event arrives, or fail after timeoutMs. Without the timer, a page whose script or
+// subresource never finishes keeps Chrome and the CLI alive with no output; the rejection reaches openPage's catch,
+// which closes Chrome. The timer is cleared when the load event wins, so it never holds the process open.
+export function waitForLoad(loaded, timeoutMs = LOAD_TIMEOUT_MS) {
+  let timer;
+  return Promise.race([
+    loaded,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new ExportError(`The page did not finish loading within ${timeoutMs / 1000} seconds`)), timeoutMs);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 
 // Waits for Chrome to print its DevTools URL. A failure message carries the end of Chrome's stderr,

@@ -10,6 +10,7 @@ import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '..
 import { renderVideo, captionHtml, formatClock } from '../src/video/render.js';
 import { readWav, wav, mixTrack, trimSilence, synthAll, pickProvider, parseMacVoices, macVoiceFor, parseEspeakVoices, espeakVoiceFor, TtsError, SAMPLE_RATE } from '../src/video/tts.js';
 import { findChrome, connect, devtoolsUrl } from '../src/video/export.js';
+import { chromePaths } from '../src/chrome.js';
 import { renderDoc } from '../src/render.js';
 import { ParseError } from '../src/parse.js';
 import { COMPONENTS } from '../src/components/index.js';
@@ -666,6 +667,13 @@ test('cli help video / config voice', async () => {
 
 test('findChrome: AM_CHROME wins', () => {
   assert.equal(findChrome({ AM_CHROME: '/x/chrome' }), '/x/chrome');
+});
+
+test('chromePaths: Windows includes the per-user Chrome install under LOCALAPPDATA', () => {
+  const local = 'C:\\Users\\me\\AppData\\Local';
+  assert.ok(chromePaths('win32', { LOCALAPPDATA: local }).includes(`${local}\\Google\\Chrome\\Application\\chrome.exe`));
+  assert.ok(!chromePaths('win32', {}).some((p) => p.includes('AppData\\Local')));
+  assert.ok(!chromePaths('darwin', { LOCALAPPDATA: local }).some((p) => p.includes('AppData')));
 });
 
 // ── End to end: real system TTS + Chrome + ffmpeg. Slow; runs only with AM_E2E=1. ──

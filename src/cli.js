@@ -453,7 +453,8 @@ Usage:
 - The page must be an existing .html file, opened as a file:// URL; am export does not change it.
 - --pdf writes an A4 PDF with the page's own print rules (@media print), background colors, no header and no footer.
 - --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
-  A cut falls in a horizontal gap, never through a panel; the toolbar, the reply and remark controls and the new-version notice are left out.
+  A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
+  The toolbar, the reply and remark controls and the new-version notice are left out.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
@@ -607,6 +608,11 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
 
 async function cmdExport(arg, opts, ctx) {
   const { fail, print, env, io } = ctx;
+  const empty = opts.pdf === '' ? '--pdf' : opts.png === '' ? '--png' : null;
+  if (empty) {
+    fail(`✗ ${empty} needs a path`);
+    return 2;
+  }
   if (opts.pdf === undefined && opts.png === undefined) {
     fail('✗ export needs --pdf <file.pdf> or --png <dir>\n\n  am export <page.html> --pdf <file.pdf> | --png <dir>');
     return 2;
@@ -617,7 +623,14 @@ async function cmdExport(arg, opts, ctx) {
   }
   const cwd = io.cwd ?? process.cwd();
   const file = resolve(cwd, arg);
-  if (!isHtmlPage(file)) {
+  let isPage;
+  try {
+    isPage = isHtmlPage(file);
+  } catch (e) {
+    fail(`✗ Cannot read the page ${arg}: ${e.message}`);
+    return 2;
+  }
+  if (!isPage) {
     fail(`✗ ${arg} is not an existing .html file: am export takes a page am render wrote`);
     return 2;
   }

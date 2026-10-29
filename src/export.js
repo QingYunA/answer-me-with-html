@@ -2,7 +2,7 @@
 // file:// URL in the system Chrome (no npm dependency), printed with its own @media print rules, and captured in screen
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
@@ -22,9 +22,10 @@ const CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comm
 }`;
 
 // Where to cut a page of pageHeight CSS px into slices no taller than maxHeight, without cutting through a panel or the
-// header. boxes are the page's block boxes ({top, bottom} in CSS px). A cut is moved up to the top of the block it would
-// cross, which is a horizontal gap; when even that top is at or above the previous cut (one block taller than the limit),
-// the cut falls back to the limit. Returns the cut y values; the slices are [0, cut1], [cut1, cut2], ...
+// header when a gap exists. boxes are the page's block boxes ({top, bottom} in CSS px). A cut is moved up to the top of
+// the block it would cross, which is a horizontal gap; when even that top is at or above the previous cut (one block
+// taller than the limit), the cut falls back to the limit and may split that block. Returns the cut y values; the slices
+// are [0, cut1], [cut1, cut2], ...
 export function slicePoints(pageHeight, boxes = [], maxHeight = MAX_SLICE) {
   const limit = Math.floor(maxHeight);
   if (!(limit > 0)) throw new RangeError('maxHeight must be greater than 0');
@@ -55,6 +56,10 @@ function gapCut(start, target, boxes) {
 // Write the PDF and/or the PNG slices and return the files written, in that order. The CLI prints them.
 export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {} } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('Export needs Node.js 22 or later (built-in WebSocket)');
+  // The page holds the source draft in #am-source, so writing the PDF over it would lose the draft.
+  if (pdf && existsSync(pdf) && realpathSync(pdf) === realpathSync(file)) {
+    throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
+  }
   const chrome = findChrome(env);
   if (!chrome) throw new ExportError('No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable');
   // A custom path is used as given, so a typo would only show up as a spawn error that does not name the variable to fix.
@@ -94,6 +99,8 @@ async function writePdf(page, file) {
   await settle(page);
   const { data } = await page.page('Page.printToPDF', {
     printBackground: true,
+    // Part of the agreed contract: a page's own @page rules win. A page written by am has no @page size, so it prints
+    // on the A4 paper below; an html fence that sets @page is the author's explicit choice.
     preferCSSPageSize: true,
     displayHeaderFooter: false,
     paperWidth: 8.27,   // A4, 210 x 297 mm
@@ -124,13 +131,14 @@ async function writePngSlices(page, htmlFile, folder) {
       return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
     };
     return {
+      empty: document.body.children.length === 0 && !document.body.textContent.trim(),
       height: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)),
       boxes: [...document.querySelectorAll('.am-head, .am-panel')]
         .filter((el) => el.getClientRects().length)
         .map(box),
     };
   })()`);
-  if (!layout.height) throw new ExportError('The page is empty: there is nothing to export');
+  if (layout.empty) throw new ExportError('The page is empty: there is nothing to export');
 
   try {
     mkdirSync(folder, { recursive: true });
