@@ -12625,14 +12625,21 @@ function themeWarnings({ fail, themes: themes2 }) {
 }
 function outputPath(dir, title, opts, { env, io, fail }) {
   if (opts.out) {
-    const file = resolve4(io.cwd ?? process.cwd(), opts.out);
-    if (statSync4(file, { throwIfNoEntry: false })?.isDirectory()) {
+    const file2 = resolve4(io.cwd ?? process.cwd(), opts.out);
+    if (statSync4(file2, { throwIfNoEntry: false })?.isDirectory()) {
       fail("\u2717 -o names a folder; give a file path, for example -o page.html");
       return null;
     }
-    return file;
+    return file2;
   }
-  return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return opts.replace === void 0 ? unusedPagePath(file) : file;
+}
+function unusedPagePath(file) {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? file : file.replace(/\.html$/, `-${n}.html`);
+    if (!existsSync7(candidate)) return candidate;
+  }
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
@@ -12973,8 +12980,12 @@ ${comp.example}`);
   return 0;
 }
 function slug(title) {
-  const s = String(title || "page").trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
-  return s || "page";
+  const s = String(title || "").replace(/[^A-Za-z0-9]+/g, "-").toLowerCase().replace(/^-+|-+$/g, "");
+  if (!s) return "page";
+  if (s.length <= 24) return s;
+  const cut = s.slice(0, 24);
+  const at3 = cut.lastIndexOf("-");
+  return at3 > 0 ? cut.slice(0, at3) : cut;
 }
 function stamp(d) {
   const p = (n) => String(n).padStart(2, "0");
