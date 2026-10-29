@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, mkdirSync as mkdirSync4, existsSync as existsSync7, rmSync as rmSync7, statSync as statSync4 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync8, mkdirSync as mkdirSync5, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync5 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.10";
@@ -1357,8 +1357,8 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join11, resolve as resolve4, dirname as dirname3, basename as basename4, extname as extname3, sep as sep4 } from "node:path";
-import { spawn as spawn4 } from "node:child_process";
+import { join as join13, resolve as resolve4, dirname as dirname4, basename as basename5, extname as extname3, sep as sep4 } from "node:path";
+import { spawn as spawn5 } from "node:child_process";
 
 // src/languages/zh.js
 var zh_default = {
@@ -11053,21 +11053,20 @@ ${sourceTag(source)}
 }
 
 // src/video/export.js
+import { spawn as spawn3 } from "node:child_process";
+import { writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join9 } from "node:path";
+import { pathToFileURL } from "node:url";
+
+// src/chrome.js
 import { spawn as spawn2 } from "node:child_process";
-import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4, writeFileSync as writeFileSync5 } from "node:fs";
+import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
 import { join as join8 } from "node:path";
-import { pathToFileURL } from "node:url";
 var ExportError = class extends Error {
 };
 var CDP_TIMEOUT_MS = 3e4;
 var CHROME_START_TIMEOUT_MS = 2e4;
-var WIDTH = 1920;
-var HEIGHT = 1080;
-var QUALITY = 92;
-var WEBM_BITRATE = 35e5;
-var WEBM_SLICE = 1048572;
-var WEBM_POLL_MS = 250;
 var CHROME_PATHS = {
   darwin: [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -11087,10 +11086,19 @@ function findChrome(env = process.env, platform = process.platform) {
   const list2 = CHROME_PATHS[platform] ?? CHROME_PATHS.linux;
   return list2.find((p) => p.includes("/") || p.includes("\\") ? existsSync5(p) : hasCommand(p)) ?? null;
 }
-async function openPlayer(htmlFile, { env, startTimeoutMs }) {
-  const chromePath = findChrome(env);
+async function openPage(url, {
+  env = process.env,
+  chromePath = findChrome(env),
+  startTimeoutMs = CHROME_START_TIMEOUT_MS,
+  width,
+  height = 900,
+  deviceScaleFactor = 1,
+  media,
+  flags = [],
+  scriptError = "Page script error"
+} = {}) {
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join8(tmpdir3(), "am-export-"));
+  const tmp = mkdtempSync2(join8(tmpdir3(), "am-chrome-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
@@ -11099,8 +11107,8 @@ async function openPlayer(htmlFile, { env, startTimeoutMs }) {
     "--no-default-browser-check",
     "--hide-scrollbars",
     "--mute-audio",
-    "--force-device-scale-factor=1",
-    `--window-size=${WIDTH},${HEIGHT}`,
+    ...width ? [`--force-device-scale-factor=${deviceScaleFactor}`, `--window-size=${width},${height}`] : [],
+    ...flags,
     "about:blank"
   ], { stdio: ["ignore", "ignore", "pipe"] });
   let cdp = null;
@@ -11128,126 +11136,21 @@ async function openPlayer(htmlFile, { env, startTimeoutMs }) {
     const { targetId } = await cdp.send("Target.createTarget", { url: "about:blank" });
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
     const page = (method, params) => cdp.send(method, params, sessionId);
-    await page("Emulation.setDeviceMetricsOverride", { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1, mobile: false });
+    if (width) await page("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor, mobile: false });
+    if (media) await page("Emulation.setEmulatedMedia", { media });
     await page("Page.enable");
     const loaded = cdp.once("Page.loadEventFired");
-    await page("Page.navigate", { url: pathToFileURL(htmlFile).href });
+    await page("Page.navigate", { url });
     await loaded;
     const evaluate = async (expression) => {
       const r = await page("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
-      if (r.exceptionDetails) throw new ExportError(`Player page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
+      if (r.exceptionDetails) throw new ExportError(`${scriptError}: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
       return r.result.value;
     };
-    const info = await evaluate("document.fonts.ready.then(() => { window.__amv.exportMode(); return { duration: window.__amv.duration, fps: window.__amv.fps }; })");
-    const screenshot = async () => (await page("Page.captureScreenshot", { format: "jpeg", quality: QUALITY, clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT, scale: 1 } })).data;
-    return { info, evaluate, screenshot, close, tmp };
+    return { page, evaluate, close, tmp, chrome };
   } catch (e) {
     await close();
     throw e;
-  }
-}
-async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onProgress = () => {
-}, startTimeoutMs = CHROME_START_TIMEOUT_MS } = {}) {
-  if (typeof WebSocket === "undefined") throw new ExportError("MP4 export needs Node.js 22 or later (built-in WebSocket)");
-  if (!hasCommand("ffmpeg")) throw new ExportError("MP4 export needs ffmpeg: on macOS run brew install ffmpeg; on Linux install it with the package manager");
-  const player = await openPlayer(htmlFile, { env, startTimeoutMs });
-  try {
-    const { info, evaluate, screenshot, tmp } = player;
-    const wavFile = wav2 ? join8(tmp, "voice.wav") : null;
-    if (wav2) writeFileSync5(wavFile, wav2);
-    const ffmpeg = spawn2("ffmpeg", [
-      "-y",
-      "-loglevel",
-      "error",
-      "-f",
-      "image2pipe",
-      "-framerate",
-      String(info.fps),
-      "-c:v",
-      "mjpeg",
-      "-i",
-      "-",
-      ...wavFile ? ["-i", wavFile] : [],
-      "-c:v",
-      "libx264",
-      "-pix_fmt",
-      "yuv420p",
-      "-crf",
-      "20",
-      "-preset",
-      "medium",
-      ...wavFile ? ["-c:a", "aac", "-b:a", "160k", "-shortest"] : [],
-      "-movflags",
-      "+faststart",
-      mp4File
-    ], { stdio: ["pipe", "ignore", "pipe"] });
-    let ffErr = "";
-    let exited = false;
-    ffmpeg.stderr.on("data", (d) => {
-      ffErr += d;
-    });
-    ffmpeg.stdin.on("error", () => {
-    });
-    const done = new Promise((resolve5, reject) => {
-      ffmpeg.on("error", (e) => {
-        exited = true;
-        reject(new ExportError(`Cannot run ffmpeg: ${e.message}`));
-      });
-      ffmpeg.on("close", (code) => {
-        exited = true;
-        if (code === 0) resolve5();
-        else reject(new ExportError(`ffmpeg failed (${code}): ${ffErr.slice(0, 300)}`));
-      });
-    });
-    done.catch(() => {
-    });
-    const frames = Math.ceil(info.duration * info.fps);
-    for (let i = 0; i < frames && !exited; i++) {
-      await evaluate(`render(${i / info.fps})`);
-      const data = await screenshot();
-      if (exited) break;
-      if (!ffmpeg.stdin.write(Buffer.from(data, "base64"))) {
-        await Promise.race([new Promise((r) => ffmpeg.stdin.once("drain", r)), done.catch(() => {
-        })]);
-      }
-      if (i % 30 === 0 || i === frames - 1) onProgress(i + 1, frames);
-    }
-    if (!exited) ffmpeg.stdin.end();
-    await done;
-    return { frames, duration: info.duration };
-  } finally {
-    await player.close();
-  }
-}
-async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = () => {
-}, startTimeoutMs = CHROME_START_TIMEOUT_MS, bitrate = WEBM_BITRATE } = {}) {
-  if (typeof WebSocket === "undefined") throw new ExportError("The built-in encoder needs Node.js 22 or later (built-in WebSocket)");
-  const player = await openPlayer(htmlFile, { env, startTimeoutMs });
-  try {
-    const { info, evaluate } = player;
-    if (!await evaluate("window.__amvEnc.supported()")) {
-      throw new ExportError("This browser cannot encode video (WebCodecs is missing). Install ffmpeg to export an MP4");
-    }
-    const started = await evaluate(`window.__amvEnc.start(${JSON.stringify({ bitrate })})`);
-    if (started.error) throw new ExportError(`The browser could not encode the video: ${started.error}`);
-    let state = null;
-    for (; ; ) {
-      state = await evaluate("window.__amvEnc.progress()");
-      if (state.error) throw new ExportError(`The browser stopped encoding: ${state.error}`);
-      onProgress(state.done, state.total);
-      if (!state.running) break;
-      await new Promise((r) => setTimeout(r, WEBM_POLL_MS));
-    }
-    const size = await evaluate("window.__amvEnc.size()");
-    const file = Buffer.alloc(size);
-    for (let at3 = 0; at3 < size; at3 += WEBM_SLICE) {
-      const slice = await evaluate(`window.__amvEnc.bytes(${at3}, ${Math.min(WEBM_SLICE, size - at3)})`);
-      Buffer.from(slice, "base64").copy(file, at3);
-    }
-    writeFileSync5(webmFile, file);
-    return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
-  } finally {
-    await player.close();
   }
 }
 function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
@@ -11315,12 +11218,295 @@ function connect(url) {
   });
 }
 
+// src/video/export.js
+var CHROME_START_TIMEOUT_MS2 = 2e4;
+var WIDTH = 1920;
+var HEIGHT = 1080;
+var QUALITY = 92;
+var WEBM_BITRATE = 35e5;
+var WEBM_SLICE = 1048572;
+var WEBM_POLL_MS = 250;
+async function openPlayer(htmlFile, { env, startTimeoutMs }) {
+  const player = await openPage(pathToFileURL(htmlFile).href, {
+    env,
+    startTimeoutMs,
+    width: WIDTH,
+    height: HEIGHT,
+    deviceScaleFactor: 1,
+    scriptError: "Player page script error"
+  });
+  const { page, evaluate, close, tmp } = player;
+  try {
+    const info = await evaluate("document.fonts.ready.then(() => { window.__amv.exportMode(); return { duration: window.__amv.duration, fps: window.__amv.fps }; })");
+    const screenshot = async () => (await page("Page.captureScreenshot", { format: "jpeg", quality: QUALITY, clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT, scale: 1 } })).data;
+    return { info, evaluate, screenshot, close, tmp };
+  } catch (e) {
+    await close();
+    throw e;
+  }
+}
+async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onProgress = () => {
+}, startTimeoutMs = CHROME_START_TIMEOUT_MS2 } = {}) {
+  if (typeof WebSocket === "undefined") throw new ExportError("MP4 export needs Node.js 22 or later (built-in WebSocket)");
+  if (!hasCommand("ffmpeg")) throw new ExportError("MP4 export needs ffmpeg: on macOS run brew install ffmpeg; on Linux install it with the package manager");
+  const player = await openPlayer(htmlFile, { env, startTimeoutMs });
+  try {
+    const { info, evaluate, screenshot, tmp } = player;
+    const wavFile = wav2 ? join9(tmp, "voice.wav") : null;
+    if (wav2) writeFileSync5(wavFile, wav2);
+    const ffmpeg = spawn3("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-f",
+      "image2pipe",
+      "-framerate",
+      String(info.fps),
+      "-c:v",
+      "mjpeg",
+      "-i",
+      "-",
+      ...wavFile ? ["-i", wavFile] : [],
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-crf",
+      "20",
+      "-preset",
+      "medium",
+      ...wavFile ? ["-c:a", "aac", "-b:a", "160k", "-shortest"] : [],
+      "-movflags",
+      "+faststart",
+      mp4File
+    ], { stdio: ["pipe", "ignore", "pipe"] });
+    let ffErr = "";
+    let exited = false;
+    ffmpeg.stderr.on("data", (d) => {
+      ffErr += d;
+    });
+    ffmpeg.stdin.on("error", () => {
+    });
+    const done = new Promise((resolve5, reject) => {
+      ffmpeg.on("error", (e) => {
+        exited = true;
+        reject(new ExportError(`Cannot run ffmpeg: ${e.message}`));
+      });
+      ffmpeg.on("close", (code) => {
+        exited = true;
+        if (code === 0) resolve5();
+        else reject(new ExportError(`ffmpeg failed (${code}): ${ffErr.slice(0, 300)}`));
+      });
+    });
+    done.catch(() => {
+    });
+    const frames = Math.ceil(info.duration * info.fps);
+    for (let i = 0; i < frames && !exited; i++) {
+      await evaluate(`render(${i / info.fps})`);
+      const data = await screenshot();
+      if (exited) break;
+      if (!ffmpeg.stdin.write(Buffer.from(data, "base64"))) {
+        await Promise.race([new Promise((r) => ffmpeg.stdin.once("drain", r)), done.catch(() => {
+        })]);
+      }
+      if (i % 30 === 0 || i === frames - 1) onProgress(i + 1, frames);
+    }
+    if (!exited) ffmpeg.stdin.end();
+    await done;
+    return { frames, duration: info.duration };
+  } finally {
+    await player.close();
+  }
+}
+async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = () => {
+}, startTimeoutMs = CHROME_START_TIMEOUT_MS2, bitrate = WEBM_BITRATE } = {}) {
+  if (typeof WebSocket === "undefined") throw new ExportError("The built-in encoder needs Node.js 22 or later (built-in WebSocket)");
+  const player = await openPlayer(htmlFile, { env, startTimeoutMs });
+  try {
+    const { info, evaluate } = player;
+    if (!await evaluate("window.__amvEnc.supported()")) {
+      throw new ExportError("This browser cannot encode video (WebCodecs is missing). Install ffmpeg to export an MP4");
+    }
+    const started = await evaluate(`window.__amvEnc.start(${JSON.stringify({ bitrate })})`);
+    if (started.error) throw new ExportError(`The browser could not encode the video: ${started.error}`);
+    let state = null;
+    for (; ; ) {
+      state = await evaluate("window.__amvEnc.progress()");
+      if (state.error) throw new ExportError(`The browser stopped encoding: ${state.error}`);
+      onProgress(state.done, state.total);
+      if (!state.running) break;
+      await new Promise((r) => setTimeout(r, WEBM_POLL_MS));
+    }
+    const size = await evaluate("window.__amvEnc.size()");
+    const file = Buffer.alloc(size);
+    for (let at3 = 0; at3 < size; at3 += WEBM_SLICE) {
+      const slice = await evaluate(`window.__amvEnc.bytes(${at3}, ${Math.min(WEBM_SLICE, size - at3)})`);
+      Buffer.from(slice, "base64").copy(file, at3);
+    }
+    writeFileSync5(webmFile, file);
+    return { frames: state.done, duration: info.duration, codec: state.codec, audio: Boolean(state.audio) };
+  } finally {
+    await player.close();
+  }
+}
+
+// src/export.js
+import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
+import { basename as basename3, dirname as dirname2, join as join10 } from "node:path";
+import { pathToFileURL as pathToFileURL2 } from "node:url";
+var VIEWPORT = 1200;
+var DEVICE_SCALE = 2;
+var MAX_SLICE = 1800;
+var SETTLE_MS = 400;
+var CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comment-btn, .am-remark-pop,
+.am-update, .am-btn--update, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch {
+  display: none !important;
+}`;
+function slicePoints(pageHeight, boxes = [], maxHeight = MAX_SLICE) {
+  const limit = Math.floor(maxHeight);
+  if (!(limit > 0)) throw new RangeError("maxHeight must be greater than 0");
+  if (!(pageHeight > 0)) return [];
+  const cuts = [];
+  let start = 0;
+  while (pageHeight - start > limit) {
+    const target = start + limit;
+    const cut = Math.floor(gapCut(start, target, boxes) ?? target);
+    cuts.push(cut > start ? cut : target);
+    start = cuts[cuts.length - 1];
+  }
+  return cuts;
+}
+function gapCut(start, target, boxes) {
+  let y2 = target;
+  for (; ; ) {
+    const box = boxes.find((b) => y2 > b.top && y2 < b.bottom);
+    if (!box) return y2 > start ? y2 : null;
+    if (!(box.top > start)) return null;
+    y2 = box.top;
+  }
+}
+async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
+} } = {}) {
+  if (typeof WebSocket === "undefined") throw new ExportError("Export needs Node.js 22 or later (built-in WebSocket)");
+  const chrome = findChrome(env);
+  if (!chrome) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
+  if (isPath(chrome) && !existsSync6(chrome)) {
+    const from = env.AM_CHROME ? "AM_CHROME" : env.CHROME_PATH ? "CHROME_PATH" : "the built-in path";
+    throw new ExportError(`No browser at ${chrome} (from ${from}). Set AM_CHROME to the Chrome / Chromium / Edge binary`);
+  }
+  const page = await openPage(pathToFileURL2(file).href, {
+    env,
+    chromePath: chrome,
+    width: VIEWPORT,
+    height: 900,
+    deviceScaleFactor: DEVICE_SCALE,
+    media: "screen"
+  });
+  const written = [];
+  try {
+    if (pdf) {
+      const writtenPdf = await writePdf(page, pdf);
+      written.push(writtenPdf);
+      onFile(writtenPdf);
+    }
+    if (png) {
+      const writtenPngs = await writePngSlices(page, file, png);
+      written.push(...writtenPngs);
+      writtenPngs.forEach(onFile);
+    }
+  } finally {
+    await page.close();
+  }
+  return written;
+}
+async function writePdf(page, file) {
+  await page.page("Emulation.setEmulatedMedia", { media: "print" });
+  await settle2(page);
+  const { data } = await page.page("Page.printToPDF", {
+    printBackground: true,
+    preferCSSPageSize: true,
+    displayHeaderFooter: false,
+    paperWidth: 8.27,
+    // A4, 210 x 297 mm
+    paperHeight: 11.69
+  });
+  try {
+    mkdirSync4(dirname2(file), { recursive: true });
+    writeFileSync6(file, Buffer.from(data, "base64"));
+  } catch (e) {
+    throw new ExportError(`Cannot write the PDF ${file}: ${e.message}`);
+  }
+  return file;
+}
+async function writePngSlices(page, htmlFile, folder) {
+  await page.page("Emulation.setEmulatedMedia", { media: "screen" });
+  await settle2(page);
+  const layout4 = await page.evaluate(`(async () => {
+    await document.fonts.ready;
+    await new Promise((r) => setTimeout(r, ${SETTLE_MS}));
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const style = document.createElement('style');
+    style.textContent = ${JSON.stringify(CHROME_CSS)};
+    document.head.append(style);
+    const box = (el) => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top + window.scrollY, bottom: r.bottom + window.scrollY };
+    };
+    return {
+      height: Math.ceil(Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)),
+      boxes: [...document.querySelectorAll('.am-head, .am-panel')]
+        .filter((el) => el.getClientRects().length)
+        .map(box),
+    };
+  })()`);
+  if (!layout4.height) throw new ExportError("The page is empty: there is nothing to export");
+  try {
+    mkdirSync4(folder, { recursive: true });
+    if (!statSync4(folder).isDirectory()) throw new Error("not a folder");
+  } catch (e) {
+    throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
+  }
+  const cuts = slicePoints(layout4.height, layout4.boxes, MAX_SLICE);
+  const name = basename3(htmlFile).replace(/\.html?$/i, "") || "page";
+  const bounds = [0, ...cuts, layout4.height];
+  const written = [];
+  for (let i = 1; i < bounds.length; i++) {
+    const top2 = bounds[i - 1];
+    const height = bounds[i] - top2;
+    if (height <= 0) continue;
+    const { data } = await page.page("Page.captureScreenshot", {
+      format: "png",
+      // Capture each slice of the full page, not just the part inside a 900px viewport.
+      captureBeyondViewport: true,
+      clip: { x: 0, y: top2, width: VIEWPORT, height, scale: 1 }
+    });
+    const file = join10(folder, `${name}-${i}.png`);
+    try {
+      writeFileSync6(file, Buffer.from(data, "base64"));
+    } catch (e) {
+      throw new ExportError(`Cannot write the PNG ${file}: ${e.message}`);
+    }
+    written.push(file);
+  }
+  return written;
+}
+var settle2 = (page) => page.evaluate(`(async () => {
+  await document.fonts.ready;
+  await new Promise((r) => setTimeout(r, ${SETTLE_MS}));
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return true;
+})()`);
+function isHtmlPage(file) {
+  return /\.html?$/i.test(file) && statSync4(file, { throwIfNoEntry: false })?.isFile() === true;
+}
+var isPath = (value) => value.includes("/") || value.includes("\\");
+
 // src/housekeeping.js
 import { readdirSync as readdirSync2, lstatSync as lstatSync2, rmSync as rmSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join11 } from "node:path";
 
 // src/update.js
-import { spawn as spawn3 } from "node:child_process";
+import { spawn as spawn4 } from "node:child_process";
 var UPDATE = Object.freeze({
   checkEveryDays: 1,
   hintEveryDays: 3,
@@ -11388,7 +11574,7 @@ function shouldCheckUpdate(state, env, config, now = Date.now()) {
 function spawnUpdateCheck(home, scriptPath) {
   writeState(home, { lastUpdateCheck: Date.now() });
   try {
-    spawn3(process.execPath, [scriptPath, "__update-check"], { detached: true, stdio: "ignore", env: { ...process.env, AM_HOME: home } }).on("error", () => {
+    spawn4(process.execPath, [scriptPath, "__update-check"], { detached: true, stdio: "ignore", env: { ...process.env, AM_HOME: home } }).on("error", () => {
     }).unref();
   } catch {
   }
@@ -11434,7 +11620,7 @@ function walk(dir) {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join9(dir, e.name);
+    const p = join11(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
       const s = lstatSync2(p);
@@ -11447,7 +11633,7 @@ function walk(dir) {
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 function usage2(home) {
   const parts = Object.fromEntries(DIRS3.map((d) => {
-    const files = walk(join9(home, d));
+    const files = walk(join11(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
@@ -11455,8 +11641,8 @@ function usage2(home) {
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
   const victims = [
-    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join9(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
-    ...walk(join9(home, "cache"))
+    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join11(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
+    ...walk(join11(home, "cache"))
   ];
   if (!dryRun) {
     for (const f2 of victims) rmSync5(f2.path, { force: true });
@@ -11562,9 +11748,9 @@ import { connect as connect2, isIP } from "node:net";
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync3, existsSync as existsSync6, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, watch, lstatSync as lstatSync3, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join10, resolve as resolve3, dirname as dirname2, basename as basename3, sep as sep3 } from "node:path";
+import { join as join12, resolve as resolve3, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -11572,7 +11758,7 @@ var TOKEN_LENGTH = 22;
 var PREFIX2 = Object.freeze({ p: "pages", v: "videos" });
 var PREFIX_OF = Object.freeze({ pages: "p", videos: "v" });
 var EVENTS = "e";
-var SETTLE_MS = 150;
+var SETTLE_MS2 = 150;
 var LOOPBACK_HOST = /^(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$/i;
 function lanRank(address) {
   const [a, b] = address.split(".").map(Number);
@@ -11604,7 +11790,7 @@ function publicUrlOrigin(input) {
 var TAILSCALE_APP = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
 function readTailscaleStatus(run2 = (cmd) => spawnSync3(cmd, ["status", "--json"], { encoding: "utf8", timeout: 5e3, env: { ...process.env, TAILSCALE_BE_CLI: "1" } })) {
   let result = run2("tailscale");
-  if (result.error?.code === "ENOENT" && process.platform === "darwin" && existsSync6(TAILSCALE_APP)) result = run2(TAILSCALE_APP);
+  if (result.error?.code === "ENOENT" && process.platform === "darwin" && existsSync7(TAILSCALE_APP)) result = run2(TAILSCALE_APP);
   if (result.error?.code === "ENOENT") {
     throw new ServeError("--tailscale needs the tailscale CLI: install Tailscale (https://tailscale.com/download) and make sure `tailscale` is on PATH");
   }
@@ -11679,7 +11865,7 @@ function loadSecret(secretFile) {
     const secret = randomBytes(32).toString("hex");
     const tmp = `${secretFile}.${process.pid}.${randomBytes(16).toString("hex")}.tmp`;
     try {
-      writeFileSync6(tmp, secret, { mode: 384, flag: "wx" });
+      writeFileSync7(tmp, secret, { mode: 384, flag: "wx" });
       try {
         linkSync(tmp, secretFile);
       } catch (publishError) {
@@ -11695,7 +11881,7 @@ function loadSecret(secretFile) {
     }
   }
 }
-var infoPath = (home) => join10(home, "serve.json");
+var infoPath = (home) => join12(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -11741,8 +11927,8 @@ function serveLink(home, file) {
     const info = readServeInfo(home);
     if (!info) return null;
     const path = resolve3(file);
-    const dir = ["pages", "videos"].find((d) => dirname2(path) === resolve3(home, d));
-    const name = basename3(path);
+    const dir = ["pages", "videos"].find((d) => dirname3(path) === resolve3(home, d));
+    const name = basename4(path);
     return dir && validFileName(name) ? pageLink(info, dir, name) : null;
   } catch {
     return null;
@@ -11753,7 +11939,7 @@ function writeInfo(home, info) {
   const tmp = `${infoPath(home)}.${process.pid}.tmp`;
   try {
     rmSync6(tmp, { force: true });
-    writeFileSync6(tmp, `${JSON.stringify(info)}
+    writeFileSync7(tmp, `${JSON.stringify(info)}
 `, { mode: 384, flag: "wx" });
     renameSync5(tmp, infoPath(home));
   } finally {
@@ -11774,8 +11960,8 @@ function reply(req, res, status, type, body = "") {
 var notFound = (req, res) => reply(req, res, 404, "text/plain; charset=utf-8", "Not found\n");
 async function resolvePage(home, dir, file) {
   try {
-    const root = await realpath(join10(home, dir));
-    const path = join10(root, file);
+    const root = await realpath(join12(home, dir));
+    const path = join12(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
     return real.startsWith(root + sep3) ? real : null;
@@ -11834,14 +12020,14 @@ function liveStreams(home) {
       running = false;
     }
   };
-  const settle2 = () => {
+  const settle3 = () => {
     clearTimeout(timer);
-    timer = setTimeout(run2, SETTLE_MS);
+    timer = setTimeout(run2, SETTLE_MS2);
   };
   const startWatching = () => {
     if (watcher) return;
     try {
-      watcher = watch(join10(home, "pages"), settle2);
+      watcher = watch(join12(home, "pages"), settle3);
     } catch {
       return;
     }
@@ -11959,7 +12145,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   if (tail && !secretFile) ensureHome(home);
-  const secret = loadSecret(secretFile ?? (tail ? join10(home, "serve-secret") : void 0));
+  const secret = loadSecret(secretFile ?? (tail ? join12(home, "serve-secret") : void 0));
   const live = liveStreams(home);
   const server = createServer(handler(home, secret, allowedHosts, live));
   await new Promise((done, fail) => {
@@ -11986,7 +12172,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
     });
     return closed;
   };
-  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join10(home, "serve-secret") : secretFile };
+  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join12(home, "serve-secret") : secretFile };
 }
 async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, print, fail }) {
   let srv;
@@ -12033,6 +12219,8 @@ Usage:
   am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
+  am export <page.html> [--pdf <file.pdf>] [--png <dir>]
+                        export a rendered page as an A4 PDF and/or as PNG slices for a chat app (needs Chrome)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am serve  [--port 8765] [--lan | --tailscale | --public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network; --tailscale: on your tailnet only); am render then prints a link:
@@ -12041,7 +12229,7 @@ Usage:
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
   am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|video|patch|theme|export]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme / export usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
@@ -12210,6 +12398,8 @@ async function main(argv, io = {}) {
         voice: { type: "string" },
         mp4: { type: "boolean" },
         webm: { type: "boolean" },
+        pdf: { type: "string" },
+        png: { type: "string" },
         panel: { type: "string" },
         from: { type: "string" },
         days: { type: "string" },
@@ -12245,6 +12435,8 @@ ${USAGE}`);
       return cmdPatch(arg, rest[0], opts, ctx);
     case "video":
       return withSource(arg, io, fail, (src, _baseDir, from) => cmdVideo(src, opts, ctx, from));
+    case "export":
+      return cmdExport(arg, opts, ctx);
     case "lint":
       return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case "config":
@@ -12285,7 +12477,7 @@ async function withSource(arg, io, fail, fn3) {
     fail("\u2717 The draft is empty");
     return 2;
   }
-  return fn3(src, arg === "-" ? cwd : dirname3(resolve4(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve4(cwd, arg) });
+  return fn3(src, arg === "-" ? cwd : dirname4(resolve4(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve4(cwd, arg) });
 }
 async function readStream(stream) {
   const chunks = [];
@@ -12307,7 +12499,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   const { fail, print } = ctx;
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join11(amHome(ctx.env), "pages")} or ${join11(tempHome(), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join13(amHome(ctx.env), "pages")} or ${join13(tempHome(), "pages")})`);
     return 2;
   }
   const config = loadConfig(ctx);
@@ -12332,7 +12524,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
-var draftsDir = (home) => join11(resolve4(home), "drafts");
+var draftsDir = (home) => join13(resolve4(home), "drafts");
 function draftTitle(src) {
   const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
   return m?.[1] ?? "";
@@ -12347,7 +12539,7 @@ function saveDraft(src, { env, io }) {
   for (const folder of folders) {
     try {
       const dir = folder();
-      mkdirSync4(dir, { recursive: true });
+      mkdirSync5(dir, { recursive: true });
       return writeNew(dir, name, src);
     } catch {
     }
@@ -12356,9 +12548,9 @@ function saveDraft(src, { env, io }) {
 }
 function writeNew(dir, name, text2) {
   for (let n = 1; ; n++) {
-    const file = join11(dir, n === 1 ? name : name.replace(/\.md$/, `-${n}.md`));
+    const file = join13(dir, n === 1 ? name : name.replace(/\.md$/, `-${n}.md`));
     try {
-      writeFileSync7(file, text2, { flag: "wx" });
+      writeFileSync8(file, text2, { flag: "wx" });
       return file;
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
@@ -12379,7 +12571,7 @@ function keepDraft(result, src, from, ctx) {
   }
 }
 function isKeptDraft(path, { env }) {
-  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname3(path)) && basename4(path).endsWith(".md");
+  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname4(path)) && basename5(path).endsWith(".md");
 }
 var isDraftError = (e) => e instanceof DraftErrors || e instanceof RenderError || e instanceof LintError || e instanceof ParseError && e.line > 0;
 function reportDraftError(e, src, from, ctx) {
@@ -12394,8 +12586,22 @@ var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.c
 function pagePath(arg, { env, io }) {
   const path = resolve4(io.cwd ?? process.cwd(), arg);
   const folders = [resolve4(amHome(env), "pages"), resolve4(tempHome(), "pages")];
-  return folders.includes(dirname3(path)) && basename4(path).endsWith(".html") ? path : false;
+  return folders.includes(dirname4(path)) && basename5(path).endsWith(".html") ? path : false;
 }
+var EXPORT_HELP = `Export a rendered page as an A4 PDF and/or PNG slices for a chat app
+
+Usage:
+  am export <page.html> --pdf <file.pdf>
+  am export <page.html> --png <dir>
+  am export <page.html> --pdf <file.pdf> --png <dir>
+
+- The page must be an existing .html file, opened as a file:// URL; am export does not change it.
+- --pdf writes an A4 PDF with the page's own print rules (@media print), background colors, no header and no footer.
+- --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
+  A cut falls in a horizontal gap, never through a panel; the toolbar, the reply and remark controls and the new-version notice are left out.
+- Give both flags to write both; at least one is required. The folder for --png is created when missing.
+- Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
+- A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
 var PATCH_HELP = `Replace one panel of a rendered page in place
 
 Usage:
@@ -12534,6 +12740,33 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "", inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
 }
+async function cmdExport(arg, opts, ctx) {
+  const { fail, print, env, io } = ctx;
+  if (opts.pdf === void 0 && opts.png === void 0) {
+    fail("\u2717 export needs --pdf <file.pdf> or --png <dir>\n\n  am export <page.html> --pdf <file.pdf> | --png <dir>");
+    return 2;
+  }
+  if (!arg) {
+    fail("\u2717 Missing the page argument: pass the .html file am render wrote");
+    return 2;
+  }
+  const cwd = io.cwd ?? process.cwd();
+  const file = resolve4(cwd, arg);
+  if (!isHtmlPage(file)) {
+    fail(`\u2717 ${arg} is not an existing .html file: am export takes a page am render wrote`);
+    return 2;
+  }
+  const pdf = opts.pdf === void 0 ? void 0 : resolve4(cwd, opts.pdf);
+  const png = opts.png === void 0 ? void 0 : resolve4(cwd, opts.png);
+  try {
+    await exportPage(file, { pdf, png, env, onFile: (f2) => print(`\u2713 ${f2}`) });
+    return 0;
+  } catch (e) {
+    if (!(e instanceof ExportError)) throw e;
+    fail(`\u2717 Export failed: ${e.message}`);
+    return 1;
+  }
+}
 async function cmdVideo(src, opts, ctx, from) {
   const { fail, print } = ctx;
   const config = loadConfig(ctx);
@@ -12585,7 +12818,7 @@ function narrationCache(home) {
     if (!isDenied(e)) throw e;
     return void 0;
   }
-  return join11(home, "cache", "tts");
+  return join13(home, "cache", "tts");
 }
 function voiceSummary(provider, captionsOnly = []) {
   if (!provider) return "none (captions only)";
@@ -12619,23 +12852,23 @@ function themeWarnings({ fail, themes: themes2 }) {
 function outputPath(dir, title, opts, { env, io, fail }) {
   if (opts.out) {
     const file = resolve4(io.cwd ?? process.cwd(), opts.out);
-    if (statSync4(file, { throwIfNoEntry: false })?.isDirectory()) {
+    if (statSync5(file, { throwIfNoEntry: false })?.isDirectory()) {
       fail("\u2717 -o names a folder; give a file path, for example -o page.html");
       return null;
     }
     return file;
   }
-  return join11(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return join13(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
 }
 function writePage(file, html, env) {
   const home = resolve4(amHome(env));
   const path = resolve4(file);
   if (path.startsWith(home + sep4)) ensureHome(home);
-  mkdirSync4(dirname3(file), { recursive: true });
-  if (!path.startsWith(join11(home, "pages") + sep4)) return writeFileSync7(file, html);
-  const tmp = join11(dirname3(file), `.${basename4(file)}.${process.pid}.tmp`);
+  mkdirSync5(dirname4(file), { recursive: true });
+  if (!path.startsWith(join13(home, "pages") + sep4)) return writeFileSync8(file, html);
+  const tmp = join13(dirname4(file), `.${basename5(file)}.${process.pid}.tmp`);
   try {
-    writeFileSync7(tmp, html);
+    writeFileSync8(tmp, html);
     renameOver(tmp, file);
   } finally {
     rmSync7(tmp, { force: true });
@@ -12646,7 +12879,7 @@ function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   const inHome = resolve4(file).startsWith(resolve4(home) + sep4);
   const hint = (path) => {
     if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
-    return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename4(path)}"` : "Give -o a file in a folder this session can write to";
+    return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename5(path)}"` : "Give -o a file in a folder this session can write to";
   };
   const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
@@ -12655,7 +12888,7 @@ function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   } catch (e) {
     if (!isDenied(e)) throw e;
     if (!(fallback && inHome)) return refuse(file, e), null;
-    const spare = join11(tempHome(), fallback, basename4(file));
+    const spare = join13(tempHome(), fallback, basename5(file));
     try {
       checkedTempHome({ create: true });
       writePage(spare, html, env);
@@ -12910,13 +13143,13 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join11(amHome(env), "themes", `${target}.json`);
-  const name = isFile ? basename4(path).replace(/\.json$/i, "") : target;
+  const path = isFile ? resolve4(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
+  const name = isFile ? basename5(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
   if (!isFile && getTheme(name)) {
     theme = getTheme(name);
-  } else if (existsSync7(path)) {
+  } else if (existsSync8(path)) {
     ({ theme, errors } = readThemeFile(path, themeNames("video")));
   } else {
     fail(`\u2717 No theme named "${target}": ${path} does not exist`);
@@ -12949,12 +13182,13 @@ function cmdHelp(name, { print, fail }) {
   if (name === "image") return print(IMAGE_HELP), 0;
   if (name === "code") return print(CODE_HELP), 0;
   if (name === "video") return print(VIDEO_FORMAT), 0;
+  if (name === "export") return print(EXPORT_HELP), 0;
   if (name === "patch") return print(PATCH_HELP), 0;
   if (name === "theme") return print(THEME_HELP), 0;
   if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, patch, theme`);
+    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, export, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}
@@ -12976,7 +13210,7 @@ function stamp(d) {
 function openFile(file) {
   const [cmd, args] = process.platform === "darwin" ? ["open", [file]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", file]] : ["xdg-open", [file]];
   try {
-    spawn4(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {
+    spawn5(cmd, args, { detached: true, stdio: "ignore" }).on("error", () => {
     }).unref();
   } catch {
   }

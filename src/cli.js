@@ -1,4 +1,4 @@
-// am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
+// am CLI: render / patch / video / export / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
@@ -19,6 +19,7 @@ import { THEME_SELECTORS } from './themes/selectors.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
+import { exportPage, isHtmlPage } from './export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck, pageUpdate } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
@@ -45,6 +46,8 @@ Usage:
   am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
+  am export <page.html> [--pdf <file.pdf>] [--png <dir>]
+                        export a rendered page as an A4 PDF and/or as PNG slices for a chat app (needs Chrome)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am serve  [--port 8765] [--lan | --tailscale | --public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network; --tailscale: on your tailnet only); am render then prints a link:
@@ -53,7 +56,7 @@ Usage:
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
   am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|video|patch|theme|export]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme / export usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
@@ -228,6 +231,8 @@ export async function main(argv, io = {}) {
         voice: { type: 'string' },
         mp4: { type: 'boolean' },
         webm: { type: 'boolean' },
+        pdf: { type: 'string' },
+        png: { type: 'string' },
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
@@ -261,6 +266,7 @@ export async function main(argv, io = {}) {
     case 'render': return withSource(arg, io, fail, (src, baseDir, from) => cmdRender(src, opts, ctx, baseDir, from));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
     case 'video': return withSource(arg, io, fail, (src, _baseDir, from) => cmdVideo(src, opts, ctx, from));
+    case 'export': return cmdExport(arg, opts, ctx);
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
@@ -437,6 +443,21 @@ function pagePath(arg, { env, io }) {
   return folders.includes(dirname(path)) && basename(path).endsWith('.html') ? path : false;
 }
 
+const EXPORT_HELP = `Export a rendered page as an A4 PDF and/or PNG slices for a chat app
+
+Usage:
+  am export <page.html> --pdf <file.pdf>
+  am export <page.html> --png <dir>
+  am export <page.html> --pdf <file.pdf> --png <dir>
+
+- The page must be an existing .html file, opened as a file:// URL; am export does not change it.
+- --pdf writes an A4 PDF with the page's own print rules (@media print), background colors, no header and no footer.
+- --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
+  A cut falls in a horizontal gap, never through a panel; the toolbar, the reply and remark controls and the new-version notice are left out.
+- Give both flags to write both; at least one is required. The folder for --png is created when missing.
+- Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
+- A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
+
 const PATCH_HELP = `Replace one panel of a rendered page in place
 
 Usage:
@@ -582,6 +603,34 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   }
   if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '', inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
+}
+
+async function cmdExport(arg, opts, ctx) {
+  const { fail, print, env, io } = ctx;
+  if (opts.pdf === undefined && opts.png === undefined) {
+    fail('✗ export needs --pdf <file.pdf> or --png <dir>\n\n  am export <page.html> --pdf <file.pdf> | --png <dir>');
+    return 2;
+  }
+  if (!arg) {
+    fail('✗ Missing the page argument: pass the .html file am render wrote');
+    return 2;
+  }
+  const cwd = io.cwd ?? process.cwd();
+  const file = resolve(cwd, arg);
+  if (!isHtmlPage(file)) {
+    fail(`✗ ${arg} is not an existing .html file: am export takes a page am render wrote`);
+    return 2;
+  }
+  const pdf = opts.pdf === undefined ? undefined : resolve(cwd, opts.pdf);
+  const png = opts.png === undefined ? undefined : resolve(cwd, opts.png);
+  try {
+    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`) });
+    return 0;
+  } catch (e) {
+    if (!(e instanceof ExportError)) throw e;
+    fail(`✗ Export failed: ${e.message}`);
+    return 1;
+  }
 }
 
 async function cmdVideo(src, opts, ctx, from) {
@@ -1060,12 +1109,13 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'code') return print(CODE_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
+  if (name === 'export') return print(EXPORT_HELP), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, export, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);

@@ -192,6 +192,22 @@ After you render the page again, an automatic ID can name a different panel, and
 
 Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. When the session may not write there (a host sandbox that allows writes only in the workspace), `am render` and `am video` without `-o` save the page in a private folder in the system temporary folder instead (`answer-me-with-html-<uid>/pages/`; mode 0700, and a folder that is not private to your user is refused) and say so; the system may clear it. `am clean` and `--replace` cover that folder, `am serve` does not. `am patch` never moves a page. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. A render lists every draft error at once, in line order, and writes no page. When the draft came from stdin (`am render -`) and has errors or warnings, it is saved as `drafts/<title>-<time>.md` in the data directory and the output prints `draft: <path>`; the line numbers match that file, so edit the flagged lines there and run `am render <path>`. A draft in `drafts/` is deleted after a render with no warnings. A draft you give as a file is never copied. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
 
+## Export a page
+
+`am export` writes a rendered page as an A4 PDF, as PNG slices, or both, so a page can be sent to a chat app that shows an `.html` file as source.
+
+```bash
+am export page.html --pdf page.pdf
+am export page.html --png out/      # out/page-1.png, out/page-2.png ...
+am export page.html --pdf page.pdf --png out/
+```
+
+- `--pdf` prints with the page's own `@media print` rules on A4, with background colors and no header or footer.
+- `--png` renders in screen media at 1200 CSS px wide and 2x (2400 px), hides the interactive chrome (the toolbar, the reply and remark controls, the new-version notice) and cuts the page into slices no taller than 1800 CSS px, never through a panel. The folder is created when missing.
+- At least one flag is required. The page must be an existing `.html` file.
+- It needs Chrome / Chromium / Edge, like `am video --mp4` / `--webm`; set `AM_CHROME` when the browser is not in a usual place.
+- A PDF or PNG is a picture: the page's reply, remarks, theme switch and Before/After switches do not work in it.
+
 ## Languages
 
 The language of a draft sets the page's `lang` attribute, the language of the buttons and theme names, the fonts, and the video player labels. A draft can declare it with `lang:` in the header. Without it, the tool detects the language from the script of the text.

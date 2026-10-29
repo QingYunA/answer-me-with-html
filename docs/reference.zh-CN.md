@@ -192,6 +192,22 @@ AM_EOF
 
 页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。会话不能写入该位置时（宿主沙箱只允许写工作区），不带 `-o` 的 `am render` 和 `am video` 会改为把页面存到系统临时目录里的私有文件夹（`answer-me-with-html-<uid>/pages/`，权限 0700；不是当前用户私有的文件夹会被拒绝使用），并给出提示；系统可能会清理该文件夹。`am clean` 和 `--replace` 同样覆盖这个文件夹，`am serve` 不覆盖。`am patch` 不会改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。渲染失败时会一次列出草稿里的全部错误（按行号排序），不写页面。草稿来自 stdin（`am render -`）且有错误或警告时，会存成数据目录下的 `drafts/<标题>-<时间>.md`，输出里有 `draft: <路径>`；行号与该文件一致，只改被标出的行，再运行 `am render <路径>`。`drafts/` 里的草稿在无警告渲染后自动删除；以文件参数给出的草稿不会被复制。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
 
+## 导出页面
+
+`am export` 把渲染好的页面导出成 A4 PDF、PNG 切片，或者两者都要。发到聊天工具时，`.html` 文件只会显示成源码，图片和 PDF 才能直接看。
+
+```bash
+am export page.html --pdf page.pdf
+am export page.html --png out/      # out/page-1.png、out/page-2.png……
+am export page.html --pdf page.pdf --png out/
+```
+
+- `--pdf`：按页面自己的 `@media print` 规则印成 A4，保留背景色，不加页眉页脚。
+- `--png`：用屏幕媒体、1200 CSS px 宽、2 倍像素（2400 px）渲染，隐藏工具栏、回复和批注按钮、新版本提示等交互部件，再切成每张不超过 1800 CSS px 高的切片，切口不会穿过面板。目录不存在时会创建。
+- 两个参数至少要给一个。页面必须是已存在的 `.html` 文件。
+- 需要 Chrome / Chromium / Edge，和 `am video --mp4` / `--webm` 一样；不在常见位置时用 `AM_CHROME` 指定。
+- PDF 或 PNG 是图片：页面上的回复、批注、主题切换和 Before/After 切换在图片里都不能用。
+
 ## 语言
 
 稿件的语言决定页面的 `lang` 属性、按钮和主题名的语言、字体，以及视频播放器的文字。可以在稿头用 `lang:` 指定。不写时，工具按正文的文字系统识别语言。
