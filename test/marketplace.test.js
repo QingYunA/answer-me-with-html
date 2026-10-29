@@ -15,6 +15,8 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIR = join(ROOT, 'marketplace/themes');
 const FILES = readdirSync(DIR).sort();
 const BANGERS_FACE = /@font-face \{\s*font-family: "Bangers"/g;
+// Every page carries every installed theme, so one theme naming Bangers puts one face on every page in this folder.
+const HAS_BANGERS = FILES.some((f) => JSON.parse(readFileSync(join(DIR, f), 'utf8')).font === 'bangers');
 
 const nameOf = (file) => file.replace(/\.json$/, '');
 
@@ -41,13 +43,12 @@ for (const file of FILES) {
     assert.deepEqual(problems, [], 'src/themes/catalog-rules.js lists the rules');
   });
 
-  test(`catalog ${name}: renders examples/tcp.en.md from a themes folder with the requested shipped font`, () => {
+  test(`catalog ${name}: renders examples/tcp.en.md and carries the Bangers face when an installed theme names it`, () => {
     const themes = loadThemes(home);
     assert.deepEqual(themes.warnings, []);
     assert.ok(themes.get(name), `${name} is loaded`);
     const { html } = renderDoc(readFileSync(join(ROOT, 'examples/tcp.en.md'), 'utf8'), { theme: name }, {}, { themes });
-    const expectedBangersFaces = JSON.parse(readFileSync(join(DIR, file), 'utf8')).font === 'bangers' ? 1 : 0;
-    assert.equal((html.match(BANGERS_FACE) ?? []).length, expectedBangersFaces);
+    assert.equal((html.match(BANGERS_FACE) ?? []).length, HAS_BANGERS ? 1 : 0);
     assert.ok(html.includes(`html[data-theme="${name}"]`));
     // The page's own Content-Security-Policy is the one http-equiv it may carry.
     assert.doesNotMatch(html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/, ''), /http-equiv|@import/);

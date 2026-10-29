@@ -2462,8 +2462,15 @@ function themeSet(user = [], broken = /* @__PURE__ */ new Map(), folderWarning) 
       if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
       return `Theme "${name}" is not installed. Choose one of: ${names2(scope).join(" | ")}`;
     },
-    // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
-    embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
+    // The themes a page carries: the built-in ones for its scope, then every installed user theme for that scope, sorted by name,
+    // so the toolbar picker lists them all and every one can be selected. A video has no picker, so it carries only its own theme
+    // (when that is a user theme). The page's own theme is in the user list already.
+    embedFor: (name, scope) => {
+      const builtins = themes(scope);
+      const own = user.filter((t) => t.name === name && t.scope.includes(scope));
+      if (scope !== "page") return [...builtins, ...own];
+      return [...builtins, ...user.filter((t) => t.scope.includes(scope)).sort((a, b) => a.name.localeCompare(b.name))];
+    },
     warnings: [...folderWarning ? [folderWarning] : [], ...[...broken.values()].map(({ file, reason: reason2 }) => `${file} skipped: ${reason2}`)]
   });
 }
@@ -8770,11 +8777,11 @@ var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
 var languageFontCss = () => fontLanguages().map((l3) => block(langSelector(l3, "html", "[data-theme][data-mode]"), { "--font-sans": l3.fonts.sans }));
 var ownLanguageFont = (t) => fontLanguages().map((l3) => block(langSelector(l3, "html", `[data-theme="${t.name}"][data-mode]`), { "--font-sans": t.tokens.common["--font-sans"] }));
-function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, chart = false, update: update2 = false, closeAfter = false, theme, scale = 1 } = {}) {
+function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, chart = false, update: update2 = false, closeAfter = false, fonts = true, scale = 1 } = {}) {
   const decorations = list2.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  const fontFace = FONT_CSS[list2.find((t) => t.name === theme)?.font];
+  const fontFaces = fonts ? [...new Set(list2.map((t) => t.font).filter((f2) => f2 && FONT_CSS[f2]))].map((f2) => FONT_CSS[f2]) : [];
   const ownFonts = list2.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
+  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFaces, ...decorations].join("\n\n");
 }
 function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list2.filter((t) => t.video).flatMap((t) => [
@@ -8782,7 +8789,7 @@ function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = 
     t.video.css ? scoped(t.video.css, videoSel(t)) : "",
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : ""
   ]).filter(Boolean);
-  return [pageCss(list2.filter((t) => t.scope.includes("page")), { diff, delta, rtl, chart }), VIDEO_CSS, ...parts].join("\n\n");
+  return [pageCss(list2.filter((t) => t.scope.includes("page")), { diff, delta, rtl, chart, fonts: false }), VIDEO_CSS, ...parts].join("\n\n");
 }
 
 // src/lint/wordlist.en.js
@@ -9820,7 +9827,7 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), chart: hasChart(body), update: Boolean(update2), closeAfter, theme: meta.theme, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), chart: hasChart(body), update: Boolean(update2), closeAfter, scale })}
 </style>
 </head>
 <body>
@@ -10268,7 +10275,7 @@ async function add(name, opts, { print, fail, env }, net) {
       return 1;
     }
   } else if (status !== "same") {
-    print(`  Use it: theme: ${name} in a draft, --theme ${name}, or am config set theme ${name}`);
+    print(`  It now appears in every new page's theme picker. Make it the default: am theme add ${name} --use, or am config set theme ${name}`);
   }
   return 0;
 }
@@ -10383,7 +10390,7 @@ function removeTheme(name, { print, fail, env }) {
     resetConfig("theme", env);
     print(`! ${name} was the default theme; the default is auto again`);
   }
-  print("  Pages already made keep their look: a page carries its own theme.");
+  print("  Pages already made keep their look: a page embeds the themes it was made with.");
   return 0;
 }
 
@@ -12413,7 +12420,7 @@ var THEME_HELP = `Install a ready-made theme from the catalog at answer-me-with-
 
 am theme add <name> [--use] [--force]
 - Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
-  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>); without it, the theme is still in every new page's theme picker.
 - A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
 - It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
@@ -12441,7 +12448,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(" ")}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
 - Fonts: name installed fonts only; the default font stack is added as the fallback.
-- font (optional): a font this tool ships, embedded in a page rendered with the theme: ${FONT_NAMES.join(" | ")}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
+- font (optional): a font this tool ships, embedded once in every page that carries the theme: ${FONT_NAMES.join(" | ")}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
   An older version ignores the field and shows the fallback font.
 - requires (optional): the oldest version of this tool the theme supports, as x.y.z. A newer requirement makes this tool skip the theme.
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
@@ -12452,7 +12459,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
   --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
-- A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
+- A page carries the built-in themes plus every installed user theme, so the toolbar can switch to any of them and the page opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
