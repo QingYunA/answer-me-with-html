@@ -422,7 +422,7 @@ export default {
   th_meta_title: '主题库 — Answer me with HTML',
   th_meta_desc: 'Answer me with HTML 的页面主题库。点开一个主题，可看浅色和深色的效果；复制一条命令，或让 agent 代为安装。',
   th_title: '主题库',
-  th_lede: '每个主题就是一个 JSON 文件。点开一张卡片，可以在示例页面上看这个主题的浅色和深色效果，并安装它。鼠标悬停或键盘聚焦在卡片上，可以先看一眼深色。没用到某个主题的页面，不会带上它。',
+  th_lede: '每个主题就是一个 JSON 文件。点开一张卡片，可以在示例页面上看这个主题的浅色和深色效果，并安装它。鼠标悬停或键盘聚焦在卡片上，可以先看一眼深色。装好之后，每个新页面的主题选择器里都会出现它。',
   th_submit_k: '参与',
   th_submit_t: '提交你自己的主题',
   th_submit_d: '也可以在<a href="new/" id="submit-theme">主题编辑器</a>里手动制作，或者提交 PR，新增 <code>marketplace/themes/&lt;name&gt;.json</code>，规则见 <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>。每个主题上墙前都由维护者审核。主题库里的名字永久保留。',

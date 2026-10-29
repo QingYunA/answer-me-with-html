@@ -9,8 +9,8 @@ import { createServer } from 'node:http';
 import { connect, isIP } from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { networkInterfaces, uptime } from 'node:os';
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, renameSync, rmSync, watch, lstatSync, existsSync, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from 'node:fs';
+import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { readFileSync, writeFileSync, renameSync, rmSync, mkdirSync, watch, lstatSync, existsSync, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from 'node:fs';
 import { lstat, realpath, readFile, stat } from 'node:fs/promises';
 import { join, resolve, dirname, basename, sep } from 'node:path';
 import { ensureHome } from './home.js';
@@ -28,6 +28,8 @@ const PREFIX = Object.freeze({ p: 'pages', v: 'videos' });
 const PREFIX_OF = Object.freeze({ pages: 'p', videos: 'v' });
 // The event stream of a page in pages/: /e/<token>/<file>, where token is the token of the page link.
 const EVENTS = 'e';
+// The reply state of a page in pages/: /r/<token>/<file>, PUT to save, OPTIONS for the preflight.
+const SAVE = 'r';
 // Editors and renders replace a file in several steps (src/cli.js writes a temp file and renames it): wait for them to settle.
 const SETTLE_MS = 150;
 // Only loopback names are accepted: an SSH tunnel may map any local port, but a DNS-rebinding page arrives with its own host name.
@@ -291,6 +293,120 @@ function reply(req, res, status, type, body = '') {
 
 const notFound = (req, res) => reply(req, res, 404, 'text/plain; charset=utf-8', 'Not found\n');
 
+// The reply state of a page: answers, comments and remarks the reader gave on a served page. The page runs in an opaque-origin
+// sandbox with no localStorage, and a phone drops a background tab, so the state is kept next to the data directory instead:
+// <home>/serve-state/<token-hash>.json, written atomically, reachable only through the page's own token (never by path).
+const STATE_DIR = 'serve-state';
+// The largest state a page may save: answers and comments are text, so anything bigger is a mistake or an attack.
+export const MAX_STATE_BYTES = 64 * 1024;
+const STATE_KEYS = Object.freeze(['reply', 'remark']);
+
+// A record is keyed to the page's version, so a re-render drops the old reply instead of attaching it to the new page.
+async function pageVersion(home, file) {
+  try {
+    const s = await stat(await resolvePage(home, 'pages', file));
+    return `${s.mtimeMs}:${s.size}:${s.ino}`;
+  } catch {
+    return null;
+  }
+}
+
+// The record file name is a hash of the token: the token names the page, and the data directory should not hold it in clear.
+const stateFile = (home, token) => join(home, STATE_DIR, `${createHash('sha256').update(token).digest('hex')}.json`);
+
+function readState(home, token) {
+  try {
+    const record = JSON.parse(readFileSync(stateFile(home, token), 'utf8'));
+    return record && typeof record === 'object' ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeState(home, token, record) {
+  const dir = join(home, STATE_DIR);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const path = stateFile(home, token);
+  const tmp = `${path}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`;
+  try {
+    writeFileSync(tmp, `${JSON.stringify(record)}\n`, { mode: 0o600, flag: 'wx' });
+    renameSync(tmp, path);
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
+// The state to hand a page: only the parts it may restore, and only while the page file is the one the state was saved for.
+function restorable(record, version) {
+  if (!record || version === null || record.version !== version) return null;
+  const state = Object.fromEntries(STATE_KEYS.filter((k) => record[k] !== undefined).map((k) => [k, record[k]]));
+  return Object.keys(state).length ? state : null;
+}
+
+// PUT /r/<token>/<file>: the page's own capabilitiy saves its state. OPTIONS answers the preflight a JSON content type triggers.
+async function saveState(req, res, home, secret, file, token, version) {
+  const allow = 'PUT, OPTIONS';
+  const cors = {
+    'Access-Control-Allow-Origin': 'null',
+    'Access-Control-Allow-Methods': allow,
+    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Max-Age': '600',
+  };
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { ...HEADERS, ...cors, Allow: allow });
+    return res.end();
+  }
+  if (req.method !== 'PUT') {
+    res.setHeader('Allow', allow);
+    return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
+  }
+  // Same request shape as openEvents: a sandboxed page's own fetch arrives with an opaque origin and an empty destination.
+  const { origin, 'sec-fetch-dest': dest } = req.headers;
+  if ((origin !== undefined && origin !== 'null') || (dest !== undefined && dest !== 'empty')) return notFound(req, res);
+  if (!tokenMatches(secret, 'pages', file, token) || version === null) return notFound(req, res);
+  const type = (req.headers['content-type'] ?? '').toLowerCase();
+  if (!type.startsWith('application/json')) return reply(req, res, 415, 'text/plain; charset=utf-8', 'Unsupported media type\n');
+  // Keep the chunks as bytes and decode once: decoding each one on its own would corrupt a character split across two reads.
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    chunks.push(chunk);
+    if (size > MAX_STATE_BYTES) {
+      res.setHeader('Connection', 'close');
+      return reply(req, res, 413, 'text/plain; charset=utf-8', 'State too large\n');
+    }
+  }
+  const body = Buffer.concat(chunks).toString('utf8');
+  let patch;
+  try {
+    patch = JSON.parse(body);
+  } catch {
+    return reply(req, res, 400, 'text/plain; charset=utf-8', 'Invalid JSON\n');
+  }
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    return reply(req, res, 400, 'text/plain; charset=utf-8', 'Invalid JSON\n');
+  }
+  const part = Object.fromEntries(STATE_KEYS.filter((k) => patch[k] !== undefined).map((k) => [k, patch[k]]));
+  if (!Object.keys(part).length) return reply(req, res, 400, 'text/plain; charset=utf-8', 'Nothing to save\n');
+  // A record from another version of the page is dropped rather than merged: its answers name panels that may be gone.
+  const previous = readState(home, token);
+  const base = previous && previous.version === version ? previous : {};
+  // The cap covers the record that is stored, not each patch: reply and remark merge into one.
+  const next = { ...base, ...part, version, file };
+  if (Buffer.byteLength(`${JSON.stringify(next)}\n`) > MAX_STATE_BYTES) {
+    return reply(req, res, 413, 'text/plain; charset=utf-8', 'State too large\n');
+  }
+  try {
+    writeState(home, token, next);
+  } catch {
+    return reply(req, res, 500, 'text/plain; charset=utf-8', 'Cannot save the state\n');
+  }
+  res.writeHead(204, { ...HEADERS, ...cors });
+  return res.end();
+}
+
+
 // The real path of a page that is a regular file directly inside its folder, or null.
 async function resolvePage(home, dir, file) {
   try {
@@ -305,12 +421,21 @@ async function resolvePage(home, dir, file) {
 }
 
 // The page as served: the reload script goes in before </body>, with the event link and the labels in the page language.
-// The file on disk is not changed, and a page opened from file:// has no script.
-export function withLiveReload(html, eventPath) {
+// The file on disk is not changed, and a page opened from file:// has no script. `serve` adds what the page needs to save and
+// restore its reply state: the save link, and the state itself when the server holds one for this version of the page.
+export function withLiveReload(html, eventPath, serve) {
   const { ui } = resolveLanguage({ declared: readPage(html).lang });
   const script = `<script data-live="${esc(JSON.stringify({ url: eventPath, ui: ui.live }))}">${LIVE_SCRIPT_BODY}</script>\n`;
-  const at = html.lastIndexOf('</body>');
-  return at === -1 ? html + script : html.slice(0, at) + script + html.slice(at);
+  const attrs = serve
+    ? ` data-am-save="${esc(serve.save)}"${serve.state ? ` data-am-state="${esc(JSON.stringify(serve.state))}"` : ''}`
+    : '';
+  // A function, not a string: the restored state may hold `$&`, `$1`, `` $` `` or `$$`, which replace() would expand inside the page.
+  const withState = attrs && /<body\b[^>]*>/i.test(html)
+    ? html.replace(/(<body\b)([^>]*)>/i, (_m, tag, own) => `${tag}${own}${attrs}>`)
+    : html;
+  // Search the page itself: toLowerCase() can change the length of some characters (İ), which would shift the index.
+  const at = withState.search(/<\/body>(?![\s\S]*<\/body>)/i);
+  return at === -1 ? withState + script : withState.slice(0, at) + script + withState.slice(at);
 }
 
 // The open event streams, by page file. One watcher on pages/ serves all of them. After a burst of file events settles, each page with
@@ -440,24 +565,31 @@ function handler(home, secret, allowedHosts, live) {
   return async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
-        res.setHeader('Allow', 'GET, HEAD');
-        return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
-      }
       // Split the raw path by hand: URL would resolve dot segments (%2e%2e) before the checks below see them.
       const parts = req.url.split(/[?#]/)[0].split('/');
       if (parts.length !== 4 || parts[0] !== '') return notFound(req, res);
       const [, prefix, token, raw] = parts;
-      const events = prefix === EVENTS;
-      const dir = events ? 'pages' : Object.hasOwn(PREFIX, prefix) ? PREFIX[prefix] : undefined;
-      if (!dir || !token || !raw) return notFound(req, res);
       let file;
       try {
         file = decodeURIComponent(raw);
       } catch {
         return notFound(req, res);
       }
-      if (!validFileName(file) || !tokenMatches(secret, dir, file, token)) return notFound(req, res);
+      if (!validFileName(file)) return notFound(req, res);
+      // The reply state has its own write route; every other route opens a page or a stream and is GET/HEAD only.
+      if (prefix === SAVE) {
+        const version = await pageVersion(home, file);
+        if (!token) return notFound(req, res);
+        return await saveState(req, res, home, secret, file, token, version);
+      }
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.setHeader('Allow', 'GET, HEAD');
+        return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
+      }
+      const events = prefix === EVENTS;
+      const dir = events ? 'pages' : Object.hasOwn(PREFIX, prefix) ? PREFIX[prefix] : undefined;
+      if (!dir || !token) return notFound(req, res);
+      if (!tokenMatches(secret, dir, file, token)) return notFound(req, res);
       if (events) return await openEvents(req, res, home, file, live);
       // A page is only opened, never fetched: a browser marks a script's fetch (or a service worker's) with another
       // destination, so a leaked token does not let a script read the page. curl sends no Sec-Fetch-Dest.
@@ -468,7 +600,12 @@ function handler(home, secret, allowedHosts, live) {
       // The new-version button is for the person who made the page: a reader through a LAN or public address gets the page without it.
       const html = await readFile(real);
       const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString('utf8') : withoutUpdateNotice(html.toString('utf8'));
-      const body = dir === 'pages' ? withLiveReload(page, eventLink({ secret }, file)) : page;
+      const body = dir === 'pages'
+        ? withLiveReload(page, eventLink({ secret }, file), {
+          save: `/${SAVE}/${token}/${encodeURIComponent(file)}`,
+          state: restorable(readState(home, token), await pageVersion(home, file)) ?? undefined,
+        })
+        : page;
       return reply(req, res, 200, 'text/html; charset=utf-8', body);
     } catch {
       return notFound(req, res);

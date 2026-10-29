@@ -477,7 +477,7 @@ const THEME_HELP = `Install a ready-made theme from the catalog at answer-me-wit
 
 am theme add <name> [--use] [--force]
 - Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
-  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>); without it, the theme is still in every new page's theme picker.
 - A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
 - It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
@@ -505,7 +505,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(' ')}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
 - Fonts: name installed fonts only; the default font stack is added as the fallback.
-- font (optional): a font this tool ships, embedded in a page rendered with the theme: ${FONT_NAMES.join(' | ')}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
+- font (optional): a font this tool ships, embedded once in every page that carries the theme: ${FONT_NAMES.join(' | ')}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
   An older version ignores the field and shows the fallback font.
 - requires (optional): the oldest version of this tool the theme supports, as x.y.z. A newer requirement makes this tool skip the theme.
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
@@ -516,7 +516,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
   --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
-- A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
+- A page carries the built-in themes plus every installed user theme, so the toolbar can switch to any of them and the page opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
@@ -753,7 +753,16 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return opts.replace === undefined ? unusedPagePath(file) : file;
+}
+
+// A default name that does not exist yet: a second page in the same second gets -2, -3 … before .html.
+function unusedPagePath(file) {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? file : file.replace(/\.html$/, `-${n}.html`);
+    if (!existsSync(candidate)) return candidate;
+  }
 }
 
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
@@ -1136,8 +1145,12 @@ function cmdHelp(name, { print, fail }) {
 }
 
 function slug(title) {
-  const s = String(title || 'page').trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-  return s || 'page';
+  const s = String(title || '').replace(/[^A-Za-z0-9]+/g, '-').toLowerCase().replace(/^-+|-+$/g, '');
+  if (!s) return 'page';
+  if (s.length <= 24) return s;
+  const cut = s.slice(0, 24);
+  const at = cut.lastIndexOf('-');
+  return at > 0 ? cut.slice(0, at) : cut;
 }
 
 function stamp(d) {

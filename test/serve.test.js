@@ -11,7 +11,7 @@ import { uptime } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { main } from '../src/cli.js';
 import { clean } from '../src/housekeeping.js';
-import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX, withLiveReload, eventLink } from '../src/serve.js';
+import { pageToken, pageLink, validFileName, startServer, serveLink, ServeError, SANDBOX, withLiveReload, eventLink, MAX_STATE_BYTES } from '../src/serve.js';
 import { renderDoc } from '../src/render.js';
 import { unescapeHtml } from '../src/page.js';
 
@@ -542,12 +542,174 @@ test('serve events: the reload script is added only to served pages, never to th
   writeFileSync(join(home, 'pages', 'he.html'), page);
   const r = await get(urlOf('pages', 'he.html'));
   assert.equal(r.status, 200);
-  assert.equal(r.body, withLiveReload(page, eventsOf('he.html')));
-  assert.equal(r.body.replace(/<script data-live="[^"]*">\n[^]*?<\/script>\n(?=<\/body>)/, ''), page, 'only the script is added');
+  const savePath = `/r/${pageToken(srv.secret, 'pages', 'he.html')}/${encodeURIComponent('he.html')}`;
+  assert.equal(r.body, withLiveReload(page, eventsOf('he.html'), { save: savePath }));
+  assert.equal(r.body
+    .replace(/\sdata-am-save="[^"]*"/, '')
+    .replace(/\sdata-am-state="[^"]*"/, '')
+    .replace(/<script data-live="[^"]*">\n[^]*?<\/script>\n(?=<\/body>)/, ''), page, 'only the save link and the script are added');
   const data = JSON.parse(unescapeHtml(r.body.match(/<script data-live="([^"]*)">/)[1]));
   assert.deepEqual(data, { url: eventsOf('he.html'), ui: { updated: 'הדף עודכן', reload: 'רענון' } }, 'labels in the page language');
   assert.equal(readFileSync(join(home, 'pages', 'he.html'), 'utf8'), page, 'the file on disk is unchanged');
   assert.doesNotMatch((await get(urlOf('videos', 'v.html'))).body, /data-live=/);
+});
+
+test('serve events: the state attributes and the reload script find an upper-case body tag', () => {
+  // İ grows when lower-cased, so an index found in a lower-cased copy would land after the closing tag.
+  const page = renderDoc('---\nlang: en\n---\n## A\nText İİİ', {}, {}, {}).html
+    .replace('<body', '<BODY')
+    .replace('</body>', '</BODY>');
+  const out = withLiveReload(page, '/e/t/f.html', { save: '/r/t/f.html' });
+  assert.match(out, /<BODY[^>]* data-am-save="\/r\/t\/f.html">/);
+  assert.match(out, /<\/script>\n<\/BODY>/, 'the reload script still goes before the closing body tag');
+});
+
+test('serve state: a page saves its answers, and the next open gets them back', async () => {
+  const page = renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html;
+  writeFileSync(join(home, 'pages', 'state.html'), page);
+  const token = pageToken(srv.secret, 'pages', 'state.html');
+  const savePath = `/r/${token}/state.html`;
+  const send = (path, { method = 'PUT', body = '', headers = {} } = {}) => new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: srv.port, path, method, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+  const state = { asks: { 'Which cache do we use?': { picked: ['Redis'], touched: true } }, comments: { A: 'Keep it short' } };
+  assert.equal((await send(savePath, { body: JSON.stringify({ reply: state }) })).status, 204);
+  // The record sits in the data directory, under a hash of the token, and no route serves that file.
+  const records = readdirSync(join(home, 'serve-state'));
+  assert.equal(records.length, 1);
+  assert.equal((await get(`/serve-state/${records[0]}`)).status, 404);
+  const reopened = await get(urlOf('pages', 'state.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.deepEqual(restored.reply, state, 'the answers come back with the page');
+  // A remark saved by the other script merges into the same record instead of replacing the answers.
+  assert.equal((await send(savePath, { body: JSON.stringify({ remark: [{ key: 'a|p|x', kind: 'keep', note: '' }] }) })).status, 204);
+  const merged = JSON.parse(unescapeHtml((await get(urlOf('pages', 'state.html'))).body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.deepEqual([merged.reply, merged.remark], [state, [{ key: 'a|p|x', kind: 'keep', note: '' }]]);
+});
+
+// Save a state in one write, or in two writes split inside a multi-byte character.
+const putState = (path, body, { splitAt } = {}) => new Promise((resolve, reject) => {
+  const req = request({ host: '127.0.0.1', port: srv.port, path, method: 'PUT', headers: { 'content-type': 'application/json' } }, (res) => {
+    const chunks = [];
+    res.on('data', (c) => chunks.push(c));
+    res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+  });
+  req.on('error', reject);
+  if (splitAt === undefined) {
+    req.end(body);
+    return;
+  }
+  req.write(body.subarray(0, splitAt));
+  setTimeout(() => req.end(body.subarray(splitAt)), 20);
+});
+
+test('serve state: a multi-byte character split across two reads is saved whole', async () => {
+  writeFileSync(join(home, 'pages', 'split.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'split.html');
+  const body = Buffer.from(JSON.stringify({ reply: { comments: { A: '中文回答' } } }), 'utf8');
+  // Split inside the three bytes of the first character, so each read holds half of it.
+  const at = body.indexOf(Buffer.from('中', 'utf8')) + 1;
+  assert.equal((await putState(`/r/${token}/split.html`, body, { splitAt: at })).status, 204);
+  const reopened = await get(urlOf('pages', 'split.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.equal(restored.reply.comments.A, '中文回答', 'the character survives the split');
+});
+
+test('serve state: a saved answer with $ sequences comes back unchanged', async () => {
+  writeFileSync(join(home, 'pages', 'dollar.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'dollar.html');
+  const text = "cost $1 and $& and $` and $$";
+  assert.equal((await putState(`/r/${token}/dollar.html`, JSON.stringify({ reply: { comments: { A: text } } }))).status, 204);
+  const reopened = await get(urlOf('pages', 'dollar.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.equal(restored.reply.comments.A, text, 'replace() does not expand $ in the restored state');
+});
+
+test('serve state: the stored record stays under the cap after a merge', async () => {
+  writeFileSync(join(home, 'pages', 'merged.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'merged.html');
+  const reply = { comments: { A: 'r'.repeat(40 * 1024) } };
+  const remark = [{ key: 'a|p|x', kind: 'keep', note: 'm'.repeat(40 * 1024) }];
+  assert.equal((await putState(`/r/${token}/merged.html`, JSON.stringify({ reply }))).status, 204);
+  const second = await putState(`/r/${token}/merged.html`, JSON.stringify({ remark }));
+  assert.equal(second.status, 413, 'the merged record may not pass the cap');
+  const reopened = await get(urlOf('pages', 'merged.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.deepEqual(restored.reply, reply);
+  assert.equal(restored.remark, undefined, 'the refused patch was not stored');
+});
+
+test('serve state: the write route refuses the wrong token, a page that is gone, and a body over the cap', async () => {
+  writeFileSync(join(home, 'pages', 'guard.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'guard.html');
+  const send = (path, { method = 'PUT', body = '{}', headers = { 'content-type': 'application/json' } } = {}) => new Promise((resolve, reject) => {
+    const req = request({ host: '127.0.0.1', port: srv.port, path, method, headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.end(method === 'PUT' ? body : undefined);
+  });
+  assert.equal((await send(`/r/${'A'.repeat(token.length)}/guard.html`)).status, 404, 'a wrong token is not found');
+  assert.equal((await send(`/r/${token}/missing.html`)).status, 404, 'a page that is not there has no state');
+  assert.equal((await send(`/r/${token}/guard.html`, { headers: { origin: 'https://example.test' } })).status, 404, 'a non-null Origin is refused');
+  assert.equal((await send(`/r/${token}/guard.html`, { headers: { 'sec-fetch-dest': 'document' } })).status, 404, 'a non-empty Sec-Fetch-Dest is refused');
+  const post = await send(`/r/${token}/guard.html`, { method: 'POST' });
+  assert.equal(post.status, 405);
+  assert.equal(post.headers.allow, 'PUT, OPTIONS');
+  const preflight = await send(`/r/${token}/guard.html`, { method: 'OPTIONS' });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers['access-control-allow-origin'], 'null');
+  assert.equal(preflight.headers['access-control-allow-methods'], 'PUT, OPTIONS');
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const before = readdirSync(join(home, 'serve-state')).length;
+  const big = JSON.stringify({ reply: { text: 'x'.repeat(MAX_STATE_BYTES) } });
+  const over = await send(`/r/${token}/guard.html`, { body: big });
+  assert.equal(over.status, 413, 'a body over the cap is refused');
+  assert.equal(readdirSync(join(home, 'serve-state')).length, before, 'a refused body writes nothing');
+});
+
+test('serve state: a re-render drops the saved answers instead of attaching them to the new page', async () => {
+  writeFileSync(join(home, 'pages', 'version.html'), renderDoc('---\nlang: en\n---\n## A\nFirst', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'version.html');
+  const save = () => new Promise((resolve, reject) => {
+    const req = request({
+      host: '127.0.0.1', port: srv.port, path: `/r/${token}/version.html`, method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+    }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+    req.on('error', reject);
+    req.end(JSON.stringify({ reply: { asks: { 'Old question?': { picked: ['a'], touched: true } } } }));
+  });
+  assert.equal(await save(), 204);
+  assert.match((await get(urlOf('pages', 'version.html'))).body, /data-am-state=/, 'the same page gets it back');
+  await new Promise((r) => setTimeout(r, 20)); // a new mtime, so the version differs
+  writeFileSync(join(home, 'pages', 'version.html'), renderDoc('---\nlang: en\n---\n## B\nSecond', {}, {}, {}).html);
+  const after = await get(urlOf('pages', 'version.html'));
+  assert.doesNotMatch(after.body, /data-am-state=/, 'the state of the old page is not handed to the new one');
+  assert.match(after.body, /data-am-save=/, 'the new page can still save its own');
+});
+
+test('serve state: am clean removes the record with its page', async () => {
+  writeFileSync(join(home, 'pages', 'cleanme.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'cleanme.html');
+  await new Promise((resolve, reject) => {
+    const req = request({
+      host: '127.0.0.1', port: srv.port, path: `/r/${token}/cleanme.html`, method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+    }, (res) => { res.resume(); res.on('end', resolve); });
+    req.on('error', reject);
+    req.end(JSON.stringify({ reply: { comments: { A: 'note' } } }));
+  });
+  assert.ok(readdirSync(join(home, 'serve-state')).length > 0);
+  clean(home, { all: true });
+  assert.deepEqual(readdirSync(join(home, 'serve-state')), [], 'the state goes with the page');
 });
 
 test('serve events: the watcher closes with the last stream, and a pages/ folder made again is watched again', async () => {

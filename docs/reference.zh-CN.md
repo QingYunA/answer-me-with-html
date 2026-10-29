@@ -190,7 +190,7 @@ AM_EOF
 
 页面重新渲染后，自动 ID 可能已经指向另一个面板。这时按字母 patch 会改错面板，而且没有警告：工具分不清这是改错了还是改名。要按字母 patch，先在草稿里给面板写显式字母。
 
-页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。会话不能写入该位置时（宿主沙箱只允许写工作区），不带 `-o` 的 `am render` 和 `am video` 会改为把页面存到系统临时目录里的私有文件夹（`answer-me-with-html-<uid>/pages/`，权限 0700；不是当前用户私有的文件夹会被拒绝使用），并给出提示；系统可能会清理该文件夹。`am clean` 和 `--replace` 同样覆盖这个文件夹，`am serve` 不覆盖。`am patch` 不会改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。渲染失败时会一次列出草稿里的全部错误（按行号排序），不写页面。草稿来自 stdin（`am render -`）且有错误或警告时，会存成数据目录下的 `drafts/<标题>-<时间>.md`，输出里有 `draft: <路径>`；行号与该文件一致，只改被标出的行，再运行 `am render <路径>`。`drafts/` 里的草稿在无警告渲染后自动删除；以文件参数给出的草稿不会被复制。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
+页面默认保存在 `~/.answer-me-with-html/pages/`。环境变量 `AM_HOME` 可以改位置。会话不能写入该位置时（宿主沙箱只允许写工作区），不带 `-o` 的 `am render` 和 `am video` 会改为把页面存到系统临时目录里的私有文件夹（`answer-me-with-html-<uid>/pages/`，权限 0700；不是当前用户私有的文件夹会被拒绝使用），并给出提示；系统可能会清理该文件夹。`am clean` 和 `--replace` 同样覆盖这个文件夹，`am serve` 不覆盖。`am patch` 不会改位置。`-o` 指定的是文件，不是文件夹；建议写成 `page.html`。明确指定不带扩展名的文件名仍可使用，CLI 会提示建议加上 `.html`。带 STE 或代码警告的页面不会自动在浏览器里打开（加 `--open` 仍可打开）。渲染失败时会一次列出草稿里的全部错误（按行号排序），不写页面。草稿来自 stdin（`am render -`）且有错误或警告时，会存成数据目录下的 `drafts/<名称>-<时间>.md`（名称取自标题：只保留小写 ASCII 字母和数字，其他字符连续出现时合成一个 `-`，最多 24 个字符，没有可用字符时用 `page`），输出里有 `draft: <路径>`；行号与该文件一致，只改被标出的行，再运行 `am render <路径>`。`drafts/` 里的草稿在无警告渲染后自动删除；以文件参数给出的草稿不会被复制。改好草稿后再渲染，运行 `am render … --replace <页面>`：新页面写好后会删掉上一版，所以每个回答在 `pages/` 里只留一份。默认文件夹只有你自己的用户能进入（权限 0700），共用主机上的其他用户读不到你的页面；已经存在的 `AM_HOME` 文件夹保持原有权限。
 
 ## 导出页面
 
@@ -237,7 +237,7 @@ am export page.html --pdf page.pdf --png out/
 
 打补丁（`am patch`）的页面会保留原来的语言，除非稿件里声明了语言。
 
-图表里的文字按各自文字系统的单位换行：汉字、假名和全角字符一字一单位；用空格分词的文字按词换行；不用空格分词的文字（泰文、老文、高棉文、缅甸文）按词典分词，长句不会把节点撑宽。整行放不下的词会退回到按字形簇（grapheme）拆分，组合符号不会和基字符分开。
+图表里的文字按各自文字系统的单位换行：汉字、假名和全角字符一字一单位；用空格分词的文字按词换行；不用空格分词的文字（泰文、老文、高棉文、缅甸文）按词典分词，长句不会把节点撑宽。整行放不下的词会退回到按字形簇（grapheme）拆分，组合符号不会和基字符分开。在 `flow` 的节点或边标签里写字面量 `\n` 可以强制换行；强制换行后的每一行仍按宽度换行。分组标题保持原样，不参与换行。
 
 写作检查按语言走。中文、英文和日文保持原有规则。其他语言只用语言中立的规则：句长（按词数计，中日文按字数计）和段长。不用空格分词的文字，按分词器找到的词计句长，和图表换行用的是同一份文字列表。
 
@@ -261,10 +261,10 @@ am export page.html --pdf page.pdf --png out/
 - 字体只能写本机已安装的字体。系统会自动加上默认字体作为回退，没装这些字体的读者也能正常阅读。
 - `css` 里每条选择器都以 `&` 开头。`&` 代表主题的根节点，这样这些规则只在这个主题下生效。
 - 页面字号跟随读者的 `scale` 设置。用 `var(--am-fs-*)`（页面文字尺寸）或 `calc(Npx * var(--am-scale, 1))`；工具栏保持自己的大小。
-- `font`（可选）写本工具自带的字体名。用这个主题生成的页面会内嵌该字体，不需要联网，其他主题的页面也不会变大。目前只有 `bangers`（[Bangers](https://github.com/googlefonts/bangers)，SIL OFL 1.1）；在 `css` 里使用它的字体族，例如 `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`。不认识这个字段的旧版本会忽略它，显示回退字体。视频页面不内嵌这个字体。
+- `font`（可选）写本工具自带的字体名。每个带上这个主题的页面都会内嵌该字体，读者在工具栏切换过去就能看到，不需要联网；没有带这类主题的页面不会变大。目前只有 `bangers`（[Bangers](https://github.com/googlefonts/bangers)，SIL OFL 1.1）；在 `css` 里使用它的字体族，例如 `& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }`。不认识这个字段的旧版本会忽略它，显示回退字体。视频页面不内嵌这个字体。
 - `requires`（可选）写主题支持的最低版本，格式 `x.y.z`。版本更低时，这个主题会被跳过，并提示 `needs Answer me with HTML x.y.z or newer`；不认识这个字段的旧版本会忽略它。
 - 文件要自成一体：不要写指向 `http:`、`https:` 或 `//` 的 `url()` 或 `image-set()`，不要 `@import`，不要 `@font-face`，也不要用反斜杠转义（转义可以绕过检查）。外链会在每次打开页面时发出请求，而页面要能离线使用。`am theme check` 会对这些情况给出警告，已有的主题仍然可用；主题库和 `am theme add` 会拒收它们。
-- 每个页面都内嵌了内置主题和它自己的主题，所以换一台电脑也能打开。
+- 每个页面都内嵌了内置主题和所有已安装的用户主题，工具栏的选择器里都能选到，所以换一台电脑也能打开。
 - `am theme check notes` 会检查亮暗两套配色里缺少的变量、无效的颜色值和过低的对比度，对外部资源给出警告，并生成两页包含全部组件的样张。
 
 `css` 可以选中的类名保持稳定：以后的版本会保留其中每一个，也不会再新增必填的颜色变量。
@@ -301,7 +301,7 @@ am export page.html --pdf page.pdf --png out/
 
 ### 主题库
 
-[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件，所以没用到它的页面不会带上它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想做一个主题并提交到主题库，让你的 agent 按 [/themes/make.md](https://answer-me-with-html.com/themes/make.md) 的步骤做；其他方式（网站编辑器、issue 表单或 PR）见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
+[answer-me-with-html.com/zh/themes/](https://answer-me-with-html.com/zh/themes/) 展示现成的主题，每个都在浏览器里实时渲染亮色和暗色，并附上安装命令：`comic`、`manga` 和 `pop`，它们使用 Bangers 字体。主题库里的主题就是主题文件夹里的一个文件；装好之后，每个新页面的工具栏主题选择器里都会出现它。主题清单在 [/themes/index.json](https://answer-me-with-html.com/themes/index.json)（每个文件的名字、版本、大小和 sha256），文件本身在 [`marketplace/themes/`](../marketplace/themes)。想做一个主题并提交到主题库，让你的 agent 按 [/themes/make.md](https://answer-me-with-html.com/themes/make.md) 的步骤做；其他方式（网站编辑器、issue 表单或 PR）见 [CONTRIBUTING.md](../CONTRIBUTING.md#theme-catalog)。
 
 
 #### 安装主题：`am theme add`
@@ -314,12 +314,12 @@ am theme remove <name>         # 删除一个主题文件
 ```
 
 - `am theme add <name>` 读取主题库清单（`https://answer-me-with-html.com/themes/index.json`，或环境变量 `AM_CATALOG_URL` 指向的地址：只接受 https，或指向 `localhost`、`127.0.0.1`、`[::1]` 的 http，因为明文 http 下清单和文件可以被一起替换，sha256 就起不到作用；重定向到不符合这条规则的地址会被拒绝），从同一个地址下载 `themes/<name>.json`，并按清单核对大小和 sha256。随后做主题库 CI 的同一套检查：是有效的主题文件、没有对比度错误、没有外部资源。文件先写入临时文件再改名保存到 `~/.answer-me-with-html/themes/<name>.json`，中途中断不会留下半个文件。只接受主题库里的名字，不接受网址或路径。`requires` 高于当前版本的主题会被拒绝，并说明需要哪个版本。网络请求 8 秒超时。
-- `--use` 同时设为默认主题，等同 `am config set theme <name>`，不会再问别的。
+- `--use` 同时设为默认主题，等同 `am config set theme <name>`，不会再问别的。不加时，装好的主题也已经出现在每个新页面的主题选择器里；之后可以用 `am config set theme <name>` 设为默认。
 - 同名文件如果不是主题库给的那份，永远不会被覆盖，因为它可能是你自己的主题：命令会停下并提示 `--force`。完全相同的文件会提示已经安装。如果文件仍然和主题库给的一模一样，新版本会直接替换，不需要 `--force`。
 - 每个主题的来源记在数据目录的 `state.json` 里（`catalogThemes`：名字、已安装文件的版本和 sha256）。主题文件夹里只放主题文件。没有记录的文件算你自己的（`local`）。
 - `am theme list` 不联网。安装后被你改过的文件显示为 `catalog, edited`。加 `--remote` 会再读取主题库，标出有更新的主题和你还没有的主题。
 - `am theme update` 更新每个来自主题库且安装后没改过的主题；你改过的文件会被跳过并给出提示（`am theme add <name> --force` 可替换）。`am theme update <name>` 只更新一个。
-- `am theme remove <name>` 删除文件和它的记录（内置主题不能删）。如果它是默认主题，默认值会回到 `auto`。已经生成的页面外观不变，因为页面自带主题。
+- `am theme remove <name>` 删除文件和它的记录（内置主题不能删）。如果它是默认主题，默认值会回到 `auto`。已经生成的页面外观不变，因为页面内嵌了生成时带的主题。
 - 输出里只有主题名和版本号。主题库里的标签和描述是给网站看的，命令不会打印，所以主题库里的文字进不了 agent 的上下文。
 - 0.5.3 之前的版本没有 `am theme add`：按主题库页面上的方式手动保存文件（`curl` 或 PowerShell）。
 
@@ -342,12 +342,12 @@ am serve --tailscale  # 只监听 Tailscale 地址；tailnet 内的任何设备�
 - `--tailscale` 只监听这台机器的 Tailscale IPv4 地址（不是 `0.0.0.0`，也不是 `127.0.0.1`），所以只有你 tailnet 里的设备能连上。链接以 MagicDNS 名称开头（`http://<机器名>.<tailnet>.ts.net:<端口>`），MagicDNS 关闭时用 Tailscale 地址。连接是明文 `http://`，但 tailnet 内的流量由 WireGuard 加密。它读取 `tailscale status --json`，不会改动任何 Tailscale 配置。需要 `tailscale` CLI 在 `PATH` 里（macOS 上也可以用 App 自带的 CLI），并且 Tailscale 已登录、正在运行。不能与 `--lan` 或 `--public-url` 同用。链接在重启后仍然有效：密钥保存在 `~/.answer-me-with-html/serve-secret`，所以手机上的书签不会失效；要让所有链接失效，先停掉服务，删除该文件，再重新启动。如果监听时报 "cannot assign requested address"（Tailscale 的 userspace-networking 模式没有网卡），tailnet 设备请用下面的 HTTPS 做法；`--lan` 只能让同一局域网的设备访问。
 - `--secret-file <路径>` 把链接密钥存在文件里，而不是每次启动都新生成，所以链接在重启后仍然有效。文件内容是 64 个小写十六进制字符，只有你自己能读（权限 0600）；文件不存在时会自动创建。组或其他用户可读的文件会被 `am serve` 拒绝。
 - 已开启 HTTPS 证书的 tailnet 上用 HTTPS：运行 `tailscale serve --bg 8765`，再运行 `am serve --public-url https://<机器名>.<tailnet>.ts.net`。`tailscale serve` 会原样传递 `.ts.net` 的 `Host`，这正是 `--public-url` 接受的名称。开启 HTTPS 会把你的机器名公布到证书透明度（Certificate Transparency）日志里（[详情](https://tailscale.com/kb/1153/enabling-https)）。`tailscale serve --https=443 off` 可以撤销。
-- 在手机上，`http(s)` 链接里的 Reply 作答和评论只保留到标签页关闭，而且手机浏览器会丢弃后台标签页：切换应用之前先复制回复。
+- 在手机上，`http(s)` 链接里的 Reply 作答、评论和批注会边输入边存到服务端，所以浏览器丢弃的标签页再打开同一条链接时仍然能看到它们。只有服务端保留密钥（`--secret-file` 或 `--tailscale`）时，重启过的 `am serve` 才能找回它们：链接不变，而新的密钥会生成一条找不到旧记录的新链接。它们存在 `~/.answer-me-with-html/serve-state/`（每页一个文件，以页面 token 的哈希命名，只能通过该 token 读到）；页面重新渲染后不再恢复它们，旧记录会一直留到 `am clean` 把它删除。从 `file://` 打开的页面仍像以前一样存在浏览器的本地存储里。
 - 不加这些参数时，服务只响应 `localhost`、`127.0.0.1` 和 `[::1]`，请求其他主机名或 IP 一律返回 404。不要把这个端口暴露到公网。
 - 链接按页面区分：每个链接只带这一页的令牌，打不开别的页面；服务重启后所有旧链接失效，除非密钥存在文件里（`--tailscale`、`--secret-file`）。服务不列目录，只提供 `.html` 文件。
 - 把链接当作这一页的密码：能连到这个端口、又拿到链接的人都能打开页面，包括同一台机器上的其他用户。不要把链接发给别人。
 - 给隧道单独用一个本地端口。不要复用曾经打开过其他服务或其他主机页面的端口：那些页面可能在浏览器里为这个地址留下了 service worker，之后在这个端口上打开的页面它都能看到。
-- 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、批注和标注只保留到关闭页面为止，关闭前请先复制回复。
+- 每个页面在浏览器里各自隔离，一个页面的脚本读不到其他页面。因此通过 `http://` 链接打开时，Reply 里的选择、评论和批注会边输入边存到服务端，关掉页面再打开同一条链接就能看到（见下面的 `am serve`）。
 - 页面文件变了（比如 `am patch` 之后，或重新渲染到同一个文件），打开着的页面会自动刷新，并停在原来的滚动位置。如果你已经在页面上做了选择、写了批注或做了标注，页面不会自动刷新，而是显示「页面已更新 · 刷新」，让你先复制回复。这是服务在发送页面时加上的，文件本身不变：用 `file://` 打开的页面不会自动刷新。页面用自己链接里的令牌监听 `/e/<令牌>/<文件>`，这个连接只传「已变化」，不传页面内容。
 
 ## 更新与清理
@@ -383,7 +383,7 @@ am serve --tailscale  # 只监听 Tailscale 地址；tailnet 内的任何设备�
 
 配置保存在 `~/.answer-me-with-html/config.json`。稿件里写明的主题优先于默认值。`--open` 和 `--no-open` 只影响这一次。
 
-`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面只在标签页关闭前保留你的作答，所以开启后作答会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
+`close_after_reply` 只对开启期间生成的页面生效。`am serve` 提供的页面会把作答存在服务端，所以开启后作答不会随标签页一起消失，剪贴板里仍有回复。页面里的链接（比如目录链接）跳转过之后，浏览器会拒绝关闭标签页，这时页面会提示你自己关闭。
 
 ## 少一点主动
 

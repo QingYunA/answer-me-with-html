@@ -45,8 +45,15 @@ function themeSet(user = [], broken = new Map(), folderWarning) {
       if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
       return `Theme "${name}" is not installed. Choose one of: ${names(scope).join(' | ')}`;
     },
-    // The themes a page carries: the built-in ones for its scope, plus its own theme when that is a user theme.
-    embedFor: (name, scope) => [...themes(scope), ...user.filter((t) => t.name === name && t.scope.includes(scope))],
+    // The themes a page carries: the built-in ones for its scope, then every installed user theme for that scope, sorted by name,
+    // so the toolbar picker lists them all and every one can be selected. A video has no picker, so it carries only its own theme
+    // (when that is a user theme). The page's own theme is in the user list already.
+    embedFor: (name, scope) => {
+      const builtins = themes(scope);
+      const own = user.filter((t) => t.name === name && t.scope.includes(scope));
+      if (scope !== 'page') return [...builtins, ...own];
+      return [...builtins, ...user.filter((t) => t.scope.includes(scope)).sort((a, b) => a.name.localeCompare(b.name))];
+    },
     warnings: [...(folderWarning ? [folderWarning] : []), ...[...broken.values()].map(({ file, reason }) => `${file} skipped: ${reason}`)],
   });
 }

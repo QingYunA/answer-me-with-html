@@ -109,6 +109,7 @@ test('theme add: downloads, verifies and writes the file, and records the instal
   const r = await run(home, ['theme', 'add', 'comic']);
   assert.equal(r.code, 0, r.all);
   assert.match(r.out, /^✓ Installed comic 1\.0\.0: /m);
+  assert.match(r.out, /It now appears in every new page's theme picker\. Make it the default: am theme add comic --use, or am config set theme comic/);
   assert.deepEqual(readFileSync(join(themeDir(home), 'comic.json')), files.comic);
   assert.deepEqual(state(home).catalogThemes, { comic: { version: '1.0.0', sha256: sha(files.comic) } });
   assert.deepEqual(readdirSync(themeDir(home)), ['comic.json'], 'no temporary file is left');

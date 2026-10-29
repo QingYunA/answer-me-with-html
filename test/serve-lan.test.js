@@ -4,7 +4,7 @@ import { request } from 'node:http';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lanIPv4Addresses, publicUrlOrigin, pageLink, startServer, readServeInfo, ServeError, withLiveReload, eventLink } from '../src/serve.js';
+import { lanIPv4Addresses, publicUrlOrigin, pageLink, pageToken, startServer, readServeInfo, ServeError, withLiveReload, eventLink } from '../src/serve.js';
 import { renderDoc, withoutUpdateNotice } from '../src/render.js';
 
 function fetch(port, path, host) {
@@ -217,8 +217,10 @@ test('a page goes to a LAN or public address without its new-version button, and
   try {
     srv = await startServer({ home, port: 0, lan: true, lanAddresses: ['192.168.8.20'], publicUrl: 'https://render.example' });
     const path = new URL(pageLink(srv, 'pages', 'test.html')).pathname;
-    // Served pages also carry the reload script (src/runtime/live.js), added at serve time and nothing else.
-    const served = (html) => withLiveReload(html, eventLink(srv, 'test.html'));
+    // Served pages also carry the reload script (src/runtime/live.js) and the reply-state save link, added at serve time.
+    const served = (html) => withLiveReload(html, eventLink(srv, 'test.html'), {
+      save: `/r/${pageToken(srv.secret, 'pages', 'test.html')}/test.html`,
+    });
     for (const host of ['127.0.0.1:' + srv.port, 'localhost']) assert.equal(await body(srv.port, path, host), served(page), host);
     for (const host of ['192.168.8.20:' + srv.port, 'render.example']) {
       const shared = await body(srv.port, path, host);

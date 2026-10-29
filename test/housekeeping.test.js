@@ -58,6 +58,59 @@ test('clean: --dry-run deletes nothing; --all deletes every page and video', () 
   assert.ok(!existsSync(fresh));
 });
 
+test('clean: a state saved recently goes with its page when the same run deletes the page', () => {
+  const page = file('pages/old.html', 10, 40);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'abc.json');
+  writeFileSync(record, JSON.stringify({ file: 'old.html', version: '1:2:3', reply: {} }));
+  utimesSync(record, NOW / 1000, NOW / 1000); // the state itself is new, so only its page decides
+  const bytes = 10 + lstatSync(record).size;
+  const r = clean(home, { now: NOW });
+  assert.equal(r.files, 2);
+  assert.equal(r.bytes, bytes, 'the total counts the state record as well as the page');
+  assert.ok(!existsSync(page) && !existsSync(record), 'the page and its state go in one run');
+});
+
+test('clean: keeps the state of a page that stays', () => {
+  file('pages/new.html', 10, 1);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'keep.json');
+  writeFileSync(record, JSON.stringify({ file: 'new.html', version: '1:2:3' }));
+  utimesSync(record, NOW / 1000, NOW / 1000);
+  assert.equal(clean(home, { now: NOW }).files, 0);
+  assert.ok(existsSync(record), 'a live page keeps its record');
+});
+
+test('clean: leaves a state write in progress alone', () => {
+  file('pages/old.html', 10, 40);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'abc.json');
+  writeFileSync(record, JSON.stringify({ file: 'old.html', version: '1:2:3' }));
+  utimesSync(record, NOW / 1000, NOW / 1000);
+  const writing = join(home, 'serve-state', 'abc.json.123.abcd.tmp');
+  writeFileSync(writing, '{"file":"old.html"');
+  utimesSync(writing, NOW / 1000, NOW / 1000);
+  const r = clean(home, { all: true, now: NOW });
+  assert.ok(!existsSync(record), 'the finished record goes with its page');
+  assert.ok(existsSync(writing), 'the file writeState is about to rename is left alone');
+  assert.equal(r.files, 2);
+});
+
+test('clean: removes a state .tmp file that a stopped write left behind', () => {
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const old = join(home, 'serve-state', 'abc.json.1.aaaa.tmp');
+  writeFileSync(old, '{"file":"x.html"');
+  utimesSync(old, (NOW - 2 * 60 * 60 * 1000) / 1000, (NOW - 2 * 60 * 60 * 1000) / 1000);
+  const fresh = join(home, 'serve-state', 'abc.json.2.bbbb.tmp');
+  writeFileSync(fresh, '{"file":"x.html"');
+  utimesSync(fresh, NOW / 1000, NOW / 1000);
+  const r = clean(home, { now: NOW });
+  assert.ok(!existsSync(old), 'a .tmp file two hours old is removed');
+  assert.ok(existsSync(fresh), 'a .tmp file being written is kept');
+  assert.equal(r.files, 1);
+  assert.equal(r.bytes, Buffer.byteLength('{"file":"x.html"'));
+});
+
 const ROOTS = ['pages', 'videos', 'cache'];
 const otherRoot = (dir) => (dir === 'pages' ? 'videos' : 'pages');
 const skipWin = process.platform === 'win32' ? 'creating file symlinks on Windows needs privileges' : false;

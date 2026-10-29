@@ -10,10 +10,13 @@ import { DRAWING } from '../themes/type-scale.js';
 const FS = DRAWING.node;
 const LH = 17;
 const TEXT_MAX = 150;
+const EDGE_MAX = 240;
 const EDGE_FS = DRAWING.edge;
 const CLUSTER_FS = DRAWING.cluster;
 const CLUSTER_LABEL_H = 15;
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
+// Mermaid-trained agents write a literal \n for a line break. A backslash and an n in a label mean one too.
+const FORCED_BREAK = /\\n/;
 
 // Shape brackets: match longer opening brackets first.
 const BRACKETS = [
@@ -47,6 +50,7 @@ export default {
   summary: 'Flowchart / architecture diagram (automatic layout)',
   syntax: `\`\`\`flow [TB|LR|BT|RL]
 A -> B: label                 ← solid line; text after the colon is the edge label
+A -> B: first\\nsecond line    ← a literal \\n in a node or edge label forces a line break
 A --> C                       ← dashed line
 A -> B -> C                   ← chain
 A -> B & C                    ← fan-out
@@ -245,8 +249,24 @@ function parseNode(t, start, line) {
   return { node: { id: label, label, shape: bracket?.shape ?? 'rect', explicit: Boolean(bracket), hi }, end };
 }
 
+// A literal \n forces a line break; each forced line still wraps by width as before.
+function labelLines(label, maxWidth, size) {
+  return String(label).split(FORCED_BREAK).flatMap((part) => wrap(part, maxWidth, size));
+}
+
+// Edge labels are not wrapped unless they carry a forced break: that keeps a long label as it was drawn before.
+function edgeText(label) {
+  const parts = String(label).split(FORCED_BREAK);
+  const lines = parts.length > 1 ? parts.flatMap((part) => wrap(part, EDGE_MAX, EDGE_FS)) : [String(label)];
+  return {
+    lines,
+    width: Math.max(...lines.map((line) => measure(line, EDGE_FS))) + 10,
+    height: lines.length === 1 ? 18 : lines.length * LH,
+  };
+}
+
 function nodeSize(node) {
-  const lines = wrap(node.label, TEXT_MAX, FS);
+  const lines = labelLines(node.label, TEXT_MAX, FS);
   const tw = Math.max(...lines.map((l) => measure(l, FS)));
   const th = lines.length * LH;
   const w = Math.max(tw + 28, 64);
@@ -301,7 +321,9 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     });
   });
   edges.forEach((e, i) => {
-    const label = e.label ? { label: e.label, width: measure(e.label, EDGE_FS) + 12, height: 18, labelpos: 'c' } : {};
+    const size = e.label ? edgeText(e.label) : null;
+    // Dagre reserves 2px more than the drawn label box, as it always did.
+    const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: 'c' } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
   dagre.layout(g);
@@ -381,8 +403,8 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
     const pts = data.points;
     for (let k = 1; k < pts.length; k++) segments.push([pts[k - 1], pts[k]]);
     if (e.label) {
-      const w = measure(e.label, EDGE_FS) + 10;
-      boxes.push([data.x - w / 2, data.y - 9, data.x + w / 2, data.y + 9]);
+      const { width: w, height: h } = edgeText(e.label);
+      boxes.push([data.x - w / 2, data.y - h / 2, data.x + w / 2, data.y + h / 2]);
     }
   });
   return groups.map((grp, i) => {
@@ -481,8 +503,8 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
     const path = `<path class="am-edge${e.dashed ? ' am-edge--dashed' : ''}" d="${smoothPath(pts)}" marker-end="url(#${head})"/>`;
     const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>`;
     if (!e.label) return `${open}${path}</g>`;
-    const w = measure(e.label, EDGE_FS) + 10;
-    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH, '', pageDir)}</g></g>`;
+    const { lines, width: w, height: h } = edgeText(e.label);
+    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="3"/>${textLines(lines, data.x, data.y, LH, '', pageDir)}</g></g>`;
   });
 
   const nodeSvg = [...nodes.values()].map((n) => {
