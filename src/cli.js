@@ -691,7 +691,16 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return opts.replace === undefined ? unusedPagePath(file) : file;
+}
+
+// A default name that does not exist yet: a second page in the same second gets -2, -3 … before .html.
+function unusedPagePath(file) {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? file : file.replace(/\.html$/, `-${n}.html`);
+    if (!existsSync(candidate)) return candidate;
+  }
 }
 
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.

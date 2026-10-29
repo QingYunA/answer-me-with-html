@@ -88,6 +88,29 @@ test('cli render: default page names are ASCII and at most 24 characters from th
   assert.equal(await render('TCP Three-Way Handshake'), 'tcp-three-way-handshake-20260102-030405.html');
 });
 
+test('cli render: a second default page in the same second gets -2 and keeps both', async () => {
+  const { home } = freshHome();
+  const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const render = async (body) => {
+    const out = sink();
+    const code = await main(['render', '-', '--no-open'], {
+      stdout: out.stream, stderr: sink().stream,
+      stdin: Readable.from([`---\ntitle: 更新评估\n---\n## A one\n${body}\n`]),
+      env: { AM_HOME: home, AM_NO_UPDATE_CHECK: '1' }, cwd: home, now: () => now,
+    });
+    assert.equal(code, 0);
+    return out.text.match(/^✓ (.+\.html)$/m)[1];
+  };
+
+  const first = await render('First body.');
+  const second = await render('Second body.');
+  assert.equal(basename(first), 'page-20260102-030405.html');
+  assert.equal(basename(second), 'page-20260102-030405-2.html');
+  assert.ok(existsSync(first));
+  assert.ok(existsSync(second));
+  assert.match(readFileSync(first, 'utf8'), /First body\./);
+});
+
 test('cli video: the summary line names the theme', async () => {
   const r = await run(['video', '-', '--voice', 'off', '--theme', 'shadcn'], { stdin: '---\ntitle: V\n---\n## A\n> 一句。\n' });
   assert.equal(r.code, 0, r.err);
