@@ -1073,8 +1073,12 @@ function cmdHelp(name, { print, fail }) {
 }
 
 function slug(title) {
-  const s = String(title || 'page').trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-  return s || 'page';
+  const s = String(title || '').replace(/[^A-Za-z0-9]+/g, '-').toLowerCase().replace(/^-+|-+$/g, '');
+  if (!s) return 'page';
+  if (s.length <= 24) return s;
+  const cut = s.slice(0, 24);
+  const at = cut.lastIndexOf('-');
+  return at > 0 ? cut.slice(0, at) : cut;
 }
 
 function stamp(d) {

@@ -46,7 +46,7 @@ test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stat
   const r = await run(['render', '-'], { stdin: GOOD });
   assert.equal(r.code, 0, r.err);
   const file = r.out.match(/✓ (.+\.html)/)[1];
-  assert.ok(file.startsWith(join(dir, 'pages', 'CLI-测试-')));
+  assert.ok(file.startsWith(join(dir, 'pages', 'cli-')));
   assert.match(readFileSync(file, 'utf8'), /<h1>CLI 测试<\/h1>/);
   assert.match(r.out, /sheet · blueprint · 1 panel · flow×1/);
   assert.match(r.out, /STE ✓ 0 warnings/);
@@ -60,9 +60,32 @@ test('cli render: the injected clock sets the default file name; the injected op
     env: { AM_HOME: dir, AM_NO_UPDATE_CHECK: '1' }, cwd: dir, now: () => now, open: (f) => opened.push(f),
   });
   assert.equal(await call(['render', '-']), 0);
-  assert.deepEqual(opened, [join(dir, 'pages', 'CLI-测试-20260102-030405.html')]);
+  assert.deepEqual(opened, [join(dir, 'pages', 'cli-20260102-030405.html')]);
   assert.equal(await call(['render', '-', '--no-open']), 0);
   assert.equal(opened.length, 1, '--no-open does not open');
+});
+
+test('cli render: default page names are ASCII and at most 24 characters from the title', async () => {
+  const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const render = async (title) => {
+    const out = sink();
+    const code = await main(['render', '-', '--no-open'], {
+      stdout: out.stream, stderr: sink().stream,
+      stdin: Readable.from([`---\ntitle: ${title}\n---\n## A one\nText.\n`]),
+      env: { AM_HOME: dir, AM_NO_UPDATE_CHECK: '1' }, cwd: dir, now: () => now,
+    });
+    assert.equal(code, 0);
+    return basename(out.text.match(/^✓ (.+\.html)$/m)[1]);
+  };
+
+  assert.equal(await render('更新评估'), 'page-20260102-030405.html');
+
+  const mixed = (await render('answer-me-with-html 0.5.3 → 0.5.10 更新评估')).replace(/-\d{8}-\d{6}\.html$/, '');
+  assert.match(mixed, /^[a-z0-9-]+$/, mixed);
+  assert.ok(mixed.length <= 24, mixed);
+  assert.equal(mixed, 'answer-me-with-html-0-5');
+
+  assert.equal(await render('TCP Three-Way Handshake'), 'tcp-three-way-handshake-20260102-030405.html');
 });
 
 test('cli video: the summary line names the theme', async () => {
@@ -763,6 +786,15 @@ test('cli render: a failed stdin draft is saved verbatim under drafts/ and its p
   assert.equal(dirname(path), join(home, 'drafts'));
   assert.match(basename(path), /^[^/]+-\d{8}-\d{6}\.md$/);
   assert.equal(readFileSync(path, 'utf8'), THREE_ERRORS);
+});
+
+test('cli render: a saved stdin draft name follows the same ASCII rule as a page', async () => {
+  const { home, env } = freshHome();
+  const r = await run(['render', '-'], { stdin: '---\ntitle: 更新评估\n---\n## A\nUtilize the tool.\n', env });
+  assert.equal(r.code, 0);
+  const path = r.out.match(/^ {2}draft: (.+)$/m)[1];
+  assert.equal(dirname(path), join(home, 'drafts'));
+  assert.match(basename(path), /^page-\d{8}-\d{6}\.md$/);
 });
 
 test('cli render: a strict STE failure and a fatal parse error with a line keep the stdin draft too', async () => {

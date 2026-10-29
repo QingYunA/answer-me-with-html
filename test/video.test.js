@@ -600,7 +600,7 @@ async function run(args, opts = {}) {
 test('cli video: writes to AM_HOME/videos and prints scenes, narration, duration and voice', async () => {
   const r = await run(['video', '-'], { stdin: SRC });
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /✓ .+videos[\\/]握手-.+\.html/);
+  assert.match(r.out, /✓ .+videos[\\/]page-.+\.html/);
   assert.match(r.out, /2 scenes · 4 beats · [\d.]+s · voice: none/);
   assert.equal(readdirSync(join(dir, 'videos')).length, 1);
 });

@@ -12966,8 +12966,12 @@ ${comp.example}`);
   return 0;
 }
 function slug(title) {
-  const s = String(title || "page").trim().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 40);
-  return s || "page";
+  const s = String(title || "").replace(/[^A-Za-z0-9]+/g, "-").toLowerCase().replace(/^-+|-+$/g, "");
+  if (!s) return "page";
+  if (s.length <= 24) return s;
+  const cut = s.slice(0, 24);
+  const at3 = cut.lastIndexOf("-");
+  return at3 > 0 ? cut.slice(0, at3) : cut;
 }
 function stamp(d) {
   const p = (n) => String(n).padStart(2, "0");
