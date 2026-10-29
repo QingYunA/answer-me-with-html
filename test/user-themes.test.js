@@ -85,6 +85,21 @@ test('user theme: every page carries all installed user themes, with their CSS a
   assert.equal(html.match(/@font-face/g)?.length, 1, 'Bangers is embedded once');
 });
 
+test('user theme: --theme notes keeps notes selected and still lists zine with its scoped CSS', async () => {
+  install('zine', notesTheme((t) => ({
+    ...t,
+    label: { en: 'Zine' }, // lang-ok: fixture labels
+    font: 'bangers',
+    css: '& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }',
+  })));
+  install('notes', notesTheme());
+  const html = pageOf(await run(['render', '-', '--no-open', '--theme', 'notes'], DRAFT));
+  assert.match(html, /data-theme="notes"/);
+  assert.deepEqual(Object.keys(labels(html)), [...themeNames('page'), 'notes', 'zine']);
+  assert.match(html, /<option value="notes" selected>/);
+  assert.match(html, /html\[data-theme="zine"\] \.am-head h1 \{ font-family: "Bangers", Impact, sans-serif; \}/);
+});
+
 test('user theme: fonts get the default fallback stack', async () => {
   install('notes', notesTheme());
   const html = pageOf(await run(['render', '-', '--no-open', '--theme', 'notes'], DRAFT));
