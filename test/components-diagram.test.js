@@ -356,6 +356,54 @@ test('flow: a Thai label wraps inside the node budget instead of one wide line',
   for (const l of lines) assert.ok(measure(l, 13) <= 150, `line too wide: ${l}`);
 });
 
+// ── flow: a literal \n forces a line break (issue #347) ──
+// Mermaid-trained agents write `[Scan job\nAutoSignUpScanJob]`; the backslash and the n were drawn as text.
+const BR = '\\n';
+
+test('flow: a literal \\n in a node label draws one line per part in every shape', () => {
+  const cases = {
+    rect: `[Scan job${BR}AutoSignUpScanJob]`,
+    round: `(Scan job${BR}AutoSignUpScanJob)`,
+    diamond: `{Scan job${BR}AutoSignUpScanJob}`,
+    db: `[(Scan job${BR}AutoSignUpScanJob)]`,
+    bare: `Scan job${BR}AutoSignUpScanJob`,
+  };
+  for (const [shape, node] of Object.entries(cases)) {
+    const svg = render('flow', `${node} -> Done`);
+    const lines = textLines(svg);
+    assert.deepEqual(lines.slice(0, 2), ['Scan job', 'AutoSignUpScanJob'], shape);
+    assert.ok(!lines.some((line) => line.includes(BR)), `${shape}: no literal backslash-n in the text`);
+    assert.match(svg, new RegExp(`am-node--${shape === 'bare' ? 'rect' : shape}`), shape);
+  }
+});
+
+test('flow: a literal \\n in an edge label draws one line per part', () => {
+  const svg = render('flow', `A -> B: first line${BR}second line`);
+  const lines = textLines(svg);
+  assert.deepEqual(lines, ['first line', 'second line', 'A', 'B']);
+  assert.ok(!lines.some((line) => line.includes(BR)), 'no literal backslash-n in the text');
+  assert.ok(Number(svg.match(/<g class="am-edge-label"><rect[^>]*height="([\d.]+)"/)[1]) > 18, 'the label box holds both lines');
+});
+
+test('flow: each forced line still wraps by width, and the node grows by the extra lines', () => {
+  const long = 'long '.repeat(40).trim();
+  const lines = textLines(render('flow', `[${long}${BR}Short] -> Done`));
+  const wrapped = lines.slice(0, lines.indexOf('Short'));
+  assert.ok(wrapped.length > 1);
+  for (const line of wrapped) assert.ok(measure(line, 13) <= 150, `line too wide: ${line}`);
+  const height = (svg) => Number(svg.match(/<rect class="am-node-shape"[^>]*height="([\d.]+)"/)[1]);
+  assert.ok(height(render('flow', `[Short${BR}Short] -> Done`)) > height(render('flow', 'Short -> Done')));
+});
+
+test('flow: the same \\n node text on two lines is one node', () => {
+  const label = `Scan job${BR}AutoSignUpScanJob`;
+  const source = `[${label}] -> First\n[${label}] -> Second`;
+  const model = parseFlow(source);
+  assert.deepEqual([...model.nodes.keys()], [label, 'First', 'Second']);
+  const svg = render('flow', source);
+  assert.equal((svg.match(/class="am-node /g) || []).length, 3);
+});
+
 test('sequence: Korean and Thai messages wrap the same way', () => {
   assert.deepEqual(textLines(render('sequence', 'A -> B: 데이터베이스 연결을 확인하고 재시도합니다')), ['A', 'B', '데이터베이스 연결을 확인하고', '재시도합니다']);
   const thai = textLines(render('sequence', 'A -> B: ตรวจสอบการเชื่อมต่อฐานข้อมูลแล้วลองอีกครั้ง'));

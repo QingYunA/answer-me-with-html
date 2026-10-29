@@ -6933,10 +6933,12 @@ var $o = kr;
 var FS2 = DRAWING.node;
 var LH2 = 17;
 var TEXT_MAX = 150;
+var EDGE_MAX = 240;
 var EDGE_FS = DRAWING.edge;
 var CLUSTER_FS = DRAWING.cluster;
 var CLUSTER_LABEL_H = 15;
 var DIRS = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
+var FORCED_BREAK = /\\n/;
 var BRACKETS = [
   { open: "[(", close: ")]", shape: "db" },
   { open: "[", close: "]", shape: "rect" },
@@ -6962,6 +6964,7 @@ var flow_default = {
   summary: "Flowchart / architecture diagram (automatic layout)",
   syntax: `\`\`\`flow [TB|LR|BT|RL]
 A -> B: label                 \u2190 solid line; text after the colon is the edge label
+A -> B: first\\nsecond line    \u2190 a literal \\n in a node or edge label forces a line break
 A --> C                       \u2190 dashed line
 A -> B -> C                   \u2190 chain
 A -> B & C                    \u2190 fan-out
@@ -7135,8 +7138,20 @@ function parseNode(t, start, line) {
   if (!label) throw new ComponentError(`flow has an empty node: "${t}"`, line);
   return { node: { id: label, label, shape: bracket?.shape ?? "rect", explicit: Boolean(bracket), hi }, end };
 }
+function labelLines(label, maxWidth, size) {
+  return String(label).split(FORCED_BREAK).flatMap((part) => wrap(part, maxWidth, size));
+}
+function edgeText(label) {
+  const parts = String(label).split(FORCED_BREAK);
+  const lines = parts.length > 1 ? parts.flatMap((part) => wrap(part, EDGE_MAX, EDGE_FS)) : [String(label)];
+  return {
+    lines,
+    width: Math.max(...lines.map((line) => measure(line, EDGE_FS))) + 10,
+    height: lines.length === 1 ? 18 : lines.length * LH2
+  };
+}
 function nodeSize(node) {
-  const lines = wrap(node.label, TEXT_MAX, FS2);
+  const lines = labelLines(node.label, TEXT_MAX, FS2);
   const tw = Math.max(...lines.map((l3) => measure(l3, FS2)));
   const th = lines.length * LH2;
   const w = Math.max(tw + 28, 64);
@@ -7182,7 +7197,8 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     });
   });
   edges.forEach((e, i) => {
-    const label = e.label ? { label: e.label, width: measure(e.label, EDGE_FS) + 12, height: 18, labelpos: "c" } : {};
+    const size = e.label ? edgeText(e.label) : null;
+    const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: "c" } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
   $o.layout(g);
@@ -7247,8 +7263,8 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
     const pts = data.points;
     for (let k2 = 1; k2 < pts.length; k2++) segments.push([pts[k2 - 1], pts[k2]]);
     if (e.label) {
-      const w = measure(e.label, EDGE_FS) + 10;
-      boxes.push([data.x - w / 2, data.y - 9, data.x + w / 2, data.y + 9]);
+      const { width: w, height: h2 } = edgeText(e.label);
+      boxes.push([data.x - w / 2, data.y - h2 / 2, data.x + w / 2, data.y + h2 / 2]);
     }
   });
   return groups.map((grp, i) => {
@@ -7332,8 +7348,8 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr") {
     const path = `<path class="am-edge${e.dashed ? " am-edge--dashed" : ""}" d="${smoothPath(pts)}" marker-end="url(#${head})"/>`;
     const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>`;
     if (!e.label) return `${open}${path}</g>`;
-    const w = measure(e.label, EDGE_FS) + 10;
-    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - 9)}" width="${f(w)}" height="18" rx="3"/>${textLines([e.label], data.x, data.y, LH2, "", pageDir)}</g></g>`;
+    const { lines, width: w, height: h2 } = edgeText(e.label);
+    return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - h2 / 2)}" width="${f(w)}" height="${f(h2)}" rx="3"/>${textLines(lines, data.x, data.y, LH2, "", pageDir)}</g></g>`;
   });
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x: x2, y: y2 } = g.node(key.get(n.id));

@@ -221,7 +221,7 @@ Declare the language when you write a Latin-script language other than English, 
 
 A patched page keeps the language it had, unless the draft declares one.
 
-Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character.
+Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character. In a `flow` node or edge label, a literal `\n` forces a line break; each forced line still wraps by width. Group titles keep the text as written.
 
 The writing check follows the language. Chinese, English and Japanese keep their rules. Any other language gets only the language-neutral ones: sentence length (in words, or in characters for CJK text) and paragraph length. A script that writes no space between words is measured in words found by the word segmenter, the same four scripts the diagrams wrap with.
 
