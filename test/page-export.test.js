@@ -83,7 +83,8 @@ test('cli export: a missing or non-HTML input exits 2', async () => {
   assert.match(wrongType.err, /not an existing \.html file/);
 });
 
-test('cli export: a missing Chrome exits 1 with the path and AM_CHROME', async () => {
+// Node 20 has no built-in WebSocket, so exportPage stops at its Node check before it looks for Chrome.
+test('cli export: a missing Chrome exits 1 with the path and AM_CHROME', { skip: typeof WebSocket === 'undefined' && 'needs Node 22 (built-in WebSocket)' }, async () => {
   const page = join(dir, 'chrome-missing.html');
   writeFileSync(page, '<html><body></body></html>');
   const r = await run(['export', 'chrome-missing.html', '--pdf', 'out.pdf'], { env: { AM_CHROME: join(dir, 'no-such-chrome') } });
