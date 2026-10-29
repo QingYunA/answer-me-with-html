@@ -64,8 +64,10 @@ test('clean: a state saved recently goes with its page when the same run deletes
   const record = join(home, 'serve-state', 'abc.json');
   writeFileSync(record, JSON.stringify({ file: 'old.html', version: '1:2:3', reply: {} }));
   utimesSync(record, NOW / 1000, NOW / 1000); // the state itself is new, so only its page decides
+  const bytes = 10 + lstatSync(record).size;
   const r = clean(home, { now: NOW });
   assert.equal(r.files, 2);
+  assert.equal(r.bytes, bytes, 'the total counts the state record as well as the page');
   assert.ok(!existsSync(page) && !existsSync(record), 'the page and its state go in one run');
 });
 

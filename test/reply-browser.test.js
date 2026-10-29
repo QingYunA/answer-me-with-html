@@ -400,6 +400,10 @@ test('reply: a served page sends the answer it still holds when the tab is hidde
       document.querySelector('input[value="Redis"]').click();
       window.dispatchEvent(new Event('pagehide'));
     })()`);
+    // Unload the page at once: the buffered PUT must survive the navigation.
+    const away = cdp.once('Page.loadEventFired');
+    await send('Page.navigate', { url: 'about:blank' });
+    await away;
     assert.ok(await until(() => record()?.reply?.asks?.['Which cache do we use?']?.picked?.includes('Redis')), 'the pending answer reached the server on pagehide');
     assert.deepEqual(record().reply.asks['Which cache do we use?'], { picked: ['Redis'], touched: true });
   } finally {
@@ -422,13 +426,21 @@ test('reply: a malformed saved answer does not break a served page', { skip: SKI
     const res = await fetch(`http://127.0.0.1:${srv.port}/r/${token}/bad.html`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ reply: { asks: { 'Which cache do we use?': { picked: { 0: 'Memcached' }, touched: true } } } }),
+      body: JSON.stringify({
+        reply: {
+          asks: {
+            'Which cache do we use?': { picked: { 0: 'Memcached' }, touched: true },
+            'Which events do we log?': { picked: ['Retry'], touched: true },
+          },
+        },
+      }),
     });
     assert.equal(res.status, 204, 'the server stored the shape');
     const loaded = cdp.once('Page.loadEventFired');
     await send('Page.navigate', { url: pageLink(srv, 'pages', 'bad.html') });
     await loaded;
     assert.equal(await evaluate('document.querySelector(".am-reply-bar") !== null'), true, 'the reply script finished');
+    assert.equal(await evaluate('document.querySelector("input[value=Retry]").checked'), true, 'the valid answer is restored');
     assert.equal(await evaluate('document.querySelector("input[value=Memcached]").checked'), false, 'the bad answer is ignored');
   } finally {
     await srv.close();
