@@ -13,6 +13,7 @@ export const CLEAN = Object.freeze({
   hintEveryDays: 7,         // the same notice at most once every 7 days
 });
 const DIRS = ['pages', 'videos', 'cache'];
+const HOUR = DAY / 24;   // a serve-state .tmp file this old was left by a write that stopped
 
 // List regular files in a directory. Symlinks and unreadable entries are skipped, so stats never fail on a single file.
 function walk(dir) {
@@ -58,8 +59,9 @@ export function clean(home, { days = CLEAN.days, all = false, dryRun = false, no
   // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
   const gone = new Set(walk(join(home, 'pages')).filter((f) => all || f.mtime < cutoff).map((f) => f.path));
   const states = walk(join(home, 'serve-state')).filter((f) => {
-    // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save.
-    if (!f.path.endsWith('.json')) return false;
+    // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save. One that is an
+    // hour old was left by a process that stopped mid-write, and nothing will rename it.
+    if (!f.path.endsWith('.json')) return f.mtime < now - HOUR;
     if (all || f.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync(f.path, 'utf8'))?.file;

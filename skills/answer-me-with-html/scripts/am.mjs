@@ -11448,6 +11448,7 @@ var CLEAN = Object.freeze({
   // the same notice at most once every 7 days
 });
 var DIRS3 = ["pages", "videos", "cache"];
+var HOUR = DAY / 24;
 function walk(dir) {
   let entries;
   try {
@@ -11483,7 +11484,7 @@ function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Da
   ];
   const gone = new Set(walk(join9(home, "pages")).filter((f2) => all || f2.mtime < cutoff).map((f2) => f2.path));
   const states = walk(join9(home, "serve-state")).filter((f2) => {
-    if (!f2.path.endsWith(".json")) return false;
+    if (!f2.path.endsWith(".json")) return f2.mtime < now - HOUR;
     if (all || f2.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync8(f2.path, "utf8"))?.file;

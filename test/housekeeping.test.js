@@ -96,6 +96,21 @@ test('clean: leaves a state write in progress alone', () => {
   assert.equal(r.files, 2);
 });
 
+test('clean: removes a state .tmp file that a stopped write left behind', () => {
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const old = join(home, 'serve-state', 'abc.json.1.aaaa.tmp');
+  writeFileSync(old, '{"file":"x.html"');
+  utimesSync(old, (NOW - 2 * 60 * 60 * 1000) / 1000, (NOW - 2 * 60 * 60 * 1000) / 1000);
+  const fresh = join(home, 'serve-state', 'abc.json.2.bbbb.tmp');
+  writeFileSync(fresh, '{"file":"x.html"');
+  utimesSync(fresh, NOW / 1000, NOW / 1000);
+  const r = clean(home, { now: NOW });
+  assert.ok(!existsSync(old), 'a .tmp file two hours old is removed');
+  assert.ok(existsSync(fresh), 'a .tmp file being written is kept');
+  assert.equal(r.files, 1);
+  assert.equal(r.bytes, Buffer.byteLength('{"file":"x.html"'));
+});
+
 const ROOTS = ['pages', 'videos', 'cache'];
 const otherRoot = (dir) => (dir === 'pages' ? 'videos' : 'pages');
 const skipWin = process.platform === 'win32' ? 'creating file symlinks on Windows needs privileges' : false;
