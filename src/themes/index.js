@@ -33,23 +33,25 @@ const ownLanguageFont = (t) => fontLanguages().map((l) => block(langSelector(l, 
 // their styles come with the base ones. rtl: the page language is written right to left. base.css already uses logical properties;
 // rtl.css holds only what they cannot express (code stays left to right, label fonts, mirrored offsets). math: the page has a formula (src/math.js);
 // it carries the Temml styles with their font, about 20 KB, so a page without math does not. chart: the page has a chart (src/components/chart.js); it carries chart.css. update: the page has the new-version button;
-// closeAfter: the page closes its tab after the reply is copied (the close_after_reply setting). theme: the name of the theme the page is rendered with;
-// when that theme has its own font (the `font` field), the page carries the font face, and a page of another theme does not.
+// closeAfter: the page closes its tab after the reply is copied (the close_after_reply setting). fonts: every theme in list that names a
+// shipped font (`font`) brings its face, one copy per font, so the picker can switch to it; a page that carries no such theme stays
+// as small as before. A video page turns fonts off, because its player never switches theme.
 // scale: the reader's text size. It sets --am-scale after the type scale (src/themes/type-scale.js), which every page size multiplies; 1 adds nothing.
-export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, update = false, closeAfter = false, theme, scale = 1 } = {}) {
+export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, update = false, closeAfter = false, fonts = true, scale = 1 } = {}) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
-  const fontFace = FONT_CSS[list.find((t) => t.name === theme)?.font];
+  const fontFaces = fonts ? [...new Set(list.map((t) => t.font).filter((f) => f && FONT_CSS[f]))].map((f) => FONT_CSS[f]) : [];
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...(fontFace ? [fontFace] : []), ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...fontFaces, ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page
 // styles bring rtl.css (its html[dir="rtl"][data-video] block mirrors the player), and a theme's video.rtlCss mirrors what its own css places.
+// The player has no theme picker, so its page styles carry no font face (pageCss fonts: false).
 export function videoCss(list = themes('video'), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list.filter((t) => t.video).flatMap((t) => [
     t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : '',
     t.video.css ? scoped(t.video.css, videoSel(t)) : '',
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : '',
   ]).filter(Boolean);
-  return [pageCss(list.filter((t) => t.scope.includes('page')), { diff, delta, rtl, chart }), VIDEO_CSS, ...parts].join('\n\n');
+  return [pageCss(list.filter((t) => t.scope.includes('page')), { diff, delta, rtl, chart, fonts: false }), VIDEO_CSS, ...parts].join('\n\n');
 }

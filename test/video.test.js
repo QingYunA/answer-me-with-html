@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { parseVideo, estimateSeconds, buildTimeline, allBeats, TIMING } from '../src/video/script.js';
@@ -586,13 +586,13 @@ function sink() {
 
 // Without ttsProvider, use null (captions only); an explicit undefined runs the real voice selection.
 async function run(args, opts = {}) {
-  const { stdin = '', env = {} } = opts;
+  const { stdin = '', env = {}, now } = opts;
   const ttsProvider = 'ttsProvider' in opts ? opts.ttsProvider : null;
   const out = sink();
   const err = sink();
   const code = await main(args, {
     stdout: out.stream, stderr: err.stream, stdin: Readable.from([stdin]),
-    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir, ttsProvider,
+    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir, ttsProvider, now,
   });
   return { code, out: out.text, err: err.text };
 }
@@ -600,9 +600,25 @@ async function run(args, opts = {}) {
 test('cli video: writes to AM_HOME/videos and prints scenes, narration, duration and voice', async () => {
   const r = await run(['video', '-'], { stdin: SRC });
   assert.equal(r.code, 0, r.err);
-  assert.match(r.out, /✓ .+videos[\\/]握手-.+\.html/);
+  assert.match(r.out, /✓ .+videos[\\/]page-.+\.html/);
   assert.match(r.out, /2 scenes · 4 beats · [\d.]+s · voice: none/);
   assert.equal(readdirSync(join(dir, 'videos')).length, 1);
+});
+
+test('cli video: a second default video in the same second gets -2 and keeps both', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-video-same-second-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const first = await run(['video', '-', '--voice', 'off'], { stdin: SRC, env: { AM_HOME: home }, now: () => now });
+  const second = await run(['video', '-', '--voice', 'off'], { stdin: SRC, env: { AM_HOME: home }, now: () => now });
+  assert.equal(first.code, 0, first.err);
+  assert.equal(second.code, 0, second.err);
+  const a = first.out.match(/^✓ (.+\.html)$/m)[1];
+  const b = second.out.match(/^✓ (.+\.html)$/m)[1];
+  assert.equal(basename(a), 'page-20260102-030405.html');
+  assert.equal(basename(b), 'page-20260102-030405-2.html');
+  assert.ok(existsSync(a));
+  assert.ok(existsSync(b));
 });
 
 test('cli video: the output names the voice; an invalid voice is an error', async () => {

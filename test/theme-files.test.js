@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { main } from '../src/cli.js';
 import { renderDoc } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
-import { loadThemes } from '../src/themes/registry.js';
+import { loadThemes, withThemes } from '../src/themes/registry.js';
 import { normalizeTheme, externalResources, COLOR_TOKENS, DIAGRAM_TOKENS } from '../src/themes/check.js';
 import { THEME_SELECTORS } from '../src/themes/selectors.js';
 import { FONT_NAMES } from '../src/themes/font-css.js';
@@ -44,23 +44,27 @@ async function run(args) {
   return { code, out, err };
 }
 
-test('font: a user theme with font bangers embeds the Bangers face once; a built-in theme does not', () => {
+test('font: a user theme with font bangers embeds the Bangers face once on every page that carries it', () => {
   install('stripe', themeFile({ font: 'bangers', css: '& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }' }));
   const themes = loadThemes(home);
   assert.deepEqual(themes.warnings, []);
   const { html } = renderDoc(DRAFT, { theme: 'stripe' }, {}, { themes });
   assert.equal(html.match(BANGERS_FACE)?.length, 1);
   assert.match(html, /SIL Open Font License/);
+  // A page with a built-in theme carries every installed user theme, so it can switch to stripe and needs the face too.
   for (const theme of ['blueprint', 'shadcn', 'paper']) {
-    assert.doesNotMatch(renderDoc(DRAFT, { theme }, {}, { themes }).html, /Bangers|SIL Open Font License/, `${theme} page carries no font`);
+    const page = renderDoc(DRAFT, { theme }, {}, { themes }).html;
+    assert.equal(page.match(BANGERS_FACE)?.length, 1, `${theme} page carries the face of an installed user theme`);
+    assert.match(page, /<option value="stripe"/, `${theme} page lists stripe`);
   }
 });
 
-test('font: a theme without a font field embeds no font face, and a video page never does', async () => {
+test('font: a page with no font theme embeds no face, and a video page never does', async () => {
   install('plain', themeFile());
   install('stripe', themeFile({ font: 'bangers' }));
+  const plain = normalizeTheme('plain', themeFile()).theme;
+  assert.doesNotMatch(renderDoc(DRAFT, { theme: 'plain' }, {}, { themes: withThemes([plain]) }).html, /Bangers/);
   const themes = loadThemes(home);
-  assert.doesNotMatch(renderDoc(DRAFT, { theme: 'plain' }, {}, { themes }).html, /Bangers/);
   const { html } = await renderVideo(VIDEO, { overrides: { theme: 'stripe' }, themes });
   assert.doesNotMatch(html, /Bangers/);
 });

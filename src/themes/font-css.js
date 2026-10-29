@@ -5,9 +5,9 @@
  * `npx skills add` copies only the skill folder, and the bundle there carries the font). The font is embedded unchanged, as a Latin subset in WOFF2.
  */
 // The page styles for a theme's own font: an @font-face with the font file inlined (the page needs no network).
-// A theme file names its font with `"font": "<name>"` (see check.js and font-list.js); pageCss adds the face only to a page rendered with
-// that theme, so every other page stays as small as before. src/assets.js (development) and scripts/inline-assets.mjs (bundle) both call
-// composeFontCss, so the two cannot drift apart.
+// A theme file names its font with `"font": "<name>"` (see check.js and font-list.js); pageCss adds the face once for every theme the
+// page carries, so the picker can switch to it and a page with no such theme stays as small as before. src/assets.js (development) and
+// scripts/inline-assets.mjs (bundle) both call composeFontCss, so the two cannot drift apart.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { FONTS } from './font-list.js';

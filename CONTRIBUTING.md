@@ -34,7 +34,7 @@ Setup and test commands are in the README's [Development](README.md#development)
 
 ## Theme catalog
 
-The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a wall of themes, a page for each theme, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). A page that does not use a catalog theme does not carry it.
+The catalog is the set of theme files in `marketplace/themes/`. The website publishes them at `answer-me-with-html.com/themes/` (a wall of themes, a page for each theme, `index.json` and one JSON file per theme), and each one is a theme file that `am theme add <name>` checks and saves into `~/.answer-me-with-html/themes/` (`src/themes/catalog.js`; the same checks as the catalog CI, and only catalog names). Once installed, every new page carries the theme in its toolbar picker.
 
 There are four ways to submit a theme. **A catalog theme needs no accepted issue first.** A maintainer reviews every theme before it goes in.
 
