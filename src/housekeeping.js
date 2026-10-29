@@ -55,11 +55,13 @@ export function clean(home, { days = CLEAN.days, all = false, dryRun = false, no
     ...[home, temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
     ...walk(join(home, 'cache')),
   ];
+  // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
+  const gone = new Set(walk(join(home, 'pages')).filter((f) => all || f.mtime < cutoff).map((f) => f.path));
   const states = walk(join(home, 'serve-state')).filter((f) => {
     if (all || f.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync(f.path, 'utf8'))?.file;
-      return typeof file !== 'string' || !lstatSync(join(home, 'pages', file)).isFile();
+      return typeof file !== 'string' || gone.has(join(home, 'pages', file)) || !lstatSync(join(home, 'pages', file)).isFile();
     } catch {
       return true;
     }

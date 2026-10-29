@@ -366,14 +366,18 @@ async function saveState(req, res, home, secret, file, token, version) {
   if (!tokenMatches(secret, 'pages', file, token) || version === null) return notFound(req, res);
   const type = (req.headers['content-type'] ?? '').toLowerCase();
   if (!type.startsWith('application/json')) return reply(req, res, 415, 'text/plain; charset=utf-8', 'Unsupported media type\n');
-  let body = '';
+  // Keep the chunks as bytes and decode once: decoding each one on its own would corrupt a character split across two reads.
+  const chunks = [];
+  let size = 0;
   for await (const chunk of req) {
-    body += chunk;
-    if (Buffer.byteLength(body) > MAX_STATE_BYTES) {
+    size += chunk.length;
+    chunks.push(chunk);
+    if (size > MAX_STATE_BYTES) {
       res.setHeader('Connection', 'close');
       return reply(req, res, 413, 'text/plain; charset=utf-8', 'State too large\n');
     }
   }
+  const body = Buffer.concat(chunks).toString('utf8');
   let patch;
   try {
     patch = JSON.parse(body);
@@ -420,7 +424,10 @@ export function withLiveReload(html, eventPath, serve) {
   const attrs = serve
     ? ` data-am-save="${esc(serve.save)}"${serve.state ? ` data-am-state="${esc(JSON.stringify(serve.state))}"` : ''}`
     : '';
-  const withState = attrs && /<body\b[^>]*>/.test(html) ? html.replace(/<body\b([^>]*)>/, `<body$1${attrs}>`) : html;
+  // A function, not a string: the restored state may hold `$&`, `$1`, `` $` `` or `$$`, which replace() would expand inside the page.
+  const withState = attrs && /<body\b[^>]*>/.test(html)
+    ? html.replace(/<body\b([^>]*)>/, (_m, own) => `<body${own}${attrs}>`)
+    : html;
   const at = withState.lastIndexOf('</body>');
   return at === -1 ? withState + script : withState.slice(0, at) + script + withState.slice(at);
 }

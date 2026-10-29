@@ -21,14 +21,31 @@ if (replyBtn) {
     }
   })();
   let saveTimer = null;
+  let pendingPatch = null;
+  const sendSave = (patch) => {
+    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })
+      .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before
+  };
   // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.
   const saveSoon = (patch) => {
     clearTimeout(saveTimer);
+    pendingPatch = patch;
     saveTimer = setTimeout(() => {
-      fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
-        .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before
+      pendingPatch = null;
+      sendSave(patch);
     }, 400);
   };
+  // A hidden or closing page sends the change it still holds, before the timer can run.
+  const flushSave = () => {
+    if (!pendingPatch) return;
+    clearTimeout(saveTimer);
+    sendSave(pendingPatch);
+    pendingPatch = null;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+  });
+  window.addEventListener('pagehide', flushSave);
   const panels = [...document.querySelectorAll('.am-panel')];
   const asks = [...document.querySelectorAll('.am-ask')];
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.

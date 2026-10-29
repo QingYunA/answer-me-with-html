@@ -583,6 +583,44 @@ test('serve state: a page saves its answers, and the next open gets them back', 
   assert.deepEqual([merged.reply, merged.remark], [state, [{ key: 'a|p|x', kind: 'keep', note: '' }]]);
 });
 
+// Save a state in one write, or in two writes split inside a multi-byte character.
+const putState = (path, body, { splitAt } = {}) => new Promise((resolve, reject) => {
+  const req = request({ host: '127.0.0.1', port: srv.port, path, method: 'PUT', headers: { 'content-type': 'application/json' } }, (res) => {
+    const chunks = [];
+    res.on('data', (c) => chunks.push(c));
+    res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+  });
+  req.on('error', reject);
+  if (splitAt === undefined) {
+    req.end(body);
+    return;
+  }
+  req.write(body.subarray(0, splitAt));
+  setTimeout(() => req.end(body.subarray(splitAt)), 20);
+});
+
+test('serve state: a multi-byte character split across two reads is saved whole', async () => {
+  writeFileSync(join(home, 'pages', 'split.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'split.html');
+  const body = Buffer.from(JSON.stringify({ reply: { comments: { A: '中文回答' } } }), 'utf8');
+  // Split inside the three bytes of the first character, so each read holds half of it.
+  const at = body.indexOf(Buffer.from('中', 'utf8')) + 1;
+  assert.equal((await putState(`/r/${token}/split.html`, body, { splitAt: at })).status, 204);
+  const reopened = await get(urlOf('pages', 'split.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.equal(restored.reply.comments.A, '中文回答', 'the character survives the split');
+});
+
+test('serve state: a saved answer with $ sequences comes back unchanged', async () => {
+  writeFileSync(join(home, 'pages', 'dollar.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'dollar.html');
+  const text = "cost $1 and $& and $` and $$";
+  assert.equal((await putState(`/r/${token}/dollar.html`, JSON.stringify({ reply: { comments: { A: text } } }))).status, 204);
+  const reopened = await get(urlOf('pages', 'dollar.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.equal(restored.reply.comments.A, text, 'replace() does not expand $ in the restored state');
+});
+
 test('serve state: the write route refuses the wrong token, a page that is gone, and a body over the cap', async () => {
   writeFileSync(join(home, 'pages', 'guard.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
   const token = pageToken(srv.secret, 'pages', 'guard.html');

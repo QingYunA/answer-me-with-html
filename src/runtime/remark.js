@@ -19,13 +19,30 @@
     }
   })();
   let saveTimer = null;
+  let pendingPatch = null;
+  const sendSave = (patch) => {
+    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })
+      .catch(() => {});
+  };
   const saveSoon = (patch) => {
     clearTimeout(saveTimer);
+    pendingPatch = patch;
     saveTimer = setTimeout(() => {
-      fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) })
-        .catch(() => {});
+      pendingPatch = null;
+      sendSave(patch);
     }, 400);
   };
+  // A hidden or closing page sends the change it still holds, before the timer can run.
+  const flushSave = () => {
+    if (!pendingPatch) return;
+    clearTimeout(saveTimer);
+    sendSave(pendingPatch);
+    pendingPatch = null;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+  });
+  window.addEventListener('pagehide', flushSave);
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
   // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.

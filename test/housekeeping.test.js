@@ -58,6 +58,27 @@ test('clean: --dry-run deletes nothing; --all deletes every page and video', () 
   assert.ok(!existsSync(fresh));
 });
 
+test('clean: a state saved recently goes with its page when the same run deletes the page', () => {
+  const page = file('pages/old.html', 10, 40);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'abc.json');
+  writeFileSync(record, JSON.stringify({ file: 'old.html', version: '1:2:3', reply: {} }));
+  utimesSync(record, NOW / 1000, NOW / 1000); // the state itself is new, so only its page decides
+  const r = clean(home, { now: NOW });
+  assert.equal(r.files, 2);
+  assert.ok(!existsSync(page) && !existsSync(record), 'the page and its state go in one run');
+});
+
+test('clean: keeps the state of a page that stays', () => {
+  file('pages/new.html', 10, 1);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'keep.json');
+  writeFileSync(record, JSON.stringify({ file: 'new.html', version: '1:2:3' }));
+  utimesSync(record, NOW / 1000, NOW / 1000);
+  assert.equal(clean(home, { now: NOW }).files, 0);
+  assert.ok(existsSync(record), 'a live page keeps its record');
+});
+
 const ROOTS = ['pages', 'videos', 'cache'];
 const otherRoot = (dir) => (dir === 'pages' ? 'videos' : 'pages');
 const skipWin = process.platform === 'win32' ? 'creating file symlinks on Windows needs privileges' : false;

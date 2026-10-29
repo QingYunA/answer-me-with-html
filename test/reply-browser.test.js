@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -352,6 +352,58 @@ test('reply: a served page keeps the answers across a server restart', { skip: S
     assert.equal(await evaluate('document.querySelector("input[value=Memcached]").checked'), true, 'the answer is back');
     assert.equal(await evaluate('document.querySelector("#panel-C .am-comment textarea").value'), 'Survives the restart.');
   } finally {
+    await srv.close();
+  }
+});
+
+test('reply: a served page sends the answer it still holds when the tab is hidden or closes', { skip: SKIP }, async () => {
+  const home = join(tmp, 'hide-home');
+  mkdirSync(join(home, 'pages'), { recursive: true });
+  const draft = join(tmp, 'hidden.md');
+  writeFileSync(draft, DRAFT);
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', join(home, 'pages', 'hidden.html'), '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
+  });
+  const navigate = async (url) => {
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.navigate', { url });
+    await loaded;
+  };
+  const until = async (check) => {
+    for (let i = 0; i < 60; i += 1) {
+      if (await check()) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
+  };
+  const record = () => {
+    try {
+      const file = readdirSync(join(home, 'serve-state'))[0];
+      return file ? JSON.parse(readFileSync(join(home, 'serve-state', file), 'utf8')) : null;
+    } catch {
+      return null;
+    }
+  };
+  const srv = await startServer({ home, port: 0 });
+  try {
+    await navigate(pageLink(srv, 'pages', 'hidden.html'));
+    // Freeze the tab first: the 400 ms debounce cannot run, and the browser reports the page as hidden.
+    await send('Page.setWebLifecycleState', { state: 'frozen' });
+    await evaluate(`(() => {
+      document.querySelector('input[value="Memcached"]').click();
+      document.dispatchEvent(new Event('visibilitychange'));
+    })()`);
+    assert.ok(await until(() => record()?.reply?.asks?.['Which cache do we use?']?.picked?.includes('Memcached')), 'the pending answer reached the server');
+    assert.deepEqual(record().reply.asks['Which cache do we use?'], { picked: ['Memcached'], touched: true });
+    // pagehide takes the same path: still frozen, the timer cannot run, and the change is saved on the way out.
+    await evaluate(`(() => {
+      document.querySelector('input[value="Redis"]').click();
+      window.dispatchEvent(new Event('pagehide'));
+    })()`);
+    assert.ok(await until(() => record()?.reply?.asks?.['Which cache do we use?']?.picked?.includes('Redis')), 'the pending answer reached the server on pagehide');
+    assert.deepEqual(record().reply.asks['Which cache do we use?'], { picked: ['Redis'], touched: true });
+  } finally {
+    await send('Page.setWebLifecycleState', { state: 'active' });
     await srv.close();
   }
 });
