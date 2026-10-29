@@ -55,17 +55,49 @@ test('user theme: picked by --theme, theme: and config; the page embeds it next 
     assert.match(html, /html\[data-theme="notes"\] \.am-panel-head \{ letter-spacing/);
     assert.deepEqual(Object.keys(labels(html)), [...themeNames('page'), 'notes']);
     assert.equal(labels(html).notes, '笔记'); // lang-ok: expected Chinese UI label
+    assert.match(html, /<option value="notes" selected>/);
   }
   assert.equal((await run(['config', 'set', 'theme', 'notes'])).code, 0);
   const html = pageOf(await run(['render', '-', '--no-open'], DRAFT));
   assert.match(html, /data-theme="notes"/);
 });
 
-test('user theme: pages with a built-in theme do not carry user themes', async () => {
+test('user theme: every page carries all installed user themes, with their CSS and fonts, and sorts them by name', async () => {
+  install('zine', notesTheme((t) => ({
+    ...t,
+    label: { en: 'Zine' }, // lang-ok: fixture labels
+    font: 'bangers',
+    css: '& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }',
+  })));
   install('notes', notesTheme());
   const html = pageOf(await run(['render', '-', '--no-open'], DRAFT));
-  assert.doesNotMatch(html, /"notes"/);
-  assert.deepEqual(Object.keys(labels(html)), themeNames('page'));
+  // The page keeps its own built-in theme, but the picker lists every installed user theme after the built-in ones.
+  assert.match(html, /data-theme="paper"/);
+  assert.deepEqual(Object.keys(labels(html)), [...themeNames('page'), 'notes', 'zine']);
+  assert.equal(labels(html).zine, 'Zine');
+  // A non-current theme applies only when it is selected: its tokens and its decoration are scoped to its own root.
+  assert.match(html, /html\[data-theme="notes"\], html\[data-theme="notes"\]\[data-mode="light"\] \{[^}]*--paper: #fdfcf8;/);
+  assert.match(html, /html\[data-theme="notes"\] \.am-panel-head \{ letter-spacing/);
+  assert.match(html, /html\[data-theme="zine"\], html\[data-theme="zine"\]\[data-mode="light"\] \{[^}]*--paper: #fdfcf8;/);
+  assert.match(html, /html\[data-theme="zine"\] \.am-head h1 \{ font-family: "Bangers"/);
+  // The runtime switches the root's data-theme, so the font of a user theme must be in the page even when another theme is current.
+  assert.match(html, /@font-face \{\s+font-family: "Bangers";/);
+  assert.equal(html.match(/@font-face/g)?.length, 1, 'Bangers is embedded once');
+});
+
+test('user theme: --theme notes keeps notes selected and still lists zine with its scoped CSS', async () => {
+  install('zine', notesTheme((t) => ({
+    ...t,
+    label: { en: 'Zine' }, // lang-ok: fixture labels
+    font: 'bangers',
+    css: '& .am-head h1 { font-family: "Bangers", Impact, sans-serif; }',
+  })));
+  install('notes', notesTheme());
+  const html = pageOf(await run(['render', '-', '--no-open', '--theme', 'notes'], DRAFT));
+  assert.match(html, /data-theme="notes"/);
+  assert.deepEqual(Object.keys(labels(html)), [...themeNames('page'), 'notes', 'zine']);
+  assert.match(html, /<option value="notes" selected>/);
+  assert.match(html, /html\[data-theme="zine"\] \.am-head h1 \{ font-family: "Bangers", Impact, sans-serif; \}/);
 });
 
 test('user theme: fonts get the default fallback stack', async () => {

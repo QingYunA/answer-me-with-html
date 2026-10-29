@@ -76,7 +76,7 @@ async function add(name, opts, { print, fail, env }, net) {
       return 1;
     }
   } else if (status !== 'same') {
-    print(`  Use it: theme: ${name} in a draft, --theme ${name}, or am config set theme ${name}`);
+    print(`  It now appears in every new page's theme picker. Make it the default: am theme add ${name} --use, or am config set theme ${name}`);
   }
   return 0;
 }
@@ -198,6 +198,6 @@ function removeTheme(name, { print, fail, env }) {
     resetConfig('theme', env);
     print(`! ${name} was the default theme; the default is auto again`);
   }
-  print('  Pages already made keep their look: a page carries its own theme.');
+  print('  Pages already made keep their look: a page embeds the themes it was made with.');
   return 0;
 }

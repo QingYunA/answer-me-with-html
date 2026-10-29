@@ -400,7 +400,7 @@ export default {
   th_meta_title: 'Theme catalog — Answer me with HTML',
   th_meta_desc: 'Page themes for Answer me with HTML. Open a theme to see it in light and dark, then copy one command or ask your agent to install it.',
   th_title: 'Theme catalog',
-  th_lede: 'Each theme is one JSON file. Pick a card to see the theme on a sample page, in light and dark, and to install it. Hover or focus a card to peek at its dark mode. A page that does not use a theme does not carry it.',
+  th_lede: 'Each theme is one JSON file. Pick a card to see the theme on a sample page, in light and dark, and to install it. Hover or focus a card to peek at its dark mode. Once installed, every new page carries it in its theme picker.',
   th_submit_k: 'Contribute',
   th_submit_t: 'Add your own theme',
   th_submit_d: 'You can also make one by hand in the <a href="new/" id="submit-theme">theme editor</a>, or open a pull request that adds <code>marketplace/themes/&lt;name&gt;.json</code>; the rules are in <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>. A maintainer reads every theme before it goes on the wall. A catalog name is reserved forever.',
