@@ -392,8 +392,13 @@ async function saveState(req, res, home, secret, file, token, version) {
   // A record from another version of the page is dropped rather than merged: its answers name panels that may be gone.
   const previous = readState(home, token);
   const base = previous && previous.version === version ? previous : {};
+  // The cap covers the record that is stored, not each patch: reply and remark merge into one.
+  const next = { ...base, ...part, version, file };
+  if (Buffer.byteLength(`${JSON.stringify(next)}\n`) > MAX_STATE_BYTES) {
+    return reply(req, res, 413, 'text/plain; charset=utf-8', 'State too large\n');
+  }
   try {
-    writeState(home, token, { ...base, ...part, version, file });
+    writeState(home, token, next);
   } catch {
     return reply(req, res, 500, 'text/plain; charset=utf-8', 'Cannot save the state\n');
   }
@@ -425,10 +430,11 @@ export function withLiveReload(html, eventPath, serve) {
     ? ` data-am-save="${esc(serve.save)}"${serve.state ? ` data-am-state="${esc(JSON.stringify(serve.state))}"` : ''}`
     : '';
   // A function, not a string: the restored state may hold `$&`, `$1`, `` $` `` or `$$`, which replace() would expand inside the page.
-  const withState = attrs && /<body\b[^>]*>/.test(html)
-    ? html.replace(/<body\b([^>]*)>/, (_m, own) => `<body${own}${attrs}>`)
+  const withState = attrs && /<body\b[^>]*>/i.test(html)
+    ? html.replace(/(<body\b)([^>]*)>/i, (_m, tag, own) => `${tag}${own}${attrs}>`)
     : html;
-  const at = withState.lastIndexOf('</body>');
+  // Search the page itself: toLowerCase() can change the length of some characters (İ), which would shift the index.
+  const at = withState.search(/<\/body>(?![\s\S]*<\/body>)/i);
   return at === -1 ? withState + script : withState.slice(0, at) + script + withState.slice(at);
 }
 

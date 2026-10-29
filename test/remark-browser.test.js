@@ -4,11 +4,12 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
+import { startServer, pageLink } from '../src/serve.js';
 import en from '../src/languages/en.js';
 import he from '../src/languages/he.js';
 
@@ -574,4 +575,59 @@ test('remark: with the mode on, Tab reaches each block and Enter or Space opens 
     saved: { kind: 'question', focus: true },
     off: false,
   });
+});
+
+test('remark: a served page saves a mark and its note to the server and restores them', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  const L = p.lang.ui.remark;
+  const home = join(tmp, 'remark-serve-home');
+  mkdirSync(join(home, 'pages'), { recursive: true });
+  const draft = join(tmp, 'remark-serve.md');
+  const file = join(home, 'pages', 'remark.html');
+  writeFileSync(draft, draftOf(p));
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', file, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
+  });
+  const navigate = async (url) => {
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.navigate', { url });
+    await loaded;
+  };
+  const until = async (check) => {
+    for (let i = 0; i < 60; i += 1) {
+      if (await check()) return true;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return false;
+  };
+  const record = () => {
+    try {
+      const name = readdirSync(join(home, 'serve-state')).find((f) => f.endsWith('.json'));
+      return name ? JSON.parse(readFileSync(join(home, 'serve-state', name), 'utf8')) : null;
+    } catch {
+      return null;
+    }
+  };
+  const srv = await startServer({ home, port: 0 });
+  const link = pageLink(srv, 'pages', 'remark.html');
+  try {
+    await navigate(link);
+    const saved = await evaluate(`(() => { ${PAGE_JS}
+      btn.click();
+      mark(at('p', ${JSON.stringify(p.first)}), 'keep', 'server note');
+      const para = at('p', ${JSON.stringify(p.first)});
+      return { marked: para.classList.contains('am-mark'), kind: para.dataset.kind };
+    })()`);
+    assert.deepEqual(saved, { marked: true, kind: 'keep' });
+    assert.ok(await until(() => record()?.remark?.some((m) => m.kind === 'keep' && m.note === 'server note')), 'the mark reached the server');
+    await navigate(link);
+    const restored = await evaluate(`(() => { ${PAGE_JS}
+      const para = at('p', ${JSON.stringify(p.first)});
+      return { marked: para.classList.contains('am-mark'), kind: para.dataset.kind, chip: para.querySelector(':scope > .am-mark-note')?.textContent };
+    })()`);
+    assert.deepEqual(restored, { marked: true, kind: 'keep', chip: `${L.kinds.keep} server note` });
+    assert.deepEqual(await errors(), []);
+  } finally {
+    await srv.close();
+  }
 });

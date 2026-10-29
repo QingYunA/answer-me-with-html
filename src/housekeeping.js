@@ -58,6 +58,8 @@ export function clean(home, { days = CLEAN.days, all = false, dryRun = false, no
   // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
   const gone = new Set(walk(join(home, 'pages')).filter((f) => all || f.mtime < cutoff).map((f) => f.path));
   const states = walk(join(home, 'serve-state')).filter((f) => {
+    // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save.
+    if (!f.path.endsWith('.json')) return false;
     if (all || f.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync(f.path, 'utf8'))?.file;

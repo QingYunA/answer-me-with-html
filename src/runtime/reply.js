@@ -93,7 +93,7 @@ if (replyBtn) {
     const state = saved.asks?.[keyOf(ask)];
     // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started
     // with the suggestion selected and saved it untouched, and that state must come back unselected.
-    if (state?.touched && state.picked.every((v) => inputs.some((i) => i.value === v))) {
+    if (state?.touched && Array.isArray(state.picked) && state.picked.every((v) => inputs.some((i) => i.value === v))) {
       for (const input of inputs) input.checked = state.picked.includes(input.value);
       touched.add(ask);
     }

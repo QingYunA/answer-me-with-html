@@ -554,6 +554,16 @@ test('serve events: the reload script is added only to served pages, never to th
   assert.doesNotMatch((await get(urlOf('videos', 'v.html'))).body, /data-live=/);
 });
 
+test('serve events: the state attributes and the reload script find an upper-case body tag', () => {
+  // İ grows when lower-cased, so an index found in a lower-cased copy would land after the closing tag.
+  const page = renderDoc('---\nlang: en\n---\n## A\nText İİİ', {}, {}, {}).html
+    .replace('<body', '<BODY')
+    .replace('</body>', '</BODY>');
+  const out = withLiveReload(page, '/e/t/f.html', { save: '/r/t/f.html' });
+  assert.match(out, /<BODY[^>]* data-am-save="\/r\/t\/f.html">/);
+  assert.match(out, /<\/script>\n<\/BODY>/, 'the reload script still goes before the closing body tag');
+});
+
 test('serve state: a page saves its answers, and the next open gets them back', async () => {
   const page = renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html;
   writeFileSync(join(home, 'pages', 'state.html'), page);
@@ -621,6 +631,20 @@ test('serve state: a saved answer with $ sequences comes back unchanged', async 
   assert.equal(restored.reply.comments.A, text, 'replace() does not expand $ in the restored state');
 });
 
+test('serve state: the stored record stays under the cap after a merge', async () => {
+  writeFileSync(join(home, 'pages', 'merged.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
+  const token = pageToken(srv.secret, 'pages', 'merged.html');
+  const reply = { comments: { A: 'r'.repeat(40 * 1024) } };
+  const remark = [{ key: 'a|p|x', kind: 'keep', note: 'm'.repeat(40 * 1024) }];
+  assert.equal((await putState(`/r/${token}/merged.html`, JSON.stringify({ reply }))).status, 204);
+  const second = await putState(`/r/${token}/merged.html`, JSON.stringify({ remark }));
+  assert.equal(second.status, 413, 'the merged record may not pass the cap');
+  const reopened = await get(urlOf('pages', 'merged.html'));
+  const restored = JSON.parse(unescapeHtml(reopened.body.match(/data-am-state="([^"]*)"/)[1]));
+  assert.deepEqual(restored.reply, reply);
+  assert.equal(restored.remark, undefined, 'the refused patch was not stored');
+});
+
 test('serve state: the write route refuses the wrong token, a page that is gone, and a body over the cap', async () => {
   writeFileSync(join(home, 'pages', 'guard.html'), renderDoc('---\nlang: en\n---\n## A\nText', {}, {}, {}).html);
   const token = pageToken(srv.secret, 'pages', 'guard.html');
@@ -635,6 +659,8 @@ test('serve state: the write route refuses the wrong token, a page that is gone,
   });
   assert.equal((await send(`/r/${'A'.repeat(token.length)}/guard.html`)).status, 404, 'a wrong token is not found');
   assert.equal((await send(`/r/${token}/missing.html`)).status, 404, 'a page that is not there has no state');
+  assert.equal((await send(`/r/${token}/guard.html`, { headers: { origin: 'https://example.test' } })).status, 404, 'a non-null Origin is refused');
+  assert.equal((await send(`/r/${token}/guard.html`, { headers: { 'sec-fetch-dest': 'document' } })).status, 404, 'a non-empty Sec-Fetch-Dest is refused');
   const post = await send(`/r/${token}/guard.html`, { method: 'POST' });
   assert.equal(post.status, 405);
   assert.equal(post.headers.allow, 'PUT, OPTIONS');
@@ -642,6 +668,7 @@ test('serve state: the write route refuses the wrong token, a page that is gone,
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers['access-control-allow-origin'], 'null');
   assert.equal(preflight.headers['access-control-allow-methods'], 'PUT, OPTIONS');
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
   const before = readdirSync(join(home, 'serve-state')).length;
   const big = JSON.stringify({ reply: { text: 'x'.repeat(MAX_STATE_BYTES) } });
   const over = await send(`/r/${token}/guard.html`, { body: big });

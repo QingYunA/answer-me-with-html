@@ -79,6 +79,21 @@ test('clean: keeps the state of a page that stays', () => {
   assert.ok(existsSync(record), 'a live page keeps its record');
 });
 
+test('clean: leaves a state write in progress alone', () => {
+  file('pages/old.html', 10, 40);
+  mkdirSync(join(home, 'serve-state'), { recursive: true });
+  const record = join(home, 'serve-state', 'abc.json');
+  writeFileSync(record, JSON.stringify({ file: 'old.html', version: '1:2:3' }));
+  utimesSync(record, NOW / 1000, NOW / 1000);
+  const writing = join(home, 'serve-state', 'abc.json.123.abcd.tmp');
+  writeFileSync(writing, '{"file":"old.html"');
+  utimesSync(writing, NOW / 1000, NOW / 1000);
+  const r = clean(home, { all: true, now: NOW });
+  assert.ok(!existsSync(record), 'the finished record goes with its page');
+  assert.ok(existsSync(writing), 'the file writeState is about to rename is left alone');
+  assert.equal(r.files, 2);
+});
+
 const ROOTS = ['pages', 'videos', 'cache'];
 const otherRoot = (dir) => (dir === 'pages' ? 'videos' : 'pages');
 const skipWin = process.platform === 'win32' ? 'creating file symlinks on Windows needs privileges' : false;

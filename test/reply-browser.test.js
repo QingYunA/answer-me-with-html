@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
-import { startServer, pageLink } from '../src/serve.js';
+import { startServer, pageLink, pageToken } from '../src/serve.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHROME = findChrome();
@@ -404,6 +404,33 @@ test('reply: a served page sends the answer it still holds when the tab is hidde
     assert.deepEqual(record().reply.asks['Which cache do we use?'], { picked: ['Redis'], touched: true });
   } finally {
     await send('Page.setWebLifecycleState', { state: 'active' });
+    await srv.close();
+  }
+});
+
+test('reply: a malformed saved answer does not break a served page', { skip: SKIP }, async () => {
+  const home = join(tmp, 'bad-state-home');
+  mkdirSync(join(home, 'pages'), { recursive: true });
+  const draft = join(tmp, 'bad-state.md');
+  writeFileSync(draft, DRAFT);
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', join(home, 'pages', 'bad.html'), '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
+  });
+  const srv = await startServer({ home, port: 0 });
+  try {
+    const token = pageToken(srv.secret, 'pages', 'bad.html');
+    const res = await fetch(`http://127.0.0.1:${srv.port}/r/${token}/bad.html`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ reply: { asks: { 'Which cache do we use?': { picked: { 0: 'Memcached' }, touched: true } } } }),
+    });
+    assert.equal(res.status, 204, 'the server stored the shape');
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.navigate', { url: pageLink(srv, 'pages', 'bad.html') });
+    await loaded;
+    assert.equal(await evaluate('document.querySelector(".am-reply-bar") !== null'), true, 'the reply script finished');
+    assert.equal(await evaluate('document.querySelector("input[value=Memcached]").checked'), false, 'the bad answer is ignored');
+  } finally {
     await srv.close();
   }
 });
