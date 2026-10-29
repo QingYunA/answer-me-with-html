@@ -61,7 +61,7 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
   // A PDF named like a PNG slice in the --png folder would be overwritten by that slice.
-  if (pdf && png && resolve(dirname(pdf)) === resolve(png) && new RegExp(`^${escapeRe(sliceName(file))}-\\d+\\.png$`).test(basename(pdf))) {
+  if (pdf && png && resolve(dirname(pdf)) === resolve(png) && isSliceOf(basename(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -193,7 +193,11 @@ export function isHtmlPage(file) {
 
 // The PNG slices of page.html are page-1.png, page-2.png ...
 const sliceName = (htmlFile) => basename(htmlFile).replace(/\.html?$/i, '') || 'page';
-const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// True for a name the PNG writer can produce for this page: <name>-<n>.png with n counted from 1.
+const isSliceOf = (fileName, name) => {
+  if (!fileName.startsWith(`${name}-`) || !fileName.endsWith('.png')) return false;
+  return /^[1-9]\d*$/.test(fileName.slice(name.length + 1, -'.png'.length));
+};
 
 // The same file on disk: a symlink or a hard link to the page is the page, so compare the device and inode, not the path.
 const sameFile = (a, b) => {

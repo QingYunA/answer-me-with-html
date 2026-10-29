@@ -118,6 +118,10 @@ test('cli export: a PDF named like one of the PNG slices is refused', { skip: ty
   assert.equal(r.code, 1);
   assert.match(r.err, /has the name of a PNG slice/);
   assert.ok(!existsSync(join(dir, 'shots')), 'nothing is written');
+  for (const name of ['clash-0.png', 'clash-01.png', 'clash-1.pdf', 'other-1.png']) {
+    const ok = await run(['export', 'clash.html', '--pdf', `shots/${name}`, '--png', 'shots'], { env: { AM_CHROME: join(dir, 'no-such-chrome') } });
+    assert.doesNotMatch(ok.err, /has the name of a PNG slice/, `${name} is not a slice name`);
+  }
 });
 
 test('cli export: a missing or non-HTML input exits 2', async () => {

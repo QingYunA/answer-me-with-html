@@ -11428,7 +11428,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   if (pdf && existsSync6(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
-  if (pdf && png && resolve3(dirname2(pdf)) === resolve3(png) && new RegExp(`^${escapeRe(sliceName(file))}-\\d+\\.png$`).test(basename3(pdf))) {
+  if (pdf && png && resolve3(dirname2(pdf)) === resolve3(png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -11547,7 +11547,10 @@ function isHtmlPage(file) {
   return /\.html?$/i.test(file) && statSync4(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 var sliceName = (htmlFile) => basename3(htmlFile).replace(/\.html?$/i, "") || "page";
-var escapeRe = (text2) => text2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+var isSliceOf = (fileName, name) => {
+  if (!fileName.startsWith(`${name}-`) || !fileName.endsWith(".png")) return false;
+  return /^[1-9]\d*$/.test(fileName.slice(name.length + 1, -".png".length));
+};
 var sameFile = (a, b) => {
   const x2 = statSync4(a);
   const y2 = statSync4(b);
