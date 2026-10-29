@@ -271,6 +271,14 @@ test('flow: lays out nodes whose names equal dagre reserved ids or internal grou
 
 // A group name never sits on an edge, an edge label or a node, in any direction, on left-to-right and right-to-left pages.
 // On a right-to-left page the text is anchored at its right end and set in the sans font, so its box extends left from x.
+const NODE_BOX = /<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g;
+const EDGE_LABEL_BOX = /<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g;
+const rectBoxes = (svg, re) => [...svg.matchAll(re)].map((m) => {
+  const [x, y, w, h] = m.slice(1).map(Number);
+  return [x, y, x + w, y + h];
+});
+const intersects = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+
 function labelClashes(svg, dir, which = 0) {
   const label = [...svg.matchAll(/<text class="am-cluster-label" x="([\d.]+)" y="([\d.]+)">([^<]*)<\/text>/g)][which];
   const [x, y] = [Number(label[1]), Number(label[2])];
@@ -287,15 +295,17 @@ function labelClashes(svg, dir, which = 0) {
       }
     }
   }
-  const rects = [
-    ...svg.matchAll(/<rect class="am-node-shape" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
-    ...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g),
-  ];
-  for (const m of rects) {
-    const [rx, ry, rw, rh] = m.slice(1).map(Number);
-    if (rx < box[2] && box[0] < rx + rw && ry < box[3] && box[1] < ry + rh) clashes.push(`box at ${rx},${ry}`);
+  for (const b of [...rectBoxes(svg, NODE_BOX), ...rectBoxes(svg, EDGE_LABEL_BOX)]) {
+    if (intersects(box, b)) clashes.push(`box at ${b[0]},${b[1]}`);
   }
   return [...new Set(clashes)];
+}
+
+// An edge label lies on top of its own edge, so it only has to stay clear of the node boxes.
+function edgeLabelNodeClashes(svg, which = 0) {
+  const label = rectBoxes(svg, EDGE_LABEL_BOX)[which];
+  assert.ok(label, `edge label ${which} exists`);
+  return rectBoxes(svg, NODE_BOX).filter((node) => intersects(label, node)).map(([x, y]) => `node at ${x},${y}`);
 }
 
 const CROWDED = {
@@ -383,6 +393,17 @@ test('flow: a literal \\n in an edge label draws one line per part', () => {
   assert.deepEqual(lines, ['first line', 'second line', 'A', 'B']);
   assert.ok(!lines.some((line) => line.includes(BR)), 'no literal backslash-n in the text');
   assert.ok(Number(svg.match(/<g class="am-edge-label"><rect[^>]*height="([\d.]+)"/)[1]) > 18, 'the label box holds both lines');
+});
+
+test('flow: a long forced edge-label part wraps inside the 240px budget', () => {
+  const svg = render('flow', `A -> B: ${'long '.repeat(40).trim()}${BR}Short`);
+  const width = Number(svg.match(/<g class="am-edge-label"><rect[^>]*width="([\d.]+)"/)[1]);
+  assert.ok(width <= 250, `edge label width ${width} exceeds the 240px wrap limit plus 10px padding`);
+});
+
+test('flow: a multiline edge label stays clear of every node', () => {
+  const svg = render('flow', `A -> B: first line${BR}second line${BR}third line\nB -> C\ngroup G: A, B`, 'LR');
+  assert.deepEqual(edgeLabelNodeClashes(svg), []);
 });
 
 test('flow: each forced line still wraps by width, and the node grows by the extra lines', () => {
