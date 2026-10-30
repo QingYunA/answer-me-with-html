@@ -206,7 +206,8 @@ test('permissions: am patch never falls back; a page it may not overwrite gives 
   chmodSync(page, 0o600);
   assert.equal(code, 1, err);
   assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+page\.html\. Copy the page to a folder this session can write to and patch the copy$/m);
-  assert.ok(!err.includes('-o'), err);
+  // No -o suggestion. Match the flag as a word: the random temp folder name in the path can contain "-o".
+  assert.doesNotMatch(err, /(^|\s)-o\s/, err);
   assert.ok(!existsSync(fallback()));
   assert.ok(!readFileSync(page, 'utf8').includes('New text'));
 });
