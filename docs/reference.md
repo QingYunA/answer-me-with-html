@@ -203,7 +203,7 @@ am export page.html --pdf page.pdf --png out/
 ```
 
 - `--pdf` prints with the page's own `@media print` rules on A4, with background colors and no header or footer.
-- `--png` renders in screen media at 1200 CSS px wide and 2x (2400 px), hides the interactive chrome (the toolbar, the reply and remark controls, the new-version notice) and cuts the page into slices no taller than 1800 CSS px. A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files. The folder is created when missing.
+- `--png` renders in screen media at 1200 CSS px wide and 2x (2400 px), hides the interactive chrome (the toolbar, the reply and remark controls, the new-version notice) and cuts the page into slices no taller than 1800 CSS px. A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files. The folder is created when missing. A later export into the same folder removes `<page-name>-<n>.png` slices it did not write again, so a shorter page does not leave old slices behind. Other files, other names and other extensions stay. A slice that is the input page, or that cannot be removed, is left in place and the command reports it.
 - At least one flag is required. The page must be an existing `.html` file.
 - It needs Chrome / Chromium / Edge and Node.js 22 or later (built-in `WebSocket`), like `am video --mp4` / `--webm`; set `AM_CHROME` when the browser is not in a usual place.
 - A PDF or PNG is a picture: the page's reply, remarks, theme switch and Before/After switches do not work in it.

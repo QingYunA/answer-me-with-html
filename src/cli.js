@@ -455,6 +455,8 @@ Usage:
 - --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
   A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
   The toolbar, the reply and remark controls and the new-version notice are left out.
+  A later export into the same folder removes <page-name>-<n>.png slices it did not write again. Other files stay.
+  A slice that is the input page, or that cannot be removed, is left in place and reported.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
@@ -637,7 +639,7 @@ async function cmdExport(arg, opts, ctx) {
   const pdf = opts.pdf === undefined ? undefined : resolve(cwd, opts.pdf);
   const png = opts.png === undefined ? undefined : resolve(cwd, opts.png);
   try {
-    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`) });
+    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`), onWarn: (message) => fail(`! ${message}`) });
     return 0;
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;
