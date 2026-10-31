@@ -2,7 +2,7 @@
 // file:// URL in the system Chrome (no npm dependency), printed with its own @media print rules, and captured in screen
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
@@ -54,7 +54,7 @@ function gapCut(start, target, boxes) {
 }
 
 // Write the PDF and/or the PNG slices and return the files written, in that order. The CLI prints them.
-export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {} } = {}) {
+export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {}, onWarn = () => {} } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('Export needs Node.js 22 or later (built-in WebSocket)');
   // The page holds the source draft in #am-source, so writing the PDF over it would lose the draft.
   if (pdf && existsSync(pdf) && sameFile(pdf, file)) {
@@ -87,7 +87,7 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
       onFile(writtenPdf);
     }
     if (png) {
-      const writtenPngs = await writePngSlices(page, file, png);
+      const writtenPngs = await writePngSlices(page, file, png, onWarn);
       written.push(...writtenPngs);
       writtenPngs.forEach(onFile);
     }
@@ -120,7 +120,9 @@ async function writePdf(page, file) {
 }
 
 // A PNG per slice, named <page-name>-1.png, -2.png ... in the folder the user gave (created when missing).
-async function writePngSlices(page, htmlFile, folder) {
+// After a successful write, leftover <name>-<n>.png files from an earlier export of this page are removed, so a
+// shorter page does not leave higher-numbered slices behind. The removal runs only once every slice is written.
+export async function writePngSlices(page, htmlFile, folder, onWarn = () => {}) {
   await page.page('Emulation.setEmulatedMedia', { media: 'screen' });
   await settle(page);
   const layout = await page.evaluate(`(async () => {
@@ -175,7 +177,42 @@ async function writePngSlices(page, htmlFile, folder) {
     }
     written.push(file);
   }
+  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f) => basename(f))), htmlFile, onWarn);
   return written;
+}
+
+// Remove <name>-<n>.png files in this folder that this export did not write. The predicate is the same one that
+// decides a PDF would clash with a slice, so only this page's own slice names match. Other names, extensions and
+// files in subfolders stay. A directory is left in place. So is a name that is the input page (a hard link or a
+// symlink to it): the writer treats that inode as the page, and this does not delete it either. A failure to list
+// or unlink is a warning.
+export function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {}) {
+  let entries;
+  try {
+    entries = readdirSync(folder);
+  } catch (e) {
+    onWarn(`Cannot list ${folder} to remove old PNG slices: ${e.message}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (!isSliceOf(entry, name) || kept.has(entry)) continue;
+    const file = join(folder, entry);
+    try {
+      const st = lstatSync(file);
+      if (!st.isFile() && !st.isSymbolicLink()) {
+        onWarn(`Left ${file} in place: it is not a PNG file`);
+        continue;
+      }
+      // stat follows links, so a hard link or a symlink to the page is left alone, same as a slice the writer refuses to overwrite.
+      if (existsSync(htmlFile) && sameFile(file, htmlFile)) {
+        onWarn(`Left ${file} in place: it is the input page`);
+        continue;
+      }
+      unlinkSync(file);
+    } catch (e) {
+      onWarn(`Cannot remove the old PNG slice ${file}: ${e.message}`);
+    }
+  }
 }
 
 // Let the page re-layout after a media change: the sheet planner restores and re-plans, and fonts may still settle.

@@ -11388,7 +11388,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, statSync as statSync4, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
 import { basename as basename3, dirname as dirname2, join as join10, resolve as resolve3 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
@@ -11423,6 +11423,7 @@ function gapCut(start, target, boxes) {
   }
 }
 async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
+}, onWarn = () => {
 } } = {}) {
   if (typeof WebSocket === "undefined") throw new ExportError("Export needs Node.js 22 or later (built-in WebSocket)");
   if (pdf && existsSync6(pdf) && sameFile(pdf, file)) {
@@ -11453,7 +11454,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
       onFile(writtenPdf);
     }
     if (png) {
-      const writtenPngs = await writePngSlices(page, file, png);
+      const writtenPngs = await writePngSlices(page, file, png, onWarn);
       written.push(...writtenPngs);
       writtenPngs.forEach(onFile);
     }
@@ -11483,7 +11484,8 @@ async function writePdf(page, file) {
   }
   return file;
 }
-async function writePngSlices(page, htmlFile, folder) {
+async function writePngSlices(page, htmlFile, folder, onWarn = () => {
+}) {
   await page.page("Emulation.setEmulatedMedia", { media: "screen" });
   await settle2(page);
   const layout4 = await page.evaluate(`(async () => {
@@ -11535,7 +11537,36 @@ async function writePngSlices(page, htmlFile, folder) {
     }
     written.push(file);
   }
+  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f2) => basename3(f2))), htmlFile, onWarn);
   return written;
+}
+function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
+}) {
+  let entries;
+  try {
+    entries = readdirSync2(folder);
+  } catch (e) {
+    onWarn(`Cannot list ${folder} to remove old PNG slices: ${e.message}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (!isSliceOf(entry, name) || kept.has(entry)) continue;
+    const file = join10(folder, entry);
+    try {
+      const st3 = lstatSync2(file);
+      if (!st3.isFile() && !st3.isSymbolicLink()) {
+        onWarn(`Left ${file} in place: it is not a PNG file`);
+        continue;
+      }
+      if (existsSync6(htmlFile) && sameFile(file, htmlFile)) {
+        onWarn(`Left ${file} in place: it is the input page`);
+        continue;
+      }
+      unlinkSync(file);
+    } catch (e) {
+      onWarn(`Cannot remove the old PNG slice ${file}: ${e.message}`);
+    }
+  }
 }
 var settle2 = (page) => page.evaluate(`(async () => {
   await document.fonts.ready;
@@ -11559,7 +11590,7 @@ var sameFile = (a, b) => {
 var isPath = (value) => value.includes("/") || value.includes("\\");
 
 // src/housekeeping.js
-import { readdirSync as readdirSync2, lstatSync as lstatSync2, rmSync as rmSync5, readFileSync as readFileSync8 } from "node:fs";
+import { readdirSync as readdirSync3, lstatSync as lstatSync3, rmSync as rmSync5, readFileSync as readFileSync8 } from "node:fs";
 import { join as join11 } from "node:path";
 
 // src/update.js
@@ -11672,8 +11703,8 @@ var HOUR = DAY / 24;
 function walk(dir) {
   let entries;
   try {
-    if (!lstatSync2(dir).isDirectory()) return [];
-    entries = readdirSync2(dir, { withFileTypes: true });
+    if (!lstatSync3(dir).isDirectory()) return [];
+    entries = readdirSync3(dir, { withFileTypes: true });
   } catch {
     return [];
   }
@@ -11681,7 +11712,7 @@ function walk(dir) {
     const p = join11(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
-      const s = lstatSync2(p);
+      const s = lstatSync3(p);
       return s.isFile() ? [{ path: p, bytes: s.size, mtime: s.mtimeMs }] : [];
     } catch {
       return [];
@@ -11708,7 +11739,7 @@ function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Da
     if (all || f2.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync8(f2.path, "utf8"))?.file;
-      return typeof file !== "string" || gone.has(join11(home, "pages", file)) || !lstatSync2(join11(home, "pages", file)).isFile();
+      return typeof file !== "string" || gone.has(join11(home, "pages", file)) || !lstatSync3(join11(home, "pages", file)).isFile();
     } catch {
       return true;
     }
@@ -11817,7 +11848,7 @@ import { connect as connect2, isIP } from "node:net";
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, createHash as createHash3, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync3, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync4, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
 import { join as join12, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
@@ -11914,7 +11945,7 @@ var SECRET_PATTERN = /^[0-9a-f]{64}$/;
 function loadSecret(secretFile) {
   if (secretFile === void 0) return randomBytes(32).toString("hex");
   try {
-    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync3(secretFile).isSymbolicLink()) {
+    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync4(secretFile).isSymbolicLink()) {
       throw new ServeError("--secret-file must not be a symbolic link");
     }
     const flags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
@@ -12777,6 +12808,8 @@ Usage:
 - --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
   A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
   The toolbar, the reply and remark controls and the new-version notice are left out.
+  A later export into the same folder removes <page-name>-<n>.png slices it did not write again. Other files stay.
+  A slice that is the input page, or that cannot be removed, is left in place and reported.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
@@ -12949,7 +12982,7 @@ async function cmdExport(arg, opts, ctx) {
   const pdf = opts.pdf === void 0 ? void 0 : resolve5(cwd, opts.pdf);
   const png = opts.png === void 0 ? void 0 : resolve5(cwd, opts.png);
   try {
-    await exportPage(file, { pdf, png, env, onFile: (f2) => print(`\u2713 ${f2}`) });
+    await exportPage(file, { pdf, png, env, onFile: (f2) => print(`\u2713 ${f2}`), onWarn: (message) => fail(`! ${message}`) });
     return 0;
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;

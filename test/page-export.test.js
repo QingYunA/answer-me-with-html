@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { chmodSync, existsSync, linkSync, mkdirSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { main } from '../src/cli.js';
-import { slicePoints, isHtmlPage, MAX_SLICE, VIEWPORT, DEVICE_SCALE } from '../src/export.js';
+import { slicePoints, isHtmlPage, removeStaleSlices, writePngSlices, MAX_SLICE, VIEWPORT, DEVICE_SCALE } from '../src/export.js';
 import { renderDoc } from '../src/render.js';
 import { findChrome } from '../src/video/export.js';
 
@@ -124,6 +124,111 @@ test('cli export: a PDF named like one of the PNG slices is refused', { skip: ty
   }
 });
 
+// A stand-in for the browser: the height decides how many slices the writer emits, and each PNG's bytes name that height.
+function fakePage(height, { shots } = {}) {
+  let shot = 0;
+  return {
+    async page(method) {
+      if (method !== 'Page.captureScreenshot') return {};
+      shot += 1;
+      if (shots && shot > shots) throw new Error('capture failed');
+      return { data: Buffer.from(`h${height}-s${shot}`).toString('base64') };
+    },
+    async evaluate(expr) {
+      return String(expr).includes('scrollHeight') ? { empty: false, height, boxes: [] } : true;
+    },
+  };
+}
+
+test('writePngSlices: a shorter re-export removes leftover slices of this page only', async () => {
+  const folder = join(dir, 'shorter');
+  const html = join(dir, 'page.html');
+  writeFileSync(html, '<html>page</html>');
+  const warnings = [];
+  const onWarn = (message) => warnings.push(message);
+
+  const long = await writePngSlices(fakePage(4000), html, folder, onWarn);
+  assert.deepEqual(long.map((f) => basename(f)), ['page-1.png', 'page-2.png', 'page-3.png']);
+  const firstSlice = readFileSync(join(folder, 'page-1.png'));
+
+  writeFileSync(join(folder, 'other-1.png'), 'keep-other');
+  writeFileSync(join(folder, 'page-2.txt'), 'keep-txt');
+  writeFileSync(join(folder, 'page-01.png'), 'keep-pad');
+  writeFileSync(join(folder, 'page-2.png.bak'), 'keep-bak');
+  writeFileSync(join(folder, 'notes.png'), 'keep-notes');
+  writeFileSync(join(folder, 'page-1-1.png'), 'keep-other-page');
+  mkdirSync(join(folder, 'nested'));
+  writeFileSync(join(folder, 'nested', 'page-2.png'), 'keep-nested');
+  mkdirSync(join(folder, 'page-9.png'));
+  writeFileSync(join(folder, 'page-9.png', 'inside'), 'keep-dir');
+  writeFileSync(join(folder, 'unrelated.png'), 'keep-unrelated');
+  if (process.platform !== 'win32') {
+    symlinkSync(html, join(folder, 'page-8.png'));
+    symlinkSync(join(folder, 'unrelated.png'), join(folder, 'page-7.png'));
+    linkSync(html, join(folder, 'page-6.png'));
+  }
+
+  const short = await writePngSlices(fakePage(100), html, folder, onWarn);
+  assert.deepEqual(short.map((f) => basename(f)), ['page-1.png']);
+  assert.notDeepEqual(readFileSync(join(folder, 'page-1.png')), firstSlice, 'the new slice replaces the old one');
+  assert.equal(existsSync(join(folder, 'page-2.png')), false);
+  assert.equal(existsSync(join(folder, 'page-3.png')), false);
+  assert.equal(existsSync(join(folder, 'page-7.png')), false, 'a symlink to some other file is removed');
+  for (const name of ['other-1.png', 'page-2.txt', 'page-01.png', 'page-2.png.bak', 'notes.png', 'page-1-1.png', 'unrelated.png']) {
+    assert.equal(existsSync(join(folder, name)), true, name);
+  }
+  assert.equal(readFileSync(join(folder, 'nested', 'page-2.png'), 'utf8'), 'keep-nested');
+  assert.equal(readFileSync(join(folder, 'page-9.png', 'inside'), 'utf8'), 'keep-dir');
+  assert.equal(readFileSync(html, 'utf8'), '<html>page</html>');
+  const text = warnings.join('\n');
+  assert.match(text, /page-9\.png/);
+  assert.match(text, /not a PNG file/);
+  if (process.platform !== 'win32') {
+    assert.match(text, /page-8\.png/);
+    assert.match(text, /page-6\.png/);
+    assert.match(text, /input page/);
+    assert.equal(existsSync(join(folder, 'page-8.png')), true, 'a symlink to the page stays');
+    assert.equal(existsSync(join(folder, 'page-6.png')), true, 'a hard link to the page stays');
+    assert.equal(readFileSync(join(folder, 'unrelated.png'), 'utf8'), 'keep-unrelated');
+  }
+  assert.equal(warnings.some((w) => /other-1|page-2\.txt|page-01|notes\.png|page-1-1|nested/.test(w)), false);
+});
+
+test('writePngSlices: a failed export leaves earlier slices in place', async () => {
+  const folder = join(dir, 'failed');
+  const html = join(dir, 'fail.html');
+  writeFileSync(html, '<html>fail</html>');
+  await writePngSlices(fakePage(4000), html, folder);
+  const kept = readFileSync(join(folder, 'fail-2.png'));
+  await assert.rejects(() => writePngSlices(fakePage(4000, { shots: 1 }), html, folder), /capture failed/);
+  assert.equal(readFileSync(join(folder, 'fail-1.png')).toString(), 'h4000-s1', 'the first slice of the failed run was written');
+  assert.deepEqual(readFileSync(join(folder, 'fail-2.png')), kept, 'a slice the failed run never reached stays');
+  assert.equal(existsSync(join(folder, 'fail-3.png')), true);
+});
+
+test('removeStaleSlices: a folder that cannot be listed, or a slice that cannot be removed, is a warning', () => {
+  const html = join(dir, 'warn.html');
+  writeFileSync(html, '<html>warn</html>');
+  const warnings = [];
+  const onWarn = (message) => warnings.push(message);
+  removeStaleSlices(join(dir, 'no-such-slice-dir'), 'page', new Set(), html, onWarn);
+  assert.match(warnings.at(-1), /Cannot list/);
+
+  const folder = join(dir, 'locked-slices');
+  mkdirSync(folder);
+  writeFileSync(join(folder, 'page-2.png'), 'old');
+  const skip = process.platform === 'win32' || process.getuid?.() === 0;
+  if (skip) return;
+  chmodSync(folder, 0o555);
+  try {
+    removeStaleSlices(folder, 'page', new Set(['page-1.png']), html, onWarn);
+    assert.match(warnings.at(-1), /Cannot remove the old PNG slice/);
+    assert.equal(readFileSync(join(folder, 'page-2.png'), 'utf8'), 'old');
+  } finally {
+    chmodSync(folder, 0o755);
+  }
+});
+
 test('cli export: a missing or non-HTML input exits 2', async () => {
   const missing = await run(['export', 'nope.html', '--pdf', 'out.pdf']);
   assert.equal(missing.code, 2);
@@ -207,6 +312,19 @@ test('e2e: am export writes an A4 PDF and PNG slices at 2400 px wide', { skip: S
   }
   assert.match(r.out, /✓ .*export-test\.pdf/);
   assert.match(r.out, /✓ .*export-test-1\.png/);
+
+  writeFileSync(join(dir, 'png', 'export-test-9.png'), 'stale');
+  writeFileSync(join(dir, 'png', 'other-1.png'), 'keep');
+  writeFileSync(join(dir, 'png', 'export-test-2.txt'), 'keep');
+  const again = await run(['export', 'export-test.html', '--png', 'png'], { env: { AM_CHROME: CHROME } });
+  assert.equal(again.code, 0, again.err);
+  assert.equal(existsSync(join(dir, 'png', 'export-test-9.png')), false, 'a higher slice from before is removed');
+  assert.equal(readFileSync(join(dir, 'png', 'other-1.png'), 'utf8'), 'keep');
+  assert.equal(readFileSync(join(dir, 'png', 'export-test-2.txt'), 'utf8'), 'keep');
+  const againPngs = readdirSync(join(dir, 'png'))
+    .filter((f) => /^export-test-\d+\.png$/.test(f))
+    .sort((a, b) => Number(a.match(/-(\d+)\.png$/)[1]) - Number(b.match(/-(\d+)\.png$/)[1]));
+  assert.deepEqual(againPngs, pngs);
 
   writeFileSync(join(dir, 'empty.html'), '<!doctype html><html><body></body></html>');
   const empty = await run(['export', 'empty.html', '--png', 'empty-png'], { env: { AM_CHROME: CHROME } });
