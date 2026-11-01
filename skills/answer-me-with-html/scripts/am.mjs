@@ -11429,7 +11429,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   if (pdf && existsSync6(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
-  if (pdf && png && resolve3(dirname2(pdf)) === resolve3(png) && isSliceOf(basename3(pdf), sliceName(file))) {
+  if (pdf && png && sameDirectory(dirname2(pdf), png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -11558,7 +11558,7 @@ function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
         onWarn(`Left ${file} in place: it is not a PNG file`);
         continue;
       }
-      if (existsSync6(htmlFile) && sameFile(file, htmlFile)) {
+      if (existsSync6(file) && existsSync6(htmlFile) && sameFile(file, htmlFile)) {
         onWarn(`Left ${file} in place: it is the input page`);
         continue;
       }
@@ -11586,6 +11586,16 @@ var sameFile = (a, b) => {
   const x2 = statSync4(a);
   const y2 = statSync4(b);
   return x2.dev === y2.dev && x2.ino === y2.ino;
+};
+var sameDirectory = (a, b) => {
+  if (resolve3(a) === resolve3(b)) return true;
+  try {
+    const x2 = statSync4(a);
+    const y2 = statSync4(b);
+    return x2.dev === y2.dev && x2.ino === y2.ino;
+  } catch {
+    return false;
+  }
 };
 var isPath = (value) => value.includes("/") || value.includes("\\");
 
@@ -12810,6 +12820,7 @@ Usage:
   The toolbar, the reply and remark controls and the new-version notice are left out.
   A later export into the same folder removes <page-name>-<n>.png slices it did not write again. Other files stay.
   A slice that is the input page, or that cannot be removed, is left in place and reported.
+  Run one export of a page into a folder at a time. Two at once can remove each other's slices.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;

@@ -60,8 +60,9 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
   if (pdf && existsSync(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
-  // A PDF named like a PNG slice in the --png folder would be overwritten by that slice.
-  if (pdf && png && resolve(dirname(pdf)) === resolve(png) && isSliceOf(basename(pdf), sliceName(file))) {
+  // A PDF named like a PNG slice in the --png folder would be overwritten by that slice, or removed afterwards as a
+  // stale slice. Compare the directories by path and by identity: a symlink to the folder is the same folder.
+  if (pdf && png && sameDirectory(dirname(pdf), png) && isSliceOf(basename(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -203,8 +204,9 @@ export function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
         onWarn(`Left ${file} in place: it is not a PNG file`);
         continue;
       }
-      // stat follows links, so a hard link or a symlink to the page is left alone, same as a slice the writer refuses to overwrite.
-      if (existsSync(htmlFile) && sameFile(file, htmlFile)) {
+      // existsSync is false for a dangling symlink, so sameFile is not asked to stat a missing target. A link that
+      // does resolve to the input page is left alone, same as a slice the writer refuses to overwrite.
+      if (existsSync(file) && existsSync(htmlFile) && sameFile(file, htmlFile)) {
         onWarn(`Left ${file} in place: it is the input page`);
         continue;
       }
@@ -241,6 +243,19 @@ const sameFile = (a, b) => {
   const x = statSync(a);
   const y = statSync(b);
   return x.dev === y.dev && x.ino === y.ino;
+};
+
+// The same directory. Path text catches a folder that does not exist yet; device and inode catch a symlink or a
+// bind mount whose path text differs. stat throws when either path is missing, which is not a match.
+const sameDirectory = (a, b) => {
+  if (resolve(a) === resolve(b)) return true;
+  try {
+    const x = statSync(a);
+    const y = statSync(b);
+    return x.dev === y.dev && x.ino === y.ino;
+  } catch {
+    return false;
+  }
 };
 
 const isPath = (value) => value.includes('/') || value.includes('\\');

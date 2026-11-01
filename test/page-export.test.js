@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
-import { chmodSync, existsSync, linkSync, mkdirSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { main } from '../src/cli.js';
@@ -124,6 +124,26 @@ test('cli export: a PDF named like one of the PNG slices is refused', { skip: ty
   }
 });
 
+// The folder check used to compare path text only, so a symlink to the PNG folder slipped through and the stale-slice
+// cleanup deleted the PDF after the command had already reported it.
+test('cli export: a slice-named PDF reached through a symlink to the PNG folder is refused', {
+  skip: typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : process.platform === 'win32' ? 'symlinks need privileges on Windows' : false,
+}, async () => {
+  writeFileSync(join(dir, 'alias.html'), '<html><body><p>alias</p></body></html>');
+  const real = join(dir, 'alias-real');
+  mkdirSync(real);
+  symlinkSync(real, join(dir, 'alias-link'));
+  writeFileSync(join(real, 'alias-9.png'), '%PDF-1.4 already');
+  const r = await run(['export', 'alias.html', '--pdf', 'alias-link/alias-9.png', '--png', 'alias-real'], { env: { AM_CHROME: join(dir, 'no-such-chrome') } });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /has the name of a PNG slice/);
+  assert.equal(readFileSync(join(real, 'alias-9.png'), 'utf8'), '%PDF-1.4 already', 'the PDF is not removed');
+  const pdf = await run(['export', 'alias.html', '--pdf', 'alias-link/alias.pdf', '--png', 'alias-real'], { env: { AM_CHROME: join(dir, 'no-such-chrome') } });
+  assert.equal(pdf.code, 1);
+  assert.match(pdf.err, /No browser at/);
+  assert.doesNotMatch(pdf.err, /has the name of a PNG slice/);
+});
+
 // A stand-in for the browser: the height decides how many slices the writer emits, and each PNG's bytes name that height.
 function fakePage(height, { shots } = {}) {
   let shot = 0;
@@ -204,6 +224,20 @@ test('writePngSlices: a failed export leaves earlier slices in place', async () 
   assert.equal(readFileSync(join(folder, 'fail-1.png')).toString(), 'h4000-s1', 'the first slice of the failed run was written');
   assert.deepEqual(readFileSync(join(folder, 'fail-2.png')), kept, 'a slice the failed run never reached stays');
   assert.equal(existsSync(join(folder, 'fail-3.png')), true);
+});
+
+test('removeStaleSlices: a dangling slice symlink is removed', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, () => {
+  const folder = join(dir, 'dangle');
+  const html = join(dir, 'dangle.html');
+  mkdirSync(folder);
+  writeFileSync(html, '<html>dangle</html>');
+  writeFileSync(join(folder, 'page-1.png'), 'keep');
+  symlinkSync(join(dir, 'no-such-target'), join(folder, 'page-4.png'));
+  const warnings = [];
+  removeStaleSlices(folder, 'page', new Set(['page-1.png']), html, (message) => warnings.push(message));
+  assert.equal(lstatSync(join(folder, 'page-4.png'), { throwIfNoEntry: false }), undefined);
+  assert.equal(readFileSync(join(folder, 'page-1.png'), 'utf8'), 'keep');
+  assert.deepEqual(warnings, []);
 });
 
 test('removeStaleSlices: a folder that cannot be listed, or a slice that cannot be removed, is a warning', () => {

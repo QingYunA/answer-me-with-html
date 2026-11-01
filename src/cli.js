@@ -457,6 +457,7 @@ Usage:
   The toolbar, the reply and remark controls and the new-version notice are left out.
   A later export into the same folder removes <page-name>-<n>.png slices it did not write again. Other files stay.
   A slice that is the input page, or that cannot be removed, is left in place and reported.
+  Run one export of a page into a folder at a time. Two at once can remove each other's slices.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
