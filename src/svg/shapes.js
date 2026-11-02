@@ -68,6 +68,35 @@ export function scaleSvgBoxes(html, scale = 1) {
 // (the first node or participant on the right, arrows pointing left). Text is not mirrored, only placed.
 export const mirror = (width, rtl) => (rtl ? (x) => width - x : (x) => x);
 
+// dagre's customOrder for flow and er. dagre sorts each rank by the average position of its neighbours alone, so two edges that
+// leave one node tie and keep the order of the draft, wherever they end. After dagre's order, swap neighbours in a rank for as
+// long as a swap removes crossings. Only nodes with the same parent swap, and group borders stay, so a group keeps its members.
+export function orderRanks(g, order) {
+  order(g);
+  const ranks = {};
+  for (const v of g.nodes()) {
+    const { rank, order: at } = g.node(v);
+    if (rank !== undefined) (ranks[rank] ??= [])[at] = v;
+  }
+  const pairs = (as, bs) => as.reduce((n, a) => n + bs.filter((b) => g.node(b).order < g.node(a).order).length, 0);
+  const crossings = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
+  const border = (v) => g.node(v).dummy === 'border';
+  let swapped = true;
+  while (swapped) {
+    swapped = false;
+    for (const rank of Object.values(ranks)) {
+      for (let i = 1; i < rank.length; i++) {
+        const [a, b] = [rank[i - 1], rank[i]];
+        if (g.parent(a) !== g.parent(b) || border(a) || border(b) || crossings(b, a) >= crossings(a, b)) continue;
+        [rank[i - 1], rank[i]] = [b, a];
+        g.node(a).order = i;
+        g.node(b).order = i - 1;
+        swapped = true;
+      }
+    }
+  }
+}
+
 // Mirror a finished dagre layout left to right, in place: node and group centres, edge points and edge label positions.
 export function mirrorLayout(g) {
   const flip = mirror(g.graph().width, true);
