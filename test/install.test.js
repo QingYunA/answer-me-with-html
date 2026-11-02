@@ -42,6 +42,7 @@ test('install: script paths referenced by commands and SKILL.md exist', () => {
   // The plugin root is skills/ (see .claude-plugin/marketplace.json).
   for (const f of readdirSync(join(ROOT, 'skills/commands'))) {
     for (const [, rel] of readFileSync(join(ROOT, 'skills/commands', f), 'utf8').matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([\w./-]+)/g)) {
+      assert.ok(!rel.split('/').includes('..'), `${f}: ${rel} leaves the plugin root`);
       assert.ok(existsSync(join(ROOT, 'skills', rel)), `${f}: ${rel}`);
     }
   }
