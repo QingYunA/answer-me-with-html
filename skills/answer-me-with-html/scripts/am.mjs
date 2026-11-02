@@ -10475,11 +10475,14 @@ function splitNarration(blocks) {
   return { blocks: out, beats };
 }
 function normalizeNarration(raw) {
-  return raw.replace(NARRATION, "$1").replace(FOCUS, "$1").replace(/\s+/g, " ").trim();
+  return normalizeNarrationText(raw.replace(NARRATION, "$1"));
+}
+function normalizeNarrationText(raw) {
+  return raw.replace(FOCUS, "$1").replace(/\s+/g, " ").trim();
 }
 function beat(raw, line) {
   const focus = [...raw.matchAll(FOCUS)].map((m) => m[1].trim());
-  return { raw, text: normalizeNarration(raw), focus: focus[0] ?? null, line };
+  return { raw, text: normalizeNarrationText(raw), focus: focus[0] ?? null, line };
 }
 function estimateSeconds(text2) {
   let cjk = 0;
@@ -10688,15 +10691,18 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
   let source;
   let mapStat;
   try {
-    source = readFileSync7(mapFile, "utf8");
+    source = readFileSync7(mapFile, "utf8").replace(/^\uFEFF/, "");
     mapStat = statSync4(mapFile);
   } catch (e) {
     throw new TtsError(`Cannot read audio map ${mapFile}: ${e.message}`);
   }
   let json;
   try {
+    const duplicate = duplicateRawKey(source);
+    if (duplicate !== void 0) throw new TtsError(`Audio map ${mapFile} has duplicate narration key "${duplicate}"`);
     json = JSON.parse(source);
   } catch (e) {
+    if (e instanceof TtsError) throw e;
     throw new TtsError(`Cannot parse audio map ${mapFile}: ${e.message}`);
   }
   if (!json || typeof json !== "object" || Array.isArray(json)) throw new TtsError(`Audio map ${mapFile} must be a JSON object of narration lines to audio files`);
@@ -10708,14 +10714,16 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
     if (typeof value !== "string" || !value.trim()) throw new TtsError(`Audio map entry for narration line "${text2}" must name an audio file`);
     const audioFile = resolve3(dirname2(mapFile), value);
     let stat2;
+    let audio;
     try {
       stat2 = statSync4(audioFile);
       if (!stat2.isFile()) throw new TtsError(`Audio file for narration line "${text2}" is not a file: ${audioFile}`);
+      audio = readFileSync7(audioFile);
     } catch (e) {
       if (e instanceof TtsError) throw e;
       throw new TtsError(`Cannot read audio file for narration line "${text2}": ${audioFile}: ${e.message}`);
     }
-    entries.set(text2, { file: audioFile, size: stat2.size, mtimeMs: stat2.mtimeMs });
+    entries.set(text2, { file: audioFile, size: stat2.size, mtimeMs: stat2.mtimeMs, sha256: createHash2("sha256").update(audio).digest("hex") });
   }
   const signature = {
     map: { file: mapFile, size: mapStat.size, mtimeMs: mapStat.mtimeMs },
@@ -10746,12 +10754,13 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
 async function mappedSamples(buf, file, { which, runCommand }) {
   if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WAVE") {
     try {
-      return readWav(buf);
+      return readWav(buf, { downmix: true });
     } catch (e) {
-      throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
+      if (!which("ffmpeg")) throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
     }
+  } else if (!which("ffmpeg")) {
+    throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
   }
-  if (!which("ffmpeg")) throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
   return withTemp(async (out) => {
     try {
       await runCommand("ffmpeg", ["-v", "error", "-y", "-i", file, "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", out]);
@@ -10760,6 +10769,36 @@ async function mappedSamples(buf, file, { which, runCommand }) {
       throw new TtsError(`Cannot convert audio map file ${file} with ffmpeg: ${e.message}`);
     }
   });
+}
+function duplicateRawKey(source) {
+  const keys = /* @__PURE__ */ new Set();
+  let depth = 0;
+  let previous = "";
+  let rootObject = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (/\s/.test(ch)) continue;
+    if (ch === '"') {
+      let end = i + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") end += 2;
+        else if (source[end++] === '"') break;
+      }
+      if (rootObject && depth === 1 && (previous === "{" || previous === ",")) {
+        const key = JSON.parse(source.slice(i, end));
+        if (keys.has(key)) return key;
+        keys.add(key);
+      }
+      previous = '"';
+      i = end - 1;
+      continue;
+    }
+    if (!depth) rootObject = ch === "{";
+    if (ch === "{" || ch === "[") depth++;
+    if (ch === "}" || ch === "]") depth--;
+    previous = ch;
+  }
+  return void 0;
 }
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
@@ -10877,19 +10916,28 @@ async function withTemp(fn3) {
     rmSync3(dir, { recursive: true, force: true });
   }
 }
-function readWav(buf) {
+function readWav(buf, { downmix = false } = {}) {
   if (buf.toString("ascii", 0, 4) !== "RIFF" || buf.toString("ascii", 8, 12) !== "WAVE") throw new TtsError("Not a WAV file");
   let pos = 12;
   let fmt2 = null;
   while (pos + 8 <= buf.length) {
     const id = buf.toString("ascii", pos, pos + 4);
     const size = buf.readUInt32LE(pos + 4);
-    if (id === "fmt ") fmt2 = { channels: buf.readUInt16LE(pos + 10), rate: buf.readUInt32LE(pos + 12), bits: buf.readUInt16LE(pos + 22) };
+    if (id === "fmt ") fmt2 = { format: buf.readUInt16LE(pos + 8), channels: buf.readUInt16LE(pos + 10), rate: buf.readUInt32LE(pos + 12), bits: buf.readUInt16LE(pos + 22) };
     if (id === "data") {
-      if (!fmt2 || fmt2.bits !== 16) throw new TtsError("Only 16-bit PCM WAV is supported");
+      if (!fmt2 || fmt2.format !== 1 || fmt2.bits !== 16) throw new TtsError("Only 16-bit PCM WAV is supported");
       const n = Math.floor(Math.min(size, buf.length - pos - 8) / 2 / fmt2.channels);
       const samples = new Int16Array(n);
-      for (let i = 0; i < n; i++) samples[i] = buf.readInt16LE(pos + 8 + i * 2 * fmt2.channels);
+      for (let i = 0; i < n; i++) {
+        const frame = pos + 8 + i * 2 * fmt2.channels;
+        if (!downmix) {
+          samples[i] = buf.readInt16LE(frame);
+          continue;
+        }
+        let sum2 = 0;
+        for (let channel = 0; channel < fmt2.channels; channel++) sum2 += buf.readInt16LE(frame + channel * 2);
+        samples[i] = Math.round(sum2 / fmt2.channels);
+      }
       return fmt2.rate === SAMPLE_RATE ? samples : resample({ rate: fmt2.rate, samples });
     }
     pos += 8 + size + size % 2;
