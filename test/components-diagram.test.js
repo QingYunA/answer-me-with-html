@@ -121,6 +121,7 @@ test('flow: an edge routed around the outside keeps the margin inside the drawin
 // How many pairs of drawn edges cross, read from the bends of their paths. Two edges that only touch at a shared node do not count.
 const crossings = (svg) => {
   const lines = [...svg.matchAll(/class="am-edge[^"]*" d="([^"]+)"/g)].map((m) => [...m[1].matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(([, x, y]) => [+x, +y]));
+  assert.ok(lines.length > 0, 'the svg draws no edges');
   const side = ([ax, ay], [bx, by], [cx, cy]) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
   const cross = ([a, b], [c, d]) => side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
   const segments = (line) => line.slice(1).map((p, i) => [line[i], p]);
