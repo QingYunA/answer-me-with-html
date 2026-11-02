@@ -4,7 +4,7 @@
 // 2. install once for real with a temporary HOME, then render a page with the installed am.mjs;
 // 3. claude plugin validate checks the manifests of the marketplace and the plugin.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, readdirSync, statSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, statSync, lstatSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,18 @@ function find(dir, name) {
     }
   }
   return null;
+}
+
+// An SSH session of the Claude Code desktop app does not copy a plugin that holds a symlink, such as the
+// node_modules/.bin links of an npm install in the plugin root (#361). The copied plugin must hold neither.
+function checkPluginCopy(dir) {
+  for (const e of readdirSync(dir)) {
+    const p = join(dir, e);
+    if (e === 'node_modules') throw new Error(`the installed plugin holds node_modules: ${p}`);
+    const st = lstatSync(p);
+    if (st.isSymbolicLink()) throw new Error(`the installed plugin holds a symlink: ${p}`);
+    if (st.isDirectory()) checkPluginCopy(p);
+  }
 }
 
 // The commands in INSTALL.md are run as written, so the guide cannot drift from what works.
@@ -100,6 +112,7 @@ function runGuide() {
   const pluginAm = find(join(h, '.claude-config', 'plugins', 'cache', 'answer-me-with-html', 'answer-me-with-html'), 'am.mjs');
   if (!pluginAm) throw new Error('am.mjs not found after the guide installed the plugin');
   if (!find(join(h, '.claude-config', 'plugins', 'cache', 'answer-me-with-html', 'answer-me-with-html'), 'config.md')) throw new Error('the config command is not part of the installed plugin');
+  checkPluginCopy(join(h, '.claude-config', 'plugins', 'cache', 'answer-me-with-html', 'answer-me-with-html'));
   bash(updateCmd('claude plugin update'));
   process.stdout.write('✓ plugin route: install, enabled, commands present, update works\n');
   rmSync(h, { recursive: true, force: true });
@@ -132,7 +145,8 @@ try {
   if (!pluginAm) throw new Error('am.mjs not found after plugin install');
   const out2 = sh(process.execPath, [pluginAm, 'render', '-', '--no-open'], { input: '## A 标题\n文字\n' });
   if (!/^✓ /m.test(out2)) throw new Error(`the plugin's am.mjs cannot render a page:\n${out2}`);
-  process.stdout.write('✓ the plugin installs and its am.mjs renders a page\n');
+  checkPluginCopy(join(cache, 'answer-me-with-html'));
+  process.stdout.write('✓ the plugin installs without node_modules or symlinks, and its am.mjs renders a page\n');
 
   step('claude plugin validate');
   // On a validation failure claude exits non-zero and execFileSync throws; output wording is no longer matched.
