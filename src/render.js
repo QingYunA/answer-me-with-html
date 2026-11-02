@@ -10,7 +10,7 @@ import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
 import { SCALE } from './themes/type-scale.js';
-import { VERSION, RUNTIME_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -101,7 +101,7 @@ export function renderBlocks(blocks, ctx) {
 }
 
 function renderBlock(b, ctx) {
-  const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text)}</div>` : renderFence(b, ctx)), { math: !ctx.video });
+  const { result, notes } = collectHtmlNotes(() => (b.type === 'md' ? `<div class="am-md">${md(b.text, { ui: ctx.ui, interactive: !ctx.video })}</div>` : renderFence(b, ctx)), { math: !ctx.video });
   noteHtml(b, notes.filter((n) => !n.math), ctx);
   noteMath(b, notes.filter((n) => n.math), ctx);
   const out = embedImages(b, result, ctx);
@@ -169,7 +169,14 @@ function embedImages(block, html, ctx) {
 
 function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
-  if (RAW_LANGS.has(lang)) return text;
+  if (RAW_LANGS.has(lang)) {
+    if (lang === 'html') {
+      for (const match of text.matchAll(/<script\b/gi)) {
+        ctx.stats.htmlWarnings?.push({ line: line + 1 + text.slice(0, match.index).split('\n').length - 1, message: 'this script will not run: the page allows only am\'s own scripts' });
+      }
+    }
+    return text;
+  }
   const comp = COMPONENTS.get(lang);
   if (!comp) return codeBlock(block, ctx);
   if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
@@ -310,7 +317,8 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, sca
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
-  const script = `\n${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
+  const interactiveTable = body.includes('<table data-am-table=');
+  const script = `\n${RUNTIME_JS}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -320,7 +328,7 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), update: Boolean(update), closeAfter, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), table: interactiveTable, update: Boolean(update), closeAfter, scale })}
 </style>
 </head>
 <body>

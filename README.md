@@ -270,7 +270,7 @@ The agent picks a component by the shape of the information:
 | `callout` | A conclusion, a tip, a warning |
 | `ask` | A decision you make on the page; the agent's suggestion has a tag; nothing starts selected |
 | Code block | Real code quoted from a file (`src=` `lines=`), or a sketch |
-| Table | Multi-way comparison. Write `ok` / `no` / `warn` in a cell to get ✓ ✗ ! |
+| Table | Multi-way comparison. Write `ok` / `no` / `warn` in a cell to get ✓ ✗ !; add `{table sort filter}` after the table for interactive sorting and filtering |
 
 The draft format (frontmatter, `span`, `rows`, raw `html` / `svg` blocks) and how to call the CLI without an agent are in the [reference](docs/reference.md). Full syntax for a component: `am help <component>`.
 

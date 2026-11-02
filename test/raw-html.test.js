@@ -140,7 +140,7 @@ test('raw html: code, comments, autolinks, Markdown and fences are left alone', 
   const fences = renderDoc('## A\n```html\n<host onclick="x()"><script>1</script></host>\n```\n```svg\n<svg onload="y()"><host/></svg>\n```\n');
   assert.ok(fences.html.includes('<host onclick="x()"><script>1</script></host>'));
   assert.ok(fences.html.includes('<svg onload="y()"><host/></svg>'));
-  assert.deepEqual(fences.stats.htmlWarnings, []);
+  assert.deepEqual(fences.stats.htmlWarnings, [{ line: 3, message: "this script will not run: the page allows only am's own scripts" }]);
 });
 
 // ── attributes ──
@@ -308,4 +308,10 @@ test('cli render: lists at most 20 html warnings; patch and a clean draft print 
   const patched = await run(['patch', 'clean.html', '--panel', 'A'], 'Use <host> here.\n');
   assert.equal(patched.code, 0, patched.err);
   assert.match(patched.out, /L2 \[html\] <host> is not an HTML element/);
+});
+
+test('cli render: a script in an html fence is embedded but warns that CSP blocks it', async () => {
+  const r = await run(['render', '-', '-o', 'script.html'], '## A\n```html\n<p>raw</p>\n<script>window.x = 1</script>\n```\n');
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /^  L4 \[html\] this script will not run: the page allows only am's own scripts$/m);
 });

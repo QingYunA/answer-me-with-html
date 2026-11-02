@@ -110,6 +110,15 @@ lang: en
   assert.match(messages[2], /^L10 remote image http:\/\/example\.com\/b\.png /);
 });
 
+test('csp: a script in an html fence warns with its draft line, while an svg fence does not', () => {
+  const { html, stats } = renderDoc('## A\n```html\n<p>one</p>\n<SCRIPT>one()</SCRIPT>\n<script src="x"></script>\n```\n```svg\n<script>two()</script>\n```\n');
+  assert.ok(html.includes('<SCRIPT>one()</SCRIPT>'));
+  assert.deepEqual(stats.htmlWarnings, [
+    { line: 4, message: "this script will not run: the page allows only am's own scripts" },
+    { line: 5, message: "this script will not run: the page allows only am's own scripts" },
+  ]);
+});
+
 test('csp: the warning names the src attribute, not data-src before it', () => {
   assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="//cdn.example.com/b.png">'), ['//cdn.example.com/b.png']);
   assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="local.png">'), []);
