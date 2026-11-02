@@ -170,8 +170,9 @@ function embedImages(block, html, ctx) {
 function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
   if (RAW_LANGS.has(lang)) {
-    if (lang === 'html') {
-      for (const match of text.matchAll(/<script\b/gi)) {
+    if (lang === 'html' || lang === 'svg') {
+      for (const match of text.matchAll(/<!--[\s\S]*?(?:-->|$)|<textarea\b[^>]*>[\s\S]*?(?:<\/textarea\s*>|$)|<script\b/gi)) {
+        if (match[0].toLowerCase() !== '<script') continue;
         ctx.stats.htmlWarnings?.push({ line: line + 1 + text.slice(0, match.index).split('\n').length - 1, message: 'this script will not run: the page allows only am\'s own scripts' });
       }
     }

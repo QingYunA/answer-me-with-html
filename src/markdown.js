@@ -47,15 +47,23 @@ function tableOptions(tokens) {
     const token = tokens[k];
     if (token.type === 'table') {
       const row = token.rows.at(-1);
-      const rowMatch = row?.[0] && row.slice(1).every((cell) => !cell.text.trim()) && row[0].text.trim().match(TABLE_ATTR);
+      const rowOption = row?.[0]?.text.trim().match(TABLE_ATTR);
+      const rowMatch = rowOption && row.length > 1 && row.slice(1).every((cell) => !cell.text.trim()) && rowOption;
       const nextIndex = tokens.findIndex((candidate, index) => index > k && candidate.type !== 'space');
       const next = tokens[nextIndex];
       const paragraphMatch = next?.type === 'paragraph' && next.text.trim().match(TABLE_ATTR);
       const match = rowMatch || paragraphMatch;
       if (match) {
-        token.amTable = parseAttrs(match[1]);
-        if (rowMatch) token.rows.pop();
-        else tokens.splice(nextIndex, 1);
+        const options = parseAttrs(match[1]);
+        if (['sort', 'filter'].some((flag) => options[flag] === true)) {
+          token.amTable = options;
+          if (rowMatch) token.rows.pop();
+          else tokens.splice(nextIndex, 1);
+        } else {
+          note(match[0], 'unrecognized table option; use {table sort}, {table filter}, or {table sort filter}');
+        }
+      } else if (rowOption && !['sort', 'filter'].some((flag) => parseAttrs(rowOption[1])[flag] === true)) {
+        note(rowOption[0], 'unrecognized table option; use {table sort}, {table filter}, or {table sort filter}');
       }
     } else if (token.type === 'list') {
       token.items.forEach((item) => tableOptions(item.tokens));
@@ -66,7 +74,7 @@ function tableOptions(tokens) {
   return tokens;
 }
 
-marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => marked.lexer(source), note }) } });
+marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note }) } });
 inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
 marked.use({ extensions: [{
   name: 'table',

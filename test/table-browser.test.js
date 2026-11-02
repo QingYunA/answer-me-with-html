@@ -19,7 +19,7 @@ title: Table interactions
 lang: en
 ---
 ## A Projects
-| Project | Stars | Updated | Kind |
+| Project [docs](https://example.com) | Stars | Updated | Kind |
 | --- | ---: | --- | --- |
 | alpha | 12000 | 2025-09-30 | Library |
 | beta | 900 | 2026-10-20 | CLI |
@@ -30,6 +30,38 @@ lang: en
 | Name | Value |
 | --- | ---: |
 | delta | 4 |
+
+## C Mixed values
+| Item | Value |
+| --- | ---: |
+| empty |  |
+| negative | -40 |
+| grouped | $1,200 |
+| currency | $900 |
+| text | 10a |
+| two | 2 |
+| eight | 8 |
+| ten | 10 |
+| percent | 12% |
+{table sort}
+
+## D Exact integers and ties
+| Item | Value |
+| --- | ---: |
+| larger | 9007199254740993 |
+| smaller | 9007199254740992 |
+| largest | 9007199254740994 |
+| integer-first | 2 |
+| decimal-second | 2.0 |
+{table sort}
+
+## E Impossible date
+| Item | Value |
+| --- | ---: |
+| invalid | 2024-02-31 |
+| march-first | 2024-03-01 |
+| march-second | 2024-03-02 |
+{table sort}
 `;
 
 let tmp;
@@ -44,8 +76,9 @@ const evaluate = async (expression) => {
   if (result.exceptionDetails) throw new Error(`page script error: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`);
   return result.result.value;
 };
-const projects = () => evaluate('[...document.querySelectorAll("table[data-am-table] tbody tr")].map((row) => ({ name: row.cells[0].textContent, hidden: row.hidden }))');
-const click = (column) => evaluate(`document.querySelectorAll('table[data-am-table] th')[${column}].querySelector('button').click()`);
+const projects = () => evaluate('[...document.querySelectorAll("table[data-am-table]")[0].tBodies[0].rows].map((row) => ({ name: row.cells[0].textContent, hidden: row.hidden }))');
+const items = (table) => evaluate(`[...document.querySelectorAll('table[data-am-table]')[${table}].tBodies[0].rows].map((row) => row.cells[0].textContent)`);
+const click = (column, table = 0) => evaluate(`document.querySelectorAll('table[data-am-table]')[${table}].tHead.rows[0].cells[${column}].querySelector('button').click()`);
 
 before(async () => {
   if (SKIP) return;
@@ -105,6 +138,40 @@ test('e2e table: numeric and date columns sort by value, toggle direction, and s
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 
+test('e2e table: header links stay outside sort buttons and do not trigger sorting', { skip: SKIP }, async () => {
+  const before = (await projects()).map((row) => row.name);
+  const structure = await evaluate(`(() => {
+    const head = document.querySelectorAll('table[data-am-table] th')[0];
+    const link = head.querySelector('a');
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+    link.click();
+    return { nested: Boolean(head.querySelector('button a')), label: head.querySelector('button').getAttribute('aria-label') };
+  })()`);
+  assert.equal(structure.nested, false);
+  assert.equal(structure.label, 'Project docs');
+  assert.deepEqual((await projects()).map((row) => row.name), before);
+  assert.equal(await evaluate('document.querySelectorAll("table[data-am-table] th")[0].hasAttribute("aria-sort")'), false);
+});
+
+test('e2e table: mixed value columns use one total order with parseable values before text', { skip: SKIP }, async () => {
+  await click(1, 1);
+  assert.deepEqual(await items(1), ['negative', 'two', 'eight', 'ten', 'percent', 'currency', 'grouped', 'empty', 'text']);
+  await click(1, 1);
+  assert.deepEqual(await items(1), ['text', 'empty', 'grouped', 'currency', 'percent', 'ten', 'eight', 'two', 'negative']);
+});
+
+test('e2e table: integers beyond 2^53 compare exactly and numeric ties stay stable', { skip: SKIP }, async () => {
+  await click(1, 2);
+  assert.deepEqual(await items(2), ['integer-first', 'decimal-second', 'smaller', 'larger', 'largest']);
+  await click(1, 2);
+  assert.deepEqual(await items(2), ['largest', 'larger', 'smaller', 'integer-first', 'decimal-second']);
+});
+
+test('e2e table: impossible ISO dates sort as text instead of overflowing into March', { skip: SKIP }, async () => {
+  await click(1, 3);
+  assert.deepEqual(await items(3), ['march-first', 'march-second', 'invalid']);
+});
+
 test('e2e table: the filter hides only non-matching rows and clearing restores all of them under the CSP', { skip: SKIP }, async () => {
   assert.equal(await evaluate('document.querySelector("[data-am-table-filter]").closest(".am-table-controls").hidden'), false);
   await evaluate(`(() => {
@@ -145,7 +212,7 @@ test('e2e table: without JavaScript every row renders, no sort buttons appear, a
   await loaded;
   const result = await cdp.send('Runtime.evaluate', {
     expression: `JSON.stringify({
-      rows: document.querySelectorAll('table[data-am-table] tbody tr').length,
+      rows: document.querySelectorAll('table[data-am-table]')[0].tBodies[0].rows.length,
       buttons: document.querySelectorAll('.am-table-sort').length,
       hidden: document.querySelector('.am-table-controls').hidden
     })`, returnByValue: true,
