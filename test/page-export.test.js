@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, symlinkSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:http';
 import { basename, join } from 'node:path';
 import { main } from '../src/cli.js';
 import { slicePoints, isHtmlPage, removeStaleSlices, writePngSlices, MAX_SLICE, VIEWPORT, DEVICE_SCALE } from '../src/export.js';
@@ -144,6 +145,26 @@ test('cli export: a slice-named PDF reached through a symlink to the PNG folder 
   assert.doesNotMatch(pdf.err, /has the name of a PNG slice/);
 });
 
+test('cli export: a slice-named PDF in a missing folder under a symlink is refused', {
+  skip: typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : process.platform === 'win32' ? 'symlinks need privileges on Windows' : false,
+}, async () => {
+  writeFileSync(join(dir, 'missing-alias.html'), '<html><body>source</body></html>');
+  const real = join(dir, 'missing-alias-real');
+  const alias = join(dir, 'missing-alias-link');
+  mkdirSync(real);
+  symlinkSync(real, alias);
+  for (const [pdfParent, pngParent] of [[alias, real], [real, alias]]) {
+    const folder = join(pngParent, 'new', 'nested');
+    const r = await run(['export', 'missing-alias.html', '--pdf', join(pdfParent, 'new', 'nested', 'missing-alias-9.png'), '--png', folder], {
+      env: { AM_CHROME: join(dir, 'no-such-chrome') },
+    });
+    assert.equal(r.code, 1);
+    assert.match(r.err, /has the name of a PNG slice/);
+    assert.equal(r.out, '');
+    assert.equal(existsSync(folder), false, 'the collision is caught before creating the folder');
+  }
+});
+
 // A stand-in for the browser: the height decides how many slices the writer emits, and each PNG's bytes name that height.
 function fakePage(height, { shots } = {}) {
   let shot = 0;
@@ -224,6 +245,61 @@ test('writePngSlices: a failed export leaves earlier slices in place', async () 
   assert.equal(readFileSync(join(folder, 'fail-1.png')).toString(), 'h4000-s1', 'the first slice of the failed run was written');
   assert.deepEqual(readFileSync(join(folder, 'fail-2.png')), kept, 'a slice the failed run never reached stays');
   assert.equal(existsSync(join(folder, 'fail-3.png')), true);
+});
+
+test('writePngSlices: the last hard link to the input page stays when its original path disappears', async () => {
+  const folder = join(dir, 'missing-input');
+  const html = join(dir, 'missing-input.html');
+  const source = '<html>source draft</html>';
+  mkdirSync(folder);
+  writeFileSync(html, source);
+  const linked = join(folder, 'missing-input-9.png');
+  linkSync(html, linked);
+  writeFileSync(join(folder, 'missing-input-8.png'), 'stale');
+  const page = fakePage(100);
+  const capture = page.page;
+  page.page = async (method) => {
+    if (method === 'Page.captureScreenshot') rmSync(html);
+    return capture(method);
+  };
+  const warnings = [];
+  const written = await writePngSlices(page, html, folder, (message) => warnings.push(message));
+  assert.deepEqual(written.map((f) => basename(f)), ['missing-input-1.png']);
+  assert.equal(existsSync(html), false);
+  assert.equal(existsSync(linked), true, 'the last name for the source draft must survive cleanup');
+  assert.equal(readFileSync(linked, 'utf8'), source);
+  assert.equal(existsSync(join(folder, 'missing-input-8.png')), false, 'ordinary stale slices are still removed');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /missing-input-9\.png.*input page/);
+});
+
+for (const target of ['1', '9']) test(`writePngSlices: replacing the input protects both drafts at slice ${target}`, async () => {
+  const name = `replaced-${target}`;
+  const folder = join(dir, name);
+  const html = join(dir, `${name}.html`);
+  mkdirSync(folder);
+  writeFileSync(html, 'original draft');
+  const original = join(folder, `${name}-8.png`);
+  const replacement = join(folder, `${name}-${target}.png`);
+  linkSync(html, original);
+  const page = fakePage(100);
+  const capture = page.page;
+  page.page = async (method) => {
+    if (method === 'Page.captureScreenshot') {
+      rmSync(html);
+      writeFileSync(html, 'replacement draft');
+      linkSync(html, replacement);
+    }
+    return capture(method);
+  };
+  if (target === '1') {
+    await assert.rejects(() => writePngSlices(page, html, folder), /is the input page/);
+  } else {
+    await writePngSlices(page, html, folder);
+  }
+  assert.equal(readFileSync(original, 'utf8'), 'original draft');
+  assert.equal(readFileSync(html, 'utf8'), 'replacement draft');
+  assert.equal(readFileSync(replacement, 'utf8'), 'replacement draft');
 });
 
 test('removeStaleSlices: a dangling slice symlink is removed', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, () => {
@@ -308,6 +384,108 @@ Plain text in the first panel.
 Ask -> Reply: answer
 \`\`\`
 `;
+
+test('e2e: the source disappears during Chrome loading and its last hard link survives', { skip: SKIP, timeout: 120000 }, async () => {
+  const html = join(dir, 'vanished.html');
+  const folder = join(dir, 'vanished');
+  mkdirSync(folder);
+  let removed = false;
+  const server = createServer((_request, response) => {
+    if (!removed) { rmSync(html); removed = true; }
+    response.writeHead(204).end();
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const source = `<!doctype html><html><body>Source draft<img src="http://127.0.0.1:${server.address().port}/remove"></body></html>`;
+    writeFileSync(html, source);
+    const linked = join(folder, 'vanished-9.png');
+    linkSync(html, linked);
+    writeFileSync(join(folder, 'vanished-8.png'), 'stale');
+    const r = await run(['export', html, '--png', folder], { env: { AM_CHROME: CHROME } });
+    assert.equal(r.code, 0, r.err);
+    assert.equal(removed, true, 'Chrome loaded the page and requested its image');
+    assert.equal(existsSync(html), false);
+    assert.equal(readFileSync(linked, 'utf8'), source);
+    assert.equal(existsSync(join(folder, 'vanished-8.png')), false);
+    assert.equal(readFileSync(join(folder, 'vanished-1.png')).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+    assert.match(r.err, /vanished-9\.png.*input page/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+for (const variant of ['folder', 'extension', 'prefix']) test(`e2e: PDF and PNG collision respects filesystem case sensitivity (${variant})`, {
+  skip: SKIP || (process.platform === 'win32' && variant === 'folder' && 'symlinks need privileges on Windows'), timeout: 120000,
+}, async () => {
+  const name = `case-${variant}`;
+  const html = join(dir, `${name}.html`);
+  writeFileSync(html, '<!doctype html><html><body>Case sensitivity test</body></html>');
+  const insensitive = existsSync(join(dir, `${name.toUpperCase()}.HTML`));
+  const real = join(dir, `${name}-real`);
+  mkdirSync(real);
+  let pdf;
+  let png;
+  if (variant === 'folder') {
+    const alias = join(dir, `${name}-alias`);
+    symlinkSync(real, alias);
+    pdf = join(alias, 'new', `${name}-9.png`);
+    png = join(real, 'NEW');
+  } else {
+    pdf = join(real, variant === 'extension' ? `${name}-1.PNG` : `${name.toUpperCase()}-1.png`);
+    png = real;
+  }
+  const r = await run(['export', html, '--pdf', pdf, '--png', png], { env: { AM_CHROME: CHROME } });
+  assert.equal(r.code, insensitive ? 1 : 0, r.err);
+  if (insensitive) {
+    assert.match(r.err, /has the name of a PNG slice/);
+    assert.equal(r.out, '', 'a rejected collision is not reported as a successful export');
+  } else {
+    assert.equal(readFileSync(join(png, `${name}-1.png`)).subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
+  }
+  assert.equal(readFileSync(pdf).subarray(0, 4).toString(), '%PDF', 'the PDF is never removed or overwritten by a PNG');
+  assert.equal(readFileSync(html, 'utf8'), '<!doctype html><html><body>Case sensitivity test</body></html>');
+});
+
+test('e2e: an inaccessible PNG ancestor reports an export error and preserves the PDF', {
+  skip: SKIP || ((process.platform === 'win32' || process.getuid?.() === 0) && 'needs a non-root POSIX user'), timeout: 120000,
+}, async () => {
+  const html = join(dir, 'inaccessible-png.html');
+  const pdf = join(dir, 'inaccessible-png.pdf');
+  const locked = join(dir, 'inaccessible-png');
+  mkdirSync(locked);
+  writeFileSync(html, '<!doctype html><html><body>Readable error test</body></html>');
+  chmodSync(locked, 0o000);
+  try {
+    const r = await run(['export', html, '--pdf', pdf, '--png', join(locked, 'nested')], { env: { AM_CHROME: CHROME } });
+    assert.equal(r.code, 1);
+    assert.match(r.err, /Cannot check the PNG folder.*EACCES/);
+    assert.doesNotMatch(r.err, /Internal error/);
+    assert.equal(readFileSync(pdf).subarray(0, 4).toString(), '%PDF');
+  } finally {
+    chmodSync(locked, 0o700);
+  }
+});
+
+for (const kind of ['hard', 'symbolic']) for (const index of ['1', '9']) test(`e2e: a ${kind} PDF link to slice ${index} is kept intact`, {
+  skip: SKIP || (process.platform === 'win32' && kind === 'symbolic' && 'symlinks need privileges on Windows'), timeout: 120000,
+}, async () => {
+  const name = `pdf-link-${kind}-${index}`;
+  const html = join(dir, `${name}.html`);
+  const folder = join(dir, name);
+  mkdirSync(folder);
+  writeFileSync(html, '<!doctype html><html><body>PDF link test</body></html>');
+  const target = join(folder, `${name}-${index}.png`);
+  const pdf = join(folder, 'report.pdf');
+  writeFileSync(target, 'old output');
+  (kind === 'hard' ? linkSync : symlinkSync)(target, pdf);
+  const r = await run(['export', html, '--pdf', pdf, '--png', folder], { env: { AM_CHROME: CHROME } });
+  assert.equal(r.code, 1, r.err);
+  assert.match(r.err, /has the name of a PNG slice/);
+  assert.equal(r.out, '');
+  assert.equal(readFileSync(pdf).subarray(0, 4).toString(), '%PDF');
+  assert.deepEqual(readFileSync(target), readFileSync(pdf));
+  assert.equal(readFileSync(html, 'utf8'), '<!doctype html><html><body>PDF link test</body></html>');
+});
 
 test('e2e: a PNG slice path that links to the page is refused, and the page is kept', { skip: SKIP || (process.platform === 'win32' && 'symlinks need privileges on Windows'), timeout: 120000 }, async () => {
   const { html } = renderDoc(DRAFT);

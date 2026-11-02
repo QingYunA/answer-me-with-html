@@ -11388,7 +11388,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, statSync as statSync4, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, realpathSync as realpathSync3, statSync as statSync4, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
 import { basename as basename3, dirname as dirname2, join as join10, resolve as resolve3 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
@@ -11438,6 +11438,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
     const from = env.AM_CHROME ? "AM_CHROME" : env.CHROME_PATH ? "CHROME_PATH" : "the built-in path";
     throw new ExportError(`No browser at ${chrome} (from ${from}). Set AM_CHROME to the Chrome / Chromium / Edge binary`);
   }
+  const inputStat = statSync4(file);
   const page = await openPage(pathToFileURL2(file).href, {
     env,
     chromePath: chrome,
@@ -11450,11 +11451,26 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   try {
     if (pdf) {
       const writtenPdf = await writePdf(page, pdf);
+      if (png) {
+        let entries;
+        try {
+          entries = statSync4(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync2(png) : [];
+        } catch (e) {
+          throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
+        }
+        for (const entry of entries) {
+          const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
+          const slice = index && join10(png, `${sliceName(file)}-${index}.png`);
+          if (slice && existsSync6(slice) && sameFile(slice, pdf)) {
+            throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+          }
+        }
+      }
       written.push(writtenPdf);
       onFile(writtenPdf);
     }
     if (png) {
-      const writtenPngs = await writePngSlices(page, file, png, onWarn);
+      const writtenPngs = await writePngSlices(page, file, png, onWarn, inputStat);
       written.push(...writtenPngs);
       writtenPngs.forEach(onFile);
     }
@@ -11485,7 +11501,7 @@ async function writePdf(page, file) {
   return file;
 }
 async function writePngSlices(page, htmlFile, folder, onWarn = () => {
-}) {
+}, inputStat = statSync4(htmlFile)) {
   await page.page("Emulation.setEmulatedMedia", { media: "screen" });
   await settle2(page);
   const layout4 = await page.evaluate(`(async () => {
@@ -11529,7 +11545,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
       clip: { x: 0, y: top2, width: VIEWPORT, height, scale: 1 }
     });
     const file = join10(folder, `${name}-${i}.png`);
-    if (existsSync6(file) && sameFile(file, htmlFile)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
+    if (isInputFile(file, htmlFile, inputStat)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync6(file, Buffer.from(data, "base64"));
     } catch (e) {
@@ -11537,11 +11553,11 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
     }
     written.push(file);
   }
-  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f2) => basename3(f2))), htmlFile, onWarn);
+  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f2) => basename3(f2))), htmlFile, onWarn, inputStat);
   return written;
 }
 function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
-}) {
+}, inputStat = statSync4(htmlFile, { throwIfNoEntry: false })) {
   let entries;
   try {
     entries = readdirSync2(folder);
@@ -11558,7 +11574,7 @@ function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
         onWarn(`Left ${file} in place: it is not a PNG file`);
         continue;
       }
-      if (existsSync6(file) && existsSync6(htmlFile) && sameFile(file, htmlFile)) {
+      if (isInputFile(file, htmlFile, inputStat)) {
         onWarn(`Left ${file} in place: it is the input page`);
         continue;
       }
@@ -11583,13 +11599,27 @@ var isSliceOf = (fileName, name) => {
   return /^[1-9]\d*$/.test(fileName.slice(name.length + 1, -".png".length));
 };
 var sameFile = (a, b) => {
-  const x2 = statSync4(a);
-  const y2 = statSync4(b);
-  return x2.dev === y2.dev && x2.ino === y2.ino;
+  return sameIdentity(statSync4(a), statSync4(b));
+};
+var sameIdentity = (a, b) => a.dev === b.dev && a.ino === b.ino;
+var isInputFile = (file, htmlFile, inputStat) => {
+  if (!existsSync6(file)) return false;
+  const st3 = statSync4(file);
+  return inputStat && sameIdentity(st3, inputStat) || existsSync6(htmlFile) && sameIdentity(st3, statSync4(htmlFile));
+};
+var realOrAncestor = (path) => {
+  const missing = [];
+  let current = resolve3(path);
+  while (!existsSync6(current) && dirname2(current) !== current) {
+    missing.unshift(basename3(current));
+    current = dirname2(current);
+  }
+  return join10(realpathSync3(current), ...missing);
 };
 var sameDirectory = (a, b) => {
   if (resolve3(a) === resolve3(b)) return true;
   try {
+    if (realOrAncestor(a) === realOrAncestor(b)) return true;
     const x2 = statSync4(a);
     const y2 = statSync4(b);
     return x2.dev === y2.dev && x2.ino === y2.ino;
