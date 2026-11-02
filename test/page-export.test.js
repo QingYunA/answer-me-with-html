@@ -98,6 +98,27 @@ test('cli export: an unreadable page path exits 2 with a readable error', { skip
   }
 });
 
+test('cli export: a page removed after validation reports an export error', { skip: typeof WebSocket === 'undefined' && 'needs Node 22 (built-in WebSocket)' }, async () => {
+  const html = join(dir, 'removed-after-validation.html');
+  const pdf = join(dir, 'removed-after-validation.pdf');
+  writeFileSync(html, '<html><body>source</body></html>');
+  const out = sink();
+  const err = sink();
+  const code = await main(['export', html, '--pdf', pdf], {
+    stdout: out.stream, stderr: err.stream, cwd: dir,
+    env: {
+      AM_HOME: dir,
+      // Browser discovery runs after the CLI has validated the page, but before export saves its identity.
+      get AM_CHROME() { rmSync(html); return process.execPath; },
+    },
+  });
+  assert.equal(code, 1);
+  assert.match(err.text, /Export failed: Cannot read the page .*removed-after-validation\.html.*ENOENT/);
+  assert.doesNotMatch(err.text, /Internal error|\n\s+at /);
+  assert.equal(out.text, '');
+  assert.equal(existsSync(pdf), false);
+});
+
 test('cli export: a PDF path that is the input page is refused', { skip: typeof WebSocket === 'undefined' && 'needs Node 22 (built-in WebSocket)' }, async () => {
   const html = '<html><body><p>source</p></body></html>';
   writeFileSync(join(dir, 'same-page.html'), html);
@@ -466,7 +487,7 @@ test('e2e: an inaccessible PNG ancestor reports an export error and preserves th
   }
 });
 
-for (const kind of ['hard', 'symbolic']) for (const index of ['1', '9']) test(`e2e: a ${kind} PDF link to slice ${index} is kept intact`, {
+for (const kind of ['hard', 'symbolic']) for (const index of ['1', '9']) test(`e2e: a ${kind} PDF link to slice ${index} preserves the PNG bytes`, {
   skip: SKIP || (process.platform === 'win32' && kind === 'symbolic' && 'symlinks need privileges on Windows'), timeout: 120000,
 }, async () => {
   const name = `pdf-link-${kind}-${index}`;
@@ -476,14 +497,15 @@ for (const kind of ['hard', 'symbolic']) for (const index of ['1', '9']) test(`e
   writeFileSync(html, '<!doctype html><html><body>PDF link test</body></html>');
   const target = join(folder, `${name}-${index}.png`);
   const pdf = join(folder, 'report.pdf');
-  writeFileSync(target, 'old output');
+  const original = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG1cAAAAASUVORK5CYII=', 'base64');
+  writeFileSync(target, original);
   (kind === 'hard' ? linkSync : symlinkSync)(target, pdf);
   const r = await run(['export', html, '--pdf', pdf, '--png', folder], { env: { AM_CHROME: CHROME } });
   assert.equal(r.code, 1, r.err);
   assert.match(r.err, /has the name of a PNG slice/);
   assert.equal(r.out, '');
-  assert.equal(readFileSync(pdf).subarray(0, 4).toString(), '%PDF');
-  assert.deepEqual(readFileSync(target), readFileSync(pdf));
+  assert.deepEqual(readFileSync(target), original, 'the PNG slice is never overwritten through the PDF link');
+  assert.deepEqual(readFileSync(pdf), original);
   assert.equal(readFileSync(html, 'utf8'), '<!doctype html><html><body>PDF link test</body></html>');
 });
 

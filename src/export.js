@@ -65,6 +65,8 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
   if (pdf && png && sameDirectory(dirname(pdf), png) && isSliceOf(basename(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
+  // Check existing links before writing PDF bytes through them into a PNG slice.
+  if (pdf && png && existsSync(pdf)) checkPdfCollision(file, pdf, png);
   const chrome = findChrome(env);
   if (!chrome) throw new ExportError('No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable');
   // A custom path is used as given, so a typo would only show up as a spawn error that does not name the variable to fix.
@@ -72,7 +74,12 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
     const from = env.AM_CHROME ? 'AM_CHROME' : env.CHROME_PATH ? 'CHROME_PATH' : 'the built-in path';
     throw new ExportError(`No browser at ${chrome} (from ${from}). Set AM_CHROME to the Chrome / Chromium / Edge binary`);
   }
-  const inputStat = statSync(file);
+  let inputStat;
+  try {
+    inputStat = statSync(file);
+  } catch (e) {
+    throw new ExportError(`Cannot read the page ${file}: ${e.message}`);
+  }
   const page = await openPage(pathToFileURL(file).href, {
     env,
     chromePath: chrome,
@@ -87,21 +94,7 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
       const writtenPdf = await writePdf(page, pdf);
       // Once the PDF exists, identity catches links and case aliases on macOS / Windows, including parents that
       // were missing during preflight. Check before any PNG can overwrite the PDF or cleanup can unlink its target.
-      if (png) {
-        let entries;
-        try {
-          entries = statSync(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync(png) : [];
-        } catch (e) {
-          throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
-        }
-        for (const entry of entries) {
-          const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
-          const slice = index && join(png, `${sliceName(file)}-${index}.png`);
-          if (slice && existsSync(slice) && sameFile(slice, pdf)) {
-            throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
-          }
-        }
-      }
+      if (png) checkPdfCollision(file, pdf, png);
       written.push(writtenPdf);
       onFile(writtenPdf);
     }
@@ -114,6 +107,22 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
     await page.close();
   }
   return written;
+}
+
+function checkPdfCollision(file, pdf, png) {
+  let entries;
+  try {
+    entries = statSync(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync(png) : [];
+  } catch (e) {
+    throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
+  }
+  for (const entry of entries) {
+    const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
+    const slice = index && join(png, `${sliceName(file)}-${index}.png`);
+    if (slice && existsSync(slice) && sameFile(slice, pdf)) {
+      throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+    }
+  }
 }
 
 async function writePdf(page, file) {
