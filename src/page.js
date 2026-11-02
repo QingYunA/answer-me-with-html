@@ -9,7 +9,7 @@ const AUDIO_OPEN = '<audio id="amv-audio"';
 
 // lang is already an html lang value when passed in (e.g. zh-CN). dir is written only for a right-to-left language (dir="rtl");
 // a left-to-right page keeps the root tag it always had.
-// voice is written only on voiced video pages (elevenlabs / local / system); patch keeps the same voice.
+// voice is written only on voiced video pages (elevenlabs / local / system / audio-map); patch keeps the same voice.
 // scale is the reader's text size (src/themes/type-scale.js); 1 is the default, so the tag carries it only when it differs.
 export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false }) {
   return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;

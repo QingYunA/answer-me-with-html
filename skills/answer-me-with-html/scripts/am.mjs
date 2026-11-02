@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync5 } from "node:fs";
+import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync6 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.10";
@@ -1357,7 +1357,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join13, resolve as resolve5, dirname as dirname4, basename as basename5, extname as extname3, sep as sep4 } from "node:path";
+import { join as join13, resolve as resolve6, dirname as dirname5, basename as basename5, extname as extname3, sep as sep4 } from "node:path";
 import { spawn as spawn5 } from "node:child_process";
 
 // src/languages/zh.js
@@ -10474,9 +10474,12 @@ function splitNarration(blocks) {
   }
   return { blocks: out, beats };
 }
+function normalizeNarration(raw) {
+  return raw.replace(NARRATION, "$1").replace(FOCUS, "$1").replace(/\s+/g, " ").trim();
+}
 function beat(raw, line) {
   const focus = [...raw.matchAll(FOCUS)].map((m) => m[1].trim());
-  return { raw, text: raw.replace(FOCUS, "$1"), focus: focus[0] ?? null, line };
+  return { raw, text: normalizeNarration(raw), focus: focus[0] ?? null, line };
 }
 function estimateSeconds(text2) {
   let cjk = 0;
@@ -10527,9 +10530,9 @@ var round3 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4, statSync as statSync4 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { join as join7 } from "node:path";
+import { dirname as dirname2, join as join7, resolve as resolve3 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -10680,6 +10683,84 @@ function localSpeech(env) {
     }
   };
 }
+function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}) {
+  const mapFile = resolve3(mapPath);
+  let source;
+  let mapStat;
+  try {
+    source = readFileSync7(mapFile, "utf8");
+    mapStat = statSync4(mapFile);
+  } catch (e) {
+    throw new TtsError(`Cannot read audio map ${mapFile}: ${e.message}`);
+  }
+  let json;
+  try {
+    json = JSON.parse(source);
+  } catch (e) {
+    throw new TtsError(`Cannot parse audio map ${mapFile}: ${e.message}`);
+  }
+  if (!json || typeof json !== "object" || Array.isArray(json)) throw new TtsError(`Audio map ${mapFile} must be a JSON object of narration lines to audio files`);
+  const entries = /* @__PURE__ */ new Map();
+  for (const [key, value] of Object.entries(json)) {
+    const text2 = normalizeNarration(key);
+    if (!text2) throw new TtsError(`Audio map ${mapFile} has an empty narration key`);
+    if (entries.has(text2)) throw new TtsError(`Audio map ${mapFile} has more than one entry for narration line "${text2}"`);
+    if (typeof value !== "string" || !value.trim()) throw new TtsError(`Audio map entry for narration line "${text2}" must name an audio file`);
+    const audioFile = resolve3(dirname2(mapFile), value);
+    let stat2;
+    try {
+      stat2 = statSync4(audioFile);
+      if (!stat2.isFile()) throw new TtsError(`Audio file for narration line "${text2}" is not a file: ${audioFile}`);
+    } catch (e) {
+      if (e instanceof TtsError) throw e;
+      throw new TtsError(`Cannot read audio file for narration line "${text2}": ${audioFile}: ${e.message}`);
+    }
+    entries.set(text2, { file: audioFile, size: stat2.size, mtimeMs: stat2.mtimeMs });
+  }
+  const signature = {
+    map: { file: mapFile, size: mapStat.size, mtimeMs: mapStat.mtimeMs },
+    audio: [...entries].map(([text2, entry]) => ({ text: text2, ...entry }))
+  };
+  return {
+    name: "audio-map",
+    voice: "audio-map",
+    id: `audio-map:${stableJson(signature)}`,
+    concurrency: 1,
+    async synth(text2) {
+      const key = normalizeNarration(text2);
+      const entry = entries.get(key);
+      if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
+      let buf;
+      try {
+        buf = readFileSync7(entry.file);
+      } catch (e) {
+        throw new TtsError(`Cannot read audio file for narration line "${key}": ${entry.file}: ${e.message}`);
+      }
+      const samples = await mappedSamples(buf, entry.file, { which, runCommand });
+      const trimmed = trimSilence(samples);
+      if (!trimmed.some((x2) => Math.abs(x2) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
+      return trimmed;
+    }
+  };
+}
+async function mappedSamples(buf, file, { which, runCommand }) {
+  if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WAVE") {
+    try {
+      return readWav(buf);
+    } catch (e) {
+      throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
+    }
+  }
+  if (!which("ffmpeg")) throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
+  return withTemp(async (out) => {
+    try {
+      await runCommand("ffmpeg", ["-v", "error", "-y", "-i", file, "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", out]);
+      return readWav(readFileSync7(out));
+    } catch (e) {
+      throw new TtsError(`Cannot convert audio map file ${file} with ffmpeg: ${e.message}`);
+    }
+  });
+}
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -10773,14 +10854,14 @@ function bestVoice(candidates, base) {
 }
 var stripName = (name) => name.replace(/\s*[(（].*$/, "");
 function run(cmd, args) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     p.stderr.on("data", (d) => {
       err += d;
     });
     p.on("error", reject);
-    p.on("close", (code) => code === 0 ? resolve6() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
+    p.on("close", (code) => code === 0 ? resolve7() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
   });
 }
 function textFile(wavFile, text2) {
@@ -11191,7 +11272,7 @@ function waitForLoad(loaded, timeoutMs = LOAD_TIMEOUT_MS) {
   ]).finally(() => clearTimeout(timer));
 }
 function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     let buf = "";
     const fail = (msg) => {
       clearTimeout(timer);
@@ -11207,13 +11288,13 @@ ${tail}` : msg));
       const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
       if (m) {
         clearTimeout(timer);
-        resolve6(m[1]);
+        resolve7(m[1]);
       }
     });
   });
 }
 function connect(url) {
-  return new Promise((resolve6, reject) => {
+  return new Promise((resolve7, reject) => {
     const ws = new WebSocket(url);
     const pending = /* @__PURE__ */ new Map();
     const waiters = /* @__PURE__ */ new Map();
@@ -11231,7 +11312,7 @@ function connect(url) {
         waiters.delete(msg.method);
       }
     });
-    ws.addEventListener("open", () => resolve6({
+    ws.addEventListener("open", () => resolve7({
       send(method, params = {}, sessionId) {
         return new Promise((ok, fail) => {
           const msgId = ++id;
@@ -11324,14 +11405,14 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
     });
     ffmpeg.stdin.on("error", () => {
     });
-    const done = new Promise((resolve6, reject) => {
+    const done = new Promise((resolve7, reject) => {
       ffmpeg.on("error", (e) => {
         exited = true;
         reject(new ExportError(`Cannot run ffmpeg: ${e.message}`));
       });
       ffmpeg.on("close", (code) => {
         exited = true;
-        if (code === 0) resolve6();
+        if (code === 0) resolve7();
         else reject(new ExportError(`ffmpeg failed (${code}): ${ffErr.slice(0, 300)}`));
       });
     });
@@ -11388,8 +11469,8 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync4, writeFileSync as writeFileSync6 } from "node:fs";
-import { basename as basename3, dirname as dirname2, join as join10, resolve as resolve3 } from "node:path";
+import { existsSync as existsSync6, mkdirSync as mkdirSync4, statSync as statSync5, writeFileSync as writeFileSync6 } from "node:fs";
+import { basename as basename3, dirname as dirname3, join as join10, resolve as resolve4 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
 var DEVICE_SCALE = 2;
@@ -11428,7 +11509,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   if (pdf && existsSync6(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
-  if (pdf && png && resolve3(dirname2(pdf)) === resolve3(png) && isSliceOf(basename3(pdf), sliceName(file))) {
+  if (pdf && png && resolve4(dirname3(pdf)) === resolve4(png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
   const chrome = findChrome(env);
@@ -11476,7 +11557,7 @@ async function writePdf(page, file) {
     paperHeight: 11.69
   });
   try {
-    mkdirSync4(dirname2(file), { recursive: true });
+    mkdirSync4(dirname3(file), { recursive: true });
     writeFileSync6(file, Buffer.from(data, "base64"));
   } catch (e) {
     throw new ExportError(`Cannot write the PDF ${file}: ${e.message}`);
@@ -11508,7 +11589,7 @@ async function writePngSlices(page, htmlFile, folder) {
   if (layout4.empty) throw new ExportError("The page is empty: there is nothing to export");
   try {
     mkdirSync4(folder, { recursive: true });
-    if (!statSync4(folder).isDirectory()) throw new Error("not a folder");
+    if (!statSync5(folder).isDirectory()) throw new Error("not a folder");
   } catch (e) {
     throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
   }
@@ -11544,7 +11625,7 @@ var settle2 = (page) => page.evaluate(`(async () => {
   return true;
 })()`);
 function isHtmlPage(file) {
-  return /\.html?$/i.test(file) && statSync4(file, { throwIfNoEntry: false })?.isFile() === true;
+  return /\.html?$/i.test(file) && statSync5(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 var sliceName = (htmlFile) => basename3(htmlFile).replace(/\.html?$/i, "") || "page";
 var isSliceOf = (fileName, name) => {
@@ -11552,8 +11633,8 @@ var isSliceOf = (fileName, name) => {
   return /^[1-9]\d*$/.test(fileName.slice(name.length + 1, -".png".length));
 };
 var sameFile = (a, b) => {
-  const x2 = statSync4(a);
-  const y2 = statSync4(b);
+  const x2 = statSync5(a);
+  const y2 = statSync5(b);
   return x2.dev === y2.dev && x2.ino === y2.ino;
 };
 var isPath = (value) => value.includes("/") || value.includes("\\");
@@ -11819,7 +11900,7 @@ import { networkInterfaces, uptime } from "node:os";
 import { createHmac, createHash as createHash3, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync3, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join12, resolve as resolve4, dirname as dirname3, basename as basename4, sep as sep3 } from "node:path";
+import { join as join12, resolve as resolve5, dirname as dirname4, basename as basename4, sep as sep3 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -11996,8 +12077,8 @@ function serveLink(home, file) {
   try {
     const info = readServeInfo(home);
     if (!info) return null;
-    const path = resolve4(file);
-    const dir = ["pages", "videos"].find((d) => dirname3(path) === resolve4(home, d));
+    const path = resolve5(file);
+    const dir = ["pages", "videos"].find((d) => dirname4(path) === resolve5(home, d));
     const name = basename4(path);
     return dir && validFileName(name) ? pageLink(info, dir, name) : null;
   } catch {
@@ -12393,8 +12474,8 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme \u2026] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
-                      [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off | --audio-map <file.json>]
+                      [--mp4] [--webm] [--no-open] [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am export <page.html> [--pdf <file.pdf>] [--png <dir>]
                         export a rendered page as an A4 PDF and/or as PNG slices for a chat app (needs Chrome)
@@ -12544,6 +12625,11 @@ Client -> Server: ACK
   and am always sets input, response_format and stream. A line whose duration is clearly wrong is synthesized again,
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit       AM_TTS_VOICE=vivian am video draft.md --voice local
+  --audio-map lines.json reads ready-made audio from a JSON object of narration line to audio file, for example
+  {"First the client sends SYN.":"audio/01.mp3"}. Relative audio paths start at the map file's folder. Keys ignore > and [ ]
+  markers and extra whitespace. Non-WAV audio needs ffmpeg; every line needs an entry and every audio file must exist.
+  --audio-map cannot be combined with an explicit --voice; when a map is given, the configured voice is ignored.
+  Example: am video draft.md --audio-map lines.json
 - Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
   speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
 - --mp4 also saves a 1080p .mp4 next to the page (H.264 + AAC; needs ffmpeg; about 1.3 times the video length).
@@ -12573,6 +12659,7 @@ async function main(argv, io = {}) {
         style: { type: "string" },
         mode: { type: "string" },
         voice: { type: "string" },
+        "audio-map": { type: "string" },
         mp4: { type: "boolean" },
         webm: { type: "boolean" },
         pdf: { type: "string" },
@@ -12645,7 +12732,7 @@ async function withSource(arg, io, fail, fn3) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve5(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve6(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -12654,7 +12741,7 @@ async function withSource(arg, io, fail, fn3) {
     fail("\u2717 The draft is empty");
     return 2;
   }
-  return fn3(src, arg === "-" ? cwd : dirname4(resolve5(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve5(cwd, arg) });
+  return fn3(src, arg === "-" ? cwd : dirname5(resolve6(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve6(cwd, arg) });
 }
 async function readStream(stream) {
   const chunks = [];
@@ -12693,7 +12780,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages" });
   if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
-  if (replaced && replaced !== resolve5(written)) removeEarlier(replaced, ctx);
+  if (replaced && replaced !== resolve6(written)) removeEarlier(replaced, ctx);
   keepDraft(result, src, from, ctx);
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
@@ -12701,7 +12788,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
-var draftsDir = (home) => join13(resolve5(home), "drafts");
+var draftsDir = (home) => join13(resolve6(home), "drafts");
 function draftTitle(src) {
   const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
   return m?.[1] ?? "";
@@ -12748,7 +12835,7 @@ function keepDraft(result, src, from, ctx) {
   }
 }
 function isKeptDraft(path, { env }) {
-  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname4(path)) && basename5(path).endsWith(".md");
+  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname5(path)) && basename5(path).endsWith(".md");
 }
 var isDraftError = (e) => e instanceof DraftErrors || e instanceof RenderError || e instanceof LintError || e instanceof ParseError && e.line > 0;
 function reportDraftError(e, src, from, ctx) {
@@ -12761,9 +12848,9 @@ function reportDraftError(e, src, from, ctx) {
 }
 var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 function pagePath(arg, { env, io }) {
-  const path = resolve5(io.cwd ?? process.cwd(), arg);
-  const folders = [resolve5(amHome(env), "pages"), resolve5(tempHome(), "pages")];
-  return folders.includes(dirname4(path)) && basename5(path).endsWith(".html") ? path : false;
+  const path = resolve6(io.cwd ?? process.cwd(), arg);
+  const folders = [resolve6(amHome(env), "pages"), resolve6(tempHome(), "pages")];
+  return folders.includes(dirname5(path)) && basename5(path).endsWith(".html") ? path : false;
 }
 var EXPORT_HELP = `Export a rendered page as an A4 PDF and/or PNG slices for a chat app
 
@@ -12855,7 +12942,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     return 2;
   }
   const cwd = io.cwd ?? process.cwd();
-  const file = resolve5(cwd, htmlArg);
+  const file = resolve6(cwd, htmlArg);
   let html;
   try {
     html = readFileSync10(file, "utf8");
@@ -12872,7 +12959,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve5(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve6(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -12902,15 +12989,20 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
+      if (!validAudioMap(opts, fail)) return 2;
       const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : "off");
-      if (!validVoice(voice, fail)) return 2;
+      if (page.voice === "audio-map" && opts.voice === void 0 && opts["audio-map"] === void 0) {
+        fail("\u2717 This video uses an audio map; pass --audio-map <file.json> or choose another source with --voice");
+        return 2;
+      }
+      if (opts["audio-map"] === void 0 && !validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
       result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: page.scale });
     }
   } catch (e) {
     if (e instanceof TtsError) {
-      fail(`\u2717 Voice-over failed: ${e.message}. Add --voice off for captions only`);
+      fail(`\u2717 Voice-over failed: ${e.message}. ${opts["audio-map"] === void 0 ? "Add --voice off" : "Remove --audio-map and add --voice off"} for captions only`);
       return 1;
     }
     return reportError(e, fail);
@@ -12934,7 +13026,7 @@ async function cmdExport(arg, opts, ctx) {
     return 2;
   }
   const cwd = io.cwd ?? process.cwd();
-  const file = resolve5(cwd, arg);
+  const file = resolve6(cwd, arg);
   let isPage;
   try {
     isPage = isHtmlPage(file);
@@ -12946,8 +13038,8 @@ async function cmdExport(arg, opts, ctx) {
     fail(`\u2717 ${arg} is not an existing .html file: am export takes a page am render wrote`);
     return 2;
   }
-  const pdf = opts.pdf === void 0 ? void 0 : resolve5(cwd, opts.pdf);
-  const png = opts.png === void 0 ? void 0 : resolve5(cwd, opts.png);
+  const pdf = opts.pdf === void 0 ? void 0 : resolve6(cwd, opts.pdf);
+  const png = opts.png === void 0 ? void 0 : resolve6(cwd, opts.png);
   try {
     await exportPage(file, { pdf, png, env, onFile: (f2) => print(`\u2713 ${f2}`) });
     return 0;
@@ -12959,9 +13051,10 @@ async function cmdExport(arg, opts, ctx) {
 }
 async function cmdVideo(src, opts, ctx, from) {
   const { fail, print } = ctx;
+  if (!validAudioMap(opts, fail)) return 2;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
-  if (!validVoice(voice, fail)) return 2;
+  if (opts["audio-map"] === void 0 && !validVoice(voice, fail)) return 2;
   let file = opts.out ? outputPath("videos", "", opts, ctx) : null;
   if (opts.out && !file) return 2;
   let result;
@@ -12969,7 +13062,7 @@ async function cmdVideo(src, opts, ctx, from) {
     result = await buildVideo(src, voice, opts, config, ctx);
   } catch (e) {
     if (!(e instanceof TtsError)) return reportDraftError(e, src, from, ctx);
-    fail(`\u2717 Voice-over failed: ${e.message}. Add --voice off for captions only`);
+    fail(`\u2717 Voice-over failed: ${e.message}. ${opts["audio-map"] === void 0 ? "Add --voice off" : "Remove --audio-map and add --voice off"} for captions only`);
     return 1;
   }
   file ??= outputPath("videos", result.meta.title, opts, ctx);
@@ -12988,8 +13081,20 @@ function validVoice(voice, fail) {
   fail(`\u2717 Invalid voice value "${voice}". Choose one of: ${VOICES.join(" | ")}`);
   return false;
 }
+function validAudioMap(opts, fail) {
+  if (opts["audio-map"] === void 0) return true;
+  if (!opts["audio-map"].trim()) {
+    fail("\u2717 --audio-map needs a JSON file path");
+    return false;
+  }
+  if (opts.voice !== void 0) {
+    fail("\u2717 --audio-map cannot be used with --voice; choose one narration source");
+    return false;
+  }
+  return true;
+}
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes: themes2 }) {
-  const provider = io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
+  const provider = opts["audio-map"] !== void 0 ? audioMapProvider(resolve6(io.cwd ?? process.cwd(), opts["audio-map"])) : io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
     cacheDir: provider ? narrationCache(amHome(env)) : void 0,
@@ -13041,8 +13146,8 @@ function themeWarnings({ fail, themes: themes2 }) {
 }
 function outputPath(dir, title, opts, { env, io, fail }) {
   if (opts.out) {
-    const file2 = resolve5(io.cwd ?? process.cwd(), opts.out);
-    if (statSync5(file2, { throwIfNoEntry: false })?.isDirectory()) {
+    const file2 = resolve6(io.cwd ?? process.cwd(), opts.out);
+    if (statSync6(file2, { throwIfNoEntry: false })?.isDirectory()) {
       fail("\u2717 -o names a folder; give a file path, for example -o page.html");
       return null;
     }
@@ -13058,12 +13163,12 @@ function unusedPagePath(file) {
   }
 }
 function writePage(file, html, env) {
-  const home = resolve5(amHome(env));
-  const path = resolve5(file);
+  const home = resolve6(amHome(env));
+  const path = resolve6(file);
   if (path.startsWith(home + sep4)) ensureHome(home);
-  mkdirSync6(dirname4(file), { recursive: true });
+  mkdirSync6(dirname5(file), { recursive: true });
   if (!path.startsWith(join13(home, "pages") + sep4)) return writeFileSync8(file, html);
-  const tmp = join13(dirname4(file), `.${basename5(file)}.${process.pid}.tmp`);
+  const tmp = join13(dirname5(file), `.${basename5(file)}.${process.pid}.tmp`);
   try {
     writeFileSync8(tmp, html);
     renameOver(tmp, file);
@@ -13073,7 +13178,7 @@ function writePage(file, html, env) {
 }
 function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   const home = amHome(env);
-  const inHome = resolve5(file).startsWith(resolve5(home) + sep4);
+  const inHome = resolve6(file).startsWith(resolve6(home) + sep4);
   const hint = (path) => {
     if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
     return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename5(path)}"` : "Give -o a file in a folder this session can write to";
@@ -13210,7 +13315,7 @@ function cmdServe(opts, { print, fail, env, io }) {
     return 2;
   }
   const port = opts.port === void 0 ? DEFAULT_PORT : Number(opts.port);
-  const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve5(io?.cwd ?? process.cwd(), opts["secret-file"]);
+  const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve6(io?.cwd ?? process.cwd(), opts["secret-file"]);
   return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts["public-url"], secretFile, print, fail });
 }
 function cmdLint(src, opts, { print, fail }) {
@@ -13340,7 +13445,7 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve5(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
+  const path = isFile ? resolve6(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
   const name = isFile ? basename5(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];

@@ -43,9 +43,13 @@ function splitNarration(blocks) {
   return { blocks: out, beats };
 }
 
+export function normalizeNarration(raw) {
+  return raw.replace(NARRATION, '$1').replace(FOCUS, '$1').replace(/\s+/g, ' ').trim();
+}
+
 function beat(raw, line) {
   const focus = [...raw.matchAll(FOCUS)].map((m) => m[1].trim());
-  return { raw, text: raw.replace(FOCUS, '$1'), focus: focus[0] ?? null, line };
+  return { raw, text: normalizeNarration(raw), focus: focus[0] ?? null, line };
 }
 
 // Without a voice-over, reading time is estimated from word count: Chinese about 4.2 characters/s, words about 2.6/s.
