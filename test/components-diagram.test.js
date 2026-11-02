@@ -134,6 +134,12 @@ test('flow: two edges from one node keep the order of the nodes they end at', ()
   for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
 });
 
+test('flow: edges inside a group keep the order of the nodes they end at too', () => {
+  // The order of these lines matters: dagre then leaves a crossing that one swap removes. Other orders can need two moves at once.
+  const src = 'P -> X\nP -> M\nQ -> M\nQ -> Y\nY -> Z\nX -> Z\ngroup G: P, Q, M, X, Y, Z';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
+});
+
 test('flow: diamond nodes draw as a polygon, databases as a cylinder', () => {
   const svg = render('flow', '{判断?} -> [(DB)]');
   assert.match(svg, /<polygon class="am-node-shape"/);
