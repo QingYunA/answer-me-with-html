@@ -197,7 +197,9 @@ test('e2e table: the filter hides only non-matching rows and clearing restores a
     input.value = 'CLI';
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
-  assert.deepEqual((await projects()).map((row) => [row.name, row.hidden]), [['gamma', true], ['alpha', true], ['beta', false]]);
+  // Compared by name: the sort tests before this one leave the rows in their own order.
+  const byName = (rows) => rows.map((row) => [row.name, row.hidden]).sort(([a], [b]) => a.localeCompare(b));
+  assert.deepEqual(byName(await projects()), [['alpha', true], ['beta', false], ['gamma', true]]);
   await evaluate(`(() => {
     const input = document.querySelector('[data-am-table-filter]');
     input.value = '';
