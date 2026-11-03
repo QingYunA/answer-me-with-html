@@ -13,7 +13,7 @@ const json = (rel) => JSON.parse(readFileSync(join(ROOT, rel), 'utf8'));
 const VERSION = json('package.json').version;
 
 test('install: package.json, plugin.json and marketplace.json have the same version', () => {
-  assert.equal(json('.claude-plugin/plugin.json').version, VERSION);
+  assert.equal(json('skills/.claude-plugin/plugin.json').version, VERSION);
   for (const p of json('.claude-plugin/marketplace.json').plugins) assert.equal(p.version, VERSION, p.name);
 });
 
@@ -25,10 +25,25 @@ test('install: every marketplace plugin exists and its name matches plugin.json'
   }
 });
 
+// Claude Code runs npm install in a copied plugin whose root has package.json and a lockfile, and the
+// node_modules/.bin symlinks it leaves stop the plugin from being copied to an SSH host (#361).
+test('install: no marketplace plugin root holds package.json or a symlink', () => {
+  const symlinks = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isSymbolicLink() ? [join(dir, e.name)] : e.isDirectory() ? symlinks(join(dir, e.name)) : []);
+  for (const p of json('.claude-plugin/marketplace.json').plugins) {
+    assert.notEqual(p.source.replace(/\/$/, ''), '.', `${p.name}: the plugin root is the repository root`);
+    assert.ok(!existsSync(join(ROOT, p.source, 'package.json')), `${p.name}: package.json in the plugin root`);
+    // Git for Windows checks a symlink out as a text file by default, so a linked folder would be empty there.
+    assert.deepEqual(symlinks(join(ROOT, p.source)), [], `${p.name}: symlinks in the plugin root`);
+  }
+});
+
 test('install: script paths referenced by commands and SKILL.md exist', () => {
-  for (const f of readdirSync(join(ROOT, 'commands'))) {
-    for (const [, rel] of readFileSync(join(ROOT, 'commands', f), 'utf8').matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([\w./-]+)/g)) {
-      assert.ok(existsSync(join(ROOT, rel)), `${f}: ${rel}`);
+  // The plugin root is skills/ (see .claude-plugin/marketplace.json).
+  for (const f of readdirSync(join(ROOT, 'skills/commands'))) {
+    for (const [, rel] of readFileSync(join(ROOT, 'skills/commands', f), 'utf8').matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([\w./-]+)/g)) {
+      assert.ok(!rel.split('/').includes('..'), `${f}: ${rel} leaves the plugin root`);
+      assert.ok(existsSync(join(ROOT, 'skills', rel)), `${f}: ${rel}`);
     }
   }
   const skill = readFileSync(join(ROOT, 'skills/answer-me-with-html/SKILL.md'), 'utf8');

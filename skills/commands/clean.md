@@ -6,11 +6,11 @@ allowed-tools: Bash(node *)
 
 ## Current usage (dry run, nothing deleted)
 
-!`node "${CLAUDE_PLUGIN_ROOT}/skills/answer-me-with-html/scripts/am.mjs" clean --dry-run`
+!`node "${CLAUDE_PLUGIN_ROOT}/answer-me-with-html/scripts/am.mjs" clean --dry-run`
 
 ## What to do
 
-CLI: `node "${CLAUDE_PLUGIN_ROOT}/skills/answer-me-with-html/scripts/am.mjs" clean …`
+CLI: `node "${CLAUDE_PLUGIN_ROOT}/answer-me-with-html/scripts/am.mjs" clean …`
 
 User arguments: `$ARGUMENTS` (accept only `--days <non-negative integer>` or `--all`; ignore anything else)
 

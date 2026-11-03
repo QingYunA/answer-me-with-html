@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR cancels the run still going for the old one. Every other run gets a group of its own, so no run on
+# main is cancelled or replaced while it waits, and every commit there is checked.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: true
+
 jobs:
   test:
     # 单元测试 + 健壮性测试：Linux 跑三个 Node 版本，macOS / Windows 各跑一个（用户主要在 macOS 上用）。
@@ -79,10 +85,11 @@ jobs:
         if: ${{ matrix.full }}
         run: npm run smoke:install
 
-  video:
-    # 视频端到端：espeak-ng 配音 + 无头 Chrome 逐帧 + ffmpeg 编码，确认播放页脚本在真实浏览器里能跑完。
+  # 视频端到端：espeak-ng 配音 + 无头 Chrome 逐帧 + ffmpeg 编码，确认播放页脚本在真实浏览器里能跑完。
+  # The three slow end-to-end parts run as separate jobs at the same time; one after another they took about four minutes.
+  video-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -90,12 +97,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
+        timeout-minutes: 5
       - run: npm ci
       - name: End-to-end video tests
+        timeout-minutes: 8
         run: AM_E2E=1 node --test --test-timeout=300000 --test-name-pattern=e2e test/video.test.js
-      - name: Browser tests in headless Chrome
-        run: AM_E2E=1 node --test --test-timeout=300000 test/*-browser.test.js
+
+  video-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg espeak-ng
+        timeout-minutes: 5
+      - run: npm ci
       - name: Export an example video to MP4
+        timeout-minutes: 8
         run: |
           set -euo pipefail
           export AM_NO_UPDATE_CHECK=1 AM_HOME="$RUNNER_TEMP/am-home"
@@ -103,3 +124,18 @@ jobs:
           ffprobe -v error -show_entries stream=codec_type,width,height -of csv=p=0 out/video.mp4 | tee probe.txt
           grep -q 'video,1920,1080' probe.txt
           grep -q 'audio' probe.txt
+
+  # The runner image has Chrome, so this job needs neither ffmpeg nor espeak-ng.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Browser tests in headless Chrome
+        timeout-minutes: 8
+        run: AM_E2E=1 node --test --test-timeout=300000 test/*-browser.test.js test/page-export.test.js
