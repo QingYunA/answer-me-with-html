@@ -82,12 +82,13 @@ Intro (optional, shown below the title)
 ## A Panel title {span=2 meta="top-right note"}
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+After a table, {table sort} enables header sorting, {table filter} adds a text filter; combine them as {table sort filter}.
 
 \`\`\`flow LR          ← fence language = component name, followed by component arguments
 A -> B
 \`\`\`
 
-\`\`\`html             ← html / svg fences are embedded as-is (escape hatch)
+\`\`\`html             ← html / svg fences are embedded as-is; a script in an html fence does not run (render warns)
 <div>any content</div>
 \`\`\`
 

@@ -269,7 +269,7 @@ Agent 会按信息的形状挑组件：
 | `callout` | 结论、提示、警告 |
 | `ask` | 需要你在页面上做的决定，Agent 的建议项带标签，所有选项开始时都不选中 |
 | 代码块 | 从文件引用的真实代码（`src=` `lines=`），或手写的示意代码 |
-| 表格 | 多维对比。单元格写 `ok` / `no` / `warn` 会变成 ✓ ✗ ! |
+| 表格 | 多维对比。单元格写 `ok` / `no` / `warn` 会变成 ✓ ✗ !；表格后写 `{table sort filter}` 可开启交互排序和筛选 |
 
 稿件格式（frontmatter、`span`、`rows`、原始 `html`/`svg` 块）和不经过 Agent 直接用命令行：见[参考](docs/reference.zh-CN.md)。每个组件的完整写法：`am help <组件名>`。
 

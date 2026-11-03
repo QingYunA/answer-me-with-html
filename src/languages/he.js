@@ -37,6 +37,7 @@ export default {
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
     generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },
     chart: { name: 'תרשים', data: 'נתונים', value: 'ערך', share: 'חלק' },
+    table: { filter: 'סינון הטבלה' },
   },
   // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.
   metaKeys: {
