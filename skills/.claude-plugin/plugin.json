@@ -14,5 +14,7 @@
     "explainer",
     "visualization",
     "ste100"
-  ]
+  ],
+  "skills": "./",
+  "commands": "./commands/"
 }

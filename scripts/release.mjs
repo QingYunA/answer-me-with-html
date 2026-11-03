@@ -15,7 +15,7 @@ if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) {
 const FILES = [
   'package.json',
   'package-lock.json',
-  '.claude-plugin/plugin.json',
+  'skills/.claude-plugin/plugin.json',
   '.claude-plugin/marketplace.json',
 ];
 
