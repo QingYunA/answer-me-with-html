@@ -62,6 +62,13 @@ lang: en
 | march-first | 2024-03-01 |
 | march-second | 2024-03-02 |
 {table sort}
+
+## F Exact integers with a zero fraction
+| Item | Value |
+| --- | ---: |
+| larger | 9007199254740993.0 |
+| smaller | 9007199254740992.0 |
+{table sort}
 `;
 
 let tmp;
@@ -165,6 +172,17 @@ test('e2e table: integers beyond 2^53 compare exactly and numeric ties stay stab
   assert.deepEqual(await items(2), ['integer-first', 'decimal-second', 'smaller', 'larger', 'largest']);
   await click(1, 2);
   assert.deepEqual(await items(2), ['largest', 'larger', 'smaller', 'integer-first', 'decimal-second']);
+});
+
+test('e2e table: integers with an all-zero fraction beyond 2^53 compare exactly', { skip: SKIP }, async () => {
+  await click(1, 4);
+  assert.deepEqual(await items(4), ['smaller', 'larger']);
+});
+
+test('e2e table: the sort button replaces the first moved node, so text before a header link stays before it', { skip: SKIP }, async () => {
+  const order = await evaluate(`[...document.querySelectorAll('table[data-am-table] th')[0].childNodes].map((node) => node.nodeType === 1 ? node.tagName : node.textContent.trim())`);
+  assert.deepEqual(order, ['BUTTON', 'A']);
+  assert.equal(await evaluate(`document.querySelectorAll('table[data-am-table] th')[0].querySelector('button').textContent.trim()`), 'Project');
 });
 
 test('e2e table: impossible ISO dates sort as text instead of overflowing into March', { skip: SKIP }, async () => {

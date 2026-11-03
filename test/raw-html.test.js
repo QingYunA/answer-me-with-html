@@ -143,6 +143,15 @@ test('raw html: code, comments, autolinks, Markdown and fences are left alone', 
   assert.deepEqual(fences.stats.htmlWarnings, [{ line: 3, message: "this script will not run: the page allows only am's own scripts" }]);
 });
 
+test('raw html: a script warning skips <style> text in an html fence but not in an svg fence', () => {
+  const html = renderDoc('## A\n```html\n<style>/* <script> */ .a::after { content: "<script>"; }</style>\n<p>x</p>\n```\n');
+  assert.deepEqual(html.stats.htmlWarnings, []);
+  const svg = renderDoc('## A\n```svg\n<svg><style>.a { fill: red }</style><script>1</script></svg>\n```\n');
+  assert.equal(svg.stats.htmlWarnings.length, 1);
+  const svgStyle = renderDoc('## A\n```svg\n<svg><style><script>1</script></style></svg>\n```\n');
+  assert.equal(svgStyle.stats.htmlWarnings.length, 1);
+});
+
 // ── attributes ──
 test('raw html: event handlers are removed from a kept tag, everything else stays', () => {
   assert.equal(page('<span onclick="x()">s</span>'), '<p><span>s</span></p>');

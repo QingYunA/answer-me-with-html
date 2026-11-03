@@ -2,6 +2,7 @@
   const NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
   const FORMATTED_NUMBER = /^[+-]?\$?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d*)?|\.\d+)%?$/;
   const INTEGER = /^[+-]?\d+$/;
+  const ZERO_FRACTION = /^[+-]?\d+\.0*$/;
   const DATE = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
   const INTERACTIVE = 'a, button, input, select, textarea, details, audio[controls], video[controls], [contenteditable], [tabindex]';
   const validDate = (text) => {
@@ -17,6 +18,7 @@
     if (FORMATTED_NUMBER.test(text)) normalized = text.replace(/[$,%]/g, '');
     else if (!NUMBER.test(text)) return null;
     if (INTEGER.test(normalized)) return BigInt(normalized);
+    if (ZERO_FRACTION.test(normalized)) return BigInt(normalized.slice(0, normalized.indexOf('.')));
     const value = Number(normalized);
     return Number.isFinite(value) ? value : null;
   };
@@ -52,11 +54,9 @@
       button.type = 'button';
       button.className = 'am-table-sort';
       button.setAttribute('aria-label', head.textContent.trim());
-      for (const child of [...head.childNodes]) {
-        if (child.nodeType === 1 && (child.matches(INTERACTIVE) || child.querySelector(INTERACTIVE))) continue;
-        button.append(child);
-      }
-      head.append(button);
+      const moved = [...head.childNodes].filter((child) => !(child.nodeType === 1 && (child.matches(INTERACTIVE) || child.querySelector(INTERACTIVE))));
+      head.insertBefore(button, moved[0] ?? null);
+      button.append(...moved);
       button.addEventListener('click', () => {
         const direction = head.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
         for (const cell of headers) cell.removeAttribute('aria-sort');

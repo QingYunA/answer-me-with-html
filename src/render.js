@@ -171,7 +171,9 @@ function renderFence(block, ctx) {
   const { lang, args, text, line } = block;
   if (RAW_LANGS.has(lang)) {
     if (lang === 'html' || lang === 'svg') {
-      for (const match of text.matchAll(/<!--[\s\S]*?(?:-->|$)|<textarea\b[^>]*>[\s\S]*?(?:<\/textarea\s*>|$)|<script\b/gi)) {
+      // Comments and <textarea> are skipped; so is <style> in html, whose content is raw text (in svg its children are parsed).
+      const style = lang === 'html' ? '|<style\\b[^>]*>[\\s\\S]*?(?:<\\/style\\s*>|$)' : '';
+      for (const match of text.matchAll(new RegExp(`<!--[\\s\\S]*?(?:-->|$)|<textarea\\b[^>]*>[\\s\\S]*?(?:<\\/textarea\\s*>|$)${style}|<script\\b`, 'gi'))) {
         if (match[0].toLowerCase() !== '<script') continue;
         ctx.stats.htmlWarnings?.push({ line: line + 1 + text.slice(0, match.index).split('\n').length - 1, message: 'this script will not run: the page allows only am\'s own scripts' });
       }
