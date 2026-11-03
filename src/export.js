@@ -2,7 +2,7 @@
 // file:// URL in the system Chrome (no npm dependency), printed with its own @media print rules, and captured in screen
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
-import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
@@ -65,6 +65,13 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
   if (pdf && png && sameDirectory(dirname(pdf), png) && isSliceOf(basename(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
+  // A dangling symlink has no target to compare, so check the name it points at: writing would create that slice file.
+  if (pdf && png && lstatSync(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    const target = resolve(dirname(pdf), readlinkSync(pdf));
+    if (sameDirectory(dirname(target), png) && isSliceOf(basename(target), sliceName(file))) {
+      throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+    }
+  }
   // Check existing links before writing PDF bytes through them into a PNG slice.
   if (pdf && png && existsSync(pdf)) checkPdfCollision(file, pdf, png);
   const chrome = findChrome(env);
@@ -116,10 +123,13 @@ function checkPdfCollision(file, pdf, png) {
   } catch (e) {
     throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
   }
+  const checked = new Set();
   for (const entry of entries) {
     const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
-    const slice = index && join(png, `${sliceName(file)}-${index}.png`);
-    if (slice && existsSync(slice) && sameFile(slice, pdf)) {
+    if (!index || checked.has(index)) continue;
+    checked.add(index);
+    const slice = join(png, `${sliceName(file)}-${index}.png`);
+    if (existsSync(slice) && sameFile(slice, pdf)) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
     }
   }

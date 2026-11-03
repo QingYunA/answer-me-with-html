@@ -11388,7 +11388,7 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, realpathSync as realpathSync3, statSync as statSync4, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readlinkSync, realpathSync as realpathSync3, statSync as statSync4, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
 import { basename as basename3, dirname as dirname2, join as join10, resolve as resolve3 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
@@ -11431,6 +11431,12 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   }
   if (pdf && png && sameDirectory(dirname2(pdf), png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+  }
+  if (pdf && png && lstatSync2(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    const target = resolve3(dirname2(pdf), readlinkSync(pdf));
+    if (sameDirectory(dirname2(target), png) && isSliceOf(basename3(target), sliceName(file))) {
+      throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+    }
   }
   if (pdf && png && existsSync6(pdf)) checkPdfCollision(file, pdf, png);
   const chrome = findChrome(env);
@@ -11478,10 +11484,13 @@ function checkPdfCollision(file, pdf, png) {
   } catch (e) {
     throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
   }
+  const checked = /* @__PURE__ */ new Set();
   for (const entry of entries) {
     const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
-    const slice = index && join10(png, `${sliceName(file)}-${index}.png`);
-    if (slice && existsSync6(slice) && sameFile(slice, pdf)) {
+    if (!index || checked.has(index)) continue;
+    checked.add(index);
+    const slice = join10(png, `${sliceName(file)}-${index}.png`);
+    if (existsSync6(slice) && sameFile(slice, pdf)) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
     }
   }

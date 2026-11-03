@@ -186,6 +186,21 @@ test('cli export: a slice-named PDF in a missing folder under a symlink is refus
   }
 });
 
+test('cli export: a dangling PDF symlink to a PNG slice name is refused', {
+  skip: typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : process.platform === 'win32' ? 'symlinks need privileges on Windows' : false,
+}, async () => {
+  writeFileSync(join(dir, 'dangling.html'), '<html><body>source</body></html>');
+  const folder = join(dir, 'dangling-shots');
+  mkdirSync(folder);
+  const target = join(folder, 'dangling-1.png');
+  symlinkSync(target, join(dir, 'dangling-report.pdf'));
+  const r = await run(['export', 'dangling.html', '--pdf', 'dangling-report.pdf', '--png', 'dangling-shots'], { env: { AM_CHROME: join(dir, 'no-such-chrome') } });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /has the name of a PNG slice/);
+  assert.equal(r.out, '');
+  assert.equal(lstatSync(target, { throwIfNoEntry: false }), undefined, 'the slice name is not created through the link');
+});
+
 // A stand-in for the browser: the height decides how many slices the writer emits, and each PNG's bytes name that height.
 function fakePage(height, { shots } = {}) {
   let shot = 0;
