@@ -6,13 +6,13 @@ allowed-tools: Bash(node *)
 
 ## Current settings
 
-!`node "${CLAUDE_PLUGIN_ROOT}/skills/answer-me-with-html/scripts/am.mjs" config`
+!`node "${CLAUDE_PLUGIN_ROOT}/answer-me-with-html/scripts/am.mjs" config`
 
 ## What to do
 
 User arguments: `$ARGUMENTS`
 
-CLI: `node "${CLAUDE_PLUGIN_ROOT}/skills/answer-me-with-html/scripts/am.mjs" config …`
+CLI: `node "${CLAUDE_PLUGIN_ROOT}/answer-me-with-html/scripts/am.mjs" config …`
 
 - **No arguments**: use AskUserQuestion to let the user choose. Ask at most 4 settings at a time, these first: auto-open the browser (open), default theme (theme), light/dark (mode), writing check (style). Mark the current value in the options. After the user chooses, run `config set` for each setting.
 - **`<key> <value>`** (for example `open off`): run `config set <key> <value>` directly.

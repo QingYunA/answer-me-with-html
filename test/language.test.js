@@ -109,7 +109,7 @@ const PARTS = {
     ),
 };
 
-const commandFiles = () => readdirSync(join(ROOT, 'commands')).filter((f) => f.endsWith('.md')).map((f) => `commands/${f}`);
+const commandFiles = () => readdirSync(join(ROOT, 'skills/commands')).filter((f) => f.endsWith('.md')).map((f) => `skills/commands/${f}`);
 
 // Every file under a directory whose name matches `re`.
 const filesIn = (dir, re) =>
@@ -122,7 +122,7 @@ const JS_CSS = /\.(m?js|css)$/;
 // The single scope list: every file that must be English, and which part of it is checked.
 const SCOPE = [
   { files: () => ['package.json'], part: 'whole' },
-  { files: () => ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'], part: 'whole' },
+  { files: () => ['skills/.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'], part: 'whole' },
   { files: () => ['src', 'bin', 'scripts'].flatMap((d) => filesIn(d, JS)), part: 'strings' },
   { files: () => ['src/lint/ste.js'], part: 'lintMessages' },
   { files: () => ['skills/answer-me-with-html/SKILL.md', ...filesIn('skills/answer-me-with-html/references', /\.md$/)], part: 'skill' },

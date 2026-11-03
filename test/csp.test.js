@@ -110,6 +110,21 @@ lang: en
   assert.match(messages[2], /^L10 remote image http:\/\/example\.com\/b\.png /);
 });
 
+test('csp: scripts in html and svg fences warn with their draft lines', () => {
+  const { html, stats } = renderDoc('## A\n```html\n<p>one</p>\n<SCRIPT>one()</SCRIPT>\n<script src="x"></script>\n```\n```svg\n<script>two()</script>\n```\n');
+  assert.ok(html.includes('<SCRIPT>one()</SCRIPT>'));
+  assert.deepEqual(stats.htmlWarnings, [
+    { line: 4, message: "this script will not run: the page allows only am's own scripts" },
+    { line: 5, message: "this script will not run: the page allows only am's own scripts" },
+    { line: 8, message: "this script will not run: the page allows only am's own scripts" },
+  ]);
+});
+
+test('csp: script-like text in comments and textarea content does not warn', () => {
+  const { stats } = renderDoc('## A\n```html\n<!-- <script>comment()</script> -->\n<textarea><script>text()</script></textarea>\n<!-- unclosed <script>comment()</script>\n```\n```svg\n<!-- <script>comment()</script> -->\n<textArea><script>text()</script></textArea>\n```\n');
+  assert.deepEqual(stats.htmlWarnings, []);
+});
+
 test('csp: the warning names the src attribute, not data-src before it', () => {
   assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="//cdn.example.com/b.png">'), ['//cdn.example.com/b.png']);
   assert.deepEqual(remoteImages('<img data-src="https://lazy.example.com/a.png" src="local.png">'), []);

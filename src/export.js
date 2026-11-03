@@ -2,7 +2,7 @@
 // file:// URL in the system Chrome (no npm dependency), printed with its own @media print rules, and captured in screen
 // media at 1200 CSS px wide and deviceScaleFactor 2. The interactive chrome (toolbar, reply, remarks, update notice) is
 // hidden: a picture has no buttons. The CDP client and Chrome launch code are shared with video export (src/chrome.js).
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage, findChrome, ExportError } from './chrome.js';
@@ -15,11 +15,12 @@ export const MAX_SLICE = 1800;      // CSS px; 3600 PNG pixels tall
 const SETTLE_MS = 400;              // web fonts and the sheet planner need a beat after load
 
 // The chrome that makes no sense in a picture. The page's print CSS hides the same controls for the PDF; this is the
-// screen-media list, plus the remark popover and the new-version notice, which only @media print hides.
+// screen-media list, plus the remark popover, new-version notice and table controls / sort indicators, which only @media print hides.
 const CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comment-btn, .am-remark-pop,
-.am-update, .am-btn--update, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch {
+.am-update, .am-btn--update, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
   display: none !important;
-}`;
+}
+.am-table-sort::after { content: none !important; }`;
 
 // Where to cut a page of pageHeight CSS px into slices no taller than maxHeight, without cutting through a panel or the
 // header when a gap exists. boxes are the page's block boxes ({top, bottom} in CSS px). A cut is moved up to the top of
@@ -54,22 +55,38 @@ function gapCut(start, target, boxes) {
 }
 
 // Write the PDF and/or the PNG slices and return the files written, in that order. The CLI prints them.
-export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {} } = {}) {
+export async function exportPage(file, { pdf, png, env = process.env, onFile = () => {}, onWarn = () => {} } = {}) {
   if (typeof WebSocket === 'undefined') throw new ExportError('Export needs Node.js 22 or later (built-in WebSocket)');
   // The page holds the source draft in #am-source, so writing the PDF over it would lose the draft.
   if (pdf && existsSync(pdf) && sameFile(pdf, file)) {
     throw new ExportError(`The PDF ${pdf} is the input page: choose another file name`);
   }
-  // A PDF named like a PNG slice in the --png folder would be overwritten by that slice.
-  if (pdf && png && resolve(dirname(pdf)) === resolve(png) && isSliceOf(basename(pdf), sliceName(file))) {
+  // A PDF named like a PNG slice in the --png folder would be overwritten by that slice, or removed afterwards as a
+  // stale slice. Compare the directories by path and by identity: a symlink to the folder is the same folder.
+  if (pdf && png && sameDirectory(dirname(pdf), png) && isSliceOf(basename(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
+  // A dangling symlink has no target to compare, so check the name it points at: writing would create that slice file.
+  if (pdf && png && lstatSync(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    const target = resolve(dirname(pdf), readlinkSync(pdf));
+    if (sameDirectory(dirname(target), png) && isSliceOf(basename(target), sliceName(file))) {
+      throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+    }
+  }
+  // Check existing links before writing PDF bytes through them into a PNG slice.
+  if (pdf && png && existsSync(pdf)) checkPdfCollision(file, pdf, png);
   const chrome = findChrome(env);
   if (!chrome) throw new ExportError('No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable');
   // A custom path is used as given, so a typo would only show up as a spawn error that does not name the variable to fix.
   if (isPath(chrome) && !existsSync(chrome)) {
     const from = env.AM_CHROME ? 'AM_CHROME' : env.CHROME_PATH ? 'CHROME_PATH' : 'the built-in path';
     throw new ExportError(`No browser at ${chrome} (from ${from}). Set AM_CHROME to the Chrome / Chromium / Edge binary`);
+  }
+  let inputStat;
+  try {
+    inputStat = statSync(file);
+  } catch (e) {
+    throw new ExportError(`Cannot read the page ${file}: ${e.message}`);
   }
   const page = await openPage(pathToFileURL(file).href, {
     env,
@@ -83,11 +100,14 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
   try {
     if (pdf) {
       const writtenPdf = await writePdf(page, pdf);
+      // Once the PDF exists, identity catches links and case aliases on macOS / Windows, including parents that
+      // were missing during preflight. Check before any PNG can overwrite the PDF or cleanup can unlink its target.
+      if (png) checkPdfCollision(file, pdf, png);
       written.push(writtenPdf);
       onFile(writtenPdf);
     }
     if (png) {
-      const writtenPngs = await writePngSlices(page, file, png);
+      const writtenPngs = await writePngSlices(page, file, png, onWarn, inputStat);
       written.push(...writtenPngs);
       writtenPngs.forEach(onFile);
     }
@@ -95,6 +115,25 @@ export async function exportPage(file, { pdf, png, env = process.env, onFile = (
     await page.close();
   }
   return written;
+}
+
+function checkPdfCollision(file, pdf, png) {
+  let entries;
+  try {
+    entries = statSync(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync(png) : [];
+  } catch (e) {
+    throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
+  }
+  const checked = new Set();
+  for (const entry of entries) {
+    const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
+    if (!index || checked.has(index)) continue;
+    checked.add(index);
+    const slice = join(png, `${sliceName(file)}-${index}.png`);
+    if (existsSync(slice) && sameFile(slice, pdf)) {
+      throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
+    }
+  }
 }
 
 async function writePdf(page, file) {
@@ -120,7 +159,9 @@ async function writePdf(page, file) {
 }
 
 // A PNG per slice, named <page-name>-1.png, -2.png ... in the folder the user gave (created when missing).
-async function writePngSlices(page, htmlFile, folder) {
+// After a successful write, leftover <name>-<n>.png files from an earlier export of this page are removed, so a
+// shorter page does not leave higher-numbered slices behind. The removal runs only once every slice is written.
+export async function writePngSlices(page, htmlFile, folder, onWarn = () => {}, inputStat = statSync(htmlFile)) {
   await page.page('Emulation.setEmulatedMedia', { media: 'screen' });
   await settle(page);
   const layout = await page.evaluate(`(async () => {
@@ -167,7 +208,7 @@ async function writePngSlices(page, htmlFile, folder) {
     });
     const file = join(folder, `${name}-${i}.png`);
     // A slice path that is a link to the page would write PNG bytes over the page.
-    if (existsSync(file) && sameFile(file, htmlFile)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
+    if (isInputFile(file, htmlFile, inputStat)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync(file, Buffer.from(data, 'base64'));
     } catch (e) {
@@ -175,7 +216,43 @@ async function writePngSlices(page, htmlFile, folder) {
     }
     written.push(file);
   }
+  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f) => basename(f))), htmlFile, onWarn, inputStat);
   return written;
+}
+
+// Remove <name>-<n>.png files in this folder that this export did not write. The predicate is the same one that
+// decides a PDF would clash with a slice, so only this page's own slice names match. Other names, extensions and
+// files in subfolders stay. A directory is left in place. So is a name that is the input page (a hard link or a
+// symlink to it): the writer treats that inode as the page, and this does not delete it either. A failure to list
+// or unlink is a warning.
+export function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {}, inputStat = statSync(htmlFile, { throwIfNoEntry: false })) {
+  let entries;
+  try {
+    entries = readdirSync(folder);
+  } catch (e) {
+    onWarn(`Cannot list ${folder} to remove old PNG slices: ${e.message}`);
+    return;
+  }
+  for (const entry of entries) {
+    if (!isSliceOf(entry, name) || kept.has(entry)) continue;
+    const file = join(folder, entry);
+    try {
+      const st = lstatSync(file);
+      if (!st.isFile() && !st.isSymbolicLink()) {
+        onWarn(`Left ${file} in place: it is not a PNG file`);
+        continue;
+      }
+      // A dangling symlink can be removed. Compare other entries with the saved input identity, even if the
+      // original pathname disappeared while rendering, so the last hard link to the draft stays.
+      if (isInputFile(file, htmlFile, inputStat)) {
+        onWarn(`Left ${file} in place: it is the input page`);
+        continue;
+      }
+      unlinkSync(file);
+    } catch (e) {
+      onWarn(`Cannot remove the old PNG slice ${file}: ${e.message}`);
+    }
+  }
 }
 
 // Let the page re-layout after a media change: the sheet planner restores and re-plans, and fonts may still settle.
@@ -201,9 +278,39 @@ const isSliceOf = (fileName, name) => {
 
 // The same file on disk: a symlink or a hard link to the page is the page, so compare the device and inode, not the path.
 const sameFile = (a, b) => {
-  const x = statSync(a);
-  const y = statSync(b);
-  return x.dev === y.dev && x.ino === y.ino;
+  return sameIdentity(statSync(a), statSync(b));
+};
+const sameIdentity = (a, b) => a.dev === b.dev && a.ino === b.ino;
+// Protect the loaded draft and any replacement now at its pathname (for example, an editor's atomic save).
+const isInputFile = (file, htmlFile, inputStat) => {
+  if (!existsSync(file)) return false;
+  const st = statSync(file);
+  return (inputStat && sameIdentity(st, inputStat)) || (existsSync(htmlFile) && sameIdentity(st, statSync(htmlFile)));
+};
+
+// Resolve existing parents before appending missing segments, so aliases compare equally before mkdir runs.
+const realOrAncestor = (path) => {
+  const missing = [];
+  let current = resolve(path);
+  while (!existsSync(current) && dirname(current) !== current) {
+    missing.unshift(basename(current));
+    current = dirname(current);
+  }
+  return join(realpathSync(current), ...missing);
+};
+
+// The same directory. Canonical paths catch missing folders under symlinked parents; device and inode also
+// catch a bind mount whose path text differs.
+const sameDirectory = (a, b) => {
+  if (resolve(a) === resolve(b)) return true;
+  try {
+    if (realOrAncestor(a) === realOrAncestor(b)) return true;
+    const x = statSync(a);
+    const y = statSync(b);
+    return x.dev === y.dev && x.ino === y.ino;
+  } catch {
+    return false;
+  }
 };
 
 const isPath = (value) => value.includes('/') || value.includes('\\');
