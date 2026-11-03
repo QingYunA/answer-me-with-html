@@ -43,6 +43,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 code, pre, kbd { font-family: var(--font-mono); }
+/* Korean is written with spaces between words, so break lines at the spaces, not between syllables. A word longer than the line still breaks. */
+:lang(ko) { word-break: keep-all; overflow-wrap: break-word; }
+:lang(ko) :is(pre, code, kbd), :is(pre, code, kbd):lang(ko) { word-break: normal; overflow-wrap: normal; }
 
 /* \u2500\u2500 Toolbar \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .am-toolbar {
@@ -232,7 +235,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 }
 
 /* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-.am-status { white-space: nowrap; font-weight: 500; }
+/* A long note wraps beside its icon, so it does not push the table past a narrow panel; one long word breaks too (break-word, not anywhere, which would let a table squeeze its columns to one word per line). The note is one flex item, so the spaces around its inline tags stay. */
+.am-status { display: inline-flex; align-items: flex-start; max-width: 100%; font-weight: 500; }
+.am-status-icon { flex: none; }
+.am-status-text { min-width: 0; overflow-wrap: break-word; }
 .am-status--ok { color: var(--ok); }
 .am-status--no { color: var(--err); }
 .am-status--warn { color: var(--warn); }
@@ -4325,7 +4331,7 @@ function statusHtml(word, label = "") {
   const kind2 = STATUS[STATUS_ALIAS[word] ?? word];
   if (!kind2) return null;
   const text2 = label.trim();
-  return `<span class="am-status am-status--${kind2.cls}"><span class="am-status-icon" aria-hidden="true">${kind2.icon}</span>${text2}</span>`;
+  return `<span class="am-status am-status--${kind2.cls}"><span class="am-status-icon" aria-hidden="true">${kind2.icon}</span>${text2 ? `<span class="am-status-text">${text2}</span>` : ""}</span>`;
 }
 var IMAGE_ONLY = /<p>\s*(<img\b[^>]*>)\s*<\/p>/g;
 var CELL_STATUS = /<td([^>]*)>\s*(ok|no|warn|✓|✔|✗|✘|⚠)(?:\s+((?:(?!<\/?td\b)[\s\S])*?))?\s*<\/td>/g;

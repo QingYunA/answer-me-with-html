@@ -48,7 +48,7 @@ export function statusHtml(word, label = '') {
   const kind = STATUS[STATUS_ALIAS[word] ?? word];
   if (!kind) return null;
   const text = label.trim();
-  return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text}</span>`;
+  return `<span class="am-status am-status--${kind.cls}"><span class="am-status-icon" aria-hidden="true">${kind.icon}</span>${text ? `<span class="am-status-text">${text}</span>` : ''}</span>`;
 }
 
 // A paragraph that holds only an image becomes a figure; the alt text is its caption.
