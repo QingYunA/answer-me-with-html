@@ -258,6 +258,22 @@ ${fillerEn('B', 2)}
 \`\`\``,
 };
 
+// A status note that is one long word with no spaces, in a box narrower than the word. A table cell would grow to the word's width
+// (the table wrapper then scrolls), so the box is a raw HTML block; the rule under test is on .am-status-text.
+const LONG_STATUS = `---
+title: Long status note
+cols: 3
+lang: en
+---
+## A Badge
+\`\`\`html
+<div id="narrow" style="width: 160px"><span class="am-status am-status--no"><span class="am-status-icon" aria-hidden="true">x</span><span class="am-status-text">https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</span></span></div>
+\`\`\`
+
+${fillerEn('B', 1)}
+${fillerEn('C', 2)}
+`;
+
 // Everything the checks need, read in the page in one call. A "row" is the set of grid children with the same top edge.
 const MEASURE = `(() => {
   const grid = document.querySelector('.am-grid');
@@ -371,6 +387,9 @@ before(() => {
   writeFileSync(scaled, SCALED);
   special['scale.en'] = render(scaled, 'scale.en');
   rmSync(scaleConfig, { force: true });
+  const longStatus = join(tmp, 'drafts', 'long-status.en.md');
+  writeFileSync(longStatus, LONG_STATUS);
+  special['long-status.en'] = render(longStatus, 'long-status.en');
 });
 
 const launch = async () => {
@@ -608,6 +627,22 @@ test('e2e: a table with short cells keeps its words together on wide screens, an
   const grid = await evaluate("Math.round(document.querySelector('.am-grid').getBoundingClientRect().width)");
   assert.ok(widths.every((w) => Math.abs(w - grid) <= 1), `print: every panel takes the full row, got ${widths.join(', ')} of ${grid}`);
   await page('Emulation.setEmulatedMedia', { media: '' });
+});
+
+test('e2e: one long unbroken status note wraps inside its badge instead of sticking out', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const p = special['long-status.en'];
+  for (const width of [DESKTOP, PHONE]) {
+    await open(p.file, width);
+    if (width > 760) await waitFor(SETTLED, `long-status.en to lay out at ${width}px`);
+    const box = await evaluate(`(() => {
+      const narrow = document.getElementById('narrow').getBoundingClientRect();
+      const text = document.querySelector('.am-status-text').getBoundingClientRect();
+      return { right: text.right - narrow.right, lines: Math.round(text.height / parseFloat(getComputedStyle(document.body).lineHeight)) };
+    })()`);
+    assert.ok(box.right <= 1, `@${width}px: the note ends inside its box, ${box.right}px past it`);
+    assert.ok(box.lines >= 2, `@${width}px: the note wrapped onto more than one line`);
+  }
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

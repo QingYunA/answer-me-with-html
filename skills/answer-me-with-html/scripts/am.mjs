@@ -235,10 +235,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 }
 
 /* \u2500\u2500 Status badges ok / no / warn \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-/* A long note wraps beside its icon, so it does not push the table past a narrow panel. The note is one flex item, so the spaces around its inline tags stay. */
+/* A long note wraps beside its icon, so it does not push the table past a narrow panel; one long word breaks too (break-word, not anywhere, which would let a table squeeze its columns to one word per line). The note is one flex item, so the spaces around its inline tags stay. */
 .am-status { display: inline-flex; align-items: flex-start; max-width: 100%; font-weight: 500; }
 .am-status-icon { flex: none; }
-.am-status-text { min-width: 0; }
+.am-status-text { min-width: 0; overflow-wrap: break-word; }
 .am-status--ok { color: var(--ok); }
 .am-status--no { color: var(--err); }
 .am-status--warn { color: var(--warn); }
