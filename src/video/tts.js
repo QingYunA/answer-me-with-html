@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { hasCommand, isDenied } from '../sys.js';
 import { baseLanguage, voiceHints } from '../language.js';
-import { estimateSeconds, normalizeNarration } from './script.js';
+import { estimateSeconds, normalizeNarration, normalizeNarrationText } from './script.js';
 
 export const SAMPLE_RATE = 22050;
 const ELEVEN_DEFAULT_VOICE = 'bIHbv24MWmeRgasZH58o'; // Will: a premade voice, so it works on the free plan; ElevenLabs lists zh as verified
@@ -202,7 +202,8 @@ export function audioMapProvider(mapPath, { which = hasCommand, runCommand = run
     id: `audio-map:${stableJson(signature)}`,
     concurrency: 1,
     async synth(text) {
-      const key = normalizeNarration(text);
+      // The beat text has its marker removed already; removing it again would turn `> hello` into `hello`.
+      const key = normalizeNarrationText(text);
       const entry = entries.get(key);
       if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
       let buf;

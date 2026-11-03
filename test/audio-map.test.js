@@ -97,9 +97,13 @@ test('audio map: draft narration and map keys strip exactly one marker', async (
   assert.deepEqual(video.scenes[0].beats.map((beat) => beat.text), ['> hello', 'ordinary line']);
   assert.deepEqual(video.scenes[0].beats.map((beat) => beat.raw), ['> hello', 'ordinary line']);
   fixture('marker.wav');
-  const provider = audioMapProvider(map('marker.json', { '> hello': 'marker.wav' }));
+  // The map key is written like the draft line, so `>> hello` names the narration `> hello`.
+  const provider = audioMapProvider(map('marker.json', { '>> hello': 'marker.wav' }));
   const samples = await provider.synth(video.scenes[0].beats[0].text);
   assert.ok(samples.some((sample) => sample !== 0));
+  // `> hello` names the narration `hello`, not `> hello`: the beat text is not stripped a second time.
+  const other = audioMapProvider(map('marker-other.json', { '> hello': 'marker.wav' }));
+  await assert.rejects(other.synth(video.scenes[0].beats[0].text), /No audio map entry for narration line "> hello"/);
 });
 
 test('audio map: a UTF-8 BOM is accepted before the JSON object', async () => {

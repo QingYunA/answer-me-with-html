@@ -47,7 +47,7 @@ export function normalizeNarration(raw) {
   return normalizeNarrationText(raw.replace(NARRATION, '$1'));
 }
 
-function normalizeNarrationText(raw) {
+export function normalizeNarrationText(raw) {
   return raw.replace(FOCUS, '$1').replace(/\s+/g, ' ').trim();
 }
 

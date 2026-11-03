@@ -10735,7 +10735,7 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
     id: `audio-map:${stableJson(signature)}`,
     concurrency: 1,
     async synth(text2) {
-      const key = normalizeNarration(text2);
+      const key = normalizeNarrationText(text2);
       const entry = entries.get(key);
       if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
       let buf;
