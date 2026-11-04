@@ -1,6 +1,6 @@
 // dagre keeps edge labels off nodes and off each other, but it can route an edge through a node that is not one of its ends, or
 // through the label of another edge. This reads a finished layout and says so, with a way to fix the draft.
-import { segmentHits } from '../svg/geometry.js';
+import { curvePoints, segmentHits } from '../svg/geometry.js';
 
 // How far a box shrinks before an edge counts as inside it: a line that grazes the border is not a crossing.
 const NODE_INSET = 2;
@@ -10,7 +10,7 @@ const OTHER = { LR: 'TB', RL: 'TB', TB: 'LR', BT: 'LR' };
 
 const around = ({ x, y }, { width, height }) => [x - width / 2, y - height / 2, x + width / 2, y + height / 2];
 const inset = ([x0, y0, x1, y1], d) => [x0 + d, y0 + d, x1 - d, y1 - d];
-const runsThrough = (points, box) => points.slice(1).some((p, k) => segmentHits(points[k], p, box));
+const runsThrough = (curve, box) => curve.slice(1).some((p, k) => segmentHits(curve[k], p, box));
 const name = (e) => `${e.from} -> ${e.to}`;
 
 // Where a drawn edge runs through something: { edge, kind: 'node', other: node id } for a node that is not its end, and
@@ -21,9 +21,10 @@ export function crossings({ g, key, sizes, labels }, { nodes, edges }) {
   const nodeBoxes = [...nodes.keys()].map((id) => [id, inset(around(g.node(key.get(id)), sizes.get(id)), NODE_INSET)]);
   const labelBoxes = edges.map((e, i) => (labels[i] ? inset(around(drawn[i], labels[i]), LABEL_INSET) : null));
   return edges.flatMap((edge, i) => {
-    const { points } = drawn[i];
-    const node = nodeBoxes.find(([id, box]) => id !== edge.from && id !== edge.to && runsThrough(points, box));
-    const label = labelBoxes.findIndex((box, j) => j !== i && box && runsThrough(points, box));
+    // The edge as drawn: smoothPath cuts each bend, so the curve, not the dagre points, decides what the edge runs through.
+    const curve = curvePoints(drawn[i].points);
+    const node = nodeBoxes.find(([id, box]) => id !== edge.from && id !== edge.to && runsThrough(curve, box));
+    const label = labelBoxes.findIndex((box, j) => j !== i && box && runsThrough(curve, box));
     return [
       ...(node ? [{ edge, kind: 'node', other: node[0] }] : []),
       ...(label >= 0 ? [{ edge, kind: 'label', other: edges[label] }] : []),
