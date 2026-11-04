@@ -38,6 +38,14 @@ test('install: no marketplace plugin root holds package.json or a symlink', () =
   }
 });
 
+// npm ci downloads from the lockfile's resolved URLs, so a local mirror written into the lock makes CI depend on that mirror.
+test('install: every package in package-lock.json resolves from registry.npmjs.org', () => {
+  const offRegistry = Object.entries(json('package-lock.json').packages)
+    .filter(([, p]) => p.resolved && !p.resolved.startsWith('https://registry.npmjs.org/'))
+    .map(([name, p]) => `${name}: ${p.resolved}`);
+  assert.deepEqual(offRegistry, [], 'reinstall with npm install --registry=https://registry.npmjs.org/');
+});
+
 test('install: script paths referenced by commands and SKILL.md exist', () => {
   // The plugin root is skills/ (see .claude-plugin/marketplace.json).
   for (const f of readdirSync(join(ROOT, 'skills/commands'))) {
