@@ -129,6 +129,14 @@ test('render: the direction in the fence decides, so the clean direction has no 
   assert.equal(flowWarnings(doc(THROUGH_NODE, ' RL')).length, 1);
 });
 
+test('render: a flow drawn BT is checked too: clean like TB, and a crossing it draws is warned with its draft line', () => {
+  assert.deepEqual(flowWarnings(doc(THROUGH_NODE, ' BT')), []);
+  const [w, ...rest] = flowWarnings(doc(NODE_EVERYWHERE, ' BT'));
+  assert.deepEqual(rest, []);
+  assert.equal(w.line, 6 + 5);
+  assert.equal(w.message, 'the edge "Docs -> Video" runs through the node "Pricing"; split the diagram into an overview and a detail diagram');
+});
+
 // The group name finds no free place in TB, so TB is drawn with room reserved for it; the advice must come from that layout.
 const CROWDED_GROUP = 'DB -> Gateway\nTop -> Queue\nQueue -> Gateway: HTTPS\nTop -> Worker\nAuth -> Worker: HTTPS\nClient -> Worker\nQueue -> Worker: HTTPS\ngroup A very long backend group name here: Auth, Queue';
 
