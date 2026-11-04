@@ -8648,13 +8648,27 @@ function parseDoc(source, options) {
   return doc2;
 }
 function parseDocLoose(source, { defaults: defaults2 = {}, choices = {} } = {}) {
-  const lines = String(source).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+  const lines = sourceLines(source);
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults2 }, { ...CHOICES, ...choices });
   const errors = [];
   const sections = splitSections(lines, bodyStart, errors);
   const intro = extractTitle(sections.intro, meta);
   const panels = assignIds(sections.panels);
   return { doc: { meta, intro, panels }, errors };
+}
+var sourceLines = (source) => String(source).replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
+var FRONT_ENTRY = /^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u;
+function frontmatterValue(source, key) {
+  const lines = sourceLines(source);
+  if (lines[0]?.trim() !== "---") return void 0;
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
+  if (end === -1) return void 0;
+  let value;
+  for (const line of lines.slice(1, end)) {
+    const m2 = stripLineComment(line).trim().match(FRONT_ENTRY);
+    if (m2?.[1] === key) value = unquote(m2[2]);
+  }
+  return value;
 }
 function parseFrontmatter(lines, base, allowed) {
   if (lines[0]?.trim() !== "---") return { meta: { ...base }, bodyStart: 0 };
@@ -8664,7 +8678,7 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith("#")) continue;
-    const m2 = raw.match(/^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u);
+    const m2 = raw.match(FRONT_ENTRY);
     if (!m2) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
     entries[m2[1]] = { value: coerce(m2[1], unquote(m2[2])), line: i + 1 };
   }
@@ -8892,7 +8906,7 @@ function panelHtml(panel, { cols = 3, grid = true, hints = {} } = {}) {
 ${head}<div class="am-panel-body">${panel.html}</div>
 </section>`;
 }
-var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "cols", "title", "subtitle", "lang", "outline"]);
+var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "cols", "title", "subtitle", "lang", "outline", "file"]);
 function headHtml(meta, introHtml, language = {}) {
   const extras = Object.entries(meta).filter(([k, v2]) => !RESERVED.has(k) && v2 !== "");
   const names2 = language.metaKeys ?? {};
@@ -12853,6 +12867,7 @@ template: sheet        # sheet: blueprint board (default, multi-panel grid) | do
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
+file: tcp-handshake    # optional: the file name, ASCII letters and digits; use it when the title has few or none
 cols: 3                # number of sheet grid columns, default 3
 style: 80              # STE check strictness: off | 80 (default, warn only) | strict (no page if it fails)
 mode: auto             # auto follows the system | light | dark
@@ -12945,6 +12960,7 @@ var VIDEO_FORMAT = `Video draft format (am video)
 ---
 title: TCP three-way handshake
 subtitle: Why three steps      # optional, subtitle on the title card
+file: tcp-handshake            # optional: the file name, as in a page draft
 theme: blueprint               # blueprint: drawing style (auto picks it; follows the theme in am config) | shadcn: cards | 3b1b: dark
 mode: light                    # light | dark (blueprint + dark is a dark-blue drawing)
 ---
@@ -13127,7 +13143,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }
-  const file = outputPath("pages", result.meta.title, opts, ctx);
+  const file = outputPath("pages", nameSource(result.meta), opts, ctx);
   if (!file) return 2;
   const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages" });
   if (!written) return 1;
@@ -13145,8 +13161,14 @@ function draftTitle(src) {
   const m2 = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
   return m2?.[1] ?? "";
 }
+function nameSource({ file, title }) {
+  return /[A-Za-z0-9]/.test(String(file ?? "")) ? file : title;
+}
+function draftName(src) {
+  return nameSource({ file: frontmatterValue(src, "file"), title: draftTitle(src) });
+}
 function saveDraft(src, { env, io }) {
-  const name2 = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
+  const name2 = `${slug(draftName(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
   const home = amHome(env);
   const folders = [() => {
     ensureHome(home);
@@ -13420,7 +13442,7 @@ async function cmdVideo(src, opts, ctx, from) {
     fail(`\u2717 Voice-over failed: ${e.message}. ${opts["audio-map"] === void 0 ? "Add --voice off" : "Remove --audio-map and add --voice off"} for captions only`);
     return 1;
   }
-  file ??= outputPath("videos", result.meta.title, opts, ctx);
+  file ??= outputPath("videos", nameSource(result.meta), opts, ctx);
   if (!file) return 2;
   const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "videos" });
   if (!written) return 1;

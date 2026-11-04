@@ -691,6 +691,13 @@ test('render: outline: left puts the rail on the inline-start side; an invalid v
   assert.throws(() => renderDoc(RAIL('outline: middle\n')), (e) => e instanceof ParseError && /Invalid outline value "middle".*left \| right/.test(e.message));
 });
 
+test('render: file: is not shown in the page header meta line', () => {
+  const { html } = renderDoc('---\ntitle: T\nfile: my-topic\nauthor: Cyan\n---\n## A one\nText.\n');
+  const head = html.match(/<header class="am-head">[\s\S]*?<\/header>/)[0];
+  assert.match(head, /Cyan/);
+  assert.doesNotMatch(head, /my-topic/);
+});
+
 test('render: a doc page with fewer than 3 panels has no rail, and outline is not shown in the meta line', () => {
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n', 2)).html, /<nav class="am-toc"/);
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n')).html, /<div class="am-head-meta">/);

@@ -606,6 +606,15 @@ test('cli video: writes to AM_HOME/videos and prints scenes, narration, duration
   assert.equal(readdirSync(join(dir, 'videos')).length, 1);
 });
 
+test('cli video: file: in the front matter names the video, as it names a page', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'am-video-file-name-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  assert.match(SRC, /^---\n/);
+  const r = await run(['video', '-'], { stdin: SRC.replace(/^---\n/, '---\nfile: tcp handshake\n'), env: { AM_HOME: home } });
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /✓ .+videos[\\/]tcp-handshake-\d{8}-\d{6}\.html/);
+});
+
 test('cli video: a second default video in the same second gets -2 and keeps both', async (t) => {
   const home = mkdtempSync(join(tmpdir(), 'am-video-same-second-'));
   t.after(() => rmSync(home, { recursive: true, force: true }));
