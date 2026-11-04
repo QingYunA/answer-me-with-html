@@ -838,6 +838,19 @@ test('cli render: a saved stdin draft name follows the same ASCII rule as a page
   assert.match(basename(path), /^page-\d{8}-\d{6}\.md$/);
 });
 
+test('cli render: a saved stdin draft takes file: only from the front matter, as the page does', async () => {
+  const { env } = freshHome();
+  const saved = async (stdin) => {
+    const r = await run(['render', '-'], { stdin, env });
+    return basename((r.out + r.err).match(/^ {2}draft: (.+)$/m)[1]);
+  };
+  const body = '## A\nUtilize the tool.\n';
+  assert.match(await saved(`---\ntitle: Body Case\n---\nfile: secret-report\n${body}`), /^body-case-\d{8}-\d{6}\.md$/, 'a file: line in the body');
+  assert.match(await saved(`---\ntitle: Blank Case\nfile:\nsubtitle: next-line\n---\n${body}`), /^blank-case-\d{8}-\d{6}\.md$/, 'an empty file:');
+  assert.match(await saved(`---\ntitle: T\nfile: my-topic # note\n---\n${body}`), /^my-topic-\d{8}-\d{6}\.md$/, 'a trailing comment');
+  assert.match(await saved(`---\ntitle: T\nnot a key line\nfile: broken-front\n---\n${body}`), /^broken-front-\d{8}-\d{6}\.md$/, 'a malformed front matter line');
+});
+
 test('cli render: a strict STE failure and a fatal parse error with a line keep the stdin draft too', async () => {
   const { home, env } = freshHome();
   const strict = await run(['render', '-', '--style', 'strict'], { stdin: '## A\nUtilize the tool.', env });

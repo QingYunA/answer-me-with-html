@@ -6,7 +6,7 @@ import { VERSION } from './assets.js';
 import { join, resolve, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
-import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES } from './parse.js';
+import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES, frontmatterValue } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
 import { resolveLanguage } from './language.js';
 import { COMPONENTS } from './components/index.js';
@@ -72,7 +72,7 @@ template: sheet        # sheet: blueprint board (default, multi-panel grid) | do
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
-file: tcp-handshake    # optional: the file name, ASCII letters and digits; use it when the title has none
+file: tcp-handshake    # optional: the file name, ASCII letters and digits; use it when the title has few or none
 cols: 3                # number of sheet grid columns, default 3
 style: 80              # STE check strictness: off | 80 (default, warn only) | strict (no page if it fails)
 mode: auto             # auto follows the system | light | dark
@@ -385,8 +385,7 @@ function nameSource({ file, title }) {
 }
 
 function draftName(src) {
-  const file = src.match(/^file:\s*["']?(.+?)["']?\s*$/m)?.[1];
-  return nameSource({ file, title: draftTitle(src) });
+  return nameSource({ file: frontmatterValue(src, 'file'), title: draftTitle(src) });
 }
 
 // The absolute path of the saved draft, or null when neither the data directory nor the temporary folder can take it. Saving is a side

@@ -10,7 +10,7 @@ template: sheet        # sheet = grid of panels (default), doc = one column with
 theme: auto            # auto (default) picks paper for long text, blueprint for diagrams; or blueprint, shadcn, paper, your own theme
 title: Page title
 subtitle: One line
-file: tcp-handshake    # the file name, when the title has no ASCII letters (see Output)
+file: tcp-handshake    # the file name, when the title has few or no ASCII letters (see Output)
 cols: 3                # columns for sheet (a whole number)
 outline: right         # doc with 3 or more sections: the side of the outline rail, left or right (default right)
 source: RFC 9293       # any other field shows under the title

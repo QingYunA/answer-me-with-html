@@ -10,7 +10,7 @@ template: sheet        # sheet 是多面板网格（默认），doc 是单栏长
 theme: auto            # auto（默认）：长文用 paper，有图表用 blueprint；也可写 blueprint、shadcn、paper 或你自己的主题
 title: 页面标题
 subtitle: 一句话说明
-file: tcp-handshake    # 文件名；标题里没有 ASCII 字母时使用（见输出）
+file: tcp-handshake    # 文件名；标题里没有或只有很少 ASCII 字母时使用（见输出）
 cols: 3                # sheet 的列数（整数）
 outline: right         # doc 且有 3 个及以上章节时，大纲条在正文的哪一侧：left 或 right（默认 right）
 source: RFC 9293       # 其他任意字段会显示在标题下方

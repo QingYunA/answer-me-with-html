@@ -90,13 +90,34 @@ export function parseDoc(source, options) {
 // caller can add what it finds later (renderDoc adds the component errors). Other errors still throw at once, since nothing
 // sensible follows them (frontmatter, an unclosed fence, a duplicate panel ID).
 export function parseDocLoose(source, { defaults = {}, choices = {} } = {}) {
-  const lines = String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = sourceLines(source);
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults }, { ...CHOICES, ...choices });
   const errors = [];
   const sections = splitSections(lines, bodyStart, errors);
   const intro = extractTitle(sections.intro, meta);
   const panels = assignIds(sections.panels);
   return { doc: { meta, intro, panels }, errors };
+}
+
+const sourceLines = (source) => String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+
+// A key is letters of any script (a Hebrew or Chinese key such as `עודכן` shows in the meta row as written), digits, _ and -,
+// and may hold single spaces between words.
+const FRONT_ENTRY = /^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u;
+
+// One front matter value read by the rules of parseFrontmatter (comments stripped, the last entry wins), or undefined. It never
+// throws: a malformed line is skipped and an unclosed block gives undefined, so a draft that does not parse can still be named.
+export function frontmatterValue(source, key) {
+  const lines = sourceLines(source);
+  if (lines[0]?.trim() !== '---') return undefined;
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
+  if (end === -1) return undefined;
+  let value;
+  for (const line of lines.slice(1, end)) {
+    const m = stripLineComment(line).trim().match(FRONT_ENTRY);
+    if (m?.[1] === key) value = unquote(m[2]);
+  }
+  return value;
 }
 
 function parseFrontmatter(lines, base, allowed) {
@@ -108,9 +129,7 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith('#')) continue;
-    // A key is letters of any script (a Hebrew or Chinese key such as `עודכן` shows in the meta row as written), digits, _ and -,
-    // and may hold single spaces between words.
-    const m = raw.match(/^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u);
+    const m = raw.match(FRONT_ENTRY);
     if (!m) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
     entries[m[1]] = { value: coerce(m[1], unquote(m[2])), line: i + 1 };
   }
