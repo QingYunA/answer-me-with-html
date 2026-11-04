@@ -449,14 +449,11 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
 // The width of a group name: monospace on a left-to-right page, the sans font on a right-to-left one (src/themes/rtl.css).
 const labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== 'rtl' }) + 2;
 
-function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
-  const { nodes, edges, groups } = model;
-  const rtl = pageDir === 'rtl';
-  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+// Lay out the flow, then give a group name that would sit on an edge or a node room of its own in another layout: first along
+// the top of its box, and in LR and RL, when an edge crosses that room too, along the bottom.
+export function reservedLayout(model, rankdir, rtl, widths) {
   let run = runLayout(model, rankdir, rtl, widths, new Set());
   let spots = placeLabels(run, model, widths, rtl, new Map());
-  // A group name that would sit on an edge or a node gets room of its own in another layout: first along the top of its box,
-  // and in LR and RL, when an edge crosses that room too, along the bottom.
   const reserve = new Map();
   for (const side of ['top', 'bottom']) {
     const crowded = spots.flatMap((s, i) => (s ? [] : [i]));
@@ -465,8 +462,17 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
     run = runLayout(model, rankdir, rtl, widths, reserve);
     spots = placeLabels(run, model, widths, rtl, reserve);
   }
+  return { run, spots, reserve };
+}
+
+function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
+  const { nodes, edges, groups } = model;
+  const rtl = pageDir === 'rtl';
+  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+  const { run, spots, reserve } = reservedLayout(model, rankdir, rtl, widths);
   const { g, key, sizes } = run;
-  if (warn) crossingWarnings(model, rankdir, run, (alt) => runLayout(model, alt, rtl, widths, new Set())).forEach(warn);
+  // The other direction is laid out the way it would be drawn, group-name room included, so its advice holds.
+  if (warn) crossingWarnings(model, rankdir, run, (alt) => reservedLayout(model, alt, rtl, widths).run).forEach(warn);
 
   const clusters = groups.map((grp, i) => {
     const c = g.node(gkey(i));

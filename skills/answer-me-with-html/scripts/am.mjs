@@ -7498,10 +7498,7 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
   });
 }
 var labelWidth = (name2, pageDir) => measure(name2, CLUSTER_FS, { mono: pageDir !== "rtl" }) + 2;
-function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
-  const { nodes, edges, groups } = model;
-  const rtl = pageDir === "rtl";
-  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+function reservedLayout(model, rankdir, rtl, widths) {
   let run2 = runLayout(model, rankdir, rtl, widths, /* @__PURE__ */ new Set());
   let spots = placeLabels(run2, model, widths, rtl, /* @__PURE__ */ new Map());
   const reserve = /* @__PURE__ */ new Map();
@@ -7512,8 +7509,15 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
     run2 = runLayout(model, rankdir, rtl, widths, reserve);
     spots = placeLabels(run2, model, widths, rtl, reserve);
   }
+  return { run: run2, spots, reserve };
+}
+function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
+  const { nodes, edges, groups } = model;
+  const rtl = pageDir === "rtl";
+  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+  const { run: run2, spots, reserve } = reservedLayout(model, rankdir, rtl, widths);
   const { g, key, sizes } = run2;
-  if (warn) crossingWarnings(model, rankdir, run2, (alt) => runLayout(model, alt, rtl, widths, /* @__PURE__ */ new Set())).forEach(warn);
+  if (warn) crossingWarnings(model, rankdir, run2, (alt) => reservedLayout(model, alt, rtl, widths).run).forEach(warn);
   const clusters = groups.map((grp, i) => {
     const c2 = g.node(gkey(i));
     const x = c2.x - c2.width / 2;

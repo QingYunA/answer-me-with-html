@@ -7,7 +7,9 @@ import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { main } from '../src/cli.js';
 import { COMPONENTS } from '../src/components/index.js';
-import { parseFlow, runLayout } from '../src/components/flow.js';
+import { parseFlow, runLayout, reservedLayout } from '../src/components/flow.js';
+import { measure } from '../src/svg/text.js';
+import { DRAWING } from '../src/themes/type-scale.js';
 import { crossings, crossingWarnings } from '../src/components/flow-check.js';
 import { overlaps, segmentHits } from '../src/svg/geometry.js';
 import { renderDoc } from '../src/render.js';
@@ -125,6 +127,18 @@ test('render: the direction in the fence decides, so the clean direction has no 
   assert.deepEqual(flowWarnings(doc(THROUGH_NODE, ' TB')), []);
   assert.deepEqual(flowWarnings(doc(THROUGH_NODE)), []);
   assert.equal(flowWarnings(doc(THROUGH_NODE, ' RL')).length, 1);
+});
+
+// The group name finds no free place in TB, so TB is drawn with room reserved for it; the advice must come from that layout.
+const CROWDED_GROUP = 'DB -> Gateway\nTop -> Queue\nQueue -> Gateway: HTTPS\nTop -> Worker\nAuth -> Worker: HTTPS\nClient -> Worker\nQueue -> Worker: HTTPS\ngroup A very long backend group name here: Auth, Queue';
+
+test('render: in a grouped flow, the direction the warning suggests is drawn without crossings, group-name room included', () => {
+  const model = parseFlow(CROWDED_GROUP);
+  const widths = model.groups.map((g) => measure(g.name, DRAWING.cluster, { mono: true }) + 2);
+  assert.deepEqual([...reservedLayout(model, 'TB', false, widths).reserve], [[0, 'top']], 'the fixture needs room for its group name in TB');
+  const [w] = flowWarnings(doc(CROWDED_GROUP, ' LR'));
+  assert.match(w.message, /```flow TB draws this diagram without crossings/);
+  assert.deepEqual(flowWarnings(doc(CROWDED_GROUP, ' TB')), []);
 });
 
 test('render: a video takes no crossing warning, and the component works without a warn function', () => {
