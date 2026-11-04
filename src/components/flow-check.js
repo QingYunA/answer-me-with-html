@@ -1,6 +1,6 @@
 // dagre keeps edge labels off nodes and off each other, but it can route an edge through a node that is not one of its ends, or
 // through the label of another edge. This reads a finished layout and says so, with a way to fix the draft.
-import { segmentHits } from '../svg/geometry.js';
+import { curvePoints, segmentHits } from '../svg/geometry.js';
 
 // How far a box shrinks before an edge counts as inside it: a line that grazes the border is not a crossing.
 const NODE_INSET = 2;
@@ -10,7 +10,11 @@ const OTHER = { LR: 'TB', RL: 'TB', TB: 'LR', BT: 'LR' };
 
 const around = ({ x, y }, { width, height }) => [x - width / 2, y - height / 2, x + width / 2, y + height / 2];
 const inset = ([x0, y0, x1, y1], d) => [x0 + d, y0 + d, x1 - d, y1 - d];
-const runsThrough = (points, box) => points.slice(1).some((p, k) => segmentHits(points[k], p, box));
+// The edge as drawn: smoothPath cuts each bend, so the curve, not the dagre points, decides what the edge runs through.
+const runsThrough = (points, box) => {
+  const drawn = curvePoints(points);
+  return drawn.slice(1).some((p, k) => segmentHits(drawn[k], p, box));
+};
 const name = (e) => `${e.from} -> ${e.to}`;
 
 // Where a drawn edge runs through something: { edge, kind: 'node', other: node id } for a node that is not its end, and

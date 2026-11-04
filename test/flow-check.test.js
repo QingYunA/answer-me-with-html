@@ -16,7 +16,8 @@ import { renderDoc } from '../src/render.js';
 
 // Home -> Pricing is routed past the Docs fan-out in LR; TB draws it clean.
 const THROUGH_NODE = 'Home -> Install\nHome -> Pricing\nHome -> Docs\nDocs -> Video\nDocs -> Settings\nDocs -> Checks';
-// The label of Sync -> Laptop covers the edge Sync -> Phone in LR; TB draws it clean.
+// The label of Sync -> Laptop covers the edge Sync -> Phone in LR. In TB the drawn curve still grazes a label by 1.3px, so it is no
+// clean direction; the TB advice is covered by the node fixtures.
 const THROUGH_LABEL = 'Phone -> Queue\nSync -> Auth: token to user\nAuth -> [(Postgres)]: version on every row\n[(Postgres)] --> Sync: read changes by cursor\nSync --> Laptop: pull changes and confirmed ids\nSync --> Phone: pull';
 // A longer label than THROUGH_LABEL: the edge crosses it in every direction.
 const LABEL_EVERYWHERE = 'Phone -> Queue\nSync -> Auth: token to user to workspace\nAuth -> [(Postgres)]: version number on every row\n[(Postgres)] --> Sync: read changes by cursor\nSync --> Laptop: pull changes and confirmed mutation ids\nSync --> Phone: pull';
@@ -55,10 +56,28 @@ test('crossings: one report for each edge and kind, however many nodes the edge 
 });
 
 test('crossings: a diagram without crossings, and the same diagram in the clean direction, report nothing', () => {
-  for (const [text, dir] of [['A -> B -> C', 'LR'], [THROUGH_NODE, 'TB'], [THROUGH_LABEL, 'TB'], [FAN, 'TB']]) {
+  for (const [text, dir] of [['A -> B -> C', 'LR'], [THROUGH_NODE, 'TB'], [FAN, 'TB']]) {
     const { model, run } = check(text, dir);
     assert.deepEqual(crossings(run, model), [], `${dir}: ${text}`);
   }
+});
+
+// An L-shaped edge A (0,0) -> bend (100,0) -> B (100,100). smoothPath draws the bend as a curve from (50,0) to (100,50), which
+// passes (87.5,12.5): the drawn edge cuts the corner, so the check must follow the curve, not the dagre points.
+const bent = (center, size) => {
+  const at = { A: { x: 0, y: 0 }, B: { x: 100, y: 100 }, C: center };
+  const g = { edge: () => ({ points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }] }), node: (k) => at[k] };
+  const ids = ['A', 'B', 'C'];
+  const run = { g, key: new Map(ids.map((id) => [id, id])), sizes: new Map(ids.map((id) => [id, id === 'C' ? size : { width: 4, height: 4 }])), labels: [null] };
+  return crossings(run, { nodes: new Map(ids.map((id) => [id, {}])), edges: [{ from: 'A', to: 'B' }] });
+};
+
+test('crossings: a node on the bend point that the drawn curve passes inside of is not crossed', () => {
+  assert.deepEqual(bent({ x: 100, y: 0 }, { width: 16, height: 10 }), []);
+});
+
+test('crossings: a node inside the corner that the drawn curve cuts through is crossed', () => {
+  assert.deepEqual(bent({ x: 84, y: 14 }, { width: 14, height: 10 }).map((c) => [c.kind, c.other]), [['node', 'C']]);
 });
 
 // ── warnings ──
@@ -72,13 +91,11 @@ test('crossingWarnings: a node crossing names the edge and the node, points at t
   assert.deepEqual(crossings(relayout('TB'), model), []);
 });
 
-test('crossingWarnings: a label crossing names both edges and the label, and suggests flow TB', () => {
+test('crossingWarnings: a label crossing names both edges and the label, on the draft line of the crossing edge', () => {
   const [w, ...rest] = warnings(THROUGH_LABEL, 'LR');
   assert.equal(rest.length, 0);
   assert.equal(w.line, 6);
-  assert.equal(w.message, 'the edge "Sync -> Phone" runs through the label "pull changes and confirmed ids" of "Sync -> Laptop"; ```flow TB draws this diagram without crossings');
-  const { model, relayout } = check(THROUGH_LABEL, 'LR');
-  assert.deepEqual(crossings(relayout('TB'), model), []);
+  assert.ok(w.message.startsWith('the edge "Sync -> Phone" runs through the label "pull changes and confirmed ids" of "Sync -> Laptop"; '), w.message);
 });
 
 test('crossingWarnings: when the other direction crosses too, a node warning says to split the diagram', () => {

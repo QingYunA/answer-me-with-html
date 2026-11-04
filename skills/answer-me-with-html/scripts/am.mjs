@@ -7116,6 +7116,24 @@ function segmentHits(p, q3, [x0, y0, x1, y1]) {
   }
   return true;
 }
+function curvePoints(points, steps2 = 8) {
+  if (points.length < 3) return points;
+  const mid2 = (a3, b) => ({ x: (a3.x + b.x) / 2, y: (a3.y + b.y) / 2 });
+  const out = [points[0]];
+  let from = mid2(points[0], points[1]);
+  for (let i = 1; i < points.length - 1; i++) {
+    const to = mid2(points[i], points[i + 1]);
+    const c2 = points[i];
+    for (let s = 0; s <= steps2; s++) {
+      const t = s / steps2;
+      const u = 1 - t;
+      out.push({ x: u * u * from.x + 2 * u * t * c2.x + t * t * to.x, y: u * u * from.y + 2 * u * t * c2.y + t * t * to.y });
+    }
+    from = to;
+  }
+  out.push(points.at(-1));
+  return out;
+}
 
 // src/components/flow-check.js
 var NODE_INSET = 2;
@@ -7123,7 +7141,10 @@ var LABEL_INSET = 1;
 var OTHER = { LR: "TB", RL: "TB", TB: "LR", BT: "LR" };
 var around = ({ x, y: y2 }, { width, height }) => [x - width / 2, y2 - height / 2, x + width / 2, y2 + height / 2];
 var inset = ([x0, y0, x1, y1], d) => [x0 + d, y0 + d, x1 - d, y1 - d];
-var runsThrough = (points, box) => points.slice(1).some((p, k) => segmentHits(points[k], p, box));
+var runsThrough = (points, box) => {
+  const drawn = curvePoints(points);
+  return drawn.slice(1).some((p, k) => segmentHits(drawn[k], p, box));
+};
 var name = (e) => `${e.from} -> ${e.to}`;
 function crossings({ g, key, sizes, labels }, { nodes, edges }) {
   const drawn = edges.map((e, i) => g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` }));
