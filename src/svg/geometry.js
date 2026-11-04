@@ -22,8 +22,9 @@ export function segmentHits(p, q, [x0, y0, x1, y1]) {
 }
 
 // The points along the edge smoothPath (src/svg/shapes.js) draws: a line to the middle of the first segment, a quadratic curve
-// around each bend from one segment middle to the next, and a line to the end. Each curve is sampled at steps points.
-export function curvePoints(points, steps = 8) {
+// around each bend from one segment middle to the next, and a line to the end. A chord of a quadratic curve cut into n equal steps
+// lies at most |from - 2c + to| / (4n²) from it, so each bend gets enough steps to stay within tolerance px.
+export function curvePoints(points, tolerance = 0.25) {
   if (points.length < 3) return points;
   const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   const out = [points[0]];
@@ -31,6 +32,8 @@ export function curvePoints(points, steps = 8) {
   for (let i = 1; i < points.length - 1; i++) {
     const to = mid(points[i], points[i + 1]);
     const c = points[i];
+    const bend = Math.hypot(from.x - 2 * c.x + to.x, from.y - 2 * c.y + to.y);
+    const steps = Math.max(1, Math.ceil(Math.sqrt(bend / (4 * tolerance))));
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const u = 1 - t;
