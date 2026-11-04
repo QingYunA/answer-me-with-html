@@ -3,6 +3,8 @@ import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
 import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirrorLayout } from '../svg/shapes.js';
 import { svgLine } from '../bidi.js';
+import { overlaps, segmentHits } from '../svg/geometry.js';
+import { crossingWarnings } from './flow-check.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 import { DRAWING } from '../themes/type-scale.js';
@@ -60,6 +62,7 @@ group Group name: B, C        ← draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).
 - Mermaid node IDs are not accepted: write the text alone, [Start] rather than A[Start], and refer to it later as Start.
+- When an edge would run through another node or through another edge's label, \`am render\` warns with the draft line; the page is still written. Follow the fix in the warning: usually the other direction, or a split diagram.
 - Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space:
 \`\`\`flow LR
 Client -> Gateway
@@ -78,7 +81,7 @@ Client -> Gateway
     const model = parseFlow(text);
     model.warnings.forEach((w) => warn?.(w));
     const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir)}</figure>`;
+    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir, video ? undefined : warn)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -287,8 +290,9 @@ const reserveKey = (i) => `r${i}`;
 // Run dagre. reserve maps each group whose name found no free place in the first layout to the side it gets room on:
 // in TB and BT a label-sized node above the group's first members, which dagre keeps clear of every edge passing by;
 // in LR and RL a strip inserted under the box's top edge, or above its bottom edge when an edge crosses the top one
-// (edges there mostly run sideways, so a strip stays empty).
-function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
+// (edges there mostly run sideways, so a strip stays empty). labels holds the drawn size of each edge label (null for an edge
+// without one), so a check on the result measures nothing again.
+export function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   const g = new dagre.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
@@ -320,8 +324,9 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
       });
     });
   });
+  const labels = edges.map((e) => (e.label ? edgeText(e.label) : null));
   edges.forEach((e, i) => {
-    const size = e.label ? edgeText(e.label) : null;
+    const size = labels[i];
     // Dagre reserves 2px more than the drawn label box, as it always did.
     const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: 'c' } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
@@ -336,7 +341,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     }
   }
   fitEdges(g);
-  return { g, key, sizes };
+  return { g, key, sizes, labels };
 }
 
 // dagre sizes the drawing to its nodes, boxes and edge labels, not to edge points: a long edge routed around the outside of the
@@ -441,31 +446,10 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
   });
 }
 
-const overlaps = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
-
-// Does the segment p-q cross the box [x0, y0, x1, y1]? Liang-Barsky clipping.
-function segmentHits(p, q, [x0, y0, x1, y1]) {
-  const dx = q.x - p.x;
-  const dy = q.y - p.y;
-  let t0 = 0;
-  let t1 = 1;
-  for (const [a, b] of [[-dx, p.x - x0], [dx, x1 - p.x], [-dy, p.y - y0], [dy, y1 - p.y]]) {
-    if (a === 0) {
-      if (b < 0) return false;
-    } else {
-      const t = b / a;
-      if (a < 0) t0 = Math.max(t0, t);
-      else t1 = Math.min(t1, t);
-      if (t0 > t1) return false;
-    }
-  }
-  return true;
-}
-
 // The width of a group name: monospace on a left-to-right page, the sans font on a right-to-left one (src/themes/rtl.css).
 const labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== 'rtl' }) + 2;
 
-function layout(model, rankdir, id, ui, pageDir = 'ltr') {
+function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
   const { nodes, edges, groups } = model;
   const rtl = pageDir === 'rtl';
   const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
@@ -482,6 +466,7 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
     spots = placeLabels(run, model, widths, rtl, reserve);
   }
   const { g, key, sizes } = run;
+  if (warn) crossingWarnings(model, rankdir, run, (alt) => runLayout(model, alt, rtl, widths, new Set())).forEach(warn);
 
   const clusters = groups.map((grp, i) => {
     const c = g.node(gkey(i));
