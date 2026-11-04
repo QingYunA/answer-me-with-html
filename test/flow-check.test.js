@@ -130,6 +130,12 @@ test('render: the direction in the fence decides, so the clean direction has no 
 });
 
 test('render: a flow drawn BT is checked too: clean like TB, and a crossing it draws is warned with its draft line', () => {
+  // The fence direction is honoured: BT draws the source Home below Install, TB above it.
+  const nodeY = (html, id) => Number(html.match(new RegExp(`data-key="${id}"[^>]*><rect[^>]* y="([\\d.]+)"`))[1]);
+  const bt = renderDoc(doc(THROUGH_NODE, ' BT')).html;
+  const tb = renderDoc(doc(THROUGH_NODE, ' TB')).html;
+  assert.ok(nodeY(bt, 'Home') > nodeY(bt, 'Install'), 'BT: Home below Install');
+  assert.ok(nodeY(tb, 'Home') < nodeY(tb, 'Install'), 'TB: Home above Install');
   assert.deepEqual(flowWarnings(doc(THROUGH_NODE, ' BT')), []);
   const [w, ...rest] = flowWarnings(doc(NODE_EVERYWHERE, ' BT'));
   assert.deepEqual(rest, []);
