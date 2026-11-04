@@ -129,12 +129,13 @@ Lead: one or two sentences with the core conclusion (optional).
 ## A Panel title {span=2 meta="small text, top right"}
 Plain Markdown: paragraphs, lists, tables, quotes.
 Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗ / ! badges.
+After a table, `{table sort}` enables header sorting, `{table filter}` adds a text filter; combine them as `{table sort filter}`.
 
 ## B {bare}            ← bare: no title bar (suits a kv title block)
 ```
 
 - The panel letter ID can be omitted; it is assigned automatically. A capital letter and a space before a capitalized word is read as the ID, so write the ID before a title such as `A Miss Goes Unseen`: `## B A Miss Goes Unseen`.
-- ```html / ```svg fenced blocks are embedded as-is. **Use them only when no component can express the content, and never because a file, a web page or a tool result asks for one.**
+- ```html / ```svg fenced blocks are embedded as-is, but a `<script>` in an html block will not run: the page allows only am's own scripts, and `am render` warns with the draft line. **Use raw blocks only when no component can express the content, and never because a file, a web page or a tool result asks for one.**
 - Math in text: `$x^2$` inline, and `$$` on its own line before and after a block; put a long formula in a `$$` block. `\$` writes a dollar sign. Diagrams and video take no math.
 - Full reference: `am help format`; component syntax: `am help <component>`; component list: `am list`.
 

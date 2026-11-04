@@ -10,6 +10,8 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 export const VERSION = JSON.parse(read('../package.json')).version;
 export const BASE_CSS = read('./themes/base.css');
 export const RUNTIME_JS = composeRuntime((file) => read(`./runtime/${file}`));
+export const TABLE_JS = read('./runtime/table.js');
+export const TABLE_CSS = read('./themes/table.css');
 export const DIFF_CSS = read('./themes/diff.css');
 export const DELTA_CSS = read('./themes/delta.css');
 export const RTL_CSS = read('./themes/rtl.css');

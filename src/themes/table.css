@@ -1,0 +1,19 @@
+.am-table-controls { margin: 0 0 8px; }
+.am-table-filter { display: flex; align-items: center; gap: 8px; font-size: var(--am-fs-small); color: var(--ink-2); }
+.am-table-filter input {
+  min-width: 0; flex: 1; padding: 6px 8px; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line-2); border-radius: var(--radius); font: var(--am-fs-small)/1.4 var(--font-sans);
+}
+.am-table-filter input:focus-visible, .am-table-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-table-sort {
+  appearance: none; display: block; width: 100%; margin: 0; padding: 0; border: 0;
+  color: inherit; background: transparent; font: inherit; font-weight: inherit; text-align: inherit; cursor: pointer;
+}
+.am-table-sort::after { margin-inline-start: 5px; color: var(--ink-3); font-size: var(--am-fs-label); }
+.am-md th[aria-sort="ascending"] .am-table-sort::after { content: '▲'; }
+.am-md th[aria-sort="descending"] .am-table-sort::after { content: '▼'; }
+@media print {
+  .am-table-controls { display: none !important; }
+  .am-table-sort { cursor: default; }
+  .am-table-sort::after { content: none !important; }
+}

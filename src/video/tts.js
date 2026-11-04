@@ -1,14 +1,15 @@
 // Narration voice-over. Fallback order: ElevenLabs (with ELEVENLABS_API_KEY) → system TTS (macOS say / Linux espeak-ng) → captions only.
 // --voice local uses a local OpenAI-compatible /v1/audio/speech service (AM_TTS_URL) instead, only when given explicitly.
-// Each line is synthesized as 22050 Hz mono 16-bit PCM and cached by text + voice in AM_HOME/cache/tts/, so re-renders do not synthesize again.
+// --audio-map reads one existing file per line. Every source produces 22050 Hz mono 16-bit PCM, cached by text + source in
+// AM_HOME/cache/tts/ (including mapped audio content), so re-renders do not synthesize or decode unchanged audio again.
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdtempSync, renameSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { hasCommand, isDenied } from '../sys.js';
 import { baseLanguage, voiceHints } from '../language.js';
-import { estimateSeconds } from './script.js';
+import { estimateSeconds, normalizeNarration, normalizeNarrationText } from './script.js';
 
 export const SAMPLE_RATE = 22050;
 const ELEVEN_DEFAULT_VOICE = 'bIHbv24MWmeRgasZH58o'; // Will: a premade voice, so it works on the free plan; ElevenLabs lists zh as verified
@@ -148,6 +149,126 @@ function localSpeech(env) {
       return best.samples;
     },
   };
+}
+
+export function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}) {
+  const mapFile = resolve(mapPath);
+  let source;
+  let mapStat;
+  try {
+    source = readFileSync(mapFile, 'utf8').replace(/^\uFEFF/, '');
+    mapStat = statSync(mapFile);
+  } catch (e) {
+    throw new TtsError(`Cannot read audio map ${mapFile}: ${e.message}`);
+  }
+  let json;
+  try {
+    const duplicate = duplicateRawKey(source);
+    if (duplicate !== undefined) throw new TtsError(`Audio map ${mapFile} has duplicate narration key "${duplicate}"`);
+    json = JSON.parse(source);
+  } catch (e) {
+    if (e instanceof TtsError) throw e;
+    throw new TtsError(`Cannot parse audio map ${mapFile}: ${e.message}`);
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new TtsError(`Audio map ${mapFile} must be a JSON object of narration lines to audio files`);
+
+  const entries = new Map();
+  for (const [key, value] of Object.entries(json)) {
+    const text = normalizeNarration(key);
+    if (!text) throw new TtsError(`Audio map ${mapFile} has an empty narration key`);
+    if (entries.has(text)) throw new TtsError(`Audio map ${mapFile} has more than one entry for narration line "${text}"`);
+    if (typeof value !== 'string' || !value.trim()) throw new TtsError(`Audio map entry for narration line "${text}" must name an audio file`);
+    const audioFile = resolve(dirname(mapFile), value);
+    let stat;
+    let audio;
+    try {
+      stat = statSync(audioFile);
+      if (!stat.isFile()) throw new TtsError(`Audio file for narration line "${text}" is not a file: ${audioFile}`);
+      audio = readFileSync(audioFile);
+    } catch (e) {
+      if (e instanceof TtsError) throw e;
+      throw new TtsError(`Cannot read audio file for narration line "${text}": ${audioFile}: ${e.message}`);
+    }
+    entries.set(text, { file: audioFile, size: stat.size, mtimeMs: stat.mtimeMs, sha256: createHash('sha256').update(audio).digest('hex') });
+  }
+
+  const signature = {
+    map: { file: mapFile, size: mapStat.size, mtimeMs: mapStat.mtimeMs },
+    audio: [...entries].map(([text, entry]) => ({ text, ...entry })),
+  };
+  return {
+    name: 'audio-map',
+    voice: 'audio-map',
+    id: `audio-map:${stableJson(signature)}`,
+    concurrency: 1,
+    async synth(text) {
+      // The beat text has its marker removed already; removing it again would turn `> hello` into `hello`.
+      const key = normalizeNarrationText(text);
+      const entry = entries.get(key);
+      if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
+      let buf;
+      try {
+        buf = readFileSync(entry.file);
+      } catch (e) {
+        throw new TtsError(`Cannot read audio file for narration line "${key}": ${entry.file}: ${e.message}`);
+      }
+      const samples = await mappedSamples(buf, entry.file, { which, runCommand });
+      const trimmed = trimSilence(samples);
+      if (!trimmed.some((x) => Math.abs(x) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
+      return trimmed;
+    },
+  };
+}
+
+async function mappedSamples(buf, file, { which, runCommand }) {
+  if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
+    try {
+      return readWav(buf, { downmix: true });
+    } catch (e) {
+      if (!which('ffmpeg')) throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
+    }
+  } else if (!which('ffmpeg')) {
+    throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
+  }
+  return withTemp(async (out) => {
+    try {
+      await runCommand('ffmpeg', ['-v', 'error', '-y', '-i', file, '-ac', '1', '-ar', String(SAMPLE_RATE), '-c:a', 'pcm_s16le', out]);
+      return readWav(readFileSync(out));
+    } catch (e) {
+      throw new TtsError(`Cannot convert audio map file ${file} with ffmpeg: ${e.message}`);
+    }
+  });
+}
+
+function duplicateRawKey(source) {
+  const keys = new Set();
+  let depth = 0;
+  let previous = '';
+  let rootObject = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (/\s/.test(ch)) continue;
+    if (ch === '"') {
+      let end = i + 1;
+      while (end < source.length) {
+        if (source[end] === '\\') end += 2;
+        else if (source[end++] === '"') break;
+      }
+      if (rootObject && depth === 1 && (previous === '{' || previous === ',')) {
+        const key = JSON.parse(source.slice(i, end));
+        if (keys.has(key)) return key;
+        keys.add(key);
+      }
+      previous = '"';
+      i = end - 1;
+      continue;
+    }
+    if (!depth) rootObject = ch === '{';
+    if (ch === '{' || ch === '[') depth++;
+    if (ch === '}' || ch === ']') depth--;
+    previous = ch;
+  }
+  return undefined;
 }
 
 // JSON with keys in alphabetical order, so the same parameters in another order give the same cache key.
@@ -310,20 +431,29 @@ async function withTemp(fn) {
   }
 }
 
-// Parse a 16-bit PCM WAV, taking the first channel of multi-channel audio. Returns { rate, samples }.
-export function readWav(buf) {
+// Parse a 16-bit PCM WAV, taking the first channel or averaging all channels to mono. Returns { rate, samples }.
+export function readWav(buf, { downmix = false } = {}) {
   if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') throw new TtsError('Not a WAV file');
   let pos = 12;
   let fmt = null;
   while (pos + 8 <= buf.length) {
     const id = buf.toString('ascii', pos, pos + 4);
     const size = buf.readUInt32LE(pos + 4);
-    if (id === 'fmt ') fmt = { channels: buf.readUInt16LE(pos + 10), rate: buf.readUInt32LE(pos + 12), bits: buf.readUInt16LE(pos + 22) };
+    if (id === 'fmt ') fmt = { format: buf.readUInt16LE(pos + 8), channels: buf.readUInt16LE(pos + 10), rate: buf.readUInt32LE(pos + 12), bits: buf.readUInt16LE(pos + 22) };
     if (id === 'data') {
-      if (!fmt || fmt.bits !== 16) throw new TtsError('Only 16-bit PCM WAV is supported');
+      if (!fmt || fmt.format !== 1 || fmt.bits !== 16) throw new TtsError('Only 16-bit PCM WAV is supported');
       const n = Math.floor(Math.min(size, buf.length - pos - 8) / 2 / fmt.channels);
       const samples = new Int16Array(n);
-      for (let i = 0; i < n; i++) samples[i] = buf.readInt16LE(pos + 8 + i * 2 * fmt.channels);
+      for (let i = 0; i < n; i++) {
+        const frame = pos + 8 + i * 2 * fmt.channels;
+        if (!downmix) {
+          samples[i] = buf.readInt16LE(frame);
+          continue;
+        }
+        let sum = 0;
+        for (let channel = 0; channel < fmt.channels; channel++) sum += buf.readInt16LE(frame + channel * 2);
+        samples[i] = Math.round(sum / fmt.channels);
+      }
       return fmt.rate === SAMPLE_RATE ? samples : resample({ rate: fmt.rate, samples });
     }
     pos += 8 + size + (size % 2);
@@ -350,8 +480,8 @@ function resample(input) {
 // per line, or null for a line whose language the voice has no voice for (the line keeps its caption, and the caller
 // estimates its duration).
 // languageOf(text) is the language to read a line in; only a voice marked usesLanguage (the system voices) gets it, and for it the
-// language and the chosen voice are part of the cache key. The cache of the other voices (ElevenLabs, a local server) does not
-// change with the language.
+// language and the chosen voice are part of the cache key. The cache of the other sources (ElevenLabs, a local server, an audio map)
+// does not change with the language.
 export async function synthAll(texts, provider, { cacheDir: wanted, languageOf } = {}) {
   const cacheDir = wanted && usableCache(wanted);
   const results = new Array(texts.length);

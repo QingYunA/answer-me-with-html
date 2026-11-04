@@ -17,7 +17,7 @@ import { checkColors, externalResourceWarnings, COLOR_TOKENS } from './themes/ch
 import { FONT_NAMES } from './themes/font-list.js';
 import { THEME_SELECTORS } from './themes/selectors.js';
 import { renderVideo } from './video/render.js';
-import { pickProvider, TtsError } from './video/tts.js';
+import { pickProvider, audioMapProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { exportPage, isHtmlPage } from './export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
@@ -43,8 +43,8 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
-                      [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off | --audio-map <file.json>]
+                      [--mp4] [--webm] [--no-open] [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am export <page.html> [--pdf <file.pdf>] [--png <dir>]
                         export a rendered page as an A4 PDF and/or as PNG slices for a chat app (needs Chrome)
@@ -82,12 +82,13 @@ Intro (optional, shown below the title)
 ## A Panel title {span=2 meta="top-right note"}
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
+After a table, {table sort} enables header sorting, {table filter} adds a text filter; combine them as {table sort filter}.
 
 \`\`\`flow LR          ← fence language = component name, followed by component arguments
 A -> B
 \`\`\`
 
-\`\`\`html             ← html / svg fences are embedded as-is (escape hatch)
+\`\`\`html             ← html / svg fences are embedded as-is; a script in an html fence does not run (render warns)
 <div>any content</div>
 \`\`\`
 
@@ -200,6 +201,11 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
+  --audio-map lines.json reads ready-made audio from a JSON object of narration line to audio file, for example
+  {"First the client sends SYN.":"audio/01.mp3"}. Relative audio paths start at the map file's folder. Keys ignore > and [ ]
+  markers and extra whitespace. Non-WAV audio needs ffmpeg; every line needs an entry and every audio file must exist.
+  --audio-map cannot be combined with an explicit --voice; when a map is given, the configured voice is ignored.
+  Example: am video draft.md --audio-map lines.json
 - Output goes to ~/.answer-me-with-html/videos/. The player carries a chapter strip (a chip jumps into that scene), a
   speed button (0.5x to 2x) and an export button that saves the same video through the browser, without a terminal.
 - --mp4 also saves a 1080p .mp4 next to the page (H.264 + AAC; needs ffmpeg; about 1.3 times the video length).
@@ -229,6 +235,7 @@ export async function main(argv, io = {}) {
         style: { type: 'string' },
         mode: { type: 'string' },
         voice: { type: 'string' },
+        'audio-map': { type: 'string' },
         mp4: { type: 'boolean' },
         webm: { type: 'boolean' },
         pdf: { type: 'string' },
@@ -455,6 +462,9 @@ Usage:
 - --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
   A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
   The toolbar, the reply and remark controls and the new-version notice are left out.
+  A later export into the same folder removes <page-name>-<n>.png slices it did not write again. Other files stay.
+  A slice that is the input page, or that cannot be removed, is left in place and reported.
+  Run one export of a page into a folder at a time. Two at once can remove each other's slices.
 - Give both flags to write both; at least one is required. The folder for --png is created when missing.
 - Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
 - A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
@@ -586,10 +596,15 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   let result;
   try {
     if (video) {
+      if (!validAudioMap(opts, fail)) return 2;
       // A voiced page keeps its original voice (data-voice; config when an old page has none); a silent video made with --voice off stays silent.
-      // An explicit --voice from the user wins.
+      // An explicit --voice or --audio-map from the user wins. A mapped page needs its map again unless the user picks another source.
       const voice = opts.voice ?? (page.voiced ? page.voice ?? config.values.voice : 'off');
-      if (!validVoice(voice, fail)) return 2;
+      if (page.voice === 'audio-map' && opts.voice === undefined && opts['audio-map'] === undefined) {
+        fail('✗ This video uses an audio map; pass --audio-map <file.json> or choose another source with --voice');
+        return 2;
+      }
+      if (opts['audio-map'] === undefined && !validVoice(voice, fail)) return 2;
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
@@ -597,7 +612,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
   } catch (e) {
     if (e instanceof TtsError) {
-      fail(`✗ Voice-over failed: ${e.message}. Add --voice off for captions only`);
+      fail(`✗ Voice-over failed: ${e.message}. ${opts['audio-map'] === undefined ? 'Add --voice off' : 'Remove --audio-map and add --voice off'} for captions only`);
       return 1;
     }
     return reportError(e, fail);
@@ -637,7 +652,7 @@ async function cmdExport(arg, opts, ctx) {
   const pdf = opts.pdf === undefined ? undefined : resolve(cwd, opts.pdf);
   const png = opts.png === undefined ? undefined : resolve(cwd, opts.png);
   try {
-    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`) });
+    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`), onWarn: (message) => fail(`! ${message}`) });
     return 0;
   } catch (e) {
     if (!(e instanceof ExportError)) throw e;
@@ -648,9 +663,10 @@ async function cmdExport(arg, opts, ctx) {
 
 async function cmdVideo(src, opts, ctx, from) {
   const { fail, print } = ctx;
+  if (!validAudioMap(opts, fail)) return 2;
   const config = loadConfig(ctx);
   const voice = opts.voice ?? config.values.voice;
-  if (!validVoice(voice, fail)) return 2;
+  if (opts['audio-map'] === undefined && !validVoice(voice, fail)) return 2;
   let file = opts.out ? outputPath('videos', '', opts, ctx) : null;
   if (opts.out && !file) return 2;
   let result;
@@ -658,7 +674,7 @@ async function cmdVideo(src, opts, ctx, from) {
     result = await buildVideo(src, voice, opts, config, ctx);
   } catch (e) {
     if (!(e instanceof TtsError)) return reportDraftError(e, src, from, ctx);
-    fail(`✗ Voice-over failed: ${e.message}. Add --voice off for captions only`);
+    fail(`✗ Voice-over failed: ${e.message}. ${opts['audio-map'] === undefined ? 'Add --voice off' : 'Remove --audio-map and add --voice off'} for captions only`);
     return 1;
   }
   file ??= outputPath('videos', result.meta.title, opts, ctx);
@@ -679,8 +695,23 @@ function validVoice(voice, fail) {
   return false;
 }
 
+function validAudioMap(opts, fail) {
+  if (opts['audio-map'] === undefined) return true;
+  if (!opts['audio-map'].trim()) {
+    fail('✗ --audio-map needs a JSON file path');
+    return false;
+  }
+  if (opts.voice !== undefined) {
+    fail('✗ --audio-map cannot be used with --voice; choose one narration source');
+    return false;
+  }
+  return true;
+}
+
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes }) {
-  const provider = io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
+  const provider = opts['audio-map'] !== undefined
+    ? audioMapProvider(resolve(io.cwd ?? process.cwd(), opts['audio-map']))
+    : io.ttsProvider !== undefined ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
     cacheDir: provider ? narrationCache(amHome(env)) : undefined,
