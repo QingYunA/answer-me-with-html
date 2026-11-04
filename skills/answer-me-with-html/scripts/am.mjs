@@ -5001,6 +5001,31 @@ function scaleSvgBoxes(html, scale = 1) {
   return String(html).replace(SVG_OPEN_BOX, (tag, w2, h) => `<svg viewBox="0 0 ${w2} ${h}" width="${Math.ceil(w2 * scale)}" height="${Math.ceil(h * scale)}"`);
 }
 var mirror = (width, rtl) => rtl ? (x) => width - x : (x) => x;
+function orderRanks(g, order) {
+  order(g);
+  const ranks = {};
+  for (const v2 of g.nodes()) {
+    const { rank, order: at3 } = g.node(v2);
+    if (rank !== void 0) (ranks[rank] ??= [])[at3] = v2;
+  }
+  const pairs = (as, bs) => as.reduce((n, a3) => n + bs.filter((b) => g.node(b).order < g.node(a3).order).length, 0);
+  const crossings2 = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
+  const border = (v2) => g.node(v2).dummy === "border";
+  let swapped = true;
+  while (swapped) {
+    swapped = false;
+    for (const rank of Object.values(ranks)) {
+      for (let i = 1; i < rank.length; i++) {
+        const [a3, b] = [rank[i - 1], rank[i]];
+        if (g.parent(a3) !== g.parent(b) || border(a3) || border(b) || crossings2(b, a3) >= crossings2(a3, b)) continue;
+        [rank[i - 1], rank[i]] = [b, a3];
+        g.node(a3).order = i;
+        g.node(b).order = i - 1;
+        swapped = true;
+      }
+    }
+  }
+}
 function mirrorLayout(g) {
   const flip = mirror(g.graph().width, true);
   for (const v2 of g.nodes()) {
@@ -7401,7 +7426,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: "c" } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
-  Uo.layout(g);
+  Uo.layout(g, { customOrder: orderRanks });
   if (rtl) mirrorLayout(g);
   if (!vertical) {
     for (const [i, side] of reserve) {
@@ -7810,7 +7835,7 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
     const label2 = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS2) + 10, height: 18, labelpos: "c" } : {};
     g.setEdge(key.get(rel.from), key.get(rel.to), label2, `e${i}`);
   });
-  Uo.layout(g);
+  Uo.layout(g, { customOrder: orderRanks });
   const rtl = pageDir === "rtl";
   if (rtl) mirrorLayout(g);
   const steps2 = [.../* @__PURE__ */ new Set([...[...entities.values()].map((e) => e.line), ...rels.map((r) => r.line)])].sort((a3, b) => a3 - b);

@@ -144,7 +144,7 @@ test('render: a flow drawn BT is checked too: clean like TB, and a crossing it d
 });
 
 // The group name finds no free place in TB, so TB is drawn with room reserved for it; the advice must come from that layout.
-const CROWDED_GROUP = 'DB -> Gateway\nTop -> Queue\nQueue -> Gateway: HTTPS\nTop -> Worker\nAuth -> Worker: HTTPS\nClient -> Worker\nQueue -> Worker: HTTPS\ngroup A very long backend group name here: Auth, Queue';
+const CROWDED_GROUP = 'Top -> Worker: HTTPS\nClient -> DB\nAuth -> Worker\nTop -> Client\nGateway -> Auth: HTTPS\nDB -> Queue\nAuth -> Client\ngroup A very long backend group name here: Auth, Queue';
 
 test('render: in a grouped flow, the direction the warning suggests is drawn without crossings, group-name room included', () => {
   const model = parseFlow(CROWDED_GROUP);

@@ -3,7 +3,7 @@
 // the boxes and the crow's-foot ends as SVG, so themes, dark mode, the lightbox and video steps work as they do for flow.
 import dagre from '@dagrejs/dagre';
 import { esc, measure } from '../svg/text.js';
-import { f, smoothPath, svgOpen, textLines, diagramLabel, mirrorLayout } from '../svg/shapes.js';
+import { f, smoothPath, svgOpen, textLines, diagramLabel, mirrorLayout, orderRanks } from '../svg/shapes.js';
 import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
@@ -267,7 +267,7 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
     const label = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS) + 10, height: 18, labelpos: 'c' } : {};
     g.setEdge(key.get(rel.from), key.get(rel.to), label, `e${i}`);
   });
-  dagre.layout(g);
+  dagre.layout(g, { customOrder: orderRanks });
   // A right-to-left page mirrors the finished layout, as flow does; the loops, field names and key markers below follow.
   const rtl = pageDir === 'rtl';
   if (rtl) mirrorLayout(g);

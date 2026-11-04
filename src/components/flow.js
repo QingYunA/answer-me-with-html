@@ -1,7 +1,7 @@
 // Flow / architecture diagram: the model writes only relations (A -> B: label), dagre computes coordinates, this file draws the layout as SVG.
 import dagre from '@dagrejs/dagre';
 import { esc, measure, wrap } from '../svg/text.js';
-import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirrorLayout } from '../svg/shapes.js';
+import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel, mirrorLayout, orderRanks } from '../svg/shapes.js';
 import { svgLine } from '../bidi.js';
 import { overlaps, segmentHits } from '../svg/geometry.js';
 import { crossingWarnings } from './flow-check.js';
@@ -331,7 +331,7 @@ export function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserv
     const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: 'c' } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
-  dagre.layout(g);
+  dagre.layout(g, { customOrder: orderRanks });
   // A right-to-left page mirrors the finished layout: every direction then reads from the right, and LR runs right to left.
   if (rtl) mirrorLayout(g);
   if (!vertical) {
