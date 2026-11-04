@@ -72,6 +72,7 @@ template: sheet        # sheet: blueprint board (default, multi-panel grid) | do
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
+file: tcp-handshake    # optional: the file name, ASCII letters and digits; use it when the title has none
 cols: 3                # number of sheet grid columns, default 3
 style: 80              # STE check strictness: off | 80 (default, warn only) | strict (no page if it fails)
 mode: auto             # auto follows the system | light | dark
@@ -168,6 +169,7 @@ const VIDEO_FORMAT = `Video draft format (am video)
 ---
 title: TCP three-way handshake
 subtitle: Why three steps      # optional, subtitle on the title card
+file: tcp-handshake            # optional: the file name, as in a page draft
 theme: blueprint               # blueprint: drawing style (auto picks it; follows the theme in am config) | shadcn: cards | 3b1b: dark
 mode: light                    # light | dark (blueprint + dark is a dark-blue drawing)
 ---
@@ -347,7 +349,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }
-  const file = outputPath('pages', result.meta.title, opts, ctx);
+  const file = outputPath('pages', nameSource(result.meta), opts, ctx);
   if (!file) return 2;
   const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages' });
   if (!written) return 1;
@@ -376,10 +378,21 @@ function draftTitle(src) {
   return m?.[1] ?? '';
 }
 
+// What a default file name is made from: the draft's file: when it has an ASCII letter or digit (a title with none gives page-<time>),
+// otherwise the title. slug() then applies the same rule to either.
+function nameSource({ file, title }) {
+  return /[A-Za-z0-9]/.test(String(file ?? '')) ? file : title;
+}
+
+function draftName(src) {
+  const file = src.match(/^file:\s*["']?(.+?)["']?\s*$/m)?.[1];
+  return nameSource({ file, title: draftTitle(src) });
+}
+
 // The absolute path of the saved draft, or null when neither the data directory nor the temporary folder can take it. Saving is a side
 // step: a page may already be written, so any file-system error only moves on to the next folder.
 function saveDraft(src, { env, io }) {
-  const name = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
+  const name = `${slug(draftName(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
   const home = amHome(env);
   const folders = [() => { ensureHome(home); return draftsDir(home); }, () => draftsDir(checkedTempHome({ create: true }))];
   for (const folder of folders) {
@@ -677,7 +690,7 @@ async function cmdVideo(src, opts, ctx, from) {
     fail(`✗ Voice-over failed: ${e.message}. ${opts['audio-map'] === undefined ? 'Add --voice off' : 'Remove --audio-map and add --voice off'} for captions only`);
     return 1;
   }
-  file ??= outputPath('videos', result.meta.title, opts, ctx);
+  file ??= outputPath('videos', nameSource(result.meta), opts, ctx);
   if (!file) return 2;
   const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'videos' });
   if (!written) return 1;

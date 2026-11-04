@@ -88,6 +88,24 @@ test('cli render: default page names are ASCII and at most 24 characters from th
   assert.equal(await render('TCP Three-Way Handshake'), 'tcp-three-way-handshake-20260102-030405.html');
 });
 
+test('cli render: file: in the front matter names the page and the saved draft, under the same ASCII rule', async () => {
+  const { home, env } = freshHome();
+  const render = async (front, args = []) => {
+    const r = await run(['render', '-', '--no-open', ...args], { stdin: `---\n${front}\n---\n## A one\nUtilize the tool.\n`, env });
+    assert.equal(r.code, 0, r.err);
+    return { page: basename(r.out.match(/^✓ (.+\.html)$/m)[1]), draft: basename(r.out.match(/^ {2}draft: (.+)$/m)?.[1] ?? '') };
+  };
+
+  const named = await render('title: 会话切换闪回首页 · 修复结果\nfile: session-flashback-fix');
+  assert.match(named.page, /^session-flashback-fix-\d{8}-\d{6}\.html$/);
+  assert.match(named.draft, /^session-flashback-fix-\d{8}-\d{6}\.md$/);
+  assert.match((await render('title: 更新评估\nfile: Update Review!')).page, /^update-review-\d{8}-\d{6}\.html$/);
+  // A file: with no ASCII letter or digit names nothing, so the title decides, as without file:.
+  assert.match((await render('title: Docker 渲染器\nfile: 渲染器')).page, /^docker-\d{8}-\d{6}\.html$/);
+  // -o still wins.
+  assert.equal((await render('title: T\nfile: ignored', ['-o', join(home, 'out.html')])).page, 'out.html');
+});
+
 test('cli render: a second default page in the same second gets -2 and keeps both', async () => {
   const { home } = freshHome();
   const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
