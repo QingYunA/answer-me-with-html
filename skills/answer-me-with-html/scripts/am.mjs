@@ -11,8 +11,8 @@ var __esm = (fn2, res, err) => function __init() {
   }
 };
 var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
 };
 
 // temml-string:temml
@@ -2239,10 +2239,10 @@ function diagramTokenProblem(key, value) {
   if (key === "--node-shadow" && !shadowOk(value)) return "must be none or one or more drop-shadow(...), with no url()";
   return "";
 }
-function normalizeTheme(name, data, builtinNames = []) {
+function normalizeTheme(name2, data, builtinNames = []) {
   const errors = [];
-  if (!NAME.test(name)) errors.push(`the name "${name}" must use lowercase letters, digits and -`);
-  if (builtinNames.includes(name)) errors.push(`"${name}" is a built-in theme; rename the file`);
+  if (!NAME.test(name2)) errors.push(`the name "${name2}" must use lowercase letters, digits and -`);
+  if (builtinNames.includes(name2)) errors.push(`"${name2}" is a built-in theme; rename the file`);
   if (!data || typeof data !== "object" || Array.isArray(data)) return { theme: null, errors: [...errors, "the file must hold a JSON object"] };
   const tokens = data.tokens ?? {};
   const group = (where, g) => {
@@ -2278,14 +2278,14 @@ function normalizeTheme(name, data, builtinNames = []) {
       css: cssField("video.css", v2.css, errors)
     };
   }
-  const label = labelField(data.label, name, errors);
+  const label = labelField(data.label, name2, errors);
   const font = fontField(data.font, errors);
   requiresField(data.requires, errors);
   const fonts = {};
   if (common["--font-sans"]) fonts["--font-sans"] = `${common["--font-sans"]}, ${SANS}`;
   if (common["--font-mono"]) fonts["--font-mono"] = `${common["--font-mono"]}, ${MONO}`;
   const theme = {
-    name,
+    name: name2,
     summary: label.en,
     label,
     scope: ["page", "video"],
@@ -2311,14 +2311,14 @@ function requiresField(requires, errors) {
   if (typeof requires !== "string" || !/^\d+\.\d+\.\d+$/.test(requires)) errors.push("requires must be a version in x.y.z format");
   else if (newer(requires, VERSION)) errors.push(`needs Answer me with HTML ${requires} or newer`);
 }
-function labelField(label, name, errors) {
-  if (label === void 0) return Object.fromEntries(LANGS.map((l) => [l, name]));
+function labelField(label, name2, errors) {
+  if (label === void 0) return Object.fromEntries(LANGS.map((l) => [l, name2]));
   if (typeof label === "string") return Object.fromEntries(LANGS.map((l) => [l, label]));
   if (!label || typeof label !== "object" || Object.values(label).some((v2) => typeof v2 !== "string")) {
     errors.push(`label must be a string or an object of ${LANGS.join(" / ")} strings`);
-    return Object.fromEntries(LANGS.map((l) => [l, name]));
+    return Object.fromEntries(LANGS.map((l) => [l, name2]));
   }
-  const fallback = label.en ?? Object.values(label)[0] ?? name;
+  const fallback = label.en ?? Object.values(label)[0] ?? name2;
   return Object.fromEntries(LANGS.map((l) => [l, label[l] ?? fallback]));
 }
 function cssField(where, css, errors) {
@@ -2435,14 +2435,14 @@ function checkColors(theme) {
 // src/themes/user.js
 var DENIED = /* @__PURE__ */ new Set(["EPERM", "EACCES"]);
 function readThemeFile(file, builtinNames) {
-  const name = basename(file).replace(/\.json$/i, "");
+  const name2 = basename(file).replace(/\.json$/i, "");
   let data;
   try {
     data = JSON.parse(readFileSync(file, "utf8"));
   } catch (e) {
-    return { name, theme: null, errors: [`cannot read it as JSON (${e.message})`] };
+    return { name: name2, theme: null, errors: [`cannot read it as JSON (${e.message})`] };
   }
-  return { name, ...normalizeTheme(name, data, builtinNames) };
+  return { name: name2, ...normalizeTheme(name2, data, builtinNames) };
 }
 function readUserThemes(home, builtinNames) {
   const dir = join(home, "themes");
@@ -2457,8 +2457,8 @@ function readUserThemes(home, builtinNames) {
     return { themes: themes2, broken, warning: `Cannot read the themes folder ${dir} (${e.code}); using the built-in themes only` };
   }
   for (const f2 of files.filter((x) => x.toLowerCase().endsWith(".json")).sort()) {
-    const { name, theme, errors } = readThemeFile(join(dir, f2), builtinNames);
-    if (errors.length) broken.set(name, { file: `themes/${f2}`, reason: errors.join("; ") });
+    const { name: name2, theme, errors } = readThemeFile(join(dir, f2), builtinNames);
+    if (errors.length) broken.set(name2, { file: `themes/${f2}`, reason: errors.join("; ") });
     else themes2.push(theme);
   }
   return { themes: themes2, broken };
@@ -2469,7 +2469,7 @@ var ALL = Object.freeze([blueprint_default, shadcn_default, paper_default, b1b_d
 var BUILTIN_NAMES = ALL.map((t) => t.name);
 var themes = (scope) => ALL.filter((t) => t.scope.includes(scope));
 var themeNames = (scope) => themes(scope).map((t) => t.name);
-var getTheme = (name) => ALL.find((t) => t.name === name);
+var getTheme = (name2) => ALL.find((t) => t.name === name2);
 var AUTO = "auto";
 function pickTheme({ scope, template, visuals }) {
   if (scope === "video") return "blueprint";
@@ -2479,27 +2479,27 @@ function themeSet(user = [], broken = /* @__PURE__ */ new Map(), folderWarning) 
   const all = [...ALL, ...user];
   const list2 = (scope) => all.filter((t) => t.scope.includes(scope));
   const names2 = (scope) => list2(scope).map((t) => t.name);
-  const unusable = [...broken].filter(([name]) => !BUILTIN_NAMES.includes(name));
+  const unusable = [...broken].filter(([name2]) => !BUILTIN_NAMES.includes(name2));
   return Object.freeze({
     list: list2,
     names: names2,
-    get: (name) => all.find((t) => t.name === name),
+    get: (name2) => all.find((t) => t.name === name2),
     // Names a draft or flag may give: usable themes plus broken ones, so the error can say what is wrong with the file.
-    choices: (scope) => [AUTO, ...names2(scope), ...unusable.map(([name]) => name)],
+    choices: (scope) => [AUTO, ...names2(scope), ...unusable.map(([name2]) => name2)],
     // Why a name cannot be used, or null.
-    problem(name, scope) {
-      if (name === AUTO) return null;
-      if (names2(scope).includes(name)) return null;
-      const bad = unusable.find(([n]) => n === name);
-      if (bad) return `Theme "${name}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
-      return `Theme "${name}" is not installed. Choose one of: ${names2(scope).join(" | ")}`;
+    problem(name2, scope) {
+      if (name2 === AUTO) return null;
+      if (names2(scope).includes(name2)) return null;
+      const bad = unusable.find(([n]) => n === name2);
+      if (bad) return `Theme "${name2}" cannot be used: ${bad[1].reason} (${bad[1].file})`;
+      return `Theme "${name2}" is not installed. Choose one of: ${names2(scope).join(" | ")}`;
     },
     // The themes a page carries: the built-in ones for its scope, then every installed user theme for that scope, sorted by name,
     // so the toolbar picker lists them all and every one can be selected. A video has no picker, so it carries only its own theme
     // (when that is a user theme). The page's own theme is in the user list already.
-    embedFor: (name, scope) => {
+    embedFor: (name2, scope) => {
       const builtins = themes(scope);
-      const own = user.filter((t) => t.name === name && t.scope.includes(scope));
+      const own = user.filter((t) => t.name === name2 && t.scope.includes(scope));
       if (scope !== "page") return [...builtins, ...own];
       return [...builtins, ...user.filter((t) => t.scope.includes(scope)).sort((a3, b) => a3.name.localeCompare(b.name))];
     },
@@ -3914,8 +3914,8 @@ var LINES = Object.freeze({
   limitsTick: 16,
   treeBadge: 15
 });
-var scaled = (name, value) => `  --${name}: calc(${value}px * var(--am-scale, 1));`;
-var fixed = (name, value) => `  --${name}: ${value}px;`;
+var scaled = (name2, value) => `  --${name2}: calc(${value}px * var(--am-scale, 1));`;
+var fixed = (name2, value) => `  --${name2}: ${value}px;`;
 function typeScaleCss() {
   const html = [
     ...Object.entries(SIZES).map(([role, value]) => scaled(`am-fs-${role}`, value)),
@@ -4062,10 +4062,10 @@ var REASON = {
   comment: (t) => `${t} is never closed with -->, shown as text`,
   bogus: (t) => `${t} is not a tag a page can hold, shown as text; put code in backticks`
 };
-function kind(name, inline2) {
-  if (NEVER.has(name)) return "never";
-  if (!PHRASING.has(name) && !BLOCK.has(name)) return "unknown";
-  return inline2 && !PHRASING.has(name) ? "block" : null;
+function kind(name2, inline2) {
+  if (NEVER.has(name2)) return "never";
+  if (!PHRASING.has(name2) && !BLOCK.has(name2)) return "unknown";
+  return inline2 && !PHRASING.has(name2) ? "block" : null;
 }
 var shown = (tag) => tag.label ?? `<${tag.close ? "/" : ""}${tag.name}>`;
 function hide(tag, reason2, note2) {
@@ -4114,8 +4114,8 @@ var URL_ATTRS = words2("href src action xlink:href poster cite background");
 var ENTITY = /&#x([0-9a-f]+);?|&#(\d+);?|&(tab|newline|colon);?/gi;
 var NAMED = { tab: "	", newline: "\n", colon: ":" };
 function decode(text2) {
-  return text2.replace(ENTITY, (_2, hex, dec, name) => {
-    if (name) return NAMED[name.toLowerCase()];
+  return text2.replace(ENTITY, (_2, hex, dec, name2) => {
+    if (name2) return NAMED[name2.toLowerCase()];
     const code = hex ? parseInt(hex, 16) : Number(dec);
     return code > 1114111 ? "" : String.fromCodePoint(code);
   });
@@ -4133,9 +4133,9 @@ function cleanTag(tag, note2) {
   if (tag.close) return tag.text;
   const head = 1 + tag.name.length;
   const removed = [];
-  const attrs = tag.text.slice(head).replace(ATTR, (attr, name, value = "") => {
-    if (!unsafe(tag.name, name.toLowerCase(), value)) return attr;
-    removed.push(name);
+  const attrs = tag.text.slice(head).replace(ATTR, (attr, name2, value = "") => {
+    if (!unsafe(tag.name, name2.toLowerCase(), value)) return attr;
+    removed.push(name2);
     return "";
   });
   if (removed.length) note2(tag.text, `removed ${removed.join(", ")} from <${tag.name}>${removed.some((n) => URL_ATTRS.has(n.toLowerCase())) ? " (unsafe URL)" : ""}`);
@@ -4932,23 +4932,23 @@ function isolateLtrRuns(html) {
   };
   for (const m2 of String(html).matchAll(TOKEN)) {
     const tok = m2[0];
-    const name = m2[1]?.toLowerCase();
+    const name2 = m2[1]?.toLowerCase();
     if (skip) {
       out.push(tok);
-      if (name === skip) depth += tok.startsWith("</") ? -1 : tok.endsWith("/>") ? 0 : 1;
+      if (name2 === skip) depth += tok.startsWith("</") ? -1 : tok.endsWith("/>") ? 0 : 1;
       if (depth === 0) skip = null;
       continue;
     }
-    if (name && SKIP.has(name) && !tok.startsWith("</")) {
+    if (name2 && SKIP.has(name2) && !tok.startsWith("</")) {
       flush();
       out.push(tok);
       if (!tok.endsWith("/>")) {
-        skip = name;
+        skip = name2;
         depth = 1;
       }
       continue;
     }
-    if (!name || INLINE.has(name)) {
+    if (!name2 || INLINE.has(name2)) {
       run2.push(tok);
       continue;
     }
@@ -4977,7 +4977,7 @@ function smoothPath(points) {
   return parts.join(" ");
 }
 function arrowDefs(uid, variants = []) {
-  const marker = (name, cls) => `<marker id="${uid}-arrow${name}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow${cls}" d="M0,0 L10,5 L0,10 z"/></marker>`;
+  const marker = (name2, cls) => `<marker id="${uid}-arrow${name2}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow${cls}" d="M0,0 L10,5 L0,10 z"/></marker>`;
   return `<defs>${[marker("", ""), ...variants.map((v2) => marker(`-${v2}`, ` am-arrow--${v2}`))].join("")}</defs>`;
 }
 function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
@@ -7072,6 +7072,61 @@ function Ce2(e) {
 var xr = { graphlib: ie2, version: ue2, layout: Oe2, debug: Ce2, util: { time: le2, notime: q2 } };
 var Uo = xr;
 
+// src/svg/geometry.js
+var overlaps = (a3, b) => a3[0] < b[2] && b[0] < a3[2] && a3[1] < b[3] && b[1] < a3[3];
+function segmentHits(p, q3, [x0, y0, x1, y1]) {
+  const dx = q3.x - p.x;
+  const dy = q3.y - p.y;
+  let t0 = 0;
+  let t1 = 1;
+  for (const [a3, b] of [[-dx, p.x - x0], [dx, x1 - p.x], [-dy, p.y - y0], [dy, y1 - p.y]]) {
+    if (a3 === 0) {
+      if (b < 0) return false;
+    } else {
+      const t = b / a3;
+      if (a3 < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+
+// src/components/flow-check.js
+var NODE_INSET = 2;
+var LABEL_INSET = 1;
+var OTHER = { LR: "TB", RL: "TB", TB: "LR", BT: "LR" };
+var around = ({ x, y: y2 }, { width, height }) => [x - width / 2, y2 - height / 2, x + width / 2, y2 + height / 2];
+var inset = ([x0, y0, x1, y1], d) => [x0 + d, y0 + d, x1 - d, y1 - d];
+var runsThrough = (points, box) => points.slice(1).some((p, k) => segmentHits(points[k], p, box));
+var name = (e) => `${e.from} -> ${e.to}`;
+function crossings({ g, key, sizes, labels }, { nodes, edges }) {
+  const drawn = edges.map((e, i) => g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` }));
+  const nodeBoxes = [...nodes.keys()].map((id) => [id, inset(around(g.node(key.get(id)), sizes.get(id)), NODE_INSET)]);
+  const labelBoxes = edges.map((e, i) => labels[i] ? inset(around(drawn[i], labels[i]), LABEL_INSET) : null);
+  return edges.flatMap((edge, i) => {
+    const { points } = drawn[i];
+    const node = nodeBoxes.find(([id, box]) => id !== edge.from && id !== edge.to && runsThrough(points, box));
+    const label = labelBoxes.findIndex((box, j) => j !== i && box && runsThrough(points, box));
+    return [
+      ...node ? [{ edge, kind: "node", other: node[0] }] : [],
+      ...label >= 0 ? [{ edge, kind: "label", other: edges[label] }] : []
+    ];
+  });
+}
+var what = ({ edge, kind: kind2, other }) => kind2 === "node" ? `the edge "${name(edge)}" runs through the node "${other}"` : `the edge "${name(edge)}" runs through the label "${other.label}" of "${name(other)}"`;
+var OTHERWISE = "split the diagram into an overview and a detail diagram";
+function crossingWarnings(model, rankdir, run2, relayout) {
+  const found = crossings(run2, model);
+  if (!found.length) return [];
+  const alt = OTHER[rankdir];
+  const clean3 = crossings(relayout(alt), model).length === 0;
+  return found.map((c2) => ({
+    line: c2.edge.line,
+    message: `${what(c2)}; ${clean3 ? `\`\`\`flow ${alt} draws this diagram without crossings` : OTHERWISE}`
+  }));
+}
+
 // src/components/flow.js
 var FS2 = DRAWING.node;
 var LH2 = 17;
@@ -7117,6 +7172,7 @@ group Group name: B, C        \u2190 draw a group box around nodes
 \`\`\`
 - The text inside the brackets is the node's identity; later lines can refer to the node by that text alone. The default direction is TB (top to bottom).
 - Mermaid node IDs are not accepted: write the text alone, [Start] rather than A[Start], and refer to it later as Start.
+- When an edge would run through another node or through another edge's label, \`am render\` warns with the draft line; the page is still written. Follow the fix in the warning: usually the other direction, or a split diagram.
 - Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space:
 \`\`\`flow LR
 Client -> Gateway
@@ -7135,7 +7191,7 @@ Client -> Gateway
     const model = parseFlow(text2);
     model.warnings.forEach((w2) => warn?.(w2));
     const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    const html = `<figure class="am-diagram am-flow">${layout2(model, DIRS.has(flowDir) ? flowDir : "TB", uid(), ui, pageDir)}</figure>`;
+    const html = `<figure class="am-diagram am-flow">${layout2(model, DIRS.has(flowDir) ? flowDir : "TB", uid(), ui, pageDir, video ? void 0 : warn)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
   }
 };
@@ -7314,7 +7370,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   const g = new Uo.graphlib.Graph({ compound: groups.length > 0, multigraph: true });
   g.setGraph({ rankdir, nodesep: 36, ranksep: 46, marginx: 14, marginy: groups.length ? 26 : 14 });
   g.setDefaultEdgeLabel(() => ({}));
-  const key = new Map([...nodes.keys()].map((name, i) => [name, nodeKey(i)]));
+  const key = new Map([...nodes.keys()].map((name2, i) => [name2, nodeKey(i)]));
   const sizes = /* @__PURE__ */ new Map();
   for (const n of nodes.values()) {
     const s = nodeSize(n);
@@ -7329,7 +7385,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     g.setNode(reserveKey(i), { width: widths[i] + 4, height: CLUSTER_LABEL_H });
     g.setParent(reserveKey(i), gkey(i));
     const down = edges.map((e) => rankdir === "TB" ? [e.from, e.to] : [e.to, e.from]);
-    const link = (a3, b, name) => rankdir === "TB" ? g.setEdge(a3, b, {}, name) : g.setEdge(b, a3, {}, name);
+    const link = (a3, b, name2) => rankdir === "TB" ? g.setEdge(a3, b, {}, name2) : g.setEdge(b, a3, {}, name2);
     const inside = new Set(grp.members);
     const first = grp.members.filter((m2) => !down.some(([a3, b]) => b === m2 && a3 !== m2 && inside.has(a3)));
     (first.length ? first : grp.members.slice(0, 1)).forEach((m2, k) => {
@@ -7339,8 +7395,9 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
       });
     });
   });
+  const labels = edges.map((e) => e.label ? edgeText(e.label) : null);
   edges.forEach((e, i) => {
-    const size = e.label ? edgeText(e.label) : null;
+    const size = labels[i];
     const label = size ? { label: e.label, width: size.width + 2, height: size.height, labelpos: "c" } : {};
     g.setEdge(key.get(e.from), key.get(e.to), label, `e${i}`);
   });
@@ -7353,7 +7410,7 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     }
   }
   fitEdges(g);
-  return { g, key, sizes };
+  return { g, key, sizes, labels };
 }
 function fitEdges(g) {
   const graph = g.graph();
@@ -7440,29 +7497,8 @@ function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, r
     return [rtl ? x0 + w2 : x0, baseline];
   });
 }
-var overlaps = (a3, b) => a3[0] < b[2] && b[0] < a3[2] && a3[1] < b[3] && b[1] < a3[3];
-function segmentHits(p, q3, [x0, y0, x1, y1]) {
-  const dx = q3.x - p.x;
-  const dy = q3.y - p.y;
-  let t0 = 0;
-  let t1 = 1;
-  for (const [a3, b] of [[-dx, p.x - x0], [dx, x1 - p.x], [-dy, p.y - y0], [dy, y1 - p.y]]) {
-    if (a3 === 0) {
-      if (b < 0) return false;
-    } else {
-      const t = b / a3;
-      if (a3 < 0) t0 = Math.max(t0, t);
-      else t1 = Math.min(t1, t);
-      if (t0 > t1) return false;
-    }
-  }
-  return true;
-}
-var labelWidth = (name, pageDir) => measure(name, CLUSTER_FS, { mono: pageDir !== "rtl" }) + 2;
-function layout2(model, rankdir, id, ui, pageDir = "ltr") {
-  const { nodes, edges, groups } = model;
-  const rtl = pageDir === "rtl";
-  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+var labelWidth = (name2, pageDir) => measure(name2, CLUSTER_FS, { mono: pageDir !== "rtl" }) + 2;
+function reservedLayout(model, rankdir, rtl, widths) {
   let run2 = runLayout(model, rankdir, rtl, widths, /* @__PURE__ */ new Set());
   let spots = placeLabels(run2, model, widths, rtl, /* @__PURE__ */ new Map());
   const reserve = /* @__PURE__ */ new Map();
@@ -7473,7 +7509,15 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr") {
     run2 = runLayout(model, rankdir, rtl, widths, reserve);
     spots = placeLabels(run2, model, widths, rtl, reserve);
   }
+  return { run: run2, spots, reserve };
+}
+function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
+  const { nodes, edges, groups } = model;
+  const rtl = pageDir === "rtl";
+  const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
+  const { run: run2, spots, reserve } = reservedLayout(model, rankdir, rtl, widths);
   const { g, key, sizes } = run2;
+  if (warn) crossingWarnings(model, rankdir, run2, (alt) => reservedLayout(model, alt, rtl, widths).run).forEach(warn);
   const clusters = groups.map((grp, i) => {
     const c2 = g.node(gkey(i));
     const x = c2.x - c2.width / 2;
@@ -7638,11 +7682,11 @@ function parseEr(text2) {
       throw new ComponentError(`"${line}" is not an entity of this component; write A 1--* B for a relationship, or the entity name at column 0 on its own line`, n);
     }
     const hi = body.startsWith("*");
-    const name = (hi ? body.slice(1) : body).trim();
-    if (!name) throw new ComponentError("an entity needs a name", n);
-    if (entities.has(name)) throw new ComponentError(`entity "${name}" is written twice`, n);
-    current = { name, hi, fields: [], line: n, ...state && { state } };
-    entities.set(name, current);
+    const name2 = (hi ? body.slice(1) : body).trim();
+    if (!name2) throw new ComponentError("an entity needs a name", n);
+    if (entities.has(name2)) throw new ComponentError(`entity "${name2}" is written twice`, n);
+    current = { name: name2, hi, fields: [], line: n, ...state && { state } };
+    entities.set(name2, current);
   }
   if (!entities.size) throw new ComponentError("an entity relationship diagram needs at least one entity (a line at column 0)", 1);
   for (const entity of entities.values()) {
@@ -7651,8 +7695,8 @@ function parseEr(text2) {
     }
   }
   for (const rel of written) {
-    for (const name of [rel.from, rel.to]) {
-      if (!entities.has(name)) throw new ComponentError(`no entity "${name}"; write it at column 0`, rel.line);
+    for (const name2 of [rel.from, rel.to]) {
+      if (!entities.has(name2)) throw new ComponentError(`no entity "${name2}"; write it at column 0`, rel.line);
     }
   }
   checkEnds(entities, written);
@@ -7662,7 +7706,7 @@ function checkEnds(entities, written) {
   const replaced = new Set(written.map((rel) => pairKey(rel.from, rel.to)));
   const implied = [...entities.values()].flatMap((entity) => entity.fields.filter((field) => field.ref && !replaced.has(pairKey(entity.name, field.ref))).map((field) => ({ from: entity.name, to: field.ref, line: field.line, state: field.state === "changed" ? void 0 : field.state })));
   for (const rel of [...implied, ...written]) {
-    const ends = [rel.from, rel.to].map((name) => entities.get(name));
+    const ends = [rel.from, rel.to].map((name2) => entities.get(name2));
     const added = ends.find((e) => e.state === "added");
     const removed = ends.find((e) => e.state === "removed");
     if (rel.state === "added" && removed) {
@@ -7687,7 +7731,7 @@ function settleField(field, mark, entity, n) {
 }
 function parseField(line, n) {
   const tokens = line.split(/\s+/);
-  const name = tokens.shift();
+  const name2 = tokens.shift();
   const arrow = tokens.indexOf("->");
   const head = arrow === -1 ? tokens : tokens.slice(0, arrow);
   const ref = arrow === -1 ? null : tokens[arrow + 1];
@@ -7701,7 +7745,7 @@ function parseField(line, n) {
   if (at3 !== -1 && at3 !== head.length - 1) throw new ComponentError(`"${line}": "${head[at3]}" must be the last word before "->"`, n);
   const marker = at3 === -1 ? null : head[at3];
   const type = head.slice(0, at3 === -1 ? head.length : at3).join(" ");
-  return { name, type, marker, ref, line: n };
+  return { name: name2, type, marker, ref, line: n };
 }
 function erLineOf(mermaid) {
   const [, from, left, right, to, label] = mermaid;
@@ -7710,7 +7754,7 @@ function erLineOf(mermaid) {
 }
 function relationships({ entities, written }) {
   const ends = (...names2) => {
-    const states = names2.map((name) => entities.get(name).state);
+    const states = names2.map((name2) => entities.get(name2).state);
     return ["removed", "added"].find((s) => states.includes(s));
   };
   const withState = (rel, state) => state ? { ...rel, state } : rel;
@@ -7743,13 +7787,13 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   const g = new Uo.graphlib.Graph({ multigraph: true });
   g.setGraph({ rankdir, nodesep: 44, ranksep: 62, marginx: 14, marginy: 14 });
   g.setDefaultEdgeLabel(() => ({}));
-  const key = new Map([...entities.keys()].map((name, i) => [name, `n${i}`]));
+  const key = new Map([...entities.keys()].map((name2, i) => [name2, `n${i}`]));
   const below = rankdir === "LR" || rankdir === "RL";
   const room = /* @__PURE__ */ new Map();
   if (below) {
-    for (const name of entities.keys()) {
-      const own = loops.filter((rel) => rel.from === name);
-      if (own.length) room.set(name, loopRoom(own));
+    for (const name2 of entities.keys()) {
+      const own = loops.filter((rel) => rel.from === name2);
+      if (own.length) room.set(name2, loopRoom(own));
     }
   }
   const sizes = /* @__PURE__ */ new Map();
@@ -7758,9 +7802,9 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
     sizes.set(entity.name, size);
     g.setNode(key.get(entity.name), { width: size.width, height: size.height + (room.get(entity.name) ?? 0) });
   }
-  const centre = (name) => {
-    const { x, y: y2 } = g.node(key.get(name));
-    return { x, y: y2 - (room.get(name) ?? 0) / 2 };
+  const centre = (name2) => {
+    const { x, y: y2 } = g.node(key.get(name2));
+    return { x, y: y2 - (room.get(name2) ?? 0) / 2 };
   };
   rels.filter((rel) => rel.from !== rel.to).forEach((rel, i) => {
     const label2 = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS2) + 10, height: 18, labelpos: "c" } : {};
@@ -8066,18 +8110,18 @@ function legendLayout(names2, maxWidth) {
   if (names2.length < 2) return { items: [], height: 0 };
   const items = [];
   let [x, y2] = [0, 0];
-  for (const [k, name] of names2.entries()) {
-    const w2 = 16 + measure(name, FS4.legend);
+  for (const [k, name2] of names2.entries()) {
+    const w2 = 16 + measure(name2, FS4.legend);
     if (x > 0 && x + w2 > maxWidth) [x, y2] = [0, y2 + LEGEND_LH];
-    items.push({ k, name, x, y: y2, w: w2 });
+    items.push({ k, name: name2, x, y: y2, w: w2 });
     x += w2 + 18;
   }
   return { items, height: y2 + LEGEND_LH + 6, width: Math.max(...items.map((i) => i.x + i.w)) };
 }
 function legendSvg({ items }, left, top2, { rtl, dir }, W3) {
-  return items.map(({ k, name, x, y: y2, w: w2 }) => {
+  return items.map(({ k, name: name2, x, y: y2, w: w2 }) => {
     const sw = rtl ? W3 - (left + x) - 10 : left + x;
-    return `<rect class="am-ch-sw am-ch-s${k + 1}" x="${f(sw)}" y="${f(top2 + y2 + 2)}" width="10" height="10" rx="2"/>${text("am-ch-leg", rtl ? W3 - (left + x + 16) : left + x + 16, top2 + y2 + 7, name, dir, ' dominant-baseline="central"')}`;
+    return `<rect class="am-ch-sw am-ch-s${k + 1}" x="${f(sw)}" y="${f(top2 + y2 + 2)}" width="10" height="10" rx="2"/>${text("am-ch-leg", rtl ? W3 - (left + x + 16) : left + x + 16, top2 + y2 + 7, name2, dir, ' dominant-baseline="central"')}`;
   }).join("");
 }
 var stepGroup = (i, cls, title, inner) => `<g data-step="${i}" class="${cls}">${title}${inner}</g>`;
@@ -8222,8 +8266,8 @@ function horizontalBars(m2) {
       return bar + text("am-ch-val", X3(end), by + bh / 2, m2.tick(v2), dir, ` text-anchor="${v2 >= 0 ? "start" : "end"}" dominant-baseline="central"`);
     });
     const first = top2 + rowH / 2 - (lines[i].length - 1) * LH4 / 2;
-    const name = lines[i].map((l, j) => text("am-ch-cat", X3(catX), first + j * LH4, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
-    body.push(rowGroup(m2, row, i, tooltip(row.label, lines[i].join(" ")), parts.join("") + name));
+    const name2 = lines[i].map((l, j) => text("am-ch-cat", X3(catX), first + j * LH4, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
+    body.push(rowGroup(m2, row, i, tooltip(row.label, lines[i].join(" ")), parts.join("") + name2));
   }
   return { width: W3, height, body };
 }
@@ -8328,8 +8372,8 @@ function lineChart(m2) {
     if (i > 0) parts.push(...row.values.map((v2, k) => segment(X3, [cx(i - 1), y2(rows[i - 1].values[k])], [cx(i), y2(v2)], [rows[i - 1].hi, row.hi], k)));
     parts.push(...row.values.map((v2, k) => `<circle class="am-ch-dot am-ch-s${k + 1}" cx="${f(X3(cx(i)))}" cy="${f(y2(v2))}" r="${row.hi ? DOT_HI : DOT}"/>`));
     if (labelled[i]) {
-      const around = (j, k) => rows[j]?.values[k];
-      const valleys = row.values.map((v2, k) => i > 0 && i < n - 1 && around(i - 1, k) > v2 && around(i + 1, k) > v2);
+      const around2 = (j, k) => rows[j]?.values[k];
+      const valleys = row.values.map((v2, k) => i > 0 && i < n - 1 && around2(i - 1, k) > v2 && around2(i + 1, k) > v2);
       parts.push(valueLabels(m2, X3, cx(i), row.values, row.values.map(y2), { valleys, end: columnEnd(i), bottom: plotBottom }));
     }
     let tip = "";
@@ -8888,10 +8932,10 @@ ${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span 
 
 // src/templates/doc.js
 function outlineRail(panels, where, label) {
-  const name = esc(label);
+  const name2 = esc(label);
   const ticks = panels.map((p) => `<i class="am-tick" data-id="${esc(p.id)}" data-title="${esc(p.id)} \xB7 ${esc(p.title)}"></i>`).join("");
   const links = panels.map((p) => `<li><a href="#panel-${esc(p.id)}">${esc(p.id)} \xB7 ${esc(p.title)}</a></li>`).join("");
-  return `<nav class="am-toc" aria-label="${name}" data-side="${where}" data-flow="in"><details class="am-outline"><summary aria-label="${name}"><span class="am-ticks" aria-hidden="true">${ticks}</span></summary><ol class="am-outline-list">${links}</ol></details></nav>
+  return `<nav class="am-toc" aria-label="${name2}" data-side="${where}" data-flow="in"><details class="am-outline"><summary aria-label="${name2}"><span class="am-ticks" aria-hidden="true">${ticks}</span></summary><ol class="am-outline-list">${links}</ol></details></nav>
 `;
 }
 function doc({ meta, introHtml, panels, ui, language }) {
@@ -9191,7 +9235,7 @@ function sourceTag(source) {
 function readPage(html) {
   const s = String(html);
   const root = s.match(/<html\b[^>]*>/)?.[0] ?? "";
-  const attr = (name) => root.match(new RegExp(`\\s${name}="([^"]+)"`))?.[1];
+  const attr = (name2) => root.match(new RegExp(`\\s${name2}="([^"]+)"`))?.[1];
   const video = /\sdata-video\b/.test(root);
   const open = s.lastIndexOf(SOURCE_OPEN);
   const m2 = open === -1 ? null : s.slice(open).match(SOURCE_RE);
@@ -9438,12 +9482,12 @@ var CodeError = class extends Error {
     this.example = example;
   }
 };
-function parseRange(value, name) {
+function parseRange(value, name2) {
   const m2 = String(value).match(/^(\d+)(?:-(\d+))?$/);
-  if (!m2) throw new CodeError(`${name}="${value}" is not a line range; write ${name}=18-30 or ${name}=18`);
+  if (!m2) throw new CodeError(`${name2}="${value}" is not a line range; write ${name2}=18-30 or ${name2}=18`);
   const from = Number(m2[1]);
   const to = m2[2] === void 0 ? from : Number(m2[2]);
-  if (from < 1 || to < from) throw new CodeError(`${name}="${value}": the first line must be 1 or more and not after the last line`);
+  if (from < 1 || to < from) throw new CodeError(`${name2}="${value}": the first line must be 1 or more and not after the last line`);
   return { from, to };
 }
 function parseHighlight(value) {
@@ -9975,7 +10019,7 @@ function scaleButtons(ui) {
 function shell({ meta, language, body, source, embedded, update: update2, closeAfter, scale }) {
   const { ui, labelKey } = language;
   const notice = updateNotice(ui, update2, labelKey);
-  const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text2]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text2)}</option>`).join("")}</select></label>`;
+  const pick = (name2, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name2}">${values.map(([value, text2]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text2)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   const interactiveTable = body.includes("<table data-am-table=");
   const script = `
@@ -10205,7 +10249,7 @@ var CatalogError = class extends Error {
 };
 var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 var themesDir = (home) => join5(home, "themes");
-var themeFile = (home, name) => join5(themesDir(home), `${name}.json`);
+var themeFile = (home, name2) => join5(themesDir(home), `${name2}.json`);
 function catalogUrl(env = process.env) {
   const url = env.AM_CATALOG_URL || CATALOG.url;
   let parsed;
@@ -10262,13 +10306,13 @@ async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.
 }
 function entryFrom(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const { name, version, requires, size, sha256: hash } = raw;
-  if (typeof name !== "string" || !NAME.test(name) || name.length > CATALOG.maxNameLength || BUILTIN_NAMES.includes(name)) return null;
+  const { name: name2, version, requires, size, sha256: hash } = raw;
+  if (typeof name2 !== "string" || !NAME.test(name2) || name2.length > CATALOG.maxNameLength || BUILTIN_NAMES.includes(name2)) return null;
   if (typeof version !== "string" || !XYZ.test(version)) return null;
   if (requires !== void 0 && (typeof requires !== "string" || !XYZ.test(requires))) return null;
   if (!Number.isInteger(size) || size <= 0 || size > CATALOG.maxThemeBytes) return null;
   if (typeof hash !== "string" || !SHA256.test(hash)) return null;
-  return { name, version, size, sha256: hash, ...requires && { requires } };
+  return { name: name2, version, size, sha256: hash, ...requires && { requires } };
 }
 async function fetchIndex(env = process.env, net = {}) {
   const url = catalogUrl(env);
@@ -10292,17 +10336,17 @@ async function fetchIndex(env = process.env, net = {}) {
   const themes2 = data.themes.slice(0, CATALOG.maxThemes).map(entryFrom).filter((e) => e && !seen.has(e.name) && seen.add(e.name));
   return { url, themes: themes2.sort((a3, b) => a3.name < b.name ? -1 : 1) };
 }
-var fileUrl = (index, name) => new URL(`${name}.json`, index.url).href;
+var fileUrl = (index, name2) => new URL(`${name2}.json`, index.url).href;
 var needsNewer = (entry) => Boolean(entry.requires && newer(entry.requires, VERSION));
-function vet(name, bytes) {
+function vet(name2, bytes) {
   let data;
   try {
     data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     throw new CatalogError("the file is not valid JSON");
   }
-  const { theme, errors } = normalizeTheme(name, data, BUILTIN_NAMES);
-  const plural = (n, what) => `${what} (${n} problem${n === 1 ? "" : "s"})`;
+  const { theme, errors } = normalizeTheme(name2, data, BUILTIN_NAMES);
+  const plural = (n, what2) => `${what2} (${n} problem${n === 1 ? "" : "s"})`;
   if (errors.length) throw new CatalogError(plural(errors.length, "the file is not a valid theme"));
   const colors = checkColors(theme).errors;
   if (colors.length) throw new CatalogError(plural(colors.length, "the colors fail the contrast check"));
@@ -10324,33 +10368,33 @@ async function fetchTheme(index, entry, net = {}) {
 function readInstalled(home) {
   const raw = readState(home).catalogThemes;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  return Object.fromEntries(Object.entries(raw).filter(([name, r]) => NAME.test(name) && typeof r?.version === "string" && typeof r?.sha256 === "string"));
+  return Object.fromEntries(Object.entries(raw).filter(([name2, r]) => NAME.test(name2) && typeof r?.version === "string" && typeof r?.sha256 === "string"));
 }
-function record(home, name, entry) {
-  writeState(home, { catalogThemes: { ...readInstalled(home), [name]: { version: entry.version, sha256: entry.sha256 } } });
+function record(home, name2, entry) {
+  writeState(home, { catalogThemes: { ...readInstalled(home), [name2]: { version: entry.version, sha256: entry.sha256 } } });
 }
-function forget(home, name) {
-  const { [name]: _gone, ...rest } = readInstalled(home);
+function forget(home, name2) {
+  const { [name2]: _gone, ...rest } = readInstalled(home);
   writeState(home, { catalogThemes: rest });
 }
-function readInstalledFile(home, name) {
+function readInstalledFile(home, name2) {
   try {
-    return readFileSync6(themeFile(home, name));
+    return readFileSync6(themeFile(home, name2));
   } catch {
     return null;
   }
 }
-function isUnchanged(home, name, installed = readInstalled(home)) {
-  const bytes = readInstalledFile(home, name);
-  return Boolean(bytes && installed[name] && sha256(bytes) === installed[name].sha256);
+function isUnchanged(home, name2, installed = readInstalled(home)) {
+  const bytes = readInstalledFile(home, name2);
+  return Boolean(bytes && installed[name2] && sha256(bytes) === installed[name2].sha256);
 }
-function writeAtomic(home, name, bytes) {
+function writeAtomic(home, name2, bytes) {
   ensureHome(home);
   mkdirSync2(themesDir(home), { recursive: true });
-  const tmp = `${themeFile(home, name)}.${process.pid}.tmp`;
+  const tmp = `${themeFile(home, name2)}.${process.pid}.tmp`;
   try {
     writeFileSync3(tmp, bytes);
-    renameSync2(tmp, themeFile(home, name));
+    renameSync2(tmp, themeFile(home, name2));
   } catch (e) {
     rmSync2(tmp, { force: true });
     throw e;
@@ -10370,9 +10414,9 @@ function install(home, entry, bytes, { force = false } = {}) {
   record(home, entry.name, entry);
   return { status, previous: installed[entry.name]?.version };
 }
-function remove(home, name) {
-  rmSync2(themeFile(home, name), { force: true });
-  if (readInstalled(home)[name]) forget(home, name);
+function remove(home, name2) {
+  rmSync2(themeFile(home, name2), { force: true });
+  if (readInstalled(home)[name2]) forget(home, name2);
 }
 
 // src/theme-market.js
@@ -10387,10 +10431,10 @@ async function cmdThemeMarket(action, target, opts, ctx) {
 }
 var usage = (fail, text2) => (fail(`\u2717 Usage: ${text2}`), 2);
 var names = (index) => index.themes.map((t) => t.name).join(" | ") || "(none)";
-async function add(name, opts, { print, fail, env }, net) {
-  if (!name) return usage(fail, "am theme add <name> [--use] [--force]");
-  if (!NAME.test(name)) {
-    fail(`\u2717 "${name}" is not a catalog theme name (lowercase letters, digits and -). am theme add takes names from the catalog only, not URLs or paths`);
+async function add(name2, opts, { print, fail, env }, net) {
+  if (!name2) return usage(fail, "am theme add <name> [--use] [--force]");
+  if (!NAME.test(name2)) {
+    fail(`\u2717 "${name2}" is not a catalog theme name (lowercase letters, digits and -). am theme add takes names from the catalog only, not URLs or paths`);
     return 2;
   }
   const home = amHome(env);
@@ -10400,44 +10444,44 @@ async function add(name, opts, { print, fail, env }, net) {
   } catch (e) {
     return netFail(e, fail);
   }
-  const entry = index.themes.find((t) => t.name === name);
+  const entry = index.themes.find((t) => t.name === name2);
   if (!entry) {
-    fail(`\u2717 No catalog theme named "${name}". Available: ${names(index)}`);
+    fail(`\u2717 No catalog theme named "${name2}". Available: ${names(index)}`);
     return 2;
   }
   if (needsNewer(entry)) {
-    fail(`\u2717 ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION})`);
+    fail(`\u2717 ${name2} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION})`);
     return 1;
   }
   let bytes;
   try {
     bytes = await fetchTheme(index, entry, net);
   } catch (e) {
-    return netFail(e, fail, `${name}: `);
+    return netFail(e, fail, `${name2}: `);
   }
-  const path = themeFile(home, name);
+  const path = themeFile(home, name2);
   const { status, previous } = install(home, entry, bytes, { force: opts.force });
   if (status === "conflict") {
-    fail(`\u2717 ${path} already exists and differs from the catalog version of ${name}; it may be your own theme. Nothing was changed. To replace it: am theme add ${name} --force`);
+    fail(`\u2717 ${path} already exists and differs from the catalog version of ${name2}; it may be your own theme. Nothing was changed. To replace it: am theme add ${name2} --force`);
     return 1;
   }
   const done = {
-    installed: `\u2713 Installed ${name} ${entry.version}: ${path}`,
-    same: `\u2713 ${name} ${entry.version} is already installed: ${path}`,
-    updated: `\u2713 Updated ${name} ${previous ?? "?"} \u2192 ${entry.version}: ${path}`,
-    replaced: `\u2713 Replaced ${name} with the catalog version ${entry.version}: ${path}`
+    installed: `\u2713 Installed ${name2} ${entry.version}: ${path}`,
+    same: `\u2713 ${name2} ${entry.version} is already installed: ${path}`,
+    updated: `\u2713 Updated ${name2} ${previous ?? "?"} \u2192 ${entry.version}: ${path}`,
+    replaced: `\u2713 Replaced ${name2} with the catalog version ${entry.version}: ${path}`
   }[status];
   print(done);
   if (opts.use) {
     try {
-      print(`\u2713 theme = ${setConfig("theme", name, env, loadThemes(home))}`);
+      print(`\u2713 theme = ${setConfig("theme", name2, env, loadThemes(home))}`);
     } catch (e) {
       if (!(e instanceof ConfigError)) throw e;
       fail(`\u2717 ${e.message}`);
       return 1;
     }
   } else if (status !== "same") {
-    print(`  It now appears in every new page's theme picker. Make it the default: am theme add ${name} --use, or am config set theme ${name}`);
+    print(`  It now appears in every new page's theme picker. Make it the default: am theme add ${name2} --use, or am config set theme ${name2}`);
   }
   return 0;
 }
@@ -10446,9 +10490,9 @@ function netFail(e, fail, prefix = "") {
   fail(`\u2717 ${prefix}${e.message}`);
   return 1;
 }
-function sourceOf(home, name, installed) {
-  if (!installed[name]) return { source: "local", version: "-" };
-  return { source: isUnchanged(home, name, installed) ? "catalog" : "catalog, edited", version: installed[name].version };
+function sourceOf(home, name2, installed) {
+  if (!installed[name2]) return { source: "local", version: "-" };
+  return { source: isUnchanged(home, name2, installed) ? "catalog" : "catalog, edited", version: installed[name2].version };
 }
 async function list(opts, { print, fail, env }, net) {
   const home = amHome(env);
@@ -10461,10 +10505,10 @@ async function list(opts, { print, fail, env }, net) {
   print(`
 Installed themes (${themesDir(home)}):`);
   if (!rows.length) print("  none. Install one with: am theme add <name>   (list the catalog: am theme list --remote)");
-  for (const name of rows) {
-    const { source, version } = sourceOf(home, name, installed);
-    const bad = broken.get(name);
-    print(`  ${name.padEnd(11)}${version.padEnd(8)}${source}${bad ? `  \u2717 skipped: ${bad.reason}` : ""}`);
+  for (const name2 of rows) {
+    const { source, version } = sourceOf(home, name2, installed);
+    const bad = broken.get(name2);
+    print(`  ${name2.padEnd(11)}${version.padEnd(8)}${source}${bad ? `  \u2717 skipped: ${bad.reason}` : ""}`);
   }
   if (!opts.remote) return 0;
   let index;
@@ -10509,48 +10553,48 @@ async function update(target, { print, fail, env }, net) {
     return netFail(e, fail);
   }
   let failed = false;
-  for (const name of todo) {
-    const mine = installed[name];
-    if (readInstalledFile(home, name) === null) {
-      print(`! ${name}: the file is gone from ${themesDir(home)}; reinstall it with: am theme add ${name}`);
-    } else if (!isUnchanged(home, name, installed)) {
-      print(`! ${name} skipped: the file changed since it was installed. To replace it with the catalog version: am theme add ${name} --force`);
+  for (const name2 of todo) {
+    const mine = installed[name2];
+    if (readInstalledFile(home, name2) === null) {
+      print(`! ${name2}: the file is gone from ${themesDir(home)}; reinstall it with: am theme add ${name2}`);
+    } else if (!isUnchanged(home, name2, installed)) {
+      print(`! ${name2} skipped: the file changed since it was installed. To replace it with the catalog version: am theme add ${name2} --force`);
     } else {
-      const entry = index.themes.find((t) => t.name === name);
-      if (!entry) print(`! ${name}: no longer in the catalog; kept ${mine.version}`);
-      else if (entry.sha256 === mine.sha256 || newer(mine.version, entry.version)) print(`\u2713 ${name} is up to date (${mine.version})`);
-      else if (needsNewer(entry)) print(`! ${name} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION}); kept ${mine.version}`);
+      const entry = index.themes.find((t) => t.name === name2);
+      if (!entry) print(`! ${name2}: no longer in the catalog; kept ${mine.version}`);
+      else if (entry.sha256 === mine.sha256 || newer(mine.version, entry.version)) print(`\u2713 ${name2} is up to date (${mine.version})`);
+      else if (needsNewer(entry)) print(`! ${name2} ${entry.version} needs Answer me with HTML ${entry.requires} or newer (this is ${VERSION}); kept ${mine.version}`);
       else {
         try {
           const bytes = await fetchTheme(index, entry, net);
           install(home, entry, bytes);
-          print(`\u2713 Updated ${name} ${mine.version} \u2192 ${entry.version}`);
+          print(`\u2713 Updated ${name2} ${mine.version} \u2192 ${entry.version}`);
         } catch (e) {
           failed = true;
-          netFail(e, fail, `${name}: `);
+          netFail(e, fail, `${name2}: `);
         }
       }
     }
   }
   return failed ? 1 : 0;
 }
-function removeTheme(name, { print, fail, env }) {
-  if (!name) return usage(fail, "am theme remove <name>");
-  if (BUILTIN_NAMES.includes(name)) {
-    fail(`\u2717 "${name}" is a built-in theme and cannot be removed`);
+function removeTheme(name2, { print, fail, env }) {
+  if (!name2) return usage(fail, "am theme remove <name>");
+  if (BUILTIN_NAMES.includes(name2)) {
+    fail(`\u2717 "${name2}" is a built-in theme and cannot be removed`);
     return 2;
   }
   const home = amHome(env);
-  if (!NAME.test(name) || readInstalledFile(home, name) === null) {
-    fail(`\u2717 No theme named "${name}" in ${themesDir(home)}`);
+  if (!NAME.test(name2) || readInstalledFile(home, name2) === null) {
+    fail(`\u2717 No theme named "${name2}" in ${themesDir(home)}`);
     return 2;
   }
-  const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name;
-  remove(home, name);
-  print(`\u2713 Removed ${join6(themesDir(home), `${name}.json`)}`);
+  const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name2;
+  remove(home, name2);
+  print(`\u2713 Removed ${join6(themesDir(home), `${name2}.json`)}`);
   if (wasDefault) {
     resetConfig("theme", env);
-    print(`! ${name} was the default theme; the default is auto again`);
+    print(`! ${name2} was the default theme; the default is auto again`);
   }
   print("  Pages already made keep their look: a page embeds the themes it was made with.");
   return 0;
@@ -11022,22 +11066,22 @@ function macVoiceFor(voices, language) {
 }
 function espeakVoiceFor(voices, language) {
   const base = baseLanguage(language);
-  const name = voiceHints(language)?.espeak ?? base;
-  if (!voices.length) return name;
-  const installed = voices.includes(name) || voices.includes(base) || voices.some((v2) => v2.startsWith(`${base}-`));
-  return installed ? name : null;
+  const name2 = voiceHints(language)?.espeak ?? base;
+  if (!voices.length) return name2;
+  const installed = voices.includes(name2) || voices.includes(base) || voices.some((v2) => v2.startsWith(`${base}-`));
+  return installed ? name2 : null;
 }
 var localeKey = (locale) => String(locale).toLowerCase().replace(/-/g, "_");
 function bestVoice(candidates, base) {
   if (!candidates.length) return null;
-  for (const name of PREFERRED_VOICES[base] ?? []) {
-    const hit = candidates.find((v2) => stripName(v2.name) === name);
+  for (const name2 of PREFERRED_VOICES[base] ?? []) {
+    const hit = candidates.find((v2) => stripName(v2.name) === name2);
     if (hit) return hit.name;
   }
   const own = candidates.filter((v2) => !SHARED_VOICES.has(stripName(v2.name)));
   return (own[0] ?? candidates[0]).name;
 }
-var stripName = (name) => name.replace(/\s*[(（].*$/, "");
+var stripName = (name2) => name2.replace(/\s*[(（].*$/, "");
 function run(cmd, args) {
   return new Promise((resolve7, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
@@ -11823,7 +11867,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
     throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
   }
   const cuts = slicePoints(layout4.height, layout4.boxes, MAX_SLICE);
-  const name = sliceName(htmlFile);
+  const name2 = sliceName(htmlFile);
   const bounds = [0, ...cuts, layout4.height];
   const written = [];
   for (let i = 1; i < bounds.length; i++) {
@@ -11836,7 +11880,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
       captureBeyondViewport: true,
       clip: { x: 0, y: top2, width: VIEWPORT, height, scale: 1 }
     });
-    const file = join10(folder, `${name}-${i}.png`);
+    const file = join10(folder, `${name2}-${i}.png`);
     if (isInputFile(file, htmlFile, inputStat)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync6(file, Buffer.from(data, "base64"));
@@ -11845,10 +11889,10 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
     }
     written.push(file);
   }
-  if (written.length) removeStaleSlices(folder, name, new Set(written.map((f2) => basename3(f2))), htmlFile, onWarn, inputStat);
+  if (written.length) removeStaleSlices(folder, name2, new Set(written.map((f2) => basename3(f2))), htmlFile, onWarn, inputStat);
   return written;
 }
-function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
+function removeStaleSlices(folder, name2, kept, htmlFile, onWarn = () => {
 }, inputStat = statSync5(htmlFile, { throwIfNoEntry: false })) {
   let entries;
   try {
@@ -11858,7 +11902,7 @@ function removeStaleSlices(folder, name, kept, htmlFile, onWarn = () => {
     return;
   }
   for (const entry of entries) {
-    if (!isSliceOf(entry, name) || kept.has(entry)) continue;
+    if (!isSliceOf(entry, name2) || kept.has(entry)) continue;
     const file = join10(folder, entry);
     try {
       const st3 = lstatSync2(file);
@@ -11886,9 +11930,9 @@ function isHtmlPage(file) {
   return /\.html?$/i.test(file) && statSync5(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 var sliceName = (htmlFile) => basename3(htmlFile).replace(/\.html?$/i, "") || "page";
-var isSliceOf = (fileName, name) => {
-  if (!fileName.startsWith(`${name}-`) || !fileName.endsWith(".png")) return false;
-  return /^[1-9]\d*$/.test(fileName.slice(name.length + 1, -".png".length));
+var isSliceOf = (fileName, name2) => {
+  if (!fileName.startsWith(`${name2}-`) || !fileName.endsWith(".png")) return false;
+  return /^[1-9]\d*$/.test(fileName.slice(name2.length + 1, -".png".length));
 };
 var sameFile = (a3, b) => {
   return sameIdentity(statSync5(a3), statSync5(b));
@@ -12325,8 +12369,8 @@ function pageLink({ port, secret, baseUrl }, dir, file) {
 function eventLink({ secret }, file) {
   return `/${EVENTS}/${pageToken(secret, "pages", file)}/${encodeURIComponent(file)}`;
 }
-function validFileName(name) {
-  return typeof name === "string" && name.length > 0 && name.endsWith(".html") && !/[/\\\0]/.test(name) && !name.includes("..");
+function validFileName(name2) {
+  return typeof name2 === "string" && name2.length > 0 && name2.endsWith(".html") && !/[/\\\0]/.test(name2) && !name2.includes("..");
 }
 function tokenMatches(secret, dir, file, token) {
   const expected = Buffer.from(pageToken(secret, dir, file));
@@ -12361,8 +12405,8 @@ function serveLink(home, file) {
     if (!info) return null;
     const path = resolve5(file);
     const dir = ["pages", "videos"].find((d) => dirname4(path) === resolve5(home, d));
-    const name = basename4(path);
-    return dir && validFileName(name) ? pageLink(info, dir, name) : null;
+    const name2 = basename4(path);
+    return dir && validFileName(name2) ? pageLink(info, dir, name2) : null;
   } catch {
     return null;
   }
@@ -13077,7 +13121,7 @@ function draftTitle(src) {
   return m2?.[1] ?? "";
 }
 function saveDraft(src, { env, io }) {
-  const name = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
+  const name2 = `${slug(draftTitle(src))}-${stamp(new Date(io.now?.() ?? Date.now()))}.md`;
   const home = amHome(env);
   const folders = [() => {
     ensureHome(home);
@@ -13087,15 +13131,15 @@ function saveDraft(src, { env, io }) {
     try {
       const dir = folder();
       mkdirSync6(dir, { recursive: true });
-      return writeNew(dir, name, src);
+      return writeNew(dir, name2, src);
     } catch {
     }
   }
   return null;
 }
-function writeNew(dir, name, text2) {
+function writeNew(dir, name2, text2) {
   for (let n = 1; ; n++) {
-    const file = join13(dir, n === 1 ? name : name.replace(/\.md$/, `-${n}.md`));
+    const file = join13(dir, n === 1 ? name2 : name2.replace(/\.md$/, `-${n}.md`));
     try {
       writeFileSync8(file, text2, { flag: "wx" });
       return file;
@@ -13712,12 +13756,12 @@ function cmdList({ print, fail, themes: themes2 }) {
   print("  <other>   code block; src=path lines=a-b quotes a file (am help code)");
   print("\nSyntax: am help <component>; draft format: am help format");
 }
-function specimenDraft(name, mode) {
+function specimenDraft(name2, mode) {
   const sections = [...COMPONENTS.values()].map((c2) => `## ${c2.name}
 ${c2.example}`);
   const table = "## table\n| Check | Status |\n|---|---|\n| Approved | ok passes |\n| Rejected | no fails |\n| Pending | warn needs a look |";
   return `---
-title: Theme ${name} (${mode})
+title: Theme ${name2} (${mode})
 lang: en
 ---
 ${[...sections, table].join("\n\n")}
@@ -13732,11 +13776,11 @@ function cmdTheme(action, target, opts, ctx) {
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
   const path = isFile ? resolve6(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
-  const name = isFile ? basename5(path).replace(/\.json$/i, "") : target;
+  const name2 = isFile ? basename5(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
-  if (!isFile && getTheme(name)) {
-    theme = getTheme(name);
+  if (!isFile && getTheme(name2)) {
+    theme = getTheme(name2);
   } else if (existsSync8(path)) {
     ({ theme, errors } = readThemeFile(path, themeNames("video")));
   } else {
@@ -13749,13 +13793,13 @@ function cmdTheme(action, target, opts, ctx) {
   const all = [...errors, ...colors.errors];
   all.forEach((e) => print(`\u2717 ${e}`));
   warnings.forEach((w2) => print(`! ${w2}`));
-  print(`${name}: ${all.length} error${all.length === 1 ? "" : "s"}, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`);
+  print(`${name2}: ${all.length} error${all.length === 1 ? "" : "s"}, ${warnings.length} warning${warnings.length === 1 ? "" : "s"}`);
   if (all.length) return 1;
   if (!theme.scope.includes("page")) return 0;
   const themes2 = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
   const files = ["light", "dark"].map((mode) => {
-    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: "off" }, {}, { themes: themes2 });
-    const file = outputPath("pages", `theme-${name}-${mode}`, {}, ctx);
+    const result = renderDoc(specimenDraft(name2, mode), { theme: name2, mode, style: "off" }, {}, { themes: themes2 });
+    const file = outputPath("pages", `theme-${name2}-${mode}`, {}, ctx);
     writePage(file, result.html, env);
     print(`\u2713 ${file}`);
     return file;
@@ -13764,19 +13808,19 @@ function cmdTheme(action, target, opts, ctx) {
   if (shouldOpen(opts, env, config.values)) files.forEach((f2) => (io.open ?? openFile)(f2));
   return 0;
 }
-function cmdHelp(name, { print, fail }) {
-  if (!name) return print(USAGE), 0;
-  if (name === "format") return print(FORMAT), 0;
-  if (name === "image") return print(IMAGE_HELP), 0;
-  if (name === "code") return print(CODE_HELP), 0;
-  if (name === "video") return print(VIDEO_FORMAT), 0;
-  if (name === "export") return print(EXPORT_HELP), 0;
-  if (name === "patch") return print(PATCH_HELP), 0;
-  if (name === "theme") return print(THEME_HELP), 0;
-  if (name === "html" || name === "svg") return print(RAW_HELP.replace(/LANG/g, name)), 0;
-  const comp = COMPONENTS.get(name);
+function cmdHelp(name2, { print, fail }) {
+  if (!name2) return print(USAGE), 0;
+  if (name2 === "format") return print(FORMAT), 0;
+  if (name2 === "image") return print(IMAGE_HELP), 0;
+  if (name2 === "code") return print(CODE_HELP), 0;
+  if (name2 === "video") return print(VIDEO_FORMAT), 0;
+  if (name2 === "export") return print(EXPORT_HELP), 0;
+  if (name2 === "patch") return print(PATCH_HELP), 0;
+  if (name2 === "theme") return print(THEME_HELP), 0;
+  if (name2 === "html" || name2 === "svg") return print(RAW_HELP.replace(/LANG/g, name2)), 0;
+  const comp = COMPONENTS.get(name2);
   if (!comp) {
-    fail(`\u2717 No component named "${name}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, export, patch, theme`);
+    fail(`\u2717 No component named "${name2}". Available: ${[...COMPONENTS.keys()].join(", ")}, html, svg, format, code, image, video, export, patch, theme`);
     return 2;
   }
   print(`${comp.name} \u2014 ${comp.summary}
