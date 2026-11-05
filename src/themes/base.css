@@ -372,6 +372,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
 .am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
+.am-api-contract + .am-api-contract { margin-block-start: 20px; padding-block-start: 16px; border-block-start: 1px solid var(--line-2); }
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }

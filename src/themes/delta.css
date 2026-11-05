@@ -44,6 +44,29 @@
 .am-view-changes .am-er-field[data-delta="removed"] { text-decoration: line-through; }
 .am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
 
+/* API changes use the shared switch but collapse hidden HTML rows and contracts so Before and After remain readable. */
+/* Use the code diff hues and ink/fill mixes: a theme's status --ok can be blue, but additions must stay green in every theme and mode. */
+.am-api {
+  --diff-add: #1f9d4d; --diff-del: #d1344a;
+  --ok: color-mix(in srgb, var(--diff-add) 75%, var(--ink));
+  --ok-bg: color-mix(in srgb, var(--diff-add) 14%, var(--fill));
+  --err: color-mix(in srgb, var(--diff-del) 75%, var(--ink));
+  --err-bg: color-mix(in srgb, var(--diff-del) 14%, var(--fill));
+}
+.am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
+.am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
+.am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }
+.am-view-changes .am-api-contract[data-delta="added"], .am-view-changes .am-api-contract [data-delta="added"] { --api-change: var(--ok); --api-change-bg: var(--ok-bg); }
+.am-view-changes .am-api-contract[data-delta="removed"], .am-view-changes .am-api-contract [data-delta="removed"] { --api-change: var(--err); --api-change-bg: var(--err-bg); }
+.am-view-changes .am-api-contract[data-delta="changed"], .am-view-changes .am-api-contract [data-delta="changed"] { --api-change: var(--warn); --api-change-bg: var(--warn-bg); }
+.am-view-changes .am-api-contract tr[data-delta] > * { color: var(--api-change); background: var(--api-change-bg); }
+.am-view-changes .am-api-section[data-delta] > h4,
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint { color: var(--api-change); }
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint strong { color: inherit; }
+.am-view-changes .am-api-contract tr[data-delta="removed"] > *,
+.am-view-changes .am-api-section[data-delta="removed"] > h4,
+.am-view-changes .am-api-contract[data-delta="removed"] > .am-api-endpoint { text-decoration: line-through; }
+
 /* tree */
 .am-tree .am-delta-badge {
   display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: var(--am-ln-treeBadge); height: var(--am-ln-treeBadge); flex: none;
