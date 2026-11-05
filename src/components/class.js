@@ -6,7 +6,7 @@ import { DRAWING } from '../themes/type-scale.js';
 import { ComponentError, contentLines } from './error.js';
 
 // RELATION matches UML links; the arrow or diamond belongs to the written end.
-const RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+(\S+)(?:\s*:\s*(.*))?$/;
+const RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+([^\s:]+)(?:\s*:\s*(.*))?$/;
 // METHOD requires a call signature before any property type, keeping callback-valued properties in the attributes compartment.
 const METHOD = /^[+\-#~]?\s*[^:\s(]+\s*\(/;
 // ROW is the fixed line height used to measure and draw class compartments.
@@ -83,7 +83,7 @@ User ..|> Store: implements
       const attributes = c.members.filter((m) => !METHOD.test(m));
       const methods = c.members.filter((m) => METHOD.test(m));
       const groups = [[...stereotype, c.name], attributes, methods].filter((rows) => rows.length);
-      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || (stereotype.length && !n) ? DRAWING.field : DRAWING.node, c.hi)));
+      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || (stereotype.length && !n) ? DRAWING.field : DRAWING.node, { bold: c.hi })));
       g.setNode(keys.get(c.name), { ...c, groups, width: Math.ceil(Math.max(100, ...widths.map((w) => w + 2 * PAD))), height: groups.reduce((n, rows) => n + rows.length * ROW + PAD, 0) });
     }
     relations.forEach((rel, i) => {
@@ -93,15 +93,15 @@ User ..|> Store: implements
     });
     dagre.layout(g, { customOrder: orderRanks });
     if (dir === 'rtl') mirrorLayout(g);
-    const edges = g.edges().map((edge, i) => {
+    const edges = g.edges().map((edge) => {
       const rel = g.edge(edge);
       const diamond = rel.kind === '*--' || rel.kind === 'o--';
       const marker = diamond ? (rel.kind === '*--' ? 'filled' : 'diamond') : rel.kind.includes('|>') ? 'triangle' : 'open';
       const end = rel.kind === '--' ? '' : ` marker-${diamond ? 'start' : 'end'}="url(#${id}-${marker})"`;
       const label = rel.label ? `<g class="am-edge-label"><rect x="${f(rel.x - rel.width / 2)}" y="${f(rel.y - 10)}" width="${f(rel.width)}" height="20" rx="3"/>${textLines([rel.label], rel.x, rel.y, ROW, '', dir)}</g>` : '';
-      return `<g data-step="${classes.size + i}"><path class="am-edge${rel.kind.startsWith('..') ? ' am-edge--dashed' : ''}" d="${smoothPath(rel.points)}"${end}/>${label}</g>`;
+      return `<g data-step="${rel.line - 1}"><path class="am-edge${rel.kind.startsWith('..') ? ' am-edge--dashed' : ''}" d="${smoothPath(rel.points)}"${end}/>${label}</g>`;
     });
-    const nodes = g.nodes().map((key, i) => {
+    const nodes = g.nodes().map((key) => {
       const c = g.node(key);
       const x = c.x - c.width / 2;
       const y = c.y - c.height / 2;
@@ -116,7 +116,7 @@ User ..|> Store: implements
         top += group.length * ROW + PAD;
         return separator + text;
       }).join('');
-      return `<g class="am-node am-node--rect${c.hi ? ' am-node--hi' : ''}" data-key="${esc(c.name)}" data-step="${i}"><rect class="am-node-shape" x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="3"/>${rows}</g>`;
+      return `<g class="am-node am-node--rect${c.hi ? ' am-node--hi' : ''}" data-key="${esc(c.name)}" data-step="${c.line - 1}"><rect class="am-node-shape" x="${f(x)}" y="${f(y)}" width="${f(c.width)}" height="${f(c.height)}" rx="3"/>${rows}</g>`;
     });
     const defs = `<defs>${[['triangle', 'M0,0 L10,5 L0,10 Z'], ['diamond', 'M0,5 L6,0 L12,5 L6,10 Z'], ['filled', 'M0,5 L6,0 L12,5 L6,10 Z'], ['open', 'M1,1 L9,5 L1,9']].map(([kind, path]) => `<marker id="${id}-${kind}" viewBox="-1 -1 14 12" refX="${kind === 'diamond' || kind === 'filled' ? 12 : 10}" refY="5" markerWidth="12" markerHeight="10" orient="auto-start-reverse"><path class="${kind === 'filled' ? 'am-arrow' : kind === 'open' ? 'am-edge' : 'am-class-hollow'}" d="${path}"/></marker>`).join('')}</defs>`;
     return `<figure class="am-diagram am-class">${svgOpen(g.graph().width, g.graph().height, diagramLabel(ui, 'class', [...classes.keys()]), dir)}${defs}${edges.join('')}${nodes.join('')}</svg></figure>`;

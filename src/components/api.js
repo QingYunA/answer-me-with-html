@@ -7,7 +7,7 @@ export function parseApi(text) {
   const lines = contentLines(text);
   const first = lines.shift();
   const endpoint = first?.text.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
-  if (!endpoint || (endpoint[1] !== 'RPC' && !endpoint[2].startsWith('/'))) {
+  if (!endpoint || (endpoint[1] === 'RPC' ? !/^[^/]+\/[^/]+$/.test(endpoint[2]) : !endpoint[2].startsWith('/'))) {
     throw new ComponentError('api: start with METHOD /path or RPC package.Service/Method', first?.line ?? 1);
   }
   const sections = [];
@@ -26,6 +26,9 @@ export function parseApi(text) {
     const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
     if (!section || (section[1] === 'response' && !section[2])) {
       throw new ComponentError('api: use path, query, headers, request [Type], or response STATUS [Type]', n);
+    }
+    if (section[1] === 'response' && endpoint[1] !== 'RPC' && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
+      throw new ComponentError('api: HTTP responses need a status code from 100 to 599, for example response 200 User', n);
     }
     if (endpoint[1] === 'RPC' && ['path', 'query', 'headers'].includes(section[1])) {
       throw new ComponentError('api: RPC contracts use request and response sections', n);
@@ -57,7 +60,7 @@ response 400 Error
 - Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
 - Write \\| for a literal | inside a type, such as string \\| null; the first unescaped | starts the description.
 - required and optional are explicit and visible in the Requirement column. If any field declares one, unspecified fields show a dash; otherwise this column is omitted.
-- A response requires a status (HTTP code or RPC status name). A section without fields can describe an empty response, such as response 204.
+- A response requires a status (HTTP code 100-599 or RPC status name). A section without fields can describe an empty response, such as response 204.
 - This displays a contract; it does not send requests or import OpenAPI / protobuf files.`,
   example: '```api\nRPC users.UserService/GetUser\nrequest GetUserRequest\n  id string required\nresponse OK User\n  id string required\n  email string optional\nresponse NOT_FOUND\n```',
   // render emits semantic tables, escaping every author-supplied contract value and translating the surrounding labels.

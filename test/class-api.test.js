@@ -29,6 +29,30 @@ test('class: draws inheritance, realization, ownership, association and dependen
   assert.doesNotMatch(render('class', 'A\nB\nA -- B'), /marker-(start|end)=/);
 });
 
+// A label delimiter cannot become part of the relation target, even without surrounding spaces.
+test('class: parses compact and empty relationship labels', () => {
+  for (const [target, label] of [['B:owns', 'owns'], ['B: owns', 'owns'], ['B:', '']]) {
+    const model = parseClass(`A\nB\nA --> ${target}`);
+    assert.equal(model.relations[0].to, 'B');
+    assert.equal(model.relations[0].label, label);
+  }
+});
+
+// Highlighted text is drawn semibold and needs a wider box than the same ordinary member text.
+test('class: measures highlighted members at the weight used by the theme', () => {
+  const plain = render('class', 'class User\n  +description: Map<string, SomeLongPropertyType>');
+  const highlighted = render('class', 'class *User\n  +description: Map<string, SomeLongPropertyType>');
+  assert.ok(Number(highlighted.match(/viewBox="0 0 (\d+)/)[1]) > Number(plain.match(/viewBox="0 0 (\d+)/)[1]));
+});
+
+// Video groups sort their data-step values, so a written relation must precede a later declaration.
+test('class: reveals interleaved declarations and relationships in source order', () => {
+  const svg = render('class', 'A\n  +id: string\nB\nA --> B\nC');
+  const relationStep = Number(svg.match(/<g data-step="(\d+)"><path class="am-edge"/)[1]);
+  const laterClassStep = Number(svg.match(/data-key="C" data-step="(\d+)"/)[1]);
+  assert.ok(relationStep < laterClassStep);
+});
+
 // All directions and cycles must yield finite, positive SVG geometry, including multiple edges and self-links.
 test('class: handles layout directions, self-links, cycles and parallel links', () => {
   for (const direction of ['TB', 'LR', 'BT', 'RL']) {
@@ -37,6 +61,18 @@ test('class: handles layout directions, self-links, cycles and parallel links', 
     const box = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
     assert.ok(Number(box[1]) > 0 && Number(box[2]) > 0);
     assert.equal((svg.match(/<g data-step=/g) ?? []).length, 4);
+  }
+});
+
+// An acyclic edge fixes the rank order, so ignoring the requested direction must fail this check.
+test('class: places linked classes in the requested layout direction', () => {
+  for (const [direction, axis, sign] of [['TB', 1, 1], ['BT', 1, -1], ['LR', 0, 1], ['RL', 0, -1]]) {
+    const svg = render('class', 'A\nB\nA --> B', direction);
+    // position reads the top-left coordinates of the actual class box.
+    const position = (name) => svg.match(new RegExp(`data-key="${name}"[^>]*><rect[^>]* x="([^"]+)" y="([^"]+)"`)).slice(1).map(Number);
+    const a = position('A');
+    const b = position('B');
+    assert.ok((b[axis] - a[axis]) * sign > 0, direction);
   }
 });
 
@@ -118,6 +154,16 @@ test('api: reports malformed endpoints, fields, sections and missing response st
   }
 });
 
+// RPC targets need a service and method; HTTP statuses use codes while the existing RPC cases keep named statuses.
+test('api: validates RPC targets and HTTP response codes at the input boundary', () => {
+  for (const target of ['/', 'users', 'users/', '/Get', 'Users/Get/Other']) {
+    assert.throws(() => parseApi(`RPC ${target}\nresponse OK`), (err) => err instanceof ComponentError && err.line === 1);
+  }
+  for (const status of ['User', '20', '600', '200User']) {
+    assert.throws(() => parseApi(`GET /users\nresponse ${status}`), (err) => err instanceof ComponentError && err.line === 2);
+  }
+});
+
 // Page integration includes registry dispatch, localized accessibility labels, RTL diagrams and multiple unique marker IDs.
 test('contracts: integrate with localized pages, colon blocks, themes and source-line errors', () => {
   for (const lang of ['en', 'zh', 'zh-TW', 'ja', 'he', 'fr']) {
@@ -126,6 +172,10 @@ test('contracts: integrate with localized pages, colon blocks, themes and source
     assert.deepEqual(stats.components, { class: 2, api: 1, er: 1 });
     assert.ok(html.includes(language.ui.class));
     assert.ok(html.includes(language.ui.api.response));
+    if (lang === 'zh') {
+      assert.match(html, /类图/); // lang-ok: expected Chinese viewer label
+      assert.match(html, /响应/); // lang-ok: expected Chinese viewer label
+    }
     assert.match(html, /id="am1-triangle"/);
     assert.match(html, /id="am2-triangle"/);
     if (lang === 'he') assert.match(html, /role="img"[^>]+direction="rtl"/);

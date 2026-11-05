@@ -83,7 +83,7 @@ response NOT_FOUND
 ````
 
 - One endpoint per `api` block. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
-- Sections are `path`, `query`, `headers`, `request [Type]` and `response STATUS [Type]`. RPC uses `request` and `response`. A response with no fields can describe an empty body.
+- Sections are `path`, `query`, `headers`, `request [Type]` and `response STATUS [Type]`. RPC uses `request` and `response`. HTTP response codes are 100-599; RPC supports named statuses. A response with no fields can describe an empty body.
 - Indent fields as `name type [required|optional] | description`. Types, nested field paths and descriptions are plain text. The Requirement column shows explicit Required or Optional labels. An unspecified value shows a dash when the column is present; tables with no explicit requirements omit the column.
 - Escape a literal type pipe as `\|`: write `email string \| null optional | Contact` for the union type `string | null`. The first unescaped `|` starts the description.
 - Labels follow the page language. Class diagrams use the existing theme tokens, scaling and diagram viewer; contract fields use semantic tables. Both render offline.

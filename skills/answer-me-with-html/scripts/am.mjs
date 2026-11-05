@@ -8044,7 +8044,7 @@ function endMark(point, toward, card) {
 }
 
 // src/components/class.js
-var RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+(\S+)(?:\s*:\s*(.*))?$/;
+var RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+([^\s:]+)(?:\s*:\s*(.*))?$/;
 var METHOD = /^[+\-#~]?\s*[^:\s(]+\s*\(/;
 var ROW = 20;
 var PAD2 = 12;
@@ -8115,7 +8115,7 @@ User ..|> Store: implements
       const attributes = c2.members.filter((m2) => !METHOD.test(m2));
       const methods = c2.members.filter((m2) => METHOD.test(m2));
       const groups = [[...stereotype, c2.name], attributes, methods].filter((rows) => rows.length);
-      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || stereotype.length && !n ? DRAWING.field : DRAWING.node, c2.hi)));
+      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || stereotype.length && !n ? DRAWING.field : DRAWING.node, { bold: c2.hi })));
       g.setNode(keys.get(c2.name), { ...c2, groups, width: Math.ceil(Math.max(100, ...widths.map((w2) => w2 + 2 * PAD2))), height: groups.reduce((n, rows) => n + rows.length * ROW + PAD2, 0) });
     }
     relations.forEach((rel, i) => {
@@ -8128,15 +8128,15 @@ User ..|> Store: implements
     });
     Uo.layout(g, { customOrder: orderRanks });
     if (dir === "rtl") mirrorLayout(g);
-    const edges = g.edges().map((edge, i) => {
+    const edges = g.edges().map((edge) => {
       const rel = g.edge(edge);
       const diamond = rel.kind === "*--" || rel.kind === "o--";
       const marker = diamond ? rel.kind === "*--" ? "filled" : "diamond" : rel.kind.includes("|>") ? "triangle" : "open";
       const end = rel.kind === "--" ? "" : ` marker-${diamond ? "start" : "end"}="url(#${id}-${marker})"`;
       const label = rel.label ? `<g class="am-edge-label"><rect x="${f(rel.x - rel.width / 2)}" y="${f(rel.y - 10)}" width="${f(rel.width)}" height="20" rx="3"/>${textLines([rel.label], rel.x, rel.y, ROW, "", dir)}</g>` : "";
-      return `<g data-step="${classes.size + i}"><path class="am-edge${rel.kind.startsWith("..") ? " am-edge--dashed" : ""}" d="${smoothPath(rel.points)}"${end}/>${label}</g>`;
+      return `<g data-step="${rel.line - 1}"><path class="am-edge${rel.kind.startsWith("..") ? " am-edge--dashed" : ""}" d="${smoothPath(rel.points)}"${end}/>${label}</g>`;
     });
-    const nodes = g.nodes().map((key, i) => {
+    const nodes = g.nodes().map((key) => {
       const c2 = g.node(key);
       const x = c2.x - c2.width / 2;
       const y2 = c2.y - c2.height / 2;
@@ -8150,7 +8150,7 @@ User ..|> Store: implements
         top2 += group.length * ROW + PAD2;
         return separator + text3;
       }).join("");
-      return `<g class="am-node am-node--rect${c2.hi ? " am-node--hi" : ""}" data-key="${esc(c2.name)}" data-step="${i}"><rect class="am-node-shape" x="${f(x)}" y="${f(y2)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="3"/>${rows}</g>`;
+      return `<g class="am-node am-node--rect${c2.hi ? " am-node--hi" : ""}" data-key="${esc(c2.name)}" data-step="${c2.line - 1}"><rect class="am-node-shape" x="${f(x)}" y="${f(y2)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="3"/>${rows}</g>`;
     });
     const defs = `<defs>${[["triangle", "M0,0 L10,5 L0,10 Z"], ["diamond", "M0,5 L6,0 L12,5 L6,10 Z"], ["filled", "M0,5 L6,0 L12,5 L6,10 Z"], ["open", "M1,1 L9,5 L1,9"]].map(([kind2, path]) => `<marker id="${id}-${kind2}" viewBox="-1 -1 14 12" refX="${kind2 === "diamond" || kind2 === "filled" ? 12 : 10}" refY="5" markerWidth="12" markerHeight="10" orient="auto-start-reverse"><path class="${kind2 === "filled" ? "am-arrow" : kind2 === "open" ? "am-edge" : "am-class-hollow"}" d="${path}"/></marker>`).join("")}</defs>`;
     return `<figure class="am-diagram am-class">${svgOpen(g.graph().width, g.graph().height, diagramLabel(ui, "class", [...classes.keys()]), dir)}${defs}${edges.join("")}${nodes.join("")}</svg></figure>`;
@@ -8162,7 +8162,7 @@ function parseApi(text2) {
   const lines = contentLines(text2);
   const first = lines.shift();
   const endpoint = first?.text.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
-  if (!endpoint || endpoint[1] !== "RPC" && !endpoint[2].startsWith("/")) {
+  if (!endpoint || (endpoint[1] === "RPC" ? !/^[^/]+\/[^/]+$/.test(endpoint[2]) : !endpoint[2].startsWith("/"))) {
     throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", first?.line ?? 1);
   }
   const sections = [];
@@ -8181,6 +8181,9 @@ function parseApi(text2) {
     const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
     if (!section || section[1] === "response" && !section[2]) {
       throw new ComponentError("api: use path, query, headers, request [Type], or response STATUS [Type]", n);
+    }
+    if (section[1] === "response" && endpoint[1] !== "RPC" && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
+      throw new ComponentError("api: HTTP responses need a status code from 100 to 599, for example response 200 User", n);
     }
     if (endpoint[1] === "RPC" && ["path", "query", "headers"].includes(section[1])) {
       throw new ComponentError("api: RPC contracts use request and response sections", n);
@@ -8211,7 +8214,7 @@ response 400 Error
 - Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
 - Write \\| for a literal | inside a type, such as string \\| null; the first unescaped | starts the description.
 - required and optional are explicit and visible in the Requirement column. If any field declares one, unspecified fields show a dash; otherwise this column is omitted.
-- A response requires a status (HTTP code or RPC status name). A section without fields can describe an empty response, such as response 204.
+- A response requires a status (HTTP code 100-599 or RPC status name). A section without fields can describe an empty response, such as response 204.
 - This displays a contract; it does not send requests or import OpenAPI / protobuf files.`,
   example: "```api\nRPC users.UserService/GetUser\nrequest GetUserRequest\n  id string required\nresponse OK User\n  id string required\n  email string optional\nresponse NOT_FOUND\n```",
   // render emits semantic tables, escaping every author-supplied contract value and translating the surrounding labels.
