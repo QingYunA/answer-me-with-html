@@ -32,7 +32,7 @@ export function parseApi(text) {
       continue;
     }
     const declaration = line.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
-    if (declaration && (declaration[1] === 'RPC' || declaration[2].startsWith('/'))) {
+    if (declaration && (declaration[1] === 'RPC' ? /^[^/]+\/[^/]+$/.test(declaration[2]) : declaration[2].startsWith('/'))) {
       endpoint = { method: declaration[1], target: declaration[2], sections: [], line: n, ...apiState(mark, null, n) };
       endpoints.push(endpoint);
       current = null;
@@ -42,6 +42,9 @@ export function parseApi(text) {
     const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
     if (!section || (section[1] === 'response' && !section[2])) {
       throw new ComponentError('api: use path, query, headers, request [Type], or response STATUS [Type]', n);
+    }
+    if (section[1] === 'response' && endpoint.method !== 'RPC' && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
+      throw new ComponentError('api: HTTP responses need a status code from 100 to 599, for example response 200 User', n);
     }
     if (endpoint.method === 'RPC' && ['path', 'query', 'headers'].includes(section[1])) {
       throw new ComponentError('api: RPC contracts use request and response sections', n);
@@ -76,7 +79,7 @@ response 400 Error
 - Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
 - Write \\| for a literal | inside a type, such as string \\| null; the first unescaped | starts the description.
 - required and optional are explicit and visible in the Requirement column. If any field declares one, unspecified fields show a dash; otherwise this column is omitted.
-- A response requires a status (HTTP code or RPC status name). A section without fields can describe an empty response, such as response 204.
+- A response requires a status (HTTP code 100-599 or RPC status name). A section without fields can describe an empty response, such as response 204.
 - Prefix an endpoint, section or indented field with + (added), - (removed), or ~ (changed), followed by a space. Children inherit + or -, and a contradictory child marker is an error. ~ marks only the written item.
 - To show exact old and new types, names or requirements, write the old field/section/endpoint with - and its replacement with +. A lone ~ has no old value to reconstruct.
 - One Before / Changes / After switch applies to every endpoint in the block. Before hides added items; After hides removed items; unchanged items stay in both views. Counts include inherited markers.

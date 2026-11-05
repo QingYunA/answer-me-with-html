@@ -83,7 +83,7 @@ response NOT_FOUND
 ````
 
 - 每个 `api` 块可以定义同一需求涉及的多个接口，在行首开始下一个接口。HTTP 使用大写方法和 `/路径`；RPC 使用 `RPC` 和服务方法名。
-- 分区支持 `path`、`query`、`headers`、`request [类型]` 和 `response 状态 [类型]`。RPC 使用 `request` 和 `response`。响应可以省略字段，表示空响应体。
+- 分区支持 `path`、`query`、`headers`、`request [类型]` 和 `response 状态 [类型]`。RPC 使用 `request` 和 `response`。HTTP 响应状态码为 100 至 599；RPC 支持状态名。响应可以省略字段，表示空响应体。
 - 缩进字段，格式为 `名称 类型 [required|optional] | 说明`。类型、嵌套字段路径和说明按纯文本显示。必填性列直接显示“必填”或“可选”。未声明的字段显示短横线；整张表均未声明时省略此列。
 - 类型中的竖线写成 `\|`。例如 `email string \| null optional | 联系方式` 表示联合类型 `string | null`；第一个未转义的 `|` 开始说明。
 - 标签跟随页面语言。类图复用现有主题、缩放和图示查看器；接口字段使用语义表格。两种组件都支持离线页面。
