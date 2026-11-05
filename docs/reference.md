@@ -226,7 +226,7 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the outline rail (`left` and `right` mirror) and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the outline rail (`left` and `right` mirror) and the toolbar start from the right; `flow`, `state`, `er` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
 
 | Script in the text | Detected as |
 | :--- | :--- |
@@ -240,7 +240,7 @@ Declare the language when you write a Latin-script language other than English, 
 
 A patched page keeps the language it had, unless the draft declares one.
 
-Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character. In a `flow` node or edge label, a literal `\n` forces a line break; each forced line still wraps by width. Group titles keep the text as written.
+Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character. In a `flow` or `state` node or edge label, a literal `\n` forces a line break; each forced line still wraps by width. Group titles keep the text as written.
 
 The writing check follows the language. Chinese, English and Japanese keep their rules. Any other language gets only the language-neutral ones: sentence length (in words, or in characters for CJK text) and paragraph length. A script that writes no space between words is measured in words found by the word segmenter, the same four scripts the diagrams wrap with.
 
@@ -282,11 +282,11 @@ The classes your `css` may target stay stable: a later version keeps every one o
 
 ### Diagram tokens
 
-A theme restyles what is inside a diagram (flow, sequence, er, the boxes of a tree, and the bars, lines and slices of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+A theme restyles what is inside a diagram (flow, state, sequence, er, the boxes of a tree, and the bars, lines and slices of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
 
 | Part | Tokens | Default |
 | :--- | :--- | :--- |
-| Node (flow, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Node (flow, state, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
 | Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
 | Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
 | Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |

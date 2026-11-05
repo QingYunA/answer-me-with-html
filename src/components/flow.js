@@ -181,7 +181,7 @@ function rewriteOf(rest) {
 }
 
 // Removed when the node exists only before, added when only after; on both sides it is unchanged unless a "~ Node" line marked it.
-function nodeState({ before, after, tilde }) {
+export function nodeState({ before, after, tilde }) {
   if (before && !after) return 'removed';
   if (after && !before) return 'added';
   return tilde ? 'changed' : null;
@@ -258,7 +258,7 @@ function labelLines(label, maxWidth, size) {
 }
 
 // Edge labels are not wrapped unless they carry a forced break: that keeps a long label as it was drawn before.
-function edgeText(label) {
+export function edgeText(label) {
   const parts = String(label).split(FORCED_BREAK);
   const lines = parts.length > 1 ? parts.flatMap((part) => wrap(part, EDGE_MAX, EDGE_FS)) : [String(label)];
   return {
@@ -268,7 +268,9 @@ function edgeText(label) {
   };
 }
 
-function nodeSize(node) {
+export function nodeSize(node) {
+  // A component can give a node its own box (the pseudo-states of `state`), which is drawn as it is.
+  if (node.size) return { lines: [], width: node.size[0], height: node.size[1] };
   const lines = labelLines(node.label, TEXT_MAX, FS);
   const tw = Math.max(...lines.map((l) => measure(l, FS)));
   const th = lines.length * LH;

@@ -259,6 +259,7 @@ The agent picks a component by the shape of the information:
 | Component | Good for |
 | :--- | :--- |
 | `flow` | Architecture, call chains, decision branches. Auto layout, with groups, decisions and databases |
+| `state` | A state machine: states and the events that move between them, with an initial state, a final state and self-transitions |
 | `er` | A data model: entities with their columns (PK / FK / UK) and crow's-foot relationships |
 | `sequence` | Messages going back and forth between several parties over time |
 | `tree` | Folders, modules, taxonomies |

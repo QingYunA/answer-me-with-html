@@ -356,6 +356,12 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-node-shape ~ .am-node-shape { filter: none; }
 /* The corner radius is an SVG attribute (the fallback for Safari before 17.4, which ignores a CSS rx); the default here equals the attribute. A pill and a diamond keep their shape. */
 .am-node--rect .am-node-shape, .am-node--er .am-node-shape { rx: var(--node-radius, 3px); }
+/* A state is a rounded rectangle; the default matches the rx attribute state.js writes, for Safari before 17.4. */
+.am-node--state .am-node-shape { rx: var(--node-radius, 8px); }
+/* The initial pseudo-state is a filled dot, the final one a ringed dot; both take the node tokens, so every theme draws them. */
+.am-diagram .am-state-dot { fill: var(--node-stroke, var(--line, #1d2026)); }
+.am-diagram .am-state-ring { fill: var(--node-fill, var(--paper, #ffffff)); stroke: var(--node-stroke, var(--line, #1d2026)); stroke-width: var(--node-width, var(--bw, 1.5px)); }
+.am-diagram .am-state-core { fill: var(--node-stroke, var(--line, #1d2026)); }
 .am-node--hi .am-node-shape { fill: var(--hi-fill, var(--accent-bg, #e4ecf8)); stroke: var(--hi-stroke, var(--accent, #1d5fbf)); }
 .am-diagram .am-node-text { fill: var(--node-text, var(--ink, #16181d)); }
 .am-node--hi text { fill: var(--hi-text, var(--accent, #1d5fbf)); font-weight: 600; }
