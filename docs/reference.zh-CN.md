@@ -286,7 +286,7 @@ am export page.html --pdf page.pdf --png out/
 
 | 部分 | 变量 | 默认值 |
 | :--- | :--- | :--- |
-| 节点（flow、state、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（tree 方框：`--radius`）、无、`--ink` |
+| 节点（flow、state、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（state：8px；tree 方框：`--radius`）、无、`--ink` |
 | 高亮节点（`*`） | `--hi-fill`、`--hi-stroke`、`--hi-text` | `--accent-bg`、`--accent`、`--accent` |
 | 连线与消息 | `--edge-color`、`--edge-width`、`--edge-label` | `--ink-2`、1.3、`--accent` |
 | 时序图参与者（含 `== 分隔 ==` 的框） | `--actor-fill`、`--actor-stroke`、`--actor-text` | `--node-fill`、`--node-stroke`、`--node-text` |

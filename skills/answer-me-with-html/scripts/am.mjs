@@ -7613,9 +7613,10 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
   const heads = ["added", "removed"].filter((state) => edges.some((e) => e.state === state));
   return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g>${clusters.join("")}</g><g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
 }
-function badgeSvg(state, x, y2) {
+function badgeSvg(state, x, y2, step) {
   if (!state) return "";
-  return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y2)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  const at3 = step === void 0 ? "" : ` data-step="${step}"`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at3}${deltaAttr(state)} transform="translate(${f(x)},${f(y2)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 function badgePoint(shape, x, y2, w2, h, rtl = false) {
   const s = rtl ? -1 : 1;
@@ -7656,9 +7657,9 @@ var LOOP_STEP = 20;
 var LOOP_END = 18;
 var LOOP_LABEL = 24;
 var LOOP_GAP = 6;
-function loopBeside({ x, y: y2, width, labelWidth: labelWidth3 = 0, nth = 0, side = 1 }) {
+function loopBeside({ x, y: y2, width, labelWidth: labelWidth3 = 0, nth = 0, offset = nth * LOOP_STEP, side = 1 }) {
   const edge = x + side * width / 2;
-  const out = edge + side * LOOP_OUT + side * nth * LOOP_STEP;
+  const out = edge + side * LOOP_OUT + side * offset;
   const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
   return {
     a: { x: edge, y: ay },
@@ -7737,24 +7738,25 @@ Polling -> Open: reply
 function parseState(text2) {
   const nodes = /* @__PURE__ */ new Map();
   const edges = [];
-  let finals = 0;
+  const lines = /* @__PURE__ */ new Set();
   const add2 = (id, label, kind2, line, mark) => {
     const prev = nodes.get(id);
     const seen = { before: mark !== "+", after: mark !== "-", tilde: mark === "~" };
-    if (!prev) nodes.set(id, { id, label, kind: kind2, line, ...seen });
-    else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde });
+    const tildeLine = mark === "~" ? line : void 0;
+    if (!prev) nodes.set(id, { id, label, kind: kind2, line, ...seen, ...tildeLine && { tildeLine } });
+    else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde, ...tildeLine && { tildeLine: prev.tildeLine ?? tildeLine } });
     return id;
   };
   const resolve7 = (name2, line, mark, side) => {
     if (name2 !== "[*]") return add2(name2, name2, "state", line, mark);
-    if (side === "from") return add2(INITIAL, "[*]", "initial", line, mark);
-    finals += 1;
-    return add2(`${FINAL}:${finals}`, "[*]", "final", line, mark);
+    return add2(side === "from" ? INITIAL : FINAL, "[*]", side === "from" ? "initial" : "final", line, mark);
   };
   for (const { text: raw, line: n } of contentLines(text2)) {
     const { mark, text: t } = splitMarker(raw);
+    if (t.includes("\0")) throw new ComponentError(`state: a state name cannot contain U+0000: "${raw}"`, n);
     const state = markState(mark);
     checkMermaid(t, raw, mark, n);
+    lines.add(n);
     const at3 = t.indexOf("->");
     if (at3 === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
@@ -7779,7 +7781,7 @@ function parseState(text2) {
     const state = nodeState(node);
     return [id, state ? { ...node, state } : node];
   }));
-  return { nodes: settled, edges };
+  return { nodes: settled, edges, lines: [...lines].sort((a3, b) => a3 - b) };
 }
 function checkMermaid(t, raw, mark, line) {
   if (/^stateDiagram(-v2)?$/i.test(t)) {
@@ -7794,44 +7796,55 @@ function checkMermaid(t, raw, mark, line) {
   throw new ComponentError(`"${raw}" is Mermaid syntax; write ${mark && mark !== "~" ? `${mark} ` : ""}${fixed2}`, line);
 }
 function checkTransitions(edges, nodes) {
-  const keyOf = (e) => `${e.from}\0${e.to}`;
+  const keyOf = (e) => `${e.from}\0${e.to}\0${e.label}`;
+  const text2 = (e) => `${nodes.get(e.from).label} -> ${nodes.get(e.to).label}${e.label ? `: ${e.label}` : ""}`;
   for (const e of edges.filter((x) => x.state)) {
     const plain = edges.find((x) => !x.state && keyOf(x) === keyOf(e));
     if (plain) {
-      const name2 = (id) => nodes.get(id).label;
-      throw new ComponentError(`state: the transition ${name2(e.from)} -> ${name2(e.to)} is written unmarked on line ${plain.line} and as ${e.state === "added" ? "+" : "-"} here. Mark every line of that transition, or none`, e.line);
+      throw new ComponentError(`state: the transition ${text2(e)} is written unmarked on line ${plain.line} and as ${e.state === "added" ? "+" : "-"} here. Mark every line of that transition, or none`, e.line);
     }
   }
 }
 function layout3(model, rankdir, id, ui, pageDir = "ltr") {
-  const { nodes, edges } = model;
+  const { nodes, edges, lines } = model;
   const rtl = pageDir === "rtl";
+  const side = rtl ? -1 : 1;
   const below = rankdir === "LR" || rankdir === "RL";
   const loops = edges.filter((e) => e.from === e.to);
   const straight = edges.filter((e) => e.from !== e.to);
   const boxes = new Map([...nodes.values()].map((n) => {
     if (n.kind !== "state") return [n.id, { width: DOT, height: DOT, lines: [] }];
-    const { width: width2, height: height2, lines } = nodeSize({ label: n.label, shape: "rect" });
-    return [n.id, { width: width2, height: height2, lines }];
+    const { width: width2, height: height2, lines: lines2 } = nodeSize({ label: n.label, shape: "rect" });
+    return [n.id, { width: width2, height: height2, lines: lines2 }];
   }));
   const room = /* @__PURE__ */ new Map();
-  if (below) {
-    for (const from of new Set(loops.map((e) => e.from))) {
-      const own = loops.filter((e) => e.from === from);
-      room.set(from, loopRoom(own.map((e) => e.label ? edgeText(e.label).width : 0)));
+  const beside = /* @__PURE__ */ new Map();
+  for (const from of new Set(loops.map((e) => e.from))) {
+    const own = loops.filter((e) => e.from === from);
+    const widths = own.map((e) => e.label ? edgeText(e.label).width : 0);
+    if (below) {
+      room.set(from, { y: loopRoom(widths) });
+      continue;
     }
+    let offset = 0;
+    beside.set(from, own.map((e, i) => {
+      if (i) offset += Math.max(LOOP_STEP, widths[i - 1] + 6);
+      return { edge: e, offset, labelWidth: widths[i], extent: LOOP_OUT + offset + 6 + widths[i] };
+    }));
+    room.set(from, { x: Math.max(...beside.get(from).map((spec) => spec.extent)) });
   }
   const layoutNodes = new Map([...nodes].map(([key2, n]) => {
     const box = boxes.get(key2);
-    return [key2, { ...n, shape: "rect", size: [box.width, box.height + (room.get(key2) ?? 0)] }];
+    const extra = room.get(key2) ?? {};
+    return [key2, { ...n, shape: "rect", size: [box.width + (extra.x ?? 0), box.height + (extra.y ?? 0)] }];
   }));
   const { g, key } = runLayout({ nodes: layoutNodes, edges: straight, groups: [] }, rankdir, rtl, [], /* @__PURE__ */ new Map());
   const centre = (nodeId) => {
     const { x, y: y2 } = g.node(key.get(nodeId));
-    return { x, y: y2 - (room.get(nodeId) ?? 0) / 2 };
+    const extra = room.get(nodeId) ?? {};
+    return { x: x - side * (extra.x ?? 0) / 2, y: y2 - (extra.y ?? 0) / 2 };
   };
-  const steps2 = [.../* @__PURE__ */ new Set([...[...nodes.values()].map((n) => n.line), ...edges.map((e) => e.line)])].sort((a3, b) => a3 - b);
-  const stepOf = new Map(steps2.map((line, i) => [line, i]));
+  const stepOf = new Map(lines.map((line, i) => [line, i]));
   const drawn = straight.map((e, i) => {
     const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
     return { e, data, points: clipEnds2(data.points, e, centre, boxes, room) };
@@ -7842,16 +7855,18 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr") {
     const text2 = e.label ? edgeLabelSvg(e.label, data.x, data.y, pageDir) : "";
     return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text2}</g>`;
   });
-  const side = rtl ? -1 : 1;
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((e) => {
-    const { nth, depth } = seen.get(e.from) ?? { nth: 0, depth: 0 };
-    seen.set(e.from, { nth: nth + 1, depth: depth + LOOP_STEP + (e.label ? LOOP_LABEL : 0) });
     const { x, y: y2 } = centre(e.from);
     const box = boxes.get(e.from);
-    const labelWidth3 = e.label ? edgeText(e.label).width : 0;
-    const spec = below ? loopBelow({ x, y: y2, height: box.height, depth, side, labelWidth: labelWidth3 }) : loopBeside({ x, y: y2, width: box.width, nth, side, labelWidth: labelWidth3 });
-    return { e, ...spec };
+    if (below) {
+      const { depth } = seen.get(e.from) ?? { depth: 0 };
+      seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? LOOP_LABEL : 0) });
+      const labelWidth3 = e.label ? edgeText(e.label).width : 0;
+      return { e, ...loopBelow({ x, y: y2, height: box.height, depth, side, labelWidth: labelWidth3 }) };
+    }
+    const spec = beside.get(e.from).find((x2) => x2.edge === e);
+    return { e, ...loopBeside({ x, y: y2, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
   });
   const loopsSvg = loopSpecs.map(({ e, ...spec }) => {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
@@ -7862,7 +7877,8 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr") {
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x, y: y2 } = centre(n.id);
     const box = boxes.get(n.id);
-    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y2 - box.height / 2);
+    const badgeStep = n.state === "changed" ? stepOf.get(n.tildeLine ?? n.line) : void 0;
+    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y2 - box.height / 2, badgeStep);
     const keyAttr = n.kind === "state" ? ` data-key="${esc(n.label)}"` : "";
     const open = `<g class="am-node am-node--state${n.kind === "state" ? "" : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
     if (n.kind === "initial") return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y2)}" r="6"/>${badge}</g>`;
@@ -7889,7 +7905,14 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr") {
       at3(data.x + w2 / 2, data.y + h / 2);
     }
   }
-  for (const { corners } of loopSpecs) corners.forEach(([x, y2]) => at3(x, y2));
+  for (const { e, corners, label: label2 } of loopSpecs) {
+    corners.forEach(([x, y2]) => at3(x, y2));
+    if (label2) {
+      const { width: w2, height: h } = edgeText(e.label);
+      at3(label2.x - w2 / 2, label2.y - h / 2);
+      at3(label2.x + w2 / 2, label2.y + h / 2);
+    }
+  }
   const margin = 14;
   const shiftX = margin - Math.min(...xs);
   const shiftY = margin - Math.min(...ys);

@@ -5,7 +5,7 @@ import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../s
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta } from './delta.js';
 import { badgeSvg, edgeText, nodeSize, nodeState, runLayout } from './flow.js';
-import { LOOP_LABEL, LOOP_STEP, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
+import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
 
 const LH = 17; // the line height runLayout measured each state label with
 const DOT = 16; // the box dagre reserves for an initial or final pseudo-state
@@ -55,26 +55,27 @@ Polling -> Open: reply
 export function parseState(text) {
   const nodes = new Map();
   const edges = [];
-  let finals = 0;
+  const lines = new Set();
   // before / after: whether the state exists before and after the change; tilde: a "~ State" line marked it changed.
   const add = (id, label, kind, line, mark) => {
     const prev = nodes.get(id);
     const seen = { before: mark !== '+', after: mark !== '-', tilde: mark === '~' };
-    if (!prev) nodes.set(id, { id, label, kind, line, ...seen });
-    else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde });
+    const tildeLine = mark === '~' ? line : undefined;
+    if (!prev) nodes.set(id, { id, label, kind, line, ...seen, ...(tildeLine && { tildeLine }) });
+    else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde, ...(tildeLine && { tildeLine: prev.tildeLine ?? tildeLine }) });
     return id;
   };
   const resolve = (name, line, mark, side) => {
     if (name !== '[*]') return add(name, name, 'state', line, mark);
-    if (side === 'from') return add(INITIAL, '[*]', 'initial', line, mark);
-    finals += 1;
-    return add(`${FINAL}:${finals}`, '[*]', 'final', line, mark);
+    return add(side === 'from' ? INITIAL : FINAL, '[*]', side === 'from' ? 'initial' : 'final', line, mark);
   };
 
   for (const { text: raw, line: n } of contentLines(text)) {
     const { mark, text: t } = splitMarker(raw);
+    if (t.includes('\u0000')) throw new ComponentError(`state: a state name cannot contain U+0000: "${raw}"`, n);
     const state = markState(mark);
     checkMermaid(t, raw, mark, n);
+    lines.add(n);
     const at = t.indexOf('->');
     if (at === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
@@ -99,7 +100,7 @@ export function parseState(text) {
     const state = nodeState(node);
     return [id, state ? { ...node, state } : node];
   }));
-  return { nodes: settled, edges };
+  return { nodes: settled, edges, lines: [...lines].sort((a, b) => a - b) };
 }
 
 // Mermaid stateDiagram-v2 syntax is close enough to this one that an agent may paste it: reject it with the line to write.
@@ -116,21 +117,23 @@ function checkMermaid(t, raw, mark, line) {
   throw new ComponentError(`"${raw}" is Mermaid syntax; write ${mark && mark !== '~' ? `${mark} ` : ''}${fixed}`, line);
 }
 
-// A transition written both unmarked and marked says two things about the same transition.
+// A transition written both unmarked and marked says two things about the same transition. The event is part of the transition,
+// so two events between the same states are two transitions, and each may carry its own marker.
 function checkTransitions(edges, nodes) {
-  const keyOf = (e) => `${e.from}\u0000${e.to}`;
+  const keyOf = (e) => `${e.from}\u0000${e.to}\u0000${e.label}`;
+  const text = (e) => `${nodes.get(e.from).label} -> ${nodes.get(e.to).label}${e.label ? `: ${e.label}` : ''}`;
   for (const e of edges.filter((x) => x.state)) {
     const plain = edges.find((x) => !x.state && keyOf(x) === keyOf(e));
     if (plain) {
-      const name = (id) => nodes.get(id).label;
-      throw new ComponentError(`state: the transition ${name(e.from)} -> ${name(e.to)} is written unmarked on line ${plain.line} and as ${e.state === 'added' ? '+' : '-'} here. Mark every line of that transition, or none`, e.line);
+      throw new ComponentError(`state: the transition ${text(e)} is written unmarked on line ${plain.line} and as ${e.state === 'added' ? '+' : '-'} here. Mark every line of that transition, or none`, e.line);
     }
   }
 }
 
 function layout(model, rankdir, id, ui, pageDir = 'ltr') {
-  const { nodes, edges } = model;
+  const { nodes, edges, lines } = model;
   const rtl = pageDir === 'rtl';
+  const side = rtl ? -1 : 1;
   const below = rankdir === 'LR' || rankdir === 'RL';
   const loops = edges.filter((e) => e.from === e.to);
   const straight = edges.filter((e) => e.from !== e.to);
@@ -143,28 +146,41 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
   }));
 
   // With the ranks running sideways a self-transition loops below its state, so dagre gets a taller node for that state: the
-  // box is drawn at the top of it and the loops hang into the room under the box, clear of the next rank.
+  // box is drawn at the top of it and the loops hang into the room under the box, clear of the next rank. In TB and BT the loop
+  // lies beside the box, which is the side where the next state of the rank would sit, so dagre gets a wider node instead and
+  // the box is drawn at the edge away from the loops.
   const room = new Map();
-  if (below) {
-    for (const from of new Set(loops.map((e) => e.from))) {
-      const own = loops.filter((e) => e.from === from);
-      room.set(from, loopRoom(own.map((e) => (e.label ? edgeText(e.label).width : 0))));
+  const beside = new Map();
+  for (const from of new Set(loops.map((e) => e.from))) {
+    const own = loops.filter((e) => e.from === from);
+    const widths = own.map((e) => (e.label ? edgeText(e.label).width : 0));
+    if (below) {
+      room.set(from, { y: loopRoom(widths) });
+      continue;
     }
+    // A wide label pushes the next loop farther out, so two labelled self-transitions do not cover each other.
+    let offset = 0;
+    beside.set(from, own.map((e, i) => {
+      if (i) offset += Math.max(LOOP_STEP, widths[i - 1] + 6);
+      return { edge: e, offset, labelWidth: widths[i], extent: LOOP_OUT + offset + 6 + widths[i] };
+    }));
+    room.set(from, { x: Math.max(...beside.get(from).map((spec) => spec.extent)) });
   }
   const layoutNodes = new Map([...nodes].map(([key, n]) => {
     const box = boxes.get(key);
-    return [key, { ...n, shape: 'rect', size: [box.width, box.height + (room.get(key) ?? 0)] }];
+    const extra = room.get(key) ?? {};
+    return [key, { ...n, shape: 'rect', size: [box.width + (extra.x ?? 0), box.height + (extra.y ?? 0)] }];
   }));
   const { g, key } = runLayout({ nodes: layoutNodes, edges: straight, groups: [] }, rankdir, rtl, [], new Map());
-  // Where the box of a state is drawn: dagre's node is centred on the box, or taller and the box at its top.
+  // Where the box of a state is drawn: dagre's node is centred on the box, or larger and the box at the edge away from the room.
   const centre = (nodeId) => {
     const { x, y } = g.node(key.get(nodeId));
-    return { x, y: y - (room.get(nodeId) ?? 0) / 2 };
+    const extra = room.get(nodeId) ?? {};
+    return { x: x - (side * (extra.x ?? 0)) / 2, y: y - (extra.y ?? 0) / 2 };
   };
 
-  // In video mode, items appear step by step by source line: the states a line first names and its transition form one step.
-  const steps = [...new Set([...[...nodes.values()].map((n) => n.line), ...edges.map((e) => e.line)])].sort((a, b) => a - b);
-  const stepOf = new Map(steps.map((line, i) => [line, i]));
+  // In video mode, items appear step by step: every source line is one step, so a line that only marks a state still has one.
+  const stepOf = new Map(lines.map((line, i) => [line, i]));
 
   const drawn = straight.map((e, i) => {
     const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
@@ -179,18 +195,18 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
 
   // A self-transition lies beside its box; with the ranks running sideways (LR, RL) the edges leave by that side, so the loop
   // lies below the box instead. Further self-transitions of one state take their own distance, so all of them stay visible.
-  const side = rtl ? -1 : 1;
   const seen = new Map();
   const loopSpecs = loops.map((e) => {
-    const { nth, depth } = seen.get(e.from) ?? { nth: 0, depth: 0 };
-    seen.set(e.from, { nth: nth + 1, depth: depth + LOOP_STEP + (e.label ? LOOP_LABEL : 0) });
     const { x, y } = centre(e.from);
     const box = boxes.get(e.from);
-    const labelWidth = e.label ? edgeText(e.label).width : 0;
-    const spec = below
-      ? loopBelow({ x, y, height: box.height, depth, side, labelWidth })
-      : loopBeside({ x, y, width: box.width, nth, side, labelWidth });
-    return { e, ...spec };
+    if (below) {
+      const { depth } = seen.get(e.from) ?? { depth: 0 };
+      seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? LOOP_LABEL : 0) });
+      const labelWidth = e.label ? edgeText(e.label).width : 0;
+      return { e, ...loopBelow({ x, y, height: box.height, depth, side, labelWidth }) };
+    }
+    const spec = beside.get(e.from).find((x) => x.edge === e);
+    return { e, ...loopBeside({ x, y, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
   });
   const loopsSvg = loopSpecs.map(({ e, ...spec }) => {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
@@ -202,7 +218,9 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
   const nodeSvg = [...nodes.values()].map((n) => {
     const { x, y } = centre(n.id);
     const box = boxes.get(n.id);
-    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y - box.height / 2);
+    // A changed state shows its badge on the step of the line that marks it, not on the line that first names it.
+    const badgeStep = n.state === 'changed' ? stepOf.get(n.tildeLine ?? n.line) : undefined;
+    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y - box.height / 2, badgeStep);
     const keyAttr = n.kind === 'state' ? ` data-key="${esc(n.label)}"` : '';
     const open = `<g class="am-node am-node--state${n.kind === 'state' ? '' : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
     if (n.kind === 'initial') return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y)}" r="6"/>${badge}</g>`;
@@ -210,8 +228,8 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
     return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y, LH, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
 
-  // The drawing is as big as everything drawn on it: dagre sizes the ranks, but a loop sits outside its box, so the extent of
-  // every point decides. A shift keeps the origin at 0.
+  // The drawing is as big as everything drawn on it: dagre sizes the ranks, but a loop and its label sit outside the box, so
+  // the extent of every point decides. A shift keeps the origin at 0.
   const xs = [];
   const ys = [];
   const at = (x, y) => {
@@ -232,7 +250,14 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
       at(data.x + w / 2, data.y + h / 2);
     }
   }
-  for (const { corners } of loopSpecs) corners.forEach(([x, y]) => at(x, y));
+  for (const { e, corners, label } of loopSpecs) {
+    corners.forEach(([x, y]) => at(x, y));
+    if (label) {
+      const { width: w, height: h } = edgeText(e.label);
+      at(label.x - w / 2, label.y - h / 2);
+      at(label.x + w / 2, label.y + h / 2);
+    }
+  }
   const margin = 14;
   const shiftX = margin - Math.min(...xs);
   const shiftY = margin - Math.min(...ys);
@@ -250,7 +275,7 @@ function edgeLabelSvg(label, x, y, pageDir) {
   return `<g class="am-edge-label"><rect x="${f(x - w / 2)}" y="${f(y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="3"/>${textLines(lines, x, y, LH, '', pageDir)}</g>`;
 }
 
-// dagre clips an edge to the node it knows, which is taller than the drawn box when loops hang below it: clip to the box again,
+// dagre clips an edge to the node it knows, which is larger than the drawn box when a loop reserves room: clip to the box again,
 // along the line from the centre of the box to the next point of the edge.
 function clipEnds(points, edge, centre, boxes, room) {
   const pts = points.map((p) => ({ ...p }));

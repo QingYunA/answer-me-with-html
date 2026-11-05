@@ -514,9 +514,10 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
-export function badgeSvg(state, x, y) {
+export function badgeSvg(state, x, y, step) {
   if (!state) return '';
-  return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  const at = step === undefined ? '' : ` data-step="${step}"`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at}${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 
 // Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.

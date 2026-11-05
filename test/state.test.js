@@ -20,11 +20,16 @@ test('state: every transition is one edge, with an optional event as its label',
   assert.equal(m.edges.filter((e) => e.from === e.to).length, 1, 'Open -> Open is the only self-transition');
 });
 
-test('state: [*] on the left is one shared initial state, [*] on the right is one final state per transition', () => {
+test('state: all [*] lines share one initial state and one final state', () => {
   const m = parseState('[*] -> A\n[*] -> B\nA -> [*]\nB -> [*]');
   const kinds = [...m.nodes.values()].map((n) => n.kind);
   assert.equal(kinds.filter((k) => k === 'initial').length, 1);
-  assert.equal(kinds.filter((k) => k === 'final').length, 2);
+  assert.equal(kinds.filter((k) => k === 'final').length, 1);
+});
+
+test('state: U+0000 in a written name is an error, so it cannot merge with a pseudo-state id', () => {
+  throwsAt(() => render('\u0000initial -> B'), 1);
+  throwsAt(() => render('A -> B\n\u0000final'), 2);
 });
 
 test('state: a line without an arrow declares a state, and a marker alone marks it', () => {
@@ -72,8 +77,8 @@ test('state: a state is a rounded rectangle, the initial state a filled dot and 
 
 test('state: the diagram label names the states and follows the page language', () => {
   assert.match(render('[*] -> Idle\nIdle -> Open: go'), /aria-label="State machine diagram: Idle, Open"/);
-  const zh = COMPONENTS.get('state').render('[*] -> Idle', { args: '', uid: () => 'u1', ui: { state: '状态机图', colon: '：', sep: '、' } });
-  assert.match(zh, /aria-label="状态机图：Idle"/);
+  const zh = COMPONENTS.get('state').render('[*] -> Idle', { args: '', uid: () => 'u1', ui: { state: '状态机图', colon: '：', sep: '、' } }); // lang-ok: expected Chinese UI label
+  assert.match(zh, /aria-label="状态机图：Idle"/); // lang-ok: expected Chinese UI label
 });
 
 test('state: the canvas is finite and holds the loops and labels', () => {
@@ -94,6 +99,13 @@ test('state: ~ on a transition is an error, and so is the same transition both m
   throwsAt(() => render('A -> B\n~ A -> C'), 2);
   throwsAt(() => render('A -> B\n+ A -> B'), 2);
   throwsAt(() => render('- A -> B\nA -> B'), 1);
+  throwsAt(() => render('A -> [*]\n+ A -> [*]'), 2);
+});
+
+test('state: two events between the same states are two transitions, each with its own marker', () => {
+  const m = parseState('A -> B: timeout\n+ A -> B: cancel');
+  assert.equal(m.edges.length, 2);
+  assert.equal(m.edges[1].state, 'added');
 });
 
 test('state: a Mermaid line and a stateDiagram-v2 header are errors that show the line to write', () => {
@@ -153,6 +165,43 @@ test('state: video mode gives each source line one step and leaves the view swit
   assert.deepEqual([...new Set(steps)].sort((a, b) => a - b), [0, 1, 2]);
   assert.equal(steps.filter((s) => s === 2).length, 1, 'the self-transition line is one step');
   assert.match(svg, /<g data-step="2"><path class="am-edge" d="M[\d.,]+ C[\d.,]+ [\d.,]+ [\d.,]+"/, 'the loop is in that step');
+});
+
+test('state: a line that only marks a state still gets a video step, and the badge appears on it', () => {
+  const svg = render('A -> B\n~ A', '', { video: true });
+  const steps = [...svg.matchAll(/data-step="(\d+)"/g)].map((m) => Number(m[1]));
+  assert.deepEqual([...new Set(steps)].sort((a, b) => a - b), [0, 1]);
+  assert.match(svg, /<g class="am-delta-badge am-delta-badge--changed" data-step="1"/);
+});
+
+test('state: a labelled loop keeps room from the next state of its rank', () => {
+  const svg = render('A -> C\nA -> B\nB -> B: a long retry event');
+  const node = (key) => {
+    const m = svg.match(new RegExp(`data-key="${key}"[^>]*><rect class="am-node-shape" x="([\\d.]+)" y="[\\d.]+" width="([\\d.]+)"`));
+    return { left: Number(m[1]), right: Number(m[1]) + Number(m[2]) };
+  };
+  const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)"/g)].map((m) => Number(m[1]) + Number(m[2]));
+  const right = Math.max(...labels);
+  assert.ok(right < node('C').left, `loop label ends at ${right}, C starts at ${node('C').left}`);
+  assert.ok(node('C').left - node('B').right > 100, 'the room beside B keeps C away');
+});
+
+test('state: the labels of two beside-loops do not cover each other', () => {
+  const svg = render('A -> B\nB -> B: retry request\nB -> B: cancel request');
+  const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"/g)].map((m) => ({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]) }));
+  assert.equal(labels.length, 2);
+  assert.equal(labels[0].y, labels[1].y, 'both labels sit at the centre of their loop');
+  assert.ok(labels[0].x + labels[0].w + 5 <= labels[1].x, `labeled ${labels[0].x + labels[0].w} then ${labels[1].x}`);
+});
+
+test('state: a multi-line loop label stays inside the drawing', () => {
+  const svg = render('A -> B\nB -> B: first\\nsecond', 'LR');
+  const shift = svg.match(/<g transform="translate\(([-\d.]+),([-\d.]+)\)">/);
+  const shiftY = shift ? Number(shift[2]) : 0;
+  const label = svg.match(/<g class="am-edge-label"><rect x="[-\d.]+" y="([-\d.]+)" width="[\d.]+" height="([\d.]+)"/);
+  const bottom = Number(label[1]) + Number(label[2]) + shiftY;
+  const height = Number(svg.match(/viewBox="0 0 [\d.]+ ([\d.]+)"/)[1]);
+  assert.ok(bottom <= height, `label ends at ${bottom}, drawing at ${height}`);
 });
 
 test('state: the component renders inside a panel with its own figure class', () => {

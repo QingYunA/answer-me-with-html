@@ -286,7 +286,7 @@ A theme restyles what is inside a diagram (flow, state, sequence, er, the boxes 
 
 | Part | Tokens | Default |
 | :--- | :--- | :--- |
-| Node (flow, state, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Node (flow, state, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (state: 8px; the tree box: `--radius`), none, `--ink` |
 | Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
 | Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
 | Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |

@@ -10,9 +10,9 @@ export const LOOP_GAP = 6; // and what is left under the lowest loop of an item 
 
 // A loop beside its box: out of the end edge (the left one on a right-to-left page, where side is -1), around, and back into
 // it, with the two ends on that edge. The label sits beyond the loop.
-export function loopBeside({ x, y, width, labelWidth = 0, nth = 0, side = 1 }) {
+export function loopBeside({ x, y, width, labelWidth = 0, nth = 0, offset = nth * LOOP_STEP, side = 1 }) {
   const edge = x + (side * width) / 2;
-  const out = edge + side * LOOP_OUT + side * nth * LOOP_STEP;
+  const out = edge + side * LOOP_OUT + side * offset;
   const [ay, by] = [y - LOOP_END / 2, y + LOOP_END / 2];
   return {
     a: { x: edge, y: ay },
