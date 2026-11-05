@@ -362,6 +362,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-diagram .am-node--hi .am-node-text { fill: var(--hi-text, var(--accent, #1d5fbf)); }
 .am-edge { fill: none; stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
 .am-edge--dashed { stroke-dasharray: 5 4; }
+.am-class-hollow { fill: var(--paper, #ffffff); stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
 .am-arrow { fill: var(--edge-color, var(--ink-2, #4b5260)); }
 .am-edge-label rect { fill: var(--paper, #ffffff); }
 .am-diagram .am-edge-label text { fill: var(--edge-label, var(--accent, #1d5fbf)); font-size: var(--am-fs-d-edge); }
@@ -370,6 +371,16 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* The PK / FK / UK marks of an entity follow the node text, and the highlighted text in a highlighted entity, so they stay readable on the theme's fills. */
 .am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
 .am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
+/* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
+.am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
+.am-api-endpoint strong { color: var(--accent); }
+.am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
+.am-api .am-api-section h4 code { font-weight: 400; }
+.am-api .am-api-section table { margin: 0; table-layout: fixed; }
+.am-api th:first-child { width: 28%; }
+.am-api th, .am-api td { overflow-wrap: anywhere; }
+.am-api tbody th { font: inherit; vertical-align: top; padding-block: 7px; }
+.am-api tbody tr:nth-child(even) th { background: var(--fill); }
 .am-lifeline { stroke: var(--lifeline-color, var(--ink-3, #8b929e)); stroke-width: 1; stroke-dasharray: 4 4; }
 /* An actor (and the box of a divider) looks like a node unless the theme sets the actor tokens. */
 .am-actor { fill: var(--actor-fill, var(--node-fill, var(--paper, #ffffff))); stroke: var(--actor-stroke, var(--node-stroke, var(--line, #1d2026))); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); rx: var(--node-radius, 2px); }
