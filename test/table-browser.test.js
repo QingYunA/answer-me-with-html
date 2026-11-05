@@ -69,6 +69,21 @@ lang: en
 | larger | 9007199254740993.0 |
 | smaller | 9007199254740992.0 |
 {table sort}
+
+## G API migration
+\`\`\`api
+~ GET /users/{id}
+response 200 User
+  id string required
+  - email string optional
+  + email string required
++ POST /users/batch
+request BatchRequest
+  ids string[] required
+- RPC Users/GetLegacy
+response OK User
+  id string required
+\`\`\`
 `;
 
 let tmp;
@@ -206,6 +221,34 @@ test('e2e table: the filter hides only non-matching rows and clearing restores a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
   assert.deepEqual((await projects()).map((row) => row.hidden), [false, false, false]);
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// API view changes must hide whole added/removed endpoints and select the correct old/new field definition together.
+test('e2e api: one switch changes multiple HTTP/RPC contracts and their exact field definitions', { skip: SKIP }, async () => {
+  // snapshot clicks the real view control and reads only contracts and rows that occupy visible layout boxes.
+  const snapshot = (view) => evaluate(`(() => {
+    const host = document.querySelector('#panel-G .am-api');
+    host.querySelector('button[data-view="${view}"]').click();
+    return [...host.querySelectorAll('.am-api-contract')].filter((el) => el.getClientRects().length).map((contract) => ({
+      target: [...contract.querySelector('.am-api-endpoint').querySelectorAll('strong,code')].map((el) => el.textContent).join(' '),
+      fields: [...contract.querySelectorAll('tbody tr')].filter((row) => row.getClientRects().length).map((row) => ({
+        name: row.cells[0].querySelector('code').textContent,
+        requirement: row.cells[0].querySelector('code').title,
+      })),
+    }));
+  })()`);
+  const changes = await snapshot('changes');
+  assert.deepEqual(changes.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch', 'RPC Users/GetLegacy']);
+  assert.deepEqual(changes[0].fields.map((field) => field.name), ['id', 'email?', 'email']);
+  const before = await snapshot('before');
+  assert.deepEqual(before.map((contract) => contract.target), ['GET /users/{id}', 'RPC Users/GetLegacy']);
+  assert.deepEqual(before[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email?', requirement: 'Optional' }]);
+  const after = await snapshot('after');
+  assert.deepEqual(after.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch']);
+  assert.deepEqual(after[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Required' }]);
+  assert.equal(await evaluate(`document.querySelector('#panel-G [data-view="after"]').getAttribute('aria-pressed')`), 'true');
+  assert.deepEqual(await snapshot('changes'), changes);
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 

@@ -1,13 +1,17 @@
 ---
 title: api
 ---
-## A HTTP 接口
+## A 接口联动改造
 ```api
-GET /users/{id}
-path
-  id string required
+~ GET /users/{id}
 response 200 User
-  email string optional
-response 404 Error
-  message string required
+  - email string optional
+  + email string required
+~ RPC users.UserService/GetUser
+response OK User
+  - email string optional
+  + email string required
++ POST /users/batch
+request BatchRequest
+  ids string[] required
 ```

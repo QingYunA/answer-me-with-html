@@ -55,3 +55,21 @@ response OK User
   email string optional
 response NOT_FOUND
 ```
+
+## E One requirement, several API changes
+```api
+~ GET /users/{id}
+response 200 User
+  id string required
+  - email string optional
+  + email string required
+~ RPC users.UserService/GetUser
+response OK User
+  - email string optional
+  + email string required
++ POST /users/batch
+request BatchRequest
+  ids string[] required
+- GET /v1/users/{id}
+response 200 User
+```

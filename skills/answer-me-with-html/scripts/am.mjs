@@ -408,6 +408,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
 .am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
+.am-api-contract + .am-api-contract { margin-block-start: 20px; padding-block-start: 16px; border-block-start: 1px solid var(--line-2); }
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
@@ -721,6 +722,21 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 .am-view-changes .am-er-sign[data-delta="changed"], .am-view-changes .am-er-field[data-delta="changed"], .am-view-changes .am-er-key[data-delta="changed"] { fill: var(--warn); }
 .am-view-changes .am-er-field[data-delta="removed"] { text-decoration: line-through; }
 .am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
+
+/* API changes use the shared switch but collapse hidden HTML rows and contracts so Before and After remain readable. */
+.am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
+.am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
+.am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }
+.am-view-changes .am-api-contract[data-delta="added"], .am-view-changes .am-api-contract [data-delta="added"] { --api-change: var(--ok); --api-change-bg: var(--ok-bg); }
+.am-view-changes .am-api-contract[data-delta="removed"], .am-view-changes .am-api-contract [data-delta="removed"] { --api-change: var(--err); --api-change-bg: var(--err-bg); }
+.am-view-changes .am-api-contract[data-delta="changed"], .am-view-changes .am-api-contract [data-delta="changed"] { --api-change: var(--warn); --api-change-bg: var(--warn-bg); }
+.am-view-changes .am-api-contract tr[data-delta] > * { color: var(--api-change); background: var(--api-change-bg); }
+.am-view-changes .am-api-section[data-delta] > h4,
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint { color: var(--api-change); }
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint strong { color: inherit; }
+.am-view-changes .am-api-contract tr[data-delta="removed"] > *,
+.am-view-changes .am-api-section[data-delta="removed"] > h4,
+.am-view-changes .am-api-contract[data-delta="removed"] > .am-api-endpoint { text-decoration: line-through; }
 
 /* tree */
 .am-tree .am-delta-badge {
@@ -8153,16 +8169,21 @@ User ..|> Store: implements
 };
 
 // src/components/api.js
-function parseApi(text2) {
-  const lines = contentLines(text2);
-  const first = lines.shift();
-  const endpoint = first?.text.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
-  if (!endpoint || endpoint[1] !== "RPC" && !endpoint[2].startsWith("/")) {
-    throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", first?.line ?? 1);
+function apiState(mark, parent, line) {
+  const own = markState(mark);
+  const inherited = ["added", "removed"].includes(parent?.state) ? parent.state : null;
+  if (inherited && own && own !== inherited) {
+    throw new ComponentError(`api: "${mark}" contradicts its ${inherited} parent; remove the marker or move the item`, line);
   }
-  const sections = [];
+  const state = inherited ?? own;
+  return state ? { state } : {};
+}
+function parseApi(text2) {
+  const endpoints = [];
+  let endpoint;
   let current;
-  for (const { raw, text: line, line: n } of lines) {
+  for (const { raw, text: source, line: n } of contentLines(text2)) {
+    const { mark, text: line } = splitMarker(source);
     if (/^\s/.test(raw)) {
       const [spec, ...description] = line.split("|");
       const parts = spec.trim().split(/\s+/);
@@ -8170,25 +8191,36 @@ function parseApi(text2) {
       const requirement = /^(required|optional)$/.test(parts.at(-1)) ? parts.pop() : "";
       const type = parts.join(" ");
       if (!current || !type) throw new ComponentError("api: indent name type [required|optional] | description under a section", n);
-      current.fields.push({ name: name2, type, requirement, description: description.join("|").trim() });
+      current.fields.push({ name: name2, type, requirement, description: description.join("|").trim(), ...apiState(mark, current, n) });
       continue;
     }
+    const declaration = line.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
+    if (declaration && (declaration[1] === "RPC" || declaration[2].startsWith("/"))) {
+      endpoint = { method: declaration[1], target: declaration[2], sections: [], line: n, ...apiState(mark, null, n) };
+      endpoints.push(endpoint);
+      current = null;
+      continue;
+    }
+    if (!endpoint) throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", n);
     const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
     if (!section || section[1] === "response" && !section[2]) {
       throw new ComponentError("api: use path, query, headers, request [Type], or response STATUS [Type]", n);
     }
-    if (endpoint[1] === "RPC" && ["path", "query", "headers"].includes(section[1])) {
+    if (endpoint.method === "RPC" && ["path", "query", "headers"].includes(section[1])) {
       throw new ComponentError("api: RPC contracts use request and response sections", n);
     }
-    current = { kind: section[1], detail: section[2] ?? "", fields: [] };
-    sections.push(current);
+    current = { kind: section[1], detail: section[2] ?? "", fields: [], ...apiState(mark, endpoint, n) };
+    endpoint.sections.push(current);
   }
-  if (!sections.length) throw new ComponentError("api needs at least one request, parameter or response section", first.line);
-  return { method: endpoint[1], target: endpoint[2], sections };
+  if (!endpoints.length) throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", 1);
+  for (const item of endpoints) {
+    if (!item.sections.length) throw new ComponentError("api: each endpoint needs at least one request, parameter or response section", item.line);
+  }
+  return { endpoints };
 }
 var api_default = {
   name: "api",
-  summary: "HTTP API or RPC contract (parameters, request and response fields)",
+  summary: "HTTP/RPC contracts and multi-endpoint changes (parameters, requests and responses)",
   syntax: `\`\`\`api
 POST /users
 headers
@@ -8201,23 +8233,30 @@ response 201 User
 response 400 Error
   message string required
 \`\`\`
-- One endpoint per block: an uppercase HTTP method and /path, or RPC package.Service/Method.
+- One or more endpoints per block: start each with an uppercase HTTP method and /path, or RPC package.Service/Method, at column 0.
 - Sections: path, query, headers, request [Type], response STATUS [Type]. RPC uses request and response.
 - Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
 - required and optional are explicit; omitting them leaves the requirement unspecified. The field's tooltip names its requirement; ? marks an optional field.
 - A response requires a status (HTTP code or RPC status name). A section without fields can describe an empty response, such as response 204.
+- Prefix an endpoint, section or indented field with + (added), - (removed), or ~ (changed), followed by a space. Children inherit + or -, and a contradictory child marker is an error. ~ marks only the written item.
+- To show exact old and new types, names or requirements, write the old field/section/endpoint with - and its replacement with +. A lone ~ has no old value to reconstruct.
+- One Before / Changes / After switch applies to every endpoint in the block. Before hides added items; After hides removed items; unchanged items stay in both views. Counts include inherited markers.
 - This displays a contract; it does not send requests or import OpenAPI / protobuf files.`,
   example: "```api\nRPC users.UserService/GetUser\nrequest GetUserRequest\n  id string required\nresponse OK User\n  id string required\n  email string optional\nresponse NOT_FOUND\n```",
   // render emits semantic tables, escaping every author-supplied contract value and translating the surrounding labels.
-  render(text2, { ui } = {}) {
-    const { method, target, sections } = parseApi(text2);
+  render(text2, { ui, video } = {}) {
+    const { endpoints } = parseApi(text2);
     const words3 = ui?.api ?? FALLBACK.ui.api;
-    const body = sections.map(({ kind: kind2, detail, fields: fields2 }) => {
-      const described = fields2.some((field) => field.description);
-      const table = fields2.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${described ? `<th scope="col">${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${fields2.map((field) => `<tr><th scope="row"><code${field.requirement ? ` title="${esc(words3[field.requirement])}"` : ""}>${esc(field.name)}${field.requirement === "optional" ? "?" : ""}</code></th><td><code>${esc(field.type)}</code></td>${described ? `<td>${esc(field.description)}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : "";
-      return `<section class="am-api-section"><h4>${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
+    const contracts = endpoints.map(({ method, target, sections, state }) => {
+      const body = sections.map(({ kind: kind2, detail, fields: fields2, state: sectionState }) => {
+        const described = fields2.some((field) => field.description);
+        const table = fields2.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${described ? `<th scope="col">${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code${field.requirement ? ` title="${esc(words3[field.requirement])}"` : ""}>${esc(field.name)}${field.requirement === "optional" ? "?" : ""}</code></th><td><code>${esc(field.type)}</code></td>${described ? `<td>${esc(field.description)}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : "";
+        return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
+      }).join("");
+      return `<article class="am-api-contract"${deltaAttr(state)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
     }).join("");
-    return `<div class="am-api am-md"><div class="am-api-endpoint" dir="ltr"><strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</div>`;
+    const states = endpoints.flatMap((endpoint) => [endpoint.state, ...endpoint.sections.flatMap((section) => [section.state, ...section.fields.map((field) => field.state)])]);
+    return withDelta(`<div class="am-api am-md">${contracts}</div>`, states, { ui, video });
   }
 };
 
