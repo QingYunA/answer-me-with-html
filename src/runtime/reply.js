@@ -46,7 +46,8 @@ if (replyBtn) {
     if (document.visibilityState === 'hidden') flushSave();
   });
   window.addEventListener('pagehide', flushSave);
-  const panels = [...document.querySelectorAll('.am-panel')];
+  // A preview may draw a mock panel; it gets no comment box and cannot shadow the real panel's id.
+  const panels = [...document.querySelectorAll('.am-panel')].filter((panel) => !panel.closest('.am-ask-preview'));
   // An ask inside a preview is part of the drawing, not a decision of the page.
   const asks = [...document.querySelectorAll('.am-ask')].filter((a) => !a.closest('.am-ask-preview'));
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.

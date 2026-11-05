@@ -58,6 +58,7 @@ Which outer?
 * Outer A
   :::html
   <fieldset class="am-ask" data-ask="mock"><legend>Mock question?</legend><label><input type="radio" name="mock" value="Ghost" data-suggested checked>Ghost</label></fieldset>
+  <section class="am-panel" id="panel-A"><div class="am-panel-body">Mock panel</div></section>
   :::
 - Outer B
 \`\`\`
@@ -169,9 +170,16 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
   assert.deepEqual(after, { memcached: true, comment: 'Make the TTL a setting.', open: true });
 });
 
-test('reply: a mock ask and a suggested control inside a preview stay out of the reply', { skip: SKIP }, async () => {
+test('reply: a mock ask, suggested control and panel inside a preview stay out of the reply', { skip: SKIP }, async () => {
   await load(previewFile);
-  await evaluate('document.querySelector(\'input[value="Outer A"]\').click()');
+  assert.equal(await evaluate('document.querySelectorAll(".am-comment-btn").length'), 1, 'the mock panel gets no comment box');
+  await evaluate(`(() => {
+    document.querySelector('input[value="Outer A"]').click();
+    document.querySelector('#panel-A .am-comment-btn').click();
+    const box = document.querySelector('#panel-A .am-comment textarea');
+    box.value = 'real note';
+    box.dispatchEvent(new Event('input'));
+  })()`);
   const text = await evaluate(`(() => {
     document.querySelector('[data-am="reply"]').click();
     const sheet = document.querySelector('dialog.am-reply');
@@ -180,6 +188,7 @@ test('reply: a mock ask and a suggested control inside a preview stay out of the
     return value;
   })()`);
   assert.match(text, /1\. \[A\] Which outer\?\n {3}→ \*\*Outer A\*\* _\(suggestion confirmed\)_/);
+  assert.match(text, /- \*\*A · Nested\*\*\n {2}> real note/);
   assert.doesNotMatch(text, /Mock question|Ghost/);
   assert.equal((text.match(/^\d+\. /gm) ?? []).length, 1, 'only the real ask is a decision');
 });
