@@ -55,7 +55,7 @@ User ..> Store: uses
 ````
 
 - Declare `class`, `interface`, `abstract` or `enum` at column 0; a bare name means `class`. Prefix a name with `*` to highlight it.
-- Indent attributes and methods. Visibility, types and signatures are shown as written. A member containing `(` is placed in the methods compartment.
+- Indent attributes and methods. Visibility, types and signatures are shown as written. A method starts with `name(` after its optional visibility sign; parentheses in a property type stay in the attributes compartment.
 - Relationships: `--|>` inheritance, `..|>` realization, `*--` composition, `o--` aggregation, `-->` association, `..>` dependency, `--` plain association. Arrowheads are at the right end; diamonds are at the left end. Add `: label` if needed.
 - Declare both ends of every relationship. Self-links and parallel links work. Directions are `TB` (default), `LR`, `BT` and `RL`.
 
@@ -77,39 +77,17 @@ RPC users.UserService/GetUser
 request GetUserRequest
   id string required
 response OK User
-  email string optional
+  email string \| null optional
 response NOT_FOUND
 ```
 ````
 
-- An `api` block can group several endpoints for one requirement; declare each endpoint at column 0. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
+- One endpoint per `api` block. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
 - Sections are `path`, `query`, `headers`, `request [Type]` and `response STATUS [Type]`. RPC uses `request` and `response`. A response with no fields can describe an empty body.
-- Indent fields as `name type [required|optional] | description`. Types, nested field paths and descriptions are plain text. A missing requirement stays unspecified. `?` marks an optional field; its tooltip names the requirement.
+- Indent fields as `name type [required|optional] | description`. Types, nested field paths and descriptions are plain text. The Requirement column shows explicit Required or Optional labels. An unspecified value shows a dash when the column is present; tables with no explicit requirements omit the column.
+- Escape a literal type pipe as `\|`: write `email string \| null optional | Contact` for the union type `string | null`. The first unescaped `|` starts the description.
 - Labels follow the page language. Class diagrams use the existing theme tokens, scaling and diagram viewer; contract fields use semantic tables. Both render offline.
 - These blocks display definitions. They do not send requests or import OpenAPI / protobuf files. Class diagrams do not interpret `+` / `-` visibility signs as change markers.
-
-To show a coordinated API change, mark endpoints, sections or indented fields with `+`, `-` or `~` followed by a space:
-
-````markdown
-```api
-~ GET /users/{id}
-response 200 User
-  id string required
-  - email string optional
-  + email string required
-~ RPC users.UserService/GetUser
-response OK User
-  - email string optional
-  + email string required
-+ POST /users/batch
-request BatchRequest
-  ids string[] required
-- GET /v1/users/{id}
-response 200 User
-```
-````
-
-One **Before / Changes / After** switch controls all endpoints in the block. Before hides added endpoints, sections and fields; After hides removed ones. Unchanged items stay in both views. Hidden HTML items take no space. The children of an added or removed item inherit its marker; contradictory markers are errors. `~` marks only its item, not its children. Counts include inherited markers. For exact before/after values, write `-` for the old definition and `+` for its replacement; `~` alone has no old value to reconstruct. This includes a change of path, type, requiredness or response status.
 
 Full syntax: `am help class`, `am help er`, `am help api`.
 

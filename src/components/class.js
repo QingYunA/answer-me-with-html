@@ -7,6 +7,8 @@ import { ComponentError, contentLines } from './error.js';
 
 // RELATION matches UML links; the arrow or diamond belongs to the written end.
 const RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+(\S+)(?:\s*:\s*(.*))?$/;
+// METHOD requires a call signature before any property type, keeping callback-valued properties in the attributes compartment.
+const METHOD = /^[+\-#~]?\s*[^:\s(]+\s*\(/;
 // ROW is the fixed line height used to measure and draw class compartments.
 const ROW = 20;
 // PAD leaves room between a class's text and its border.
@@ -63,7 +65,7 @@ User ..|> Store: implements
 \`\`\`
 - Declare class, interface, abstract or enum at column 0; a bare name is a class. * highlights a declaration.
 - Indent members. Visibility (+ public, - private, # protected, ~ package), types and signatures are shown as written.
-- Attributes and methods occupy separate compartments; a member containing ( is a method.
+- Attributes and methods occupy separate compartments; a method starts with name( after its optional visibility sign. Parentheses in a property type do not make it a method.
 - Links: --|> inheritance, ..|> realization, *-- composition, o-- aggregation, --> association, ..> dependency, -- plain association.
 - Arrowheads point at the right-hand declaration; diamonds sit at the left-hand declaration. Labels after : are optional.
 - Declare both ends of every link. Self-links and parallel links are supported. The default direction is TB.`,
@@ -77,11 +79,11 @@ User ..|> Store: implements
     g.setDefaultEdgeLabel(() => ({}));
     const keys = new Map([...classes.keys()].map((name, i) => [name, `n${i}`]));
     for (const c of classes.values()) {
-      const stereotype = c.kind === 'class' ? [] : [`«${c.kind}»`];
-      const attributes = c.members.filter((m) => !m.includes('('));
-      const methods = c.members.filter((m) => m.includes('('));
+      const stereotype = c.kind === 'class' ? [] : [c.kind];
+      const attributes = c.members.filter((m) => !METHOD.test(m));
+      const methods = c.members.filter((m) => METHOD.test(m));
       const groups = [[...stereotype, c.name], attributes, methods].filter((rows) => rows.length);
-      const widths = groups.flatMap((rows, i) => rows.map((row) => measure(row, i ? DRAWING.field : DRAWING.node, c.hi)));
+      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || (stereotype.length && !n) ? DRAWING.field : DRAWING.node, c.hi)));
       g.setNode(keys.get(c.name), { ...c, groups, width: Math.ceil(Math.max(100, ...widths.map((w) => w + 2 * PAD))), height: groups.reduce((n, rows) => n + rows.length * ROW + PAD, 0) });
     }
     relations.forEach((rel, i) => {
@@ -106,7 +108,11 @@ User ..|> Store: implements
       let top = y;
       const rows = c.groups.map((group, k) => {
         const separator = k ? `<path class="am-edge" d="M${f(x)},${f(top)} h${f(c.width)}"/>` : '';
-        const text = group.map((member, n) => `<text class="am-node-text" x="${f(k ? (dir === 'rtl' ? x + c.width - PAD : x + PAD) : c.x)}" y="${f(top + PAD / 2 + ROW * (n + 0.5))}" text-anchor="${k ? 'start' : 'middle'}" dominant-baseline="central"${k ? ` style="font-size:${DRAWING.field}px"` : ''}>${esc(svgLine(member, dir))}</text>`).join('');
+        const text = group.map((member, n) => {
+          // The kind label keeps the theme's node color, but is smaller and muted above the name.
+          const kind = !k && !n && c.kind !== 'class';
+          return `<text class="am-node-text" x="${f(k ? (dir === 'rtl' ? x + c.width - PAD : x + PAD) : c.x)}" y="${f(top + PAD / 2 + ROW * (n + 0.5))}" text-anchor="${k ? 'start' : 'middle'}" dominant-baseline="central"${k || kind ? ` style="font-size:${DRAWING.field}px${kind ? ';font-style:italic;opacity:0.65' : ''}"` : ''}>${esc(svgLine(member, dir))}</text>`;
+        }).join('');
         top += group.length * ROW + PAD;
         return separator + text;
       }).join('');

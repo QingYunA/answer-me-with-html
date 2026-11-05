@@ -37,7 +37,7 @@ export default {
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
     generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },
     chart: { name: 'תרשים', data: 'נתונים', value: 'ערך', share: 'חלק' },
-    api: { path: 'פרמטרים בנתיב', query: 'פרמטרים בשאילתה', headers: 'כותרות', request: 'בקשה', response: 'תגובה', field: 'שדה', type: 'טיפוס', description: 'תיאור', required: 'חובה', optional: 'רשות' },
+    api: { path: 'פרמטרים בנתיב', query: 'פרמטרים בשאילתה', headers: 'כותרות', request: 'בקשה', response: 'תגובה', field: 'שדה', type: 'טיפוס', description: 'תיאור', requirement: 'דרישה', required: 'חובה', optional: 'רשות' },
     table: { filter: 'סינון הטבלה' },
   },
   // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.

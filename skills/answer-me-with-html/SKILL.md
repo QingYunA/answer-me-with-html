@@ -149,7 +149,7 @@ Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); 
 | What connects to what, architecture, decision branches | `flow [LR]` | `A -> B: label`, `A --> C` dashed, `A -> B & C` fan-out, `{decision?}` `(start)` `[(database)]`, `*emphasis`, `group name: A, B`, no node IDs: `{OK?}`, not `B{OK?}` |
 | A data model: entities, their columns and the relations between them | `er [LR]` | entity at column 0, indented `name [type] [PK\|FK\|UK]` fields, `user_id FK -> User`, `User 1--* Order: places` |
 | Classes, code interfaces and their relationships | `class [LR]` | `class User`, indented `+id: string` and `+save(): void`, `User --|> Entity`, `SqlStore ..|> Store` |
-| HTTP/RPC contracts or one requirement changing several endpoints | `api` | `GET /users/{id}` or `RPC users.UserService/GetUser`, sections `path`, `query`, `headers`, `request [Type]`, `response STATUS [Type]`, indented `name type [required\|optional] \| description`; multiple endpoints per block; `+` / `-` / `~` markers on endpoints, sections or fields |
+| An HTTP or RPC interface contract | `api` | `GET /users/{id}` or `RPC users.UserService/GetUser`, sections `path`, `query`, `headers`, `request [Type]`, `response STATUS [Type]`, indented `name type [required\|optional] \| description` |
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
 | Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |

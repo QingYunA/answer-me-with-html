@@ -69,27 +69,6 @@ lang: en
 | larger | 9007199254740993.0 |
 | smaller | 9007199254740992.0 |
 {table sort}
-
-## G API migration
-\`\`\`api
-~ GET /users/{id}
-response 200 User
-  id string required
-  - email string optional
-  + email string required
-+ POST /users/batch
-request BatchRequest
-  ids string[] required
-- RPC Users/GetLegacy
-response OK User
-  id string required
-\`\`\`
-
-## H Code diff palette
-\`\`\`diff
--old
-+new
-\`\`\`
 `;
 
 let tmp;
@@ -227,64 +206,6 @@ test('e2e table: the filter hides only non-matching rows and clearing restores a
     input.dispatchEvent(new Event('input', { bubbles: true }));
   })()`);
   assert.deepEqual((await projects()).map((row) => row.hidden), [false, false, false]);
-  assert.deepEqual(await evaluate('window.__csp'), []);
-});
-
-// API view changes must hide whole added/removed endpoints and select the correct old/new field definition together.
-test('e2e api: one switch changes multiple HTTP/RPC contracts and their exact field definitions', { skip: SKIP }, async () => {
-  // snapshot clicks the real view control and reads only contracts and rows that occupy visible layout boxes.
-  const snapshot = (view) => evaluate(`(() => {
-    const host = document.querySelector('#panel-G .am-api');
-    host.querySelector('button[data-view="${view}"]').click();
-    return [...host.querySelectorAll('.am-api-contract')].filter((el) => el.getClientRects().length).map((contract) => ({
-      target: [...contract.querySelector('.am-api-endpoint').querySelectorAll('strong,code')].map((el) => el.textContent).join(' '),
-      fields: [...contract.querySelectorAll('tbody tr')].filter((row) => row.getClientRects().length).map((row) => ({
-        name: row.cells[0].querySelector('code').textContent,
-        requirement: row.cells[0].querySelector('code').title,
-      })),
-    }));
-  })()`);
-  const changes = await snapshot('changes');
-  assert.deepEqual(changes.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch', 'RPC Users/GetLegacy']);
-  assert.deepEqual(changes[0].fields.map((field) => field.name), ['id', 'email?', 'email']);
-  const before = await snapshot('before');
-  assert.deepEqual(before.map((contract) => contract.target), ['GET /users/{id}', 'RPC Users/GetLegacy']);
-  assert.deepEqual(before[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email?', requirement: 'Optional' }]);
-  const after = await snapshot('after');
-  assert.deepEqual(after.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch']);
-  assert.deepEqual(after[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Required' }]);
-  assert.equal(await evaluate(`document.querySelector('#panel-G [data-view="after"]').getAttribute('aria-pressed')`), 'true');
-  assert.deepEqual(await snapshot('changes'), changes);
-  assert.deepEqual(await evaluate('window.__csp'), []);
-});
-
-// API additions and deletions must use the code diff palette for fields, endpoints, badges and counts, even when a theme's status color is blue.
-test('e2e api: change colors match code diffs in all built-in themes and light/dark modes', { skip: SKIP }, async () => {
-  for (const theme of ['blueprint', 'shadcn', 'paper']) {
-    for (const mode of ['light', 'dark']) {
-      const tones = await evaluate(`(() => {
-        document.documentElement.dataset.theme = '${theme}';
-        document.documentElement.dataset.mode = '${mode}';
-        const host = document.querySelector('#panel-G .am-api');
-        return ['added', 'removed'].map((state) => {
-          const sign = state === 'added' ? 'add' : 'del';
-          return {
-            expected: getComputedStyle(document.querySelector('.am-code-stat-' + sign)).color,
-            expectedBg: getComputedStyle(document.querySelector('.am-ln--' + sign)).backgroundColor,
-            field: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).color,
-            background: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).backgroundColor,
-            endpoint: getComputedStyle(host.querySelector('article[data-delta="' + state + '"] .am-api-endpoint strong')).color,
-            badge: getComputedStyle(host.querySelector('.am-delta-badge--' + state)).color,
-            count: getComputedStyle(host.querySelector('.am-delta-count--' + state)).color,
-          };
-        });
-      })()`);
-      for (const tone of tones) {
-        for (const part of ['field', 'endpoint', 'badge', 'count']) assert.equal(tone[part], tone.expected, `${theme}/${mode}/${part}`);
-        assert.equal(tone.background, tone.expectedBg, `${theme}/${mode}/background`);
-      }
-    }
-  }
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 

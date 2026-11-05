@@ -38,7 +38,7 @@ A -> B: 标签
 
 ## 类图与接口定义
 
-代码结构使用 `class`，数据库实体使用 `er`，HTTP / RPC 接口使用 `api`。完整示例见 [contracts.en.md](../examples/contracts.en.md)。
+代码结构使用 `class`，数据库实体使用 `er`，HTTP / RPC 接口使用 `api`。完整示例见 [contracts.md](../examples/contracts.md)。
 
 ````markdown
 ```class LR
@@ -55,7 +55,7 @@ User ..> Store: uses
 ````
 
 - 在行首声明 `class`、`interface`、`abstract` 或 `enum`。只写名称时表示普通类；名称前的 `*` 表示高亮。
-- 缩进属性和方法。可见性、类型和签名按原文显示；含 `(` 的成员放在方法分区。
+- 缩进属性和方法。可见性、类型和签名按原文显示。去掉可见性标记后，以 `名称(` 开头的成员放在方法分区；属性类型中的括号不表示方法。
 - 关系支持 `--|>` 继承、`..|>` 实现、`*--` 组合、`o--` 聚合、`-->` 关联、`..>` 依赖和 `--` 普通关联。箭头在右端，菱形在左端；可用 `: 标签` 标注连线。
 - 关系两端都必须声明。支持自关联和平行连线。方向为 `TB`（默认）、`LR`、`BT` 或 `RL`。
 
@@ -77,39 +77,17 @@ RPC users.UserService/GetUser
 request GetUserRequest
   id string required
 response OK User
-  email string optional
+  email string \| null optional
 response NOT_FOUND
 ```
 ````
 
-- 每个 `api` 块可以定义同一需求涉及的多个接口，在行首开始下一个接口。HTTP 使用大写方法和 `/路径`；RPC 使用 `RPC` 和服务方法名。
+- 每个 `api` 块定义一个接口。HTTP 使用大写方法和 `/路径`；RPC 使用 `RPC` 和服务方法名。
 - 分区支持 `path`、`query`、`headers`、`request [类型]` 和 `response 状态 [类型]`。RPC 使用 `request` 和 `response`。响应可以省略字段，表示空响应体。
-- 缩进字段，格式为 `名称 类型 [required|optional] | 说明`。类型、嵌套字段路径和说明按纯文本显示。省略必填标记时不推断；`?` 表示可选字段，悬停提示说明必填状态。
+- 缩进字段，格式为 `名称 类型 [required|optional] | 说明`。类型、嵌套字段路径和说明按纯文本显示。必填性列直接显示“必填”或“可选”。未声明的字段显示短横线；整张表均未声明时省略此列。
+- 类型中的竖线写成 `\|`。例如 `email string \| null optional | 联系方式` 表示联合类型 `string | null`；第一个未转义的 `|` 开始说明。
 - 标签跟随页面语言。类图复用现有主题、缩放和图示查看器；接口字段使用语义表格。两种组件都支持离线页面。
 - 组件只展示定义，不发送请求，也不导入 OpenAPI 或 protobuf 文件。类图中的 `+` / `-` 表示可见性，不表示变更标记。
-
-同一需求涉及多个接口时，可以在接口、分区或缩进字段前加 `+`、`-`、`~` 和空格：
-
-````markdown
-```api
-~ GET /users/{id}
-response 200 User
-  id string required
-  - email string optional
-  + email string required
-~ RPC users.UserService/GetUser
-response OK User
-  - email string optional
-  + email string required
-+ POST /users/batch
-request BatchRequest
-  ids string[] required
-- GET /v1/users/{id}
-response 200 User
-```
-````
-
-一个「改前 / 变更 / 改后」开关控制块内所有接口。改前隐藏新增接口、分区和字段；改后隐藏已删除的内容。未变更内容在两个视图中都保留。隐藏内容不占空白。新增或删除父项时，子项继承标记，冲突标记会报错。`~` 只标记当前项，不传给子项。计数包含继承的标记。要展示准确旧值和新值，请用 `-` 写旧定义，用 `+` 写新定义；单独的 `~` 无法还原旧值。路径、类型、必填状态和响应状态码都使用同一规则。
 
 完整语法：`am help class`、`am help er`、`am help api`。
 
