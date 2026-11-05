@@ -186,6 +186,18 @@ test('am theme check: a complete theme passes and gets a specimen page per mode'
   }
 });
 
+test('am theme check: the specimen pages follow the colophon setting', async () => {
+  install('notes', notesTheme());
+  assert.equal((await run(['config', 'set', 'colophon', 'off'])).code, 0);
+  try {
+    const r = await run(['theme', 'check', 'notes', '--no-open']);
+    assert.equal(r.code, 0, r.err);
+    for (const [, f] of r.out.matchAll(/✓ (.+\.html)/g)) assert.doesNotMatch(readFileSync(f, 'utf8'), /<p class="am-colophon">/, f);
+  } finally {
+    await run(['config', 'reset']);
+  }
+});
+
 test('am theme check: reports invalid colors, missing tokens and low contrast; checks a file path', async () => {
   const file = join(home, 'draft-theme.json');
   writeFileSync(file, JSON.stringify(notesTheme((t) => ({

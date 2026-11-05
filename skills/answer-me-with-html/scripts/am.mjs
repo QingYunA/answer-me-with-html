@@ -13865,14 +13865,14 @@ function cmdTheme(action, target, opts, ctx) {
   if (all.length) return 1;
   if (!theme.scope.includes("page")) return 0;
   const themes2 = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
+  const config = readConfig(env, themes2);
   const files = ["light", "dark"].map((mode) => {
-    const result = renderDoc(specimenDraft(name2, mode), { theme: name2, mode, style: "off" }, {}, { themes: themes2 });
+    const result = renderDoc(specimenDraft(name2, mode), { theme: name2, mode, style: "off" }, {}, { themes: themes2, colophon: config.values.colophon });
     const file = outputPath("pages", `theme-${name2}-${mode}`, {}, ctx);
     writePage(file, result.html, env);
     print(`\u2713 ${file}`);
     return file;
   });
-  const config = readConfig(env, themes2);
   if (shouldOpen(opts, env, config.values)) files.forEach((f2) => (io.open ?? openFile)(f2));
   return 0;
 }

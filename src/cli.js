@@ -1156,14 +1156,14 @@ function cmdTheme(action, target, opts, ctx) {
   if (!theme.scope.includes('page')) return 0;
 
   const themes = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
+  const config = readConfig(env, themes);
   const files = ['light', 'dark'].map((mode) => {
-    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes });
+    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes, colophon: config.values.colophon });
     const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
     writePage(file, result.html, env);
     print(`✓ ${file}`);
     return file;
   });
-  const config = readConfig(env, themes);
   if (shouldOpen(opts, env, config.values)) files.forEach((f) => (io.open ?? openFile)(f));
   return 0;
 }
