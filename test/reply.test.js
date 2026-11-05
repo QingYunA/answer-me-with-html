@@ -37,6 +37,54 @@ test('ask: multi renders checkboxes and allows several or no suggestions', () =>
   assert.doesNotThrow(() => renderDoc(draft('```ask multi', 'What do we log?\n- Retry\n- Give up')));
 });
 
+test('ask: an option preview is drawn in the card canvas, and cards makes a grid', () => {
+  const body = 'Which cache?\n* Redis\n  :::flow\n  Client -> Cache: get\n  :::\n- Memcached';
+  const { html, stats } = renderDoc(draft('```ask cards', body));
+  assert.match(html, /<fieldset class="am-ask am-ask--cards" data-ask="am\d+">/);
+  assert.match(html, /<div class="am-ask-opts"><div class="am-ask-card"><label class="am-ask-opt">/);
+  assert.match(html, /<\/label><div class="am-ask-preview"><figure class="am-diagram am-flow">/);
+  assert.match(html, /am-ask-preview[\s\S]*<\/figure><\/div><\/div>/);
+  assert.equal(stats.components.ask, 1);
+  assert.equal(stats.components.flow, 1);
+  // Without cards the same preview renders, and the fieldset keeps its list layout.
+  const plain = renderDoc(draft('```ask', body)).html;
+  assert.match(plain, /<fieldset class="am-ask" data-ask="am\d+">/);
+  assert.match(plain, /<div class="am-ask-preview"><figure class="am-diagram am-flow">/);
+});
+
+test('ask: a preview can be html or svg, and an option without one has no canvas', () => {
+  const body = 'Which cache?\n* Redis\n  :::html\n  <b class="preview-mark">redis</b>\n  :::\n- Memcached';
+  const { html } = renderDoc(draft('```ask', body));
+  assert.match(html, /<div class="am-ask-preview"><b class="preview-mark">redis<\/b><\/div>/);
+  assert.equal(html.match(/class="am-ask-preview"/g).length, 1);
+  const svgBody = 'Which shape?\n* Circle\n  :::svg\n  <svg viewBox="0 0 10 10"><circle r="5"/></svg>\n  :::\n- Square';
+  const svgDoc = renderDoc(draft('```ask', svgBody)).html;
+  assert.match(svgDoc, /<div class="am-ask-preview"><svg viewBox="0 0 10 10"><circle r="5"\/><\/svg><\/div>/);
+});
+
+test('ask: preview errors name the draft line', () => {
+  const cases = [
+    ['Which?\n* A\n  :::flow\n  A -> B', /preview block is not closed/, 9],
+    ['Which?\n  :::flow\n  A -> B\n  :::\n* A\n- B', /put a preview under an option/, 8],
+    ['Which?\n* A\n  :::flow\n  A -> B\n  :::\n  :::flow\n  A -> C\n  :::\n- B', /one preview per option/, 12],
+  ];
+  for (const [body, message, line] of cases) {
+    const err = errorOf(draft('```ask', body));
+    assert.ok(err instanceof RenderError, `${body}: ${err}`);
+    assert.equal(err.component, 'ask');
+    assert.match(err.message, message);
+    assert.equal(err.line, line, body);
+  }
+});
+
+test('ask: the STE check skips the text inside a preview', () => {
+  const long = 'Which of the two caches that the team looked at during the review last week do we utilize for the session store and the job queue in production and in staging?';
+  const preview = 'This preview sentence also utilizes a very long sentence that the reader sees inside the drawing, not as prose on the page.';
+  const warnings = lintDoc(parseDoc(draft('```ask', `${long}\n* Redis\n  :::html\n  <p>${preview}</p>\n  :::\n- Memcached`)));
+  assert.ok(warnings.some((w) => w.line === 7 && w.rule === 'sentence-length'));
+  assert.ok(!warnings.some((w) => w.line === 10), 'the preview text is not checked as page prose');
+});
+
 test('ask: the suggested tag follows the page language', () => {
   const { html } = renderDoc(`---\ntitle: 缓存\nlang: zh\n---\n## A 面板\n\`\`\`ask\n用哪个缓存？\n* Redis\n- Memcached\n\`\`\`\n`);
   assert.match(html, /<span class="am-ask-tag">建议<\/span>/);

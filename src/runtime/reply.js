@@ -46,8 +46,10 @@ if (replyBtn) {
     if (document.visibilityState === 'hidden') flushSave();
   });
   window.addEventListener('pagehide', flushSave);
-  const panels = [...document.querySelectorAll('.am-panel')];
-  const asks = [...document.querySelectorAll('.am-ask')];
+  // A preview may draw a mock panel; it gets no comment box and cannot shadow the real panel's id.
+  const panels = [...document.querySelectorAll('.am-panel')].filter((panel) => !panel.closest('.am-ask-preview'));
+  // An ask inside a preview is part of the drawing, not a decision of the page.
+  const asks = [...document.querySelectorAll('.am-ask')].filter((a) => !a.closest('.am-ask-preview'));
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
   // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved
   // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).
@@ -81,7 +83,9 @@ if (replyBtn) {
     }
     if (serve) saveSoon({ reply: state });
   };
-  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);
+  // A preview can hold a mock form; those controls are a picture, not the reader's answer.
+  const inputsOf = (ask) => [...ask.querySelectorAll('input')].filter((i) => !i.closest('.am-ask-preview'));
+  const picked = (ask) => inputsOf(ask).filter((i) => i.checked).map((i) => i.value);
   const panelOf = (el) => {
     const panel = el.closest('.am-panel');
     return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };
@@ -89,7 +93,7 @@ if (replyBtn) {
 
   const saved = load();
   for (const ask of asks) {
-    const inputs = [...ask.querySelectorAll('input')];
+    const inputs = inputsOf(ask);
     const state = saved.asks?.[keyOf(ask)];
     // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started
     // with the suggestion selected and saved it untouched, and that state must come back unselected.
@@ -98,13 +102,14 @@ if (replyBtn) {
       touched.add(ask);
     }
     // A click counts even on the option that is already picked: the reader confirms the suggestion.
-    const answer = () => {
+    const answer = (e) => {
+      if (e?.target?.closest?.('.am-ask-preview')) return;
       touched.add(ask);
       save();
       refreshBar();
     };
     ask.addEventListener('change', answer);
-    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });
+    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(e); });
   }
 
   for (const panel of panels) {
@@ -158,7 +163,7 @@ if (replyBtn) {
       panel: panelOf(ask).id,
       question: textOf(ask.querySelector('legend')) ?? '',
       picked: picked(ask),
-      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),
+      suggested: inputsOf(ask).filter((i) => i.hasAttribute('data-suggested')).map((i) => i.value),
       touched: touched.has(ask),
     }));
     const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));
