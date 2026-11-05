@@ -191,8 +191,9 @@ function renderFence(block, ctx) {
       render: (blocks) => renderBlocks(blocks, ctx),
     });
     // A component's own svg is measured in viewBox units at fixed text sizes, so the whole box takes the factor. Raw svg / html blocks
-    // bypass this function, and a video never scales.
-    return ctx.video ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
+    // bypass this function, and a video never scales. A component that renders nested blocks scales each one itself, so its output
+    // must not take the factor again; otherwise a raw preview would be rewritten while the same block at the top level is not.
+    return ctx.video || comp.scalesOwnSvg ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {

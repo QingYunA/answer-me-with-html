@@ -47,12 +47,29 @@ export const TTL = 30 * 60
 \`\`\`
 `;
 
+// A preview may contain a mock ask and a suggested control; neither belongs to the page's decisions.
+const PREVIEW_DRAFT = `---
+title: Preview
+lang: en
+---
+## A Nested
+\`\`\`ask
+Which outer?
+* Outer A
+  :::html
+  <fieldset class="am-ask" data-ask="mock"><legend>Mock question?</legend><label><input type="radio" name="mock" value="Ghost" data-suggested checked>Ghost</label></fieldset>
+  :::
+- Outer B
+\`\`\`
+`;
+
 let tmp;
 let chrome;
 let cdp;
 let session;
 let file;
 let closingFile;
+let previewFile;
 
 const send = (method, params) => cdp.send(method, params, session);
 const evaluate = async (expression) => {
@@ -80,6 +97,11 @@ before(async () => {
   am('config', 'set', 'close_after_reply', 'on');
   closingFile = join(tmp, 'closing.html');
   am('render', join(tmp, 'd.md'), '-o', closingFile, '--no-open');
+  writeFileSync(join(tmp, 'preview.md'), PREVIEW_DRAFT);
+  previewFile = join(tmp, 'preview.html');
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'preview.md'), '-o', previewFile, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+  });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -145,6 +167,21 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
     open: !document.querySelector('#panel-C .am-comment').hidden,
   })`);
   assert.deepEqual(after, { memcached: true, comment: 'Make the TTL a setting.', open: true });
+});
+
+test('reply: a mock ask and a suggested control inside a preview stay out of the reply', { skip: SKIP }, async () => {
+  await load(previewFile);
+  await evaluate('document.querySelector(\'input[value="Outer A"]\').click()');
+  const text = await evaluate(`(() => {
+    document.querySelector('[data-am="reply"]').click();
+    const sheet = document.querySelector('dialog.am-reply');
+    const value = sheet.querySelector('textarea').value;
+    sheet.close();
+    return value;
+  })()`);
+  assert.match(text, /1\. \[A\] Which outer\?\n {3}→ \*\*Outer A\*\* _\(suggestion confirmed\)_/);
+  assert.doesNotMatch(text, /Mock question|Ghost/);
+  assert.equal((text.match(/^\d+\. /gm) ?? []).length, 1, 'only the real ask is a decision');
 });
 
 test('reply: an untouched answer saved by an older page, which preselected the suggestion, comes back unselected', { skip: SKIP }, async () => {

@@ -57,6 +57,9 @@ test('ask: a preview can be html or svg, and an option without one has no canvas
   const { html } = renderDoc(draft('```ask', body));
   assert.match(html, /<div class="am-ask-preview"><b class="preview-mark">redis<\/b><\/div>/);
   assert.equal(html.match(/class="am-ask-preview"/g).length, 1);
+  const svgBody = 'Which shape?\n* Circle\n  :::svg\n  <svg viewBox="0 0 10 10"><circle r="5"/></svg>\n  :::\n- Square';
+  const svgDoc = renderDoc(draft('```ask', svgBody)).html;
+  assert.match(svgDoc, /<div class="am-ask-preview"><svg viewBox="0 0 10 10"><circle r="5"\/><\/svg><\/div>/);
 });
 
 test('ask: preview errors name the draft line', () => {

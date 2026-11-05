@@ -9,8 +9,11 @@ const OPTION = /^([*-])\s+(.+)$/;
 const PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
 const PREVIEW_CLOSE = /^(\s*):::\s*$/;
 
-// The block: the question, then options. The lines inside a preview belong to it, so a * or - there is content, not another option.
-// Preview.line is 1-based inside the block; render() maps it to the draft with the line renderFence passes in.
+/**
+ * Read an ask block: the question, then options, each with an optional preview.
+ * The lines inside a preview belong to it, so a * or - there is content, not another option.
+ * Preview.line is 1-based inside the block; render() maps it to the draft with the line renderFence passes in.
+ */
 function read(text) {
   const lines = String(text).split('\n');
   let question = null;
@@ -64,6 +67,8 @@ export default {
   summary: 'A decision the reader makes on the page (collected by Reply)',
   pageOnly: true,
   panelOnly: true,
+  // Preview blocks are rendered with the page's scale, so the ask output must not take the factor again.
+  scalesOwnSvg: true,
   syntax: `\`\`\`ask [multi] [cards]
 The question, one sentence
 * The option you suggest | optional note
@@ -100,6 +105,10 @@ The question, one sentence
     }
     return out.join('\n');
   },
+  /**
+   * Render the ask fieldset. A preview is passed to the caller's nested block renderer,
+   * so it can use any component, html or svg.
+   */
   render(text, { args, uid, ui = {}, line = 0, render }) {
     const multi = /(^|\s)multi(\s|$)/.test(args);
     const cards = /(^|\s)cards(\s|$)/.test(args);

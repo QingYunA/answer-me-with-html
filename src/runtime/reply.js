@@ -47,7 +47,8 @@ if (replyBtn) {
   });
   window.addEventListener('pagehide', flushSave);
   const panels = [...document.querySelectorAll('.am-panel')];
-  const asks = [...document.querySelectorAll('.am-ask')];
+  // An ask inside a preview is part of the drawing, not a decision of the page.
+  const asks = [...document.querySelectorAll('.am-ask')].filter((a) => !a.closest('.am-ask-preview'));
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
   // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved
   // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).
@@ -161,7 +162,7 @@ if (replyBtn) {
       panel: panelOf(ask).id,
       question: textOf(ask.querySelector('legend')) ?? '',
       picked: picked(ask),
-      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),
+      suggested: inputsOf(ask).filter((i) => i.hasAttribute('data-suggested')).map((i) => i.value),
       touched: touched.has(ask),
     }));
     const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));

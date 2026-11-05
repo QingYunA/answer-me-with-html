@@ -121,7 +121,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 /* Options with a preview: the block under an option is the card's canvas. A dot grid reads as a drawing surface in every theme. */
 .am-ask-opts { clear: both; }
 .am-ask-card { min-width: 0; }
-.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); align-items: stretch; }
+.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); align-items: stretch; }
 .am-ask--cards .am-ask-card {
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius);
