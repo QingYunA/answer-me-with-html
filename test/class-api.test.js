@@ -116,4 +116,3 @@ test('contracts: integrate with localized pages, colon blocks, themes and source
   assert.throws(() => renderDoc('## Contract\n```class\nA\nA --> Missing\n```'), (err) => err instanceof RenderError && err.line === 4 && err.component === 'class');
   assert.throws(() => renderDoc('## Contract\n```api\nGET /users\nresponse\n```'), (err) => err instanceof RenderError && err.line === 4 && err.component === 'api');
 });
-
