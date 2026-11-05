@@ -45,6 +45,14 @@
 .am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
 
 /* API changes use the shared switch but collapse hidden HTML rows and contracts so Before and After remain readable. */
+/* Use the code diff hues and ink/fill mixes: a theme's status --ok can be blue, but additions must stay green in every theme and mode. */
+.am-api {
+  --diff-add: #1f9d4d; --diff-del: #d1344a;
+  --ok: color-mix(in srgb, var(--diff-add) 75%, var(--ink));
+  --ok-bg: color-mix(in srgb, var(--diff-add) 14%, var(--fill));
+  --err: color-mix(in srgb, var(--diff-del) 75%, var(--ink));
+  --err-bg: color-mix(in srgb, var(--diff-del) 14%, var(--fill));
+}
 .am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
 .am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
 .am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }

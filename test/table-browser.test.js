@@ -84,6 +84,12 @@ request BatchRequest
 response OK User
   id string required
 \`\`\`
+
+## H Code diff palette
+\`\`\`diff
+-old
++new
+\`\`\`
 `;
 
 let tmp;
@@ -249,6 +255,36 @@ test('e2e api: one switch changes multiple HTTP/RPC contracts and their exact fi
   assert.deepEqual(after[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Required' }]);
   assert.equal(await evaluate(`document.querySelector('#panel-G [data-view="after"]').getAttribute('aria-pressed')`), 'true');
   assert.deepEqual(await snapshot('changes'), changes);
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// API additions and deletions must use the code diff palette for fields, endpoints, badges and counts, even when a theme's status color is blue.
+test('e2e api: change colors match code diffs in all built-in themes and light/dark modes', { skip: SKIP }, async () => {
+  for (const theme of ['blueprint', 'shadcn', 'paper']) {
+    for (const mode of ['light', 'dark']) {
+      const tones = await evaluate(`(() => {
+        document.documentElement.dataset.theme = '${theme}';
+        document.documentElement.dataset.mode = '${mode}';
+        const host = document.querySelector('#panel-G .am-api');
+        return ['added', 'removed'].map((state) => {
+          const sign = state === 'added' ? 'add' : 'del';
+          return {
+            expected: getComputedStyle(document.querySelector('.am-code-stat-' + sign)).color,
+            expectedBg: getComputedStyle(document.querySelector('.am-ln--' + sign)).backgroundColor,
+            field: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).color,
+            background: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).backgroundColor,
+            endpoint: getComputedStyle(host.querySelector('article[data-delta="' + state + '"] .am-api-endpoint strong')).color,
+            badge: getComputedStyle(host.querySelector('.am-delta-badge--' + state)).color,
+            count: getComputedStyle(host.querySelector('.am-delta-count--' + state)).color,
+          };
+        });
+      })()`);
+      for (const tone of tones) {
+        for (const part of ['field', 'endpoint', 'badge', 'count']) assert.equal(tone[part], tone.expected, `${theme}/${mode}/${part}`);
+        assert.equal(tone.background, tone.expectedBg, `${theme}/${mode}/background`);
+      }
+    }
+  }
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 
