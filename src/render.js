@@ -186,7 +186,10 @@ function renderFence(block, ctx) {
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
-    const html = comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn });
+    const html = comp.render(text, {
+      args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn, line,
+      render: (blocks) => renderBlocks(blocks, ctx),
+    });
     // A component's own svg is measured in viewBox units at fixed text sizes, so the whole box takes the factor. Raw svg / html blocks
     // bypass this function, and a video never scales.
     return ctx.video ? html : scaleSvgBoxes(html, ctx.scale ?? 1);

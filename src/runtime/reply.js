@@ -81,7 +81,9 @@ if (replyBtn) {
     }
     if (serve) saveSoon({ reply: state });
   };
-  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);
+  // A preview can hold a mock form; those controls are a picture, not the reader's answer.
+  const inputsOf = (ask) => [...ask.querySelectorAll('input')].filter((i) => !i.closest('.am-ask-preview'));
+  const picked = (ask) => inputsOf(ask).filter((i) => i.checked).map((i) => i.value);
   const panelOf = (el) => {
     const panel = el.closest('.am-panel');
     return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };
@@ -89,7 +91,7 @@ if (replyBtn) {
 
   const saved = load();
   for (const ask of asks) {
-    const inputs = [...ask.querySelectorAll('input')];
+    const inputs = inputsOf(ask);
     const state = saved.asks?.[keyOf(ask)];
     // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started
     // with the suggestion selected and saved it untouched, and that state must come back unselected.
@@ -98,13 +100,14 @@ if (replyBtn) {
       touched.add(ask);
     }
     // A click counts even on the option that is already picked: the reader confirms the suggestion.
-    const answer = () => {
+    const answer = (e) => {
+      if (e?.target?.closest?.('.am-ask-preview')) return;
       touched.add(ask);
       save();
       refreshBar();
     };
     ask.addEventListener('change', answer);
-    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });
+    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(e); });
   }
 
   for (const panel of panels) {

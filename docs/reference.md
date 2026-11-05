@@ -56,6 +56,7 @@ Which cache do we use?
 
 - The first line is the question. Each option starts with `*` (the suggestion, shown with a tag; every option starts unselected) or `-`. Write 2 to 6 options.
 - One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options you suggest; they start unselected too.
+- An option may carry one preview: indent a `:::` block under it. The block takes any component, plus `html` and `svg`; add it only when a picture helps. `ask cards` lays the options out in a grid, so each preview becomes a card canvas.
 - The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text and remark notes come back quoted with `>`.
 
 Full syntax: `am help ask`.
