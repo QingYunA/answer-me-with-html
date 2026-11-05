@@ -1,18 +1,28 @@
 {
-  "version": "0.5.10",
+  "version": "0.5.11",
   "en": [
-    "Write a component as a :::callout … ::: block too; it renders like ```"
+    "am export turns a page into an A4 PDF or PNG slices for chat apps",
+    "Write {table sort filter} after a table to sort and filter it",
+    "am video --audio-map narrates a video with your own audio files"
   ],
   "zh": [
-    "组件也可以写成 :::callout … ::: 块，渲染结果和 ``` 写法相同"
+    "am export 把页面导出成 A4 PDF 或 PNG 切片，方便发到聊天工具",
+    "表格后面写 {table sort filter}，就能排序和筛选",
+    "am video --audio-map 用你自己的音频文件做视频旁白"
   ],
   "zh-Hant": [
-    "元件也可以寫成 :::callout … ::: 區塊，渲染結果和 ``` 寫法相同"
+    "am export 把頁面匯出成 A4 PDF 或 PNG 切片，方便傳到聊天工具",
+    "表格後面寫 {table sort filter}，就能排序和篩選",
+    "am video --audio-map 用你自己的音訊檔做影片旁白"
   ],
   "ja": [
-    "コンポーネントは :::callout … ::: でも書け、``` と同じ表示になります"
+    "am export でページを A4 PDF や PNG の分割画像にしてチャットに送れます",
+    "表の直後に {table sort filter} と書くと並べ替えと絞り込みができます",
+    "am video --audio-map で手元の音声ファイルをナレーションに使えます"
   ],
   "he": [
-    "אפשר לכתוב רכיב גם כבלוק :::callout … :::, והוא מוצג כמו ```"
+    "am export הופך עמוד ל-PDF בגודל A4 או לפרוסות PNG לאפליקציות צ'אט",
+    "כתבו {table sort filter} אחרי טבלה כדי למיין ולסנן אותה",
+    "am video --audio-map משתמש בקובצי השמע שלכם כקריינות"
   ]
 }
