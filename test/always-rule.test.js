@@ -9,21 +9,21 @@ const MARKER = '[answer-me-with-html always-on]';
 
 // Always-on mode is a rule the user pastes into a rules file. SKILL.md recognizes it by this marker,
 // so the README snippets must carry the same one.
-test('always-on rule: SKILL.md and both README snippets use the same marker', () => {
-  for (const file of ['skills/answer-me-with-html/SKILL.md', 'README.md', 'README.zh-CN.md']) {
+test('always-on rule: SKILL.md and the README snippets use the same marker', () => {
+  for (const file of ['skills/answer-me-with-html/SKILL.md', 'README.md', 'README.zh-CN.md', 'README.ja.md']) {
     assert.ok(read(file).includes(MARKER), `${file} is missing ${MARKER}`);
   }
 });
 
 test('always-on rule: the README snippets ask for --no-open, so no browser opens', () => {
-  for (const file of ['README.md', 'README.zh-CN.md']) {
+  for (const file of ['README.md', 'README.zh-CN.md', 'README.ja.md']) {
     const snippet = read(file).split('\n').find((l) => l.includes(MARKER));
     assert.match(snippet, /--no-open/, file);
   }
 });
 
 test('always-on rule: the README snippets defer the page link format to SKILL.md', () => {
-  for (const file of ['README.md', 'README.zh-CN.md']) {
+  for (const file of ['README.md', 'README.zh-CN.md', 'README.ja.md']) {
     const snippet = read(file).split('\n').find((l) => l.includes(MARKER));
     assert.match(snippet, /SKILL\.md/, file);
     assert.doesNotMatch(snippet, /file:\/\//, file);
