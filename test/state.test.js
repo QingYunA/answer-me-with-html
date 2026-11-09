@@ -75,6 +75,22 @@ test('state: a state is a rounded rectangle, the initial state a filled dot and 
   assert.match(svg, /<g class="am-node am-node--state am-node--final"[^>]*><circle class="am-state-ring"[^>]* r="6"\/><circle class="am-state-core"[^>]* r="2\.8"\/>/);
 });
 
+test('state: transitions leave the initial dot and stop at the final ring', () => {
+  const svg = render('[*] -> A\nA -> [*]');
+  const centre = (re) => {
+    const m = svg.match(re);
+    return [Number(m[1]), Number(m[2])];
+  };
+  const dot = centre(/<circle class="am-state-dot" cx="([\d.]+)" cy="([\d.]+)"/);
+  const ring = centre(/<circle class="am-state-ring" cx="([\d.]+)" cy="([\d.]+)"/);
+  const paths = [...svg.matchAll(/<path class="am-edge" d="([^"]+)"/g)].map((m) => m[1]);
+  const start = paths[0].match(/^M([\d.]+),([\d.]+)/).slice(1).map(Number);
+  const end = paths[1].match(/L([\d.]+),([\d.]+)$/).slice(1).map(Number);
+  const distance = (p, c) => Math.hypot(p[0] - c[0], p[1] - c[1]);
+  assert.ok(Math.abs(distance(start, dot) - 6) < 0.01, `line starts ${distance(start, dot)} from the dot centre`);
+  assert.ok(Math.abs(distance(end, ring) - 6) < 0.01, `line ends ${distance(end, ring)} from the ring centre`);
+});
+
 test('state: the diagram label names the states and follows the page language', () => {
   assert.match(render('[*] -> Idle\nIdle -> Open: go'), /aria-label="State machine diagram: Idle, Open"/);
   const zh = COMPONENTS.get('state').render('[*] -> Idle', { args: '', uid: () => 'u1', ui: { state: '状态机图', colon: '：', sep: '、' } }); // lang-ok: expected Chinese UI label
@@ -108,16 +124,21 @@ test('state: two events between the same states are two transitions, each with i
   assert.equal(m.edges[1].state, 'added');
 });
 
-test('state: an event may contain ->; only a second arrow before the colon is a second transition', () => {
+test('state: an event may contain -> or -->; only a second arrow before the colon is a second transition', () => {
   const m = parseState('Idle -> Busy: retry -> wait');
   assert.deepEqual(m.edges.map((e) => [e.from, e.to, e.label]), [['Idle', 'Busy', 'retry -> wait']]);
   assert.match(render('Idle -> Busy: retry -> wait'), />retry -&gt; wait<\/text>/);
+  assert.match(render('Idle -> Busy: received A --> B'), />received A --&gt; B<\/text>/);
 });
 
 test('state: a Mermaid line and a stateDiagram-v2 header are errors that show the line to write', () => {
   assert.throws(
     () => render('A -> B\nB --> C : go'),
     (e) => e instanceof ComponentError && e.line === 2 && /\bis Mermaid syntax; write B -> C: go$/.test(e.message),
+  );
+  assert.throws(
+    () => render('B --> C: x --> y'),
+    (e) => e instanceof ComponentError && e.line === 1 && /write B -> C: x --> y$/.test(e.message),
   );
   assert.throws(
     () => render('stateDiagram-v2\n[*] --> Idle'),
@@ -180,6 +201,14 @@ test('state: a line that only marks a state still gets a video step, and the bad
   assert.match(svg, /<g class="am-delta-badge am-delta-badge--changed" data-step="1"/);
 });
 
+test('state: a line that repeats a state still gets a video step, so later lines keep their beat', () => {
+  const svg = render('A -> B\nB\nC -> B', '', { video: true });
+  const steps = [...svg.matchAll(/data-step="(\d+)"/g)].map((m) => Number(m[1]));
+  assert.deepEqual([...new Set(steps)].sort((a, b) => a - b), [0, 1, 2]);
+  assert.match(svg, /<g data-step="1"><\/g>/, 'the repeated declaration is an empty step');
+  assert.match(svg, /data-step="2"><path class="am-edge"/, 'the next transition stays on step 2');
+});
+
 test('state: a labelled loop keeps room from the next state of its rank', () => {
   const svg = render('A -> C\nA -> B\nB -> B: a long retry event');
   const node = (key) => {
@@ -208,6 +237,17 @@ test('state: a multi-line loop label stays inside the drawing', () => {
   const bottom = Number(label[1]) + Number(label[2]) + shiftY;
   const height = Number(svg.match(/viewBox="0 0 [\d.]+ ([\d.]+)"/)[1]);
   assert.ok(bottom <= height, `label ends at ${bottom}, drawing at ${height}`);
+});
+
+test('state: a tall below-loop label clears its state and the next loop', () => {
+  const svg = render('A -> B\nB -> B: first\\nsecond\\nthird\\nfourth\\nfifth\\nsixth\nB -> B: seventh\\neighth\\nninth\\ntenth\\neleventh\\ntwelfth', 'LR');
+  const box = svg.match(/data-key="B"[^>]*><rect class="am-node-shape" x="[-\d.]+" y="([-\d.]+)" width="[\d.]+" height="([\d.]+)"/);
+  const boxBottom = Number(box[1]) + Number(box[2]);
+  const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="[-\d.]+" y="([-\d.]+)" width="[\d.]+" height="([\d.]+)"/g)]
+    .map((m) => ({ top: Number(m[1]), bottom: Number(m[1]) + Number(m[2]) }));
+  assert.equal(labels.length, 2);
+  assert.ok(labels[0].top >= boxBottom, `first label starts at ${labels[0].top}, state ends at ${boxBottom}`);
+  assert.ok(labels[0].bottom < labels[1].top, `labels ${labels[0].bottom} and ${labels[1].top} overlap`);
 });
 
 test('state: the component renders inside a panel with its own figure class', () => {

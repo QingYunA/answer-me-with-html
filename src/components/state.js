@@ -9,6 +9,7 @@ import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, clipToBox, loopBeside, loopBelow, loop
 
 const LH = 17; // the line height runLayout measured each state label with
 const DOT = 16; // the box dagre reserves for an initial or final pseudo-state
+const DOT_R = 6; // the radius of the initial dot and the final ring
 const DIRS = new Set(['TB', 'LR', 'BT', 'RL']);
 // The two pseudo-states are not states: they get ids no written name can collide with and a fixed box.
 const INITIAL = '\u0000initial';
@@ -47,7 +48,7 @@ Polling -> Open: reply
   render(text, { args, uid, ui, video, dir: pageDir = 'ltr' }) {
     const model = parseState(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-state">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui, pageDir)}</figure>`;
+    const html = `<figure class="am-diagram am-state">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui, pageDir, video)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -113,8 +114,12 @@ function checkMermaid(t, raw, mark, line) {
     throw new ComponentError(`"${raw}" is a Mermaid composite state, which this component does not draw; write each state on its own or in a transition`, line);
   }
   if (t === '}') throw new ComponentError(`"${raw}" closes a Mermaid composite state; this component has no nested states, so remove the braces`, line);
-  if (!t.includes('-->')) return;
-  const fixed = t.replace(/-->/g, '->').replace(/\s*[:：]\s*/, ': ');
+  const colon = t.search(/[:：]/);
+  const head = colon === -1 ? t : t.slice(0, colon);
+  if (!head.includes('-->')) return;
+  const fixedHead = head.replace(/-->/g, '->').replace(/\s+$/, '');
+  const event = colon === -1 ? '' : t.slice(colon + 1).trim();
+  const fixed = event ? `${fixedHead}: ${event}` : fixedHead;
   throw new ComponentError(`"${raw}" is Mermaid syntax; write ${mark && mark !== '~' ? `${mark} ` : ''}${fixed}`, line);
 }
 
@@ -131,7 +136,7 @@ function checkTransitions(edges, nodes) {
   }
 }
 
-function layout(model, rankdir, id, ui, pageDir = 'ltr') {
+function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false) {
   const { nodes, edges, lines } = model;
   const rtl = pageDir === 'rtl';
   const side = rtl ? -1 : 1;
@@ -150,20 +155,22 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
   // box is drawn at the top of it and the loops hang into the room under the box, clear of the next rank. In TB and BT the loop
   // lies beside the box, which is the side where the next state of the rank would sit, so dagre gets a wider node instead and
   // the box is drawn at the edge away from the loops.
+  // The space beside or below a state for its loops; the label sizes decide both, so measure each label once.
+  const measured = new Map(loops.map((e) => [e, e.label ? edgeText(e.label) : { width: 0, height: 0 }]));
   const room = new Map();
   const beside = new Map();
   for (const from of new Set(loops.map((e) => e.from))) {
     const own = loops.filter((e) => e.from === from);
-    const widths = own.map((e) => (e.label ? edgeText(e.label).width : 0));
+    const sizes = own.map((e) => measured.get(e));
     if (below) {
-      room.set(from, { y: loopRoom(widths) });
+      room.set(from, { y: loopRoom(sizes.map((s) => s.width), sizes.map((s) => s.height)) });
       continue;
     }
     // A wide label pushes the next loop farther out, so two labelled self-transitions do not cover each other.
     let offset = 0;
     beside.set(from, own.map((e, i) => {
-      if (i) offset += Math.max(LOOP_STEP, widths[i - 1] + 6);
-      return { edge: e, offset, labelWidth: widths[i], extent: LOOP_OUT + offset + 6 + widths[i] };
+      if (i) offset += Math.max(LOOP_STEP, sizes[i - 1].width + 6);
+      return { edge: e, offset, labelWidth: sizes[i].width, extent: LOOP_OUT + offset + 6 + sizes[i].width };
     }));
     room.set(from, { x: Math.max(...beside.get(from).map((spec) => spec.extent)) });
   }
@@ -185,7 +192,7 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
 
   const drawn = straight.map((e, i) => {
     const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
-    return { e, data, points: clipEnds(data.points, e, centre, boxes, room) };
+    return { e, data, points: clipEnds(data.points, e, centre, boxes, room, nodes) };
   });
   const edgeSvg = drawn.map(({ e, data, points }) => {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
@@ -201,10 +208,10 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
     const { x, y } = centre(e.from);
     const box = boxes.get(e.from);
     if (below) {
+      const size = measured.get(e);
       const { depth } = seen.get(e.from) ?? { depth: 0 };
-      seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? LOOP_LABEL : 0) });
-      const labelWidth = e.label ? edgeText(e.label).width : 0;
-      return { e, ...loopBelow({ x, y, height: box.height, depth, side, labelWidth }) };
+      seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? Math.max(LOOP_LABEL, 6 + size.height) : 0) });
+      return { e, ...loopBelow({ x, y, height: box.height, depth, side, labelWidth: size.width, labelHeight: size.height }) };
     }
     const spec = beside.get(e.from).find((x) => x.edge === e);
     return { e, ...loopBeside({ x, y, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
@@ -224,8 +231,8 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
     const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y - box.height / 2, badgeStep);
     const keyAttr = n.kind === 'state' ? ` data-key="${esc(n.label)}"` : '';
     const open = `<g class="am-node am-node--state${n.kind === 'state' ? '' : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
-    if (n.kind === 'initial') return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y)}" r="6"/>${badge}</g>`;
-    if (n.kind === 'final') return `${open}<circle class="am-state-ring" cx="${f(x)}" cy="${f(y)}" r="6"/><circle class="am-state-core" cx="${f(x)}" cy="${f(y)}" r="2.8"/>${badge}</g>`;
+    if (n.kind === 'initial') return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y)}" r="${DOT_R}"/>${badge}</g>`;
+    if (n.kind === 'final') return `${open}<circle class="am-state-ring" cx="${f(x)}" cy="${f(y)}" r="${DOT_R}"/><circle class="am-state-core" cx="${f(x)}" cy="${f(y)}" r="2.8"/>${badge}</g>`;
     return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y, LH, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
 
@@ -268,7 +275,16 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr') {
   const names = [...nodes.values()].filter((n) => n.kind === 'state').slice(0, 8).map((n) => n.label);
   const label = diagramLabel(ui, 'state', names);
   const heads = ['added', 'removed'].filter((s) => edges.some((e) => e.state === s));
-  return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g></g></svg>`;
+  // A line that repeats a state draws nothing, but video counts every source line as one step. An empty step keeps the lines
+  // after it on their own beat instead of shifting them to the next narration line.
+  const used = new Set([
+    ...straight.map((e) => stepOf.get(e.line)),
+    ...loops.map((e) => stepOf.get(e.line)),
+    ...[...nodes.values()].map((n) => stepOf.get(n.line)),
+    ...[...nodes.values()].filter((n) => n.state === 'changed').map((n) => stepOf.get(n.tildeLine ?? n.line)),
+  ]);
+  const empty = video ? lines.map((line) => (used.has(stepOf.get(line)) ? '' : `<g data-step="${stepOf.get(line)}"></g>`)).join('') : '';
+  return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g>${empty}</g></svg>`;
 }
 
 function edgeLabelSvg(label, x, y, pageDir) {
@@ -277,11 +293,20 @@ function edgeLabelSvg(label, x, y, pageDir) {
 }
 
 // dagre clips an edge to the node it knows, which is larger than the drawn box when a loop reserves room: clip to the box again,
-// along the line from the centre of the box to the next point of the edge.
-function clipEnds(points, edge, centre, boxes, room) {
+// along the line from the centre of the box to the next point of the edge. The pseudo-states are drawn as circles inside their
+// 16-unit box, so clip those ends to the visible circle instead, or the line stops at the square and leaves a gap.
+function clipEnds(points, edge, centre, boxes, room, nodes) {
   const pts = points.map((p) => ({ ...p }));
   if (room.has(edge.from) && pts.length > 1) pts[0] = clipToBox(centre(edge.from), boxes.get(edge.from), points[1]);
   if (room.has(edge.to) && pts.length > 1) pts[pts.length - 1] = clipToBox(centre(edge.to), boxes.get(edge.to), points[points.length - 2]);
+  const onCircle = (c, toward, r) => {
+    const dx = toward.x - c.x;
+    const dy = toward.y - c.y;
+    const d = Math.hypot(dx, dy);
+    return d ? { x: c.x + (dx / d) * r, y: c.y + (dy / d) * r } : { ...c };
+  };
+  if (nodes.get(edge.from).kind === 'initial' && pts.length > 1) pts[0] = onCircle(centre(edge.from), pts[1], DOT_R);
+  if (nodes.get(edge.to).kind === 'final' && pts.length > 1) pts[pts.length - 1] = onCircle(centre(edge.to), pts[pts.length - 2], DOT_R);
   return pts;
 }
 

@@ -27,7 +27,7 @@ export function loopBeside({ x, y, width, labelWidth = 0, nth = 0, offset = nth 
 // A loop below its box, for the layouts whose ranks run sideways: out of the bottom edge, down, and back up into it,
 // bulging `depth` farther than the first loop. The first end sits on the side where reading starts, and the label is
 // centred under the loop.
-export function loopBelow({ x, y, height, labelWidth = 0, depth = 0, side = 1 }) {
+export function loopBelow({ x, y, height, labelWidth = 0, labelHeight = 18, depth = 0, side = 1 }) {
   const bottom = y + height / 2;
   const out = bottom + LOOP_OUT + depth;
   const [ax, bx] = [x - (side * LOOP_END) / 2, x + (side * LOOP_END) / 2];
@@ -37,16 +37,20 @@ export function loopBelow({ x, y, height, labelWidth = 0, depth = 0, side = 1 })
     b: { x: bx, y: bottom },
     c: [{ x: ax, y: out }, { x: bx, y: out }],
     away: { x: 0, y: 1 },
-    label: labelWidth ? { x, y: out + 6 + 9 } : null,
-    corners: [[x - half, bottom], [x + half, out + (labelWidth ? 6 + 18 : 0)]],
+    label: labelWidth ? { x, y: out + 6 + labelHeight / 2 } : null,
+    corners: [[x - half, bottom], [x + half, out + (labelWidth ? 6 + labelHeight : 0)]],
   };
 }
 
+// The room a loop's label takes below the loop. A one-line label keeps the round figure the constants assume; a taller label
+// takes its measured height, so it neither covers its own loop nor the next one.
+const labelRoom = (width, height) => (width ? Math.max(LOOP_LABEL, 6 + (height ?? 18)) : 0);
+
 // The space under a box for its loops, in the order they are drawn (see loopBelow): the first one's distance from the box,
 // the steps down to the last one, and the label of the last.
-export function loopRoom(labelWidths) {
-  const steps = labelWidths.slice(0, -1).reduce((depth, width) => depth + LOOP_STEP + (width ? LOOP_LABEL : 0), 0);
-  return LOOP_OUT + steps + (labelWidths.at(-1) ? LOOP_LABEL : 0) + LOOP_GAP;
+export function loopRoom(labelWidths, labelHeights = []) {
+  const steps = labelWidths.slice(0, -1).reduce((depth, width, i) => depth + LOOP_STEP + labelRoom(width, labelHeights[i]), 0);
+  return LOOP_OUT + steps + labelRoom(labelWidths.at(-1), labelHeights.at(-1)) + LOOP_GAP;
 }
 
 // The path of a loop: a cubic from a to b that bulges through the two control points.
