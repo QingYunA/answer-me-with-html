@@ -102,6 +102,18 @@ test('state: the canvas is finite and holds the loops and labels', () => {
   assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
   const [w, h] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).slice(1).map(Number);
   assert.ok(w > 0 && h > 0);
+  const [, sx, sy] = svg.match(/<g transform="translate\(([\d.-]+),([\d.-]+)\)"/) ?? [0, 0, 0];
+  const loops = [...svg.matchAll(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/g)].map((m) => m.slice(1).map(Number));
+  assert.equal(loops.length, 1);
+  for (const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] of loops) {
+    for (const x of [x1, cx1, cx2, x2]) assert.ok(x + Number(sx) >= 0 && x + Number(sx) <= w, 'the loop lies inside the viewBox');
+    for (const y of [y1, cy1, cy2, y2]) assert.ok(y + Number(sy) >= 0 && y + Number(sy) <= h, 'the loop lies inside the viewBox');
+  }
+  const labels = [...svg.matchAll(/<g class="am-edge-label"><rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)"/g)].map((m) => m.slice(1).map(Number));
+  assert.equal(labels.length, 1);
+  for (const [x, y, lw, lh] of labels) {
+    assert.ok(x + Number(sx) >= 0 && y + Number(sy) >= 0 && x + lw + Number(sx) <= w && y + lh + Number(sy) <= h, 'the label lies inside the viewBox');
+  }
 });
 
 test('state: an unreadable line, an empty side and two arrows report the line number', () => {
