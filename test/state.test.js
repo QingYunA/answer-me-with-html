@@ -102,7 +102,11 @@ test('state: the canvas is finite and holds the loops and labels', () => {
   assert.doesNotMatch(svg, /NaN|Infinity|undefined/);
   const [w, h] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).slice(1).map(Number);
   assert.ok(w > 0 && h > 0);
-  const [, sx, sy] = svg.match(/<g transform="translate\(([\d.-]+),([\d.-]+)\)"/) ?? [0, 0, 0];
+  const group = svg.match(/<g(?: transform="([^"]*)")?>/);
+  assert.ok(group, 'the content group exists');
+  const translate = (group[1] ?? 'translate(0,0)').match(/^translate\(([\d.eE+-]+),([\d.eE+-]+)\)$/);
+  assert.ok(translate, 'the content transform is a recognized translation');
+  const [sx, sy] = translate.slice(1).map(Number);
   const loops = [...svg.matchAll(/<path class="am-edge" d="M([\d.-]+),([\d.-]+) C([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)"/g)].map((m) => m.slice(1).map(Number));
   assert.equal(loops.length, 1);
   for (const [x1, y1, cx1, cy1, cx2, cy2, x2, y2] of loops) {
