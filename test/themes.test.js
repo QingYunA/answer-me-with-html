@@ -98,4 +98,5 @@ test('themes: a theme with a fixed mode forces it in video', async () => {
   const { html } = await renderVideo(VIDEO, { overrides: { theme: '3b1b', mode: 'light' } });
   assert.match(html, /data-theme="3b1b" data-mode="dark"/);
   assert.match(html, /html\[data-video\]\[data-theme="3b1b"\][^{]*\{\n {2}color-scheme: dark;/);
+  assert.match(html, /html\[data-video\]\[data-theme="3b1b"\]\[data-mode="auto"\] \{\n {2}color-scheme: light dark;/);
 });

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
+import { renderVideo } from '../src/video/render.js';
 
 const CHROME = findChrome();
 const SKIP = process.env.AM_E2E !== '1'
@@ -104,4 +105,15 @@ test('e2e color-scheme: auto on a dark system keeps "light dark" and takes the d
   await systemScheme('light');
   assert.equal(await paper(), lightPaper);
   await systemScheme(null);
+});
+
+test('e2e color-scheme: a fixed-dark video theme computes to dark without dark tokens', { skip: SKIP, timeout: 180000 }, async () => {
+  const source = '---\ntitle: Fixed dark\n---\n## A\n```flow\nA -> B\n```\n> A goes to B.\n';
+  const { html } = await renderVideo(source, { overrides: { theme: '3b1b', mode: 'light' } });
+  const video = join(tmp, 'fixed-dark.html');
+  writeFileSync(video, html);
+  const loaded = cdp.once('Page.loadEventFired');
+  await page('Page.navigate', { url: pathToFileURL(video).href });
+  await loaded;
+  assert.equal(await scheme(), 'dark');
 });

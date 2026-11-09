@@ -9519,15 +9519,15 @@ ${Object.entries(vars).map(([k, v2]) => `  ${k}: ${v2};`).join("\n")}
 }`;
 function tokenCss(sel, { common = {}, light = {}, dark = {} }, fixedMode) {
   const baseScheme = fixedMode === "dark" ? "dark" : "light";
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { "color-scheme": baseScheme, ...common, ...light })];
+  const parts = [
+    block(`${sel}, ${sel}[data-mode="light"]`, { "color-scheme": baseScheme, ...common, ...light }),
+    block(`${sel}[data-mode="dark"]`, { "color-scheme": "dark", ...dark }),
+    block(`${sel}[data-mode="auto"]`, { "color-scheme": "light dark" })
+  ];
   if (Object.keys(dark).length) {
-    parts.push(
-      block(`${sel}[data-mode="dark"]`, { "color-scheme": "dark", ...dark }),
-      block(`${sel}[data-mode="auto"]`, { "color-scheme": "light dark" }),
-      `@media (prefers-color-scheme: dark) {
+    parts.push(`@media (prefers-color-scheme: dark) {
 ${block(`${sel}[data-mode="auto"]`, dark)}
-}`
-    );
+}`);
   }
   return parts.join("\n");
 }
