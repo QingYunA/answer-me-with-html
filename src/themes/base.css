@@ -133,7 +133,7 @@ code, pre, kbd { font-family: var(--font-mono); }
   background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-3) 38%, transparent) 1px, transparent 1px);
   background-size: 12px 12px;
 }
-.am-ask--cards .am-ask-preview { flex: 1; }
+.am-ask--cards .am-ask-preview { flex: 1; cursor: pointer; }
 .am-ask-preview > :first-child { margin-top: 0; }
 .am-ask-preview > :last-child { margin-bottom: 0; }
 /* A diagram keeps the card width, also on a phone, where a panel diagram may scroll instead. */

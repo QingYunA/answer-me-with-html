@@ -62,6 +62,13 @@ test('ask: a preview can be html or svg, and an option without one has no canvas
   assert.match(svgDoc, /<div class="am-ask-preview"><svg viewBox="0 0 10 10"><circle r="5"\/><\/svg><\/div>/);
 });
 
+test('ask: a :::ask block takes a preview, like its fenced form', () => {
+  const body = 'Which cache?\n* Redis\n  :::html\n  <b class="preview-mark">redis</b>\n  :::\n- Memcached';
+  const { html } = renderDoc(`---\ntitle: Cache\nlang: en\n---\n## A Panel\n:::ask\n${body}\n:::\n`);
+  assert.match(html, /<fieldset class="am-ask" data-ask="am\d+">/);
+  assert.match(html, /<div class="am-ask-preview"><b class="preview-mark">redis<\/b><\/div>/);
+});
+
 test('ask: preview errors name the draft line', () => {
   const cases = [
     ['Which?\n* A\n  :::flow\n  A -> B', /preview block is not closed/, 9],

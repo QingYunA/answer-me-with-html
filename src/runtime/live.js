@@ -47,13 +47,18 @@
       hold();
     }, { once: true });
   }
-  // Theme and mode are page settings, not the reader's input.
+  // Theme and mode are page settings, not the reader's input. A control inside an option preview is a picture, not an answer.
   let input = false;
-  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };
+  const inPreview = (el) => Boolean(el.closest?.('.am-ask-preview'));
+  const typed = (e) => { if (!e.target.closest?.('.am-toolbar') && !inPreview(e.target)) input = true; };
   document.addEventListener('input', typed, true);
   document.addEventListener('change', typed, true);
   // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.
-  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);
+  document.addEventListener('click', (e) => {
+    if (e.target.closest?.('.am-ask input') && !inPreview(e.target)) input = true;
+    // In cards the preview picks its option too (src/runtime/reply.js); a control in the drawing does not.
+    else if (e.target.closest?.('.am-ask--cards .am-ask-preview') && !e.target.closest('input, button, a, select, textarea, summary, label')) input = true;
+  }, true);
   const hasInput = () => input || Boolean(window.__amRemarkData?.().length);
 
   const reload = () => {

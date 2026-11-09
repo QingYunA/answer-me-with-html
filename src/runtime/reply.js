@@ -110,6 +110,17 @@ if (replyBtn) {
     };
     ask.addEventListener('change', answer);
     ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(e); });
+    // In cards the whole card looks clickable, so a click on its preview picks the option too. A control in the drawing is not the answer.
+    ask.addEventListener('click', (e) => {
+      if (!ask.classList.contains('am-ask--cards')) return;
+      if (!e.target.closest?.('.am-ask-preview') || e.target.closest('input, button, a, select, textarea, summary, label')) return;
+      const input = e.target.closest('.am-ask-card')?.querySelector('input');
+      if (!input) return;
+      const wasPicked = input.checked;
+      input.click();
+      // A radio that is already on sends no change event, and the click still confirms the suggestion.
+      if (wasPicked && input.type === 'radio') answer();
+    });
   }
 
   for (const panel of panels) {
