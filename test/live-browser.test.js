@@ -40,6 +40,16 @@ Which look?
   :::
 - Visual
 \`\`\`
+
+## D Nested
+\`\`\`ask
+Which outer?
+* Outer A
+  :::html
+  <div class="am-ask am-ask--cards"><div class="am-ask-card"><label class="am-ask-opt"><input type="radio" name="mock"><span class="am-ask-body"><span class="am-ask-label">Inner</span></span></label><div class="am-ask-preview"><b class="nested-mark">inner</b></div></div></div>
+  :::
+- Outer B
+\`\`\`
 `;
 
 let tmp;
@@ -71,6 +81,7 @@ const renderTo = (name, version) => {
 };
 const render = (version) => renderTo('live', version);
 const renderSketch = (version) => renderTo('sketch', version);
+const renderNested = (version) => renderTo('nested', version);
 
 before(async () => {
   if (SKIP) return;
@@ -79,6 +90,7 @@ before(async () => {
   mkdirSync(join(home, 'pages'), { recursive: true });
   render(1);
   renderSketch(1);
+  renderNested(1);
   srv = await startServer({ home, port: 0 });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
@@ -138,6 +150,17 @@ test('live: a control inside a preview is not reader input, so the page reloads 
   })()`);
   assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
   renderSketch(2);
+  assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
+  assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
+});
+
+test('live: a nested cards preview inside another preview is not reader input', { skip: SKIP }, async () => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await send('Page.navigate', { url: pageLink(srv, 'pages', 'nested.html') });
+  await loaded;
+  await evaluate('document.querySelector(".nested-mark").click()');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
+  renderNested(2);
   assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
   assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
 });

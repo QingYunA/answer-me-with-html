@@ -69,6 +69,13 @@ test('ask: a :::ask block takes a preview, like its fenced form', () => {
   assert.match(html, /<div class="am-ask-preview"><b class="preview-mark">redis<\/b><\/div>/);
 });
 
+test('ask: a raw preview may write ::: lines without ending the ask', () => {
+  const body = 'Which cache?\n* Redis\n  :::html\n  <b class="preview-mark">redis</b>\n  :::note\n  :::\n- Memcached';
+  const { html } = renderDoc(`---\ntitle: Cache\nlang: en\n---\n## A Panel\n:::ask\n${body}\n:::\n`);
+  assert.match(html, /<div class="am-ask-preview"><b class="preview-mark">redis<\/b>\n:::note<\/div>/);
+  assert.match(html, /value="Memcached"/);
+});
+
 test('ask: preview errors name the draft line', () => {
   const cases = [
     ['Which?\n* A\n  :::flow\n  A -> B', /preview block is not closed/, 9],

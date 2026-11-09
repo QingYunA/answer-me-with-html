@@ -9,6 +9,19 @@ const OPTION = /^([*-])\s+(.+)$/;
 const PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
 const PREVIEW_CLOSE = /^(\s*):::\s*$/;
 
+// The line that closes the preview opened at openIdx, or -1. Only a bare ::: at the same indent closes it, so a ::: line
+// inside raw html or a deeper block stays part of the preview. The parser uses this too, when it finds the close of an ask block.
+export function previewEnd(lines, openIdx) {
+  const open = lines[openIdx]?.match(PREVIEW_OPEN);
+  if (!open) return -1;
+  const indent = open[1].length;
+  for (let j = openIdx + 1; j < lines.length; j++) {
+    const end = lines[j].match(PREVIEW_CLOSE);
+    if (end && end[1].length === indent) return j;
+  }
+  return -1;
+}
+
 /**
  * Read an ask block: the question, then options, each with an optional preview.
  * The lines inside a preview belong to it, so a * or - there is content, not another option.
@@ -33,17 +46,9 @@ function read(text) {
       if (!current) throw new ComponentError('ask: put a preview under an option', i + 1);
       if (current.preview) throw new ComponentError('ask: one preview per option', i + 1);
       const indent = open[1].length;
-      const content = [];
-      let close = -1;
-      for (let j = i + 1; j < lines.length; j++) {
-        const end = lines[j].match(PREVIEW_CLOSE);
-        if (end && end[1].length === indent) {
-          close = j;
-          break;
-        }
-        content.push(lines[j].slice(Math.min(indent, lines[j].match(/^\s*/)[0].length)));
-      }
+      const close = previewEnd(lines, i);
       if (close === -1) throw new ComponentError('ask: the preview block is not closed', i + 1);
+      const content = lines.slice(i + 1, close).map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
       current.preview = { lang: open[2].toLowerCase(), args: (open[3] ?? '').trim(), text: content.join('\n'), line: i + 1 };
       i = close;
       continue;

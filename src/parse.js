@@ -3,6 +3,7 @@
 
 import { themeNames, AUTO } from './themes/registry.js';
 import { COMPONENTS } from './components/index.js';
+import { previewEnd } from './components/ask.js';
 import { parseAttrs, coerce, unquote } from './attrs.js';
 
 export { parseAttrs };
@@ -172,7 +173,7 @@ function splitSections(lines, start, errors) {
     const colonName = colon?.[2].toLowerCase();
     if (colon && COMPONENTS.has(colonName)) {
       flushMd();
-      const close = findColonClose(lines, i, colon[1]);
+      const close = findColonClose(lines, i, colon[1], colonName);
       if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
       current.blocks.push({ type: 'fence', lang: colonName, args: (colon[3] ?? '').trim(), text: lines.slice(i + 1, close).join('\n'), line: i + 1 });
       i = close;
@@ -288,11 +289,19 @@ function fenceClose(lines, openIdx, mark) {
 /**
  * The close of a `:::` block. A block may hold another one, as an ask preview does, so nested opens and closes balance before the
  * outer close; a ``` fence inside the block hides its `:::` lines from the count, like it does at the top level. A lone ``` line
- * with no close stays text, as it did before blocks could nest.
+ * with no close stays text, as it did before blocks could nest. Inside an ask block a preview is opaque: its raw html or svg may
+ * write `:::` lines, and ask's own preview rule (the next bare `:::` at the same indent) is what ends it.
  */
-function findColonClose(lines, openIdx, marker) {
+function findColonClose(lines, openIdx, marker, name) {
   const stack = [marker.length];
   for (let j = openIdx + 1; j < lines.length; j++) {
+    if (name === 'ask') {
+      const end = previewEnd(lines, j);
+      if (end !== -1) {
+        j = end;
+        continue;
+      }
+    }
     const line = lines[j];
     const mark = line.match(FENCE_MARK)?.[1];
     if (mark) {

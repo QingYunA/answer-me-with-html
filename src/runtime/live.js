@@ -57,7 +57,7 @@
   document.addEventListener('click', (e) => {
     if (e.target.closest?.('.am-ask input') && !inPreview(e.target)) input = true;
     // In cards the preview picks its option too (src/runtime/reply.js); a control in the drawing does not.
-    else if (e.target.closest?.('.am-ask--cards .am-ask-preview') && !e.target.closest('input, button, a, select, textarea, summary, label')) input = true;
+    else if (e.target.closest?.('.am-ask--cards .am-ask-preview') && !inPreview(e.target) && !e.target.closest('input, button, a, select, textarea, summary, label')) input = true;
   }, true);
   const hasInput = () => input || Boolean(window.__amRemarkData?.().length);
 

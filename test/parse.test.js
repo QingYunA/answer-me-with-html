@@ -336,6 +336,14 @@ test('a ::: block holds a nested ::: block, as an ask preview does', () => {
   assert.equal(fences[0].text, 'Before\n```\n:::\n```\nAfter', 'a ``` fence hides its ::: lines');
 });
 
+test('a :::ask block treats a preview body as opaque when finding its close', () => {
+  const src = '## A\n:::ask\nWhich?\n* A\n  :::html\n  <b>x</b>\n  :::note\n  :::\n- B\n:::\nAfter.';
+  const [block, after] = blocksOf(src);
+  assert.equal(block.lang, 'ask');
+  assert.equal(block.text, 'Which?\n* A\n  :::html\n  <b>x</b>\n  :::note\n  :::\n- B');
+  assert.equal(after.type, 'md', 'the outer ::: still closes the ask');
+});
+
 test('a ::: line with an unknown name, a bare :::, or inside a code block stays text', () => {
   assert.deepEqual(blocksOf('## A\n:::note\ntext\n:::\n').map((b) => b.type), ['md']);
   assert.deepEqual(blocksOf('## A\n:::\ntext\n:::\n').map((b) => b.type), ['md']);
