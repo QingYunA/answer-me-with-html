@@ -96,6 +96,7 @@ test('e2e color-scheme: light, dark and auto set the computed color-scheme of th
 
 test('e2e color-scheme: auto on a dark system keeps "light dark" and takes the dark palette', { skip: SKIP, timeout: 180000 }, async () => {
   await setMode('auto');
+  await systemScheme('light');
   const lightPaper = await paper();
   await systemScheme('dark');
   assert.equal(await scheme(), 'light dark', 'auto keeps offering both schemes');
