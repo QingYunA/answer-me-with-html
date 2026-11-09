@@ -9517,10 +9517,15 @@ var TEMPLATES = { sheet, doc };
 var block = (selector, vars) => `${selector} {
 ${Object.entries(vars).map(([k, v2]) => `  ${k}: ${v2};`).join("\n")}
 }`;
-function tokenCss(sel, { common = {}, light = {}, dark = {} }) {
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { ...common, ...light })];
+function tokenCss(sel, { common = {}, light = {}, dark = {} }, fixedMode) {
+  const baseScheme = fixedMode === "dark" ? "dark" : "light";
+  const parts = [
+    block(`${sel}, ${sel}[data-mode="light"]`, { "color-scheme": baseScheme, ...common, ...light }),
+    block(`${sel}[data-mode="dark"]`, { "color-scheme": "dark", ...dark }),
+    block(`${sel}[data-mode="auto"]`, { "color-scheme": "light dark" })
+  ];
   if (Object.keys(dark).length) {
-    parts.push(block(`${sel}[data-mode="dark"]`, dark), `@media (prefers-color-scheme: dark) {
+    parts.push(`@media (prefers-color-scheme: dark) {
 ${block(`${sel}[data-mode="auto"]`, dark)}
 }`);
   }
@@ -9535,11 +9540,11 @@ function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = fa
   const decorations = list2.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const fontFaces = fonts ? [...new Set(list2.map((t) => t.font).filter((f2) => f2 && FONT_CSS[f2]))].map((f2) => FONT_CSS[f2]) : [];
   const ownFonts = list2.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...table ? [TABLE_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFaces, ...decorations].join("\n\n");
+  return [list2.map((t) => tokenCss(pageSel(t), t.tokens, t.mode)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...table ? [TABLE_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFaces, ...decorations].join("\n\n");
 }
 function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list2.filter((t) => t.video).flatMap((t) => [
-    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : "",
+    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens, t.mode) : "",
     t.video.css ? scoped(t.video.css, videoSel(t)) : "",
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : ""
   ]).filter(Boolean);
