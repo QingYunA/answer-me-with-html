@@ -11,9 +11,15 @@ const block = (selector, vars) =>
   `${selector} {\n${Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join('\n')}\n}`;
 
 function tokenCss(sel, { common = {}, light = {}, dark = {} }) {
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { ...common, ...light })];
+  // Each mode block also sets color-scheme (#395): it tells the browser which native UI (scrollbar, form controls) to draw.
+  // auto says "light dark" outside the media query, so the browser follows the system the way the tokens below follow the query.
+  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { 'color-scheme': 'light', ...common, ...light })];
   if (Object.keys(dark).length) {
-    parts.push(block(`${sel}[data-mode="dark"]`, dark), `@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`);
+    parts.push(
+      block(`${sel}[data-mode="dark"]`, { 'color-scheme': 'dark', ...dark }),
+      block(`${sel}[data-mode="auto"]`, { 'color-scheme': 'light dark' }),
+      `@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`,
+    );
   }
   return parts.join('\n');
 }

@@ -9518,11 +9518,15 @@ var block = (selector, vars) => `${selector} {
 ${Object.entries(vars).map(([k, v2]) => `  ${k}: ${v2};`).join("\n")}
 }`;
 function tokenCss(sel, { common = {}, light = {}, dark = {} }) {
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { ...common, ...light })];
+  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { "color-scheme": "light", ...common, ...light })];
   if (Object.keys(dark).length) {
-    parts.push(block(`${sel}[data-mode="dark"]`, dark), `@media (prefers-color-scheme: dark) {
+    parts.push(
+      block(`${sel}[data-mode="dark"]`, { "color-scheme": "dark", ...dark }),
+      block(`${sel}[data-mode="auto"]`, { "color-scheme": "light dark" }),
+      `@media (prefers-color-scheme: dark) {
 ${block(`${sel}[data-mode="auto"]`, dark)}
-}`);
+}`
+    );
   }
   return parts.join("\n");
 }
