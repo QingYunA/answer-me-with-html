@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const AM = fileURLToPath(new URL('../skills/answer-me-with-html/scripts/am.mjs', import.meta.url));
-const COMPONENTS = ['flow', 'er', 'sequence', 'tree', 'timeline', 'limits', 'annot', 'kv', 'callout'];
+const COMPONENTS = ['flow', 'state', 'er', 'sequence', 'tree', 'timeline', 'limits', 'annot', 'kv', 'callout'];
 const BODIES = ['', ' ', '|', '||||', '->', '-->', 'A ->', '-> B', ':', '0', '0 / 0', '-1 / 0', 'NaN / NaN', 'x | 1e308 / 1e-308',
   'a | 5 / -3', 'max 0', '[', '{', '[(', '((((', '*', 'group g: X', 'note A: x', '== ==', 'participants:', 'A -> A', '#',
   '[x]{', '[x]{!', '> ', '\u0000 -> B', '__group0 -> B\ngroup G: B', 'g0 -> n0\ngroup g0: n0', '😀 -> 🚀: 💥',

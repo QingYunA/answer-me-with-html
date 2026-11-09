@@ -26,6 +26,13 @@
 .am-view-changes .am-cluster[data-delta="removed"] { stroke: var(--err, #c62828); }
 .am-view-changes .am-cluster-label[data-delta="added"] { fill: var(--ok, #1f9d4d); }
 .am-view-changes .am-cluster-label[data-delta="removed"] { fill: var(--err, #c62828); }
+/* state: a state is an .am-node, and its initial and final dots take the same colors as a node shape. */
+.am-view-changes .am-node[data-delta="added"] .am-state-dot, .am-view-changes .am-node[data-delta="added"] .am-state-core { fill: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] .am-state-dot, .am-view-changes .am-node[data-delta="removed"] .am-state-core { fill: var(--err, #c62828); }
+.am-view-changes .am-node[data-delta="changed"] .am-state-dot, .am-view-changes .am-node[data-delta="changed"] .am-state-core { fill: var(--warn, #a8620a); }
+.am-view-changes .am-node[data-delta="added"] .am-state-ring { stroke: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] .am-state-ring { stroke: var(--err, #c62828); }
+.am-view-changes .am-node[data-delta="changed"] .am-state-ring { stroke: var(--warn, #a8620a); }
 .am-view-changes g[data-delta="removed"]:not(.am-delta-badge), .am-view-changes .am-cluster[data-delta="removed"], .am-view-changes .am-cluster-label[data-delta="removed"] { opacity: 0.55; }
 .am-view-changes .am-node[data-delta="removed"] > text, .am-view-changes g[data-delta="removed"] > .am-edge-label text, .am-view-changes .am-cluster-label[data-delta="removed"] { text-decoration: line-through; }
 .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }

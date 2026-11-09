@@ -38,7 +38,7 @@ export function textLines(lines, cx, cy, lineHeight, attrs = '', dir = 'ltr') {
 }
 
 // "Flowchart: A, B": the page language's name for the diagram, then the node names. Without a context (component unit tests) it falls back to English.
-const EN_LABELS = { flow: 'Flowchart', sequence: 'Sequence diagram', er: 'Entity relationship diagram', class: 'Class diagram', colon: ': ', sep: ', ' };
+const EN_LABELS = { flow: 'Flowchart', state: 'State machine diagram', sequence: 'Sequence diagram', er: 'Entity relationship diagram', class: 'Class diagram', colon: ': ', sep: ', ' };
 
 export function diagramLabel(ui, kind, names) {
   const u = { ...EN_LABELS, ...ui };

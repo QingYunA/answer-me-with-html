@@ -181,7 +181,7 @@ function rewriteOf(rest) {
 }
 
 // Removed when the node exists only before, added when only after; on both sides it is unchanged unless a "~ Node" line marked it.
-function nodeState({ before, after, tilde }) {
+export function nodeState({ before, after, tilde }) {
   if (before && !after) return 'removed';
   if (after && !before) return 'added';
   return tilde ? 'changed' : null;
@@ -258,7 +258,7 @@ function labelLines(label, maxWidth, size) {
 }
 
 // Edge labels are not wrapped unless they carry a forced break: that keeps a long label as it was drawn before.
-function edgeText(label) {
+export function edgeText(label) {
   const parts = String(label).split(FORCED_BREAK);
   const lines = parts.length > 1 ? parts.flatMap((part) => wrap(part, EDGE_MAX, EDGE_FS)) : [String(label)];
   return {
@@ -268,7 +268,9 @@ function edgeText(label) {
   };
 }
 
-function nodeSize(node) {
+export function nodeSize(node) {
+  // A component can give a node its own box (the pseudo-states of `state`), which is drawn as it is.
+  if (node.size) return { lines: [], width: node.size[0], height: node.size[1] };
   const lines = labelLines(node.label, TEXT_MAX, FS);
   const tw = Math.max(...lines.map((l) => measure(l, FS)));
   const th = lines.length * LH;
@@ -512,9 +514,10 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
-export function badgeSvg(state, x, y) {
+export function badgeSvg(state, x, y, step) {
   if (!state) return '';
-  return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  const at = step === undefined ? '' : ` data-step="${step}"`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at}${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 
 // Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.
