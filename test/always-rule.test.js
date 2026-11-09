@@ -41,6 +41,15 @@ test('always-on rule: both README snippets exclude internal agent-to-agent repor
   assert.match(zh, /不要生成页面/);
 });
 
+// The rule is pasted into a rules file verbatim. site/i18n/ keeps English and Chinese copies in
+// sync with the READMEs and no Japanese one, so the Japanese README carries the English rule,
+// word for word.
+test('always-on rule: the Japanese README carries the English rule word for word', () => {
+  const en = read('README.md').split('\n').find((l) => l.includes(MARKER));
+  const ja = read('README.ja.md').split('\n').find((l) => l.includes(MARKER));
+  assert.equal(ja, en);
+});
+
 // The website's "copy prompt" button carries the same rule; it drifted from the README before (#324).
 test('always-on rule: the website copies match the README snippets word for word', () => {
   for (const [lang, readme] of [['en', 'README.md'], ['zh', 'README.zh-CN.md']]) {
