@@ -36,6 +36,61 @@ A -> B: label
 
 Full syntax for a component: `am help <component>`.
 
+## Class diagrams and interface contracts
+
+Use `class` for code structure, `er` for database entities, and `api` for HTTP / RPC contracts. A complete example is [contracts.en.md](../examples/contracts.en.md).
+
+````markdown
+```class LR
+abstract Entity
+  +id: string
+class User
+  -email: string
+  +save(): void
+interface Store
+  +find(id: string): User
+User --|> Entity
+User ..> Store: uses
+```
+````
+
+- Declare `class`, `interface`, `abstract` or `enum` at column 0; a bare name means `class`. Prefix a name with `*` to highlight it.
+- Indent attributes and methods. Visibility, types and signatures are shown as written. A method starts with `name(` after its optional visibility sign; parentheses in a property type stay in the attributes compartment.
+- Relationships: `--|>` inheritance, `..|>` realization, `*--` composition, `o--` aggregation, `-->` association, `..>` dependency, `--` plain association. Arrowheads are at the right end; diamonds are at the left end. Add `: label` if needed.
+- Declare both ends of every relationship. Self-links and parallel links work. Directions are `TB` (default), `LR`, `BT` and `RL`.
+
+````markdown
+```api
+GET /users/{id}
+path
+  id string required | User ID
+query
+  include string optional
+response 200 User
+  email string required
+response 404 Error
+  message string required
+```
+
+```api
+RPC users.UserService/GetUser
+request GetUserRequest
+  id string required
+response OK User
+  email string \| null optional
+response NOT_FOUND
+```
+````
+
+- One endpoint per `api` block. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
+- Sections are `path`, `query`, `headers`, `request [Type]` and `response STATUS [Type]`. RPC uses `request` and `response`. HTTP response codes are 100-599; RPC supports named statuses. A response with no fields can describe an empty body.
+- Indent fields as `name type [required|optional] | description`. Types, nested field paths and descriptions are plain text. The Requirement column shows explicit Required or Optional labels. An unspecified value shows a dash when the column is present; tables with no explicit requirements omit the column.
+- Escape a literal type pipe as `\|`: write `email string \| null optional | Contact` for the union type `string | null`. The first unescaped `|` starts the description.
+- Labels follow the page language. Class diagrams use the existing theme tokens, scaling and diagram viewer; contract fields use semantic tables. Both render offline.
+- These blocks display definitions. They do not send requests or import OpenAPI / protobuf files. Class diagrams do not interpret `+` / `-` visibility signs as change markers.
+
+Full syntax: `am help class`, `am help er`, `am help api`.
+
 ## Answer on the page
 
 Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
@@ -226,7 +281,7 @@ The language of a draft sets the page's `lang` attribute, the language of the bu
 
 A tag is written as you declare it: `zh-tw` and `zh_TW` both become `zh-TW`. An empty, `und` or invalid value is ignored and the text decides.
 
-A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the outline rail (`left` and `right` mirror) and the toolbar start from the right; `flow` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
+A right-to-left language (`he`, `ar`, `fa`, `ur`, `yi`) also gets `<html dir="rtl">`. The page mirrors: text, panels, tables, the outline rail (`left` and `right` mirror) and the toolbar start from the right; `flow`, `state`, `er` and `sequence` diagrams are drawn as their mirror image, so the first node or participant is on the right and arrows point left; timelines, trees and limits bars start from the right. Code blocks, diffs and inline code stay left to right, and so does any run of text with no right-to-left letter (a path such as `src/`, a key such as `lint:` at the start of a label, a domain, a signed number), so its punctuation stays where it was written. Hebrew has its own labels, Hebrew names for common frontmatter keys (`author`, `date`, `source`, `version` ...) and a day.month.year render date; the other right-to-left languages use English labels. A video page (`am video`) follows the same rule: the title block, the scenes, the captions, and the chapter strip start from the right, while the controls row (play button, clock, progress bar, speed and export) stays left to right, as in common video players. Exported MP4 and WebM files carry the mirrored picture.
 
 | Script in the text | Detected as |
 | :--- | :--- |
@@ -240,7 +295,7 @@ Declare the language when you write a Latin-script language other than English, 
 
 A patched page keeps the language it had, unless the draft declares one.
 
-Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character. In a `flow` node or edge label, a literal `\n` forces a line break; each forced line still wraps by width. Group titles keep the text as written.
+Diagram text wraps by the unit the script uses: one Han, kana or fullwidth character, one word where the script writes spaces, and one dictionary word for the scripts that write none (Thai, Lao, Khmer and Myanmar), so a long word does not push a node wider than its budget. A word that does not fit the line on its own falls back to graphemes, so a combining mark stays with its base character. In a `flow` or `state` node or edge label, a literal `\n` forces a line break; each forced line still wraps by width. Group titles keep the text as written.
 
 The writing check follows the language. Chinese, English and Japanese keep their rules. Any other language gets only the language-neutral ones: sentence length (in words, or in characters for CJK text) and paragraph length. A script that writes no space between words is measured in words found by the word segmenter, the same four scripts the diagrams wrap with.
 
@@ -282,11 +337,11 @@ The classes your `css` may target stay stable: a later version keeps every one o
 
 ### Diagram tokens
 
-A theme restyles what is inside a diagram (flow, sequence, er, the boxes of a tree, and the bars, lines and slices of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
+A theme restyles what is inside a diagram (flow, state, sequence, er, the boxes of a tree, and the bars, lines and slices of a chart) with tokens, not with selectors: set them in `tokens` and every diagram follows. They are all optional. A theme that sets none draws the diagrams it always did, and an older version ignores them.
 
 | Part | Tokens | Default |
 | :--- | :--- | :--- |
-| Node (flow, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (the tree box: `--radius`), none, `--ink` |
+| Node (flow, state, er, tree box) | `--node-fill`, `--node-stroke`, `--node-width`, `--node-radius`, `--node-shadow`, `--node-text` | `--paper`, `--line`, `--bw`, 3px (state: 8px; the tree box: `--radius`), none, `--ink` |
 | Highlighted node (`*`) | `--hi-fill`, `--hi-stroke`, `--hi-text` | `--accent-bg`, `--accent`, `--accent` |
 | Edge and message | `--edge-color`, `--edge-width`, `--edge-label` | `--ink-2`, 1.3, `--accent` |
 | Sequence actor (and the box of a `== divider ==`) | `--actor-fill`, `--actor-stroke`, `--actor-text` | `--node-fill`, `--node-stroke`, `--node-text` |

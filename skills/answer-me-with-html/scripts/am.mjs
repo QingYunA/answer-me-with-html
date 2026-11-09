@@ -392,12 +392,19 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-node-shape ~ .am-node-shape { filter: none; }
 /* The corner radius is an SVG attribute (the fallback for Safari before 17.4, which ignores a CSS rx); the default here equals the attribute. A pill and a diamond keep their shape. */
 .am-node--rect .am-node-shape, .am-node--er .am-node-shape { rx: var(--node-radius, 3px); }
+/* A state is a rounded rectangle; the default matches the rx attribute state.js writes, for Safari before 17.4. */
+.am-node--state .am-node-shape { rx: var(--node-radius, 8px); }
+/* The initial pseudo-state is a filled dot, the final one a ringed dot; both take the node tokens, so every theme draws them. */
+.am-diagram .am-state-dot { fill: var(--node-stroke, var(--line, #1d2026)); }
+.am-diagram .am-state-ring { fill: var(--node-fill, var(--paper, #ffffff)); stroke: var(--node-stroke, var(--line, #1d2026)); stroke-width: var(--node-width, var(--bw, 1.5px)); }
+.am-diagram .am-state-core { fill: var(--node-stroke, var(--line, #1d2026)); }
 .am-node--hi .am-node-shape { fill: var(--hi-fill, var(--accent-bg, #e4ecf8)); stroke: var(--hi-stroke, var(--accent, #1d5fbf)); }
 .am-diagram .am-node-text { fill: var(--node-text, var(--ink, #16181d)); }
 .am-node--hi text { fill: var(--hi-text, var(--accent, #1d5fbf)); font-weight: 600; }
 .am-diagram .am-node--hi .am-node-text { fill: var(--hi-text, var(--accent, #1d5fbf)); }
 .am-edge { fill: none; stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
 .am-edge--dashed { stroke-dasharray: 5 4; }
+.am-class-hollow { fill: var(--paper, #ffffff); stroke: var(--edge-color, var(--ink-2, #4b5260)); stroke-width: var(--edge-width, 1.3); }
 .am-arrow { fill: var(--edge-color, var(--ink-2, #4b5260)); }
 .am-edge-label rect { fill: var(--paper, #ffffff); }
 .am-diagram .am-edge-label text { fill: var(--edge-label, var(--accent, #1d5fbf)); font-size: var(--am-fs-d-edge); }
@@ -406,6 +413,17 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* The PK / FK / UK marks of an entity follow the node text, and the highlighted text in a highlighted entity, so they stay readable on the theme's fills. */
 .am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
 .am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
+/* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
+.am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
+.am-api-endpoint strong { color: var(--accent); }
+.am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
+.am-api .am-api-section h4 code { font-weight: 400; }
+.am-api .am-api-section table { margin: 0; table-layout: fixed; }
+.am-api th:first-child { width: 28%; }
+.am-api th, .am-api td { overflow-wrap: anywhere; }
+.am-api tbody th { font: inherit; vertical-align: top; padding-block: 7px; }
+/* Keep field code chips visible on every contract row; Markdown's stripe uses the same fill as inline code. */
+.am-api tbody tr:nth-child(even) td { background: transparent; }
 .am-lifeline { stroke: var(--lifeline-color, var(--ink-3, #8b929e)); stroke-width: 1; stroke-dasharray: 4 4; }
 /* An actor (and the box of a divider) looks like a node unless the theme sets the actor tokens. */
 .am-actor { fill: var(--actor-fill, var(--node-fill, var(--paper, #ffffff))); stroke: var(--actor-stroke, var(--node-stroke, var(--line, #1d2026))); stroke-width: var(--node-width, var(--bw, 1.5px)); filter: var(--node-shadow, none); rx: var(--node-radius, 2px); }
@@ -693,6 +711,13 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 .am-view-changes .am-cluster[data-delta="removed"] { stroke: var(--err, #c62828); }
 .am-view-changes .am-cluster-label[data-delta="added"] { fill: var(--ok, #1f9d4d); }
 .am-view-changes .am-cluster-label[data-delta="removed"] { fill: var(--err, #c62828); }
+/* state: a state is an .am-node, and its initial and final dots take the same colors as a node shape. */
+.am-view-changes .am-node[data-delta="added"] .am-state-dot, .am-view-changes .am-node[data-delta="added"] .am-state-core { fill: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] .am-state-dot, .am-view-changes .am-node[data-delta="removed"] .am-state-core { fill: var(--err, #c62828); }
+.am-view-changes .am-node[data-delta="changed"] .am-state-dot, .am-view-changes .am-node[data-delta="changed"] .am-state-core { fill: var(--warn, #a8620a); }
+.am-view-changes .am-node[data-delta="added"] .am-state-ring { stroke: var(--ok, #1f9d4d); }
+.am-view-changes .am-node[data-delta="removed"] .am-state-ring { stroke: var(--err, #c62828); }
+.am-view-changes .am-node[data-delta="changed"] .am-state-ring { stroke: var(--warn, #a8620a); }
 .am-view-changes g[data-delta="removed"]:not(.am-delta-badge), .am-view-changes .am-cluster[data-delta="removed"], .am-view-changes .am-cluster-label[data-delta="removed"] { opacity: 0.55; }
 .am-view-changes .am-node[data-delta="removed"] > text, .am-view-changes g[data-delta="removed"] > .am-edge-label text, .am-view-changes .am-cluster-label[data-delta="removed"] { text-decoration: line-through; }
 .am-diagram .am-delta-badge circle { fill: var(--badge); stroke: var(--paper, #ffffff); stroke-width: 1.5; }
@@ -1438,8 +1463,10 @@ var zh_default = {
     closeAfter: { closing: "{n} \u79D2\u540E\u5173\u95ED\u6B64\u6807\u7B7E\u9875", keep: "\u4FDD\u6301\u6253\u5F00", closeFailed: "\u56DE\u590D\u5DF2\u590D\u5236\uFF0C\u73B0\u5728\u53EF\u4EE5\u5173\u95ED\u6B64\u6807\u7B7E\u9875\u3002" },
     toc: "\u76EE\u5F55",
     flow: "\u6D41\u7A0B\u56FE",
+    state: "\u72B6\u6001\u673A\u56FE",
     sequence: "\u65F6\u5E8F\u56FE",
     er: "\u5B9E\u4F53\u5173\u7CFB\u56FE",
+    class: "\u7C7B\u56FE",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u5C55\u5F00\u67E5\u770B\u56FE\u8868",
@@ -1449,6 +1476,7 @@ var zh_default = {
     generated: "Generated by",
     limits: { value: "{value} / max {limit}", limit: "max {limit}" },
     chart: { name: "\u56FE\u8868", data: "\u6570\u636E", value: "\u6570\u503C", share: "\u5360\u6BD4" },
+    api: { path: "\u8DEF\u5F84\u53C2\u6570", query: "\u67E5\u8BE2\u53C2\u6570", headers: "\u8BF7\u6C42\u5934", request: "\u8BF7\u6C42", response: "\u54CD\u5E94", field: "\u5B57\u6BB5", type: "\u7C7B\u578B", description: "\u8BF4\u660E", requirement: "\u5FC5\u586B\u6027", required: "\u5FC5\u586B", optional: "\u53EF\u9009" },
     table: { filter: "\u7B5B\u9009\u8868\u683C" }
   },
   videoUi: {
@@ -1521,8 +1549,10 @@ var zh_Hant_default = {
     closeAfter: { closing: "{n} \u79D2\u5F8C\u95DC\u9589\u6B64\u5206\u9801", keep: "\u4FDD\u6301\u958B\u555F", closeFailed: "\u56DE\u8986\u5DF2\u8907\u88FD\uFF0C\u73FE\u5728\u53EF\u4EE5\u95DC\u9589\u6B64\u5206\u9801\u3002" },
     toc: "\u76EE\u9304",
     flow: "\u6D41\u7A0B\u5716",
+    state: "\u72C0\u614B\u6A5F\u5716",
     sequence: "\u6642\u5E8F\u5716",
     er: "\u5BE6\u9AD4\u95DC\u806F\u5716",
+    class: "\u985E\u5225\u5716",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u5C55\u958B\u67E5\u770B\u5716\u8868",
@@ -1532,6 +1562,7 @@ var zh_Hant_default = {
     generated: "Generated by",
     limits: { value: "{value} / max {limit}", limit: "max {limit}" },
     chart: { name: "\u5716\u8868", data: "\u8CC7\u6599", value: "\u6578\u503C", share: "\u5360\u6BD4" },
+    api: { path: "\u8DEF\u5F91\u53C3\u6578", query: "\u67E5\u8A62\u53C3\u6578", headers: "\u8ACB\u6C42\u6A19\u982D", request: "\u8ACB\u6C42", response: "\u56DE\u61C9", field: "\u6B04\u4F4D", type: "\u578B\u5225", description: "\u8AAA\u660E", requirement: "\u5FC5\u586B\u6027", required: "\u5FC5\u586B", optional: "\u9078\u586B" },
     table: { filter: "\u7BE9\u9078\u8868\u683C" }
   },
   videoUi: {
@@ -1598,8 +1629,10 @@ var en_default = {
     closeAfter: { closing: "Closing this tab in {n}s", keep: "Keep open", closeFailed: "Reply copied. You can close this tab now." },
     toc: "Contents",
     flow: "Flowchart",
+    state: "State machine diagram",
     sequence: "Sequence diagram",
     er: "Entity relationship diagram",
+    class: "Class diagram",
     colon: ": ",
     sep: ", ",
     expand: "Expand diagram",
@@ -1609,6 +1642,7 @@ var en_default = {
     generated: "Generated by",
     limits: { value: "{value} / max {limit}", limit: "max {limit}" },
     chart: { name: "Chart", data: "Data", value: "Value", share: "Share" },
+    api: { path: "Path parameters", query: "Query parameters", headers: "Headers", request: "Request", response: "Response", field: "Field", type: "Type", description: "Description", requirement: "Requirement", required: "Required", optional: "Optional" },
     table: { filter: "Filter table" }
   },
   // Player labels. drawn..duration are the title block cells; sheet is the scene header, with {n} and {total} the zero-padded numbers.
@@ -1681,8 +1715,10 @@ var ja_default = {
     closeAfter: { closing: "{n} \u79D2\u5F8C\u306B\u3053\u306E\u30BF\u30D6\u3092\u9589\u3058\u307E\u3059", keep: "\u958B\u3044\u305F\u307E\u307E\u306B\u3059\u308B", closeFailed: "\u8FD4\u4FE1\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\u3002\u3053\u306E\u30BF\u30D6\u3092\u9589\u3058\u3066\u69CB\u3044\u307E\u305B\u3093\u3002" },
     toc: "\u76EE\u6B21",
     flow: "\u30D5\u30ED\u30FC\u30C1\u30E3\u30FC\u30C8",
+    state: "\u72B6\u614B\u9077\u79FB\u56F3",
     sequence: "\u30B7\u30FC\u30B1\u30F3\u30B9\u56F3",
     er: "ER \u56F3",
+    class: "\u30AF\u30E9\u30B9\u56F3",
     colon: "\uFF1A",
     sep: "\u3001",
     expand: "\u62E1\u5927\u8868\u793A",
@@ -1692,6 +1728,7 @@ var ja_default = {
     generated: "Generated by",
     limits: { value: "{value} / max {limit}", limit: "max {limit}" },
     chart: { name: "\u30B0\u30E9\u30D5", data: "\u30C7\u30FC\u30BF", value: "\u5024", share: "\u5272\u5408" },
+    api: { path: "\u30D1\u30B9\u30D1\u30E9\u30E1\u30FC\u30BF\u30FC", query: "\u30AF\u30A8\u30EA\u30D1\u30E9\u30E1\u30FC\u30BF\u30FC", headers: "\u30D8\u30C3\u30C0\u30FC", request: "\u30EA\u30AF\u30A8\u30B9\u30C8", response: "\u30EC\u30B9\u30DD\u30F3\u30B9", field: "\u30D5\u30A3\u30FC\u30EB\u30C9", type: "\u578B", description: "\u8AAC\u660E", requirement: "\u5FC5\u9808\u30FB\u4EFB\u610F", required: "\u5FC5\u9808", optional: "\u4EFB\u610F" },
     table: { filter: "\u8868\u3092\u7D5E\u308A\u8FBC\u3080" }
   },
   videoUi: {
@@ -1762,8 +1799,10 @@ var he_default = {
     closeAfter: { closing: "\u05D4\u05DC\u05E9\u05D5\u05E0\u05D9\u05EA \u05EA\u05D9\u05E1\u05D2\u05E8 \u05D1\u05E2\u05D5\u05D3 {n} \u05E9\u05E0\u05D9\u05D5\u05EA", keep: "\u05DC\u05D4\u05E9\u05D0\u05D9\u05E8 \u05E4\u05EA\u05D5\u05D7\u05D4", closeFailed: "\u05D4\u05EA\u05D2\u05D5\u05D1\u05D4 \u05D4\u05D5\u05E2\u05EA\u05E7\u05D4. \u05D0\u05E4\u05E9\u05E8 \u05DC\u05E1\u05D2\u05D5\u05E8 \u05D0\u05EA \u05D4\u05DC\u05E9\u05D5\u05E0\u05D9\u05EA." },
     toc: "\u05EA\u05D5\u05DB\u05DF \u05D4\u05E2\u05E0\u05D9\u05D9\u05E0\u05D9\u05DD",
     flow: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05D6\u05E8\u05D9\u05DE\u05D4",
+    state: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05DE\u05E6\u05D1\u05D9\u05DD",
     sequence: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05E8\u05E6\u05E3",
     er: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05D9\u05E9\u05D5\u05D9\u05D5\u05EA \u05D5\u05E7\u05E9\u05E8\u05D9\u05DD",
+    class: "\u05EA\u05E8\u05E9\u05D9\u05DD \u05DE\u05D7\u05DC\u05E7\u05D5\u05EA",
     colon: ": ",
     sep: ", ",
     expand: "\u05D4\u05D2\u05D3\u05DC\u05EA \u05D4\u05EA\u05E8\u05E9\u05D9\u05DD",
@@ -1773,6 +1812,7 @@ var he_default = {
     generated: "\u05E0\u05D5\u05E6\u05E8 \u05D1\u05D0\u05DE\u05E6\u05E2\u05D5\u05EA",
     limits: { value: "{value} \u05DE\u05EA\u05D5\u05DA {limit}", limit: "\u05E2\u05D3 {limit}" },
     chart: { name: "\u05EA\u05E8\u05E9\u05D9\u05DD", data: "\u05E0\u05EA\u05D5\u05E0\u05D9\u05DD", value: "\u05E2\u05E8\u05DA", share: "\u05D7\u05DC\u05E7" },
+    api: { path: "\u05E4\u05E8\u05DE\u05D8\u05E8\u05D9\u05DD \u05D1\u05E0\u05EA\u05D9\u05D1", query: "\u05E4\u05E8\u05DE\u05D8\u05E8\u05D9\u05DD \u05D1\u05E9\u05D0\u05D9\u05DC\u05EA\u05D4", headers: "\u05DB\u05D5\u05EA\u05E8\u05D5\u05EA", request: "\u05D1\u05E7\u05E9\u05D4", response: "\u05EA\u05D2\u05D5\u05D1\u05D4", field: "\u05E9\u05D3\u05D4", type: "\u05D8\u05D9\u05E4\u05D5\u05E1", description: "\u05EA\u05D9\u05D0\u05D5\u05E8", requirement: "\u05D3\u05E8\u05D9\u05E9\u05D4", required: "\u05D7\u05D5\u05D1\u05D4", optional: "\u05E8\u05E9\u05D5\u05EA" },
     table: { filter: "\u05E1\u05D9\u05E0\u05D5\u05DF \u05D4\u05D8\u05D1\u05DC\u05D4" }
   },
   // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.
@@ -4984,7 +5024,7 @@ function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
   const top2 = cy - (lines.length - 1) * lineHeight / 2;
   return lines.map((line, i) => `<text x="${f(cx)}" y="${f(top2 + i * lineHeight)}" text-anchor="middle" dominant-baseline="central"${attrs}>${esc(svgLine(line, dir))}</text>`).join("");
 }
-var EN_LABELS = { flow: "Flowchart", sequence: "Sequence diagram", er: "Entity relationship diagram", colon: ": ", sep: ", " };
+var EN_LABELS = { flow: "Flowchart", state: "State machine diagram", sequence: "Sequence diagram", er: "Entity relationship diagram", class: "Class diagram", colon: ": ", sep: ", " };
 function diagramLabel(ui, kind2, names2) {
   const u = { ...EN_LABELS, ...ui };
   return `${u[kind2]}${u.colon}${names2.join(u.sep)}`;
@@ -7395,6 +7435,7 @@ function edgeText(label) {
   };
 }
 function nodeSize(node) {
+  if (node.size) return { lines: [], width: node.size[0], height: node.size[1] };
   const lines = labelLines(node.label, TEXT_MAX, FS2);
   const tw = Math.max(...lines.map((l) => measure(l, FS2)));
   const th = lines.length * LH2;
@@ -7594,9 +7635,10 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
   const heads = ["added", "removed"].filter((state) => edges.some((e) => e.state === state));
   return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g>${clusters.join("")}</g><g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
 }
-function badgeSvg(state, x, y2) {
+function badgeSvg(state, x, y2, step) {
   if (!state) return "";
-  return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y2)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  const at3 = step === void 0 ? "" : ` data-step="${step}"`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at3}${deltaAttr(state)} transform="translate(${f(x)},${f(y2)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 function badgePoint(shape, x, y2, w2, h, rtl = false) {
   const s = rtl ? -1 : 1;
@@ -7631,24 +7673,332 @@ function diamondPoint(node, toward) {
   return { x: node.x + dx / k, y: node.y + dy / k };
 }
 
+// src/svg/loop.js
+var LOOP_OUT = 34;
+var LOOP_STEP = 20;
+var LOOP_END = 18;
+var LOOP_LABEL = 24;
+var LOOP_GAP = 6;
+function loopBeside({ x, y: y2, width, labelWidth: labelWidth3 = 0, nth = 0, offset = nth * LOOP_STEP, side = 1 }) {
+  const edge = x + side * width / 2;
+  const out = edge + side * LOOP_OUT + side * offset;
+  const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
+  return {
+    a: { x: edge, y: ay },
+    b: { x: edge, y: by },
+    c: [{ x: out, y: ay }, { x: out, y: by }],
+    away: { x: side, y: 0 },
+    label: labelWidth3 ? { x: out + side * 6 + side * labelWidth3 / 2, y: y2 } : null,
+    corners: [[out + side * 6 + side * labelWidth3, by], [out, ay]]
+  };
+}
+function loopBelow({ x, y: y2, height, labelWidth: labelWidth3 = 0, labelHeight = 18, depth = 0, side = 1 }) {
+  const bottom = y2 + height / 2;
+  const out = bottom + LOOP_OUT + depth;
+  const [ax, bx] = [x - side * LOOP_END / 2, x + side * LOOP_END / 2];
+  const half = Math.max(LOOP_END / 2, labelWidth3 / 2);
+  return {
+    a: { x: ax, y: bottom },
+    b: { x: bx, y: bottom },
+    c: [{ x: ax, y: out }, { x: bx, y: out }],
+    away: { x: 0, y: 1 },
+    label: labelWidth3 ? { x, y: out + 6 + labelHeight / 2 } : null,
+    corners: [[x - half, bottom], [x + half, out + (labelWidth3 ? 6 + labelHeight : 0)]]
+  };
+}
+var labelRoom = (width, height) => width ? Math.max(LOOP_LABEL, 6 + (height ?? 18)) : 0;
+function loopRoom(labelWidths, labelHeights = []) {
+  const steps2 = labelWidths.slice(0, -1).reduce((depth, width, i) => depth + LOOP_STEP + labelRoom(width, labelHeights[i]), 0);
+  return LOOP_OUT + steps2 + labelRoom(labelWidths.at(-1), labelHeights.at(-1)) + LOOP_GAP;
+}
+function loopPath({ a: a3, b, c: c2 }) {
+  return `M${f(a3.x)},${f(a3.y)} C${f(c2[0].x)},${f(c2[0].y)} ${f(c2[1].x)},${f(c2[1].y)} ${f(b.x)},${f(b.y)}`;
+}
+function clipToBox(centre, box, toward) {
+  const dx = toward.x - centre.x;
+  const dy = toward.y - centre.y;
+  const k = Math.max(Math.abs(dx) / (box.width / 2), Math.abs(dy) / (box.height / 2));
+  if (k === 0) return { ...centre };
+  return { x: centre.x + dx / k, y: centre.y + dy / k };
+}
+
+// src/components/state.js
+var LH3 = 17;
+var DOT = 16;
+var DOT_R = 6;
+var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
+var INITIAL = "\0initial";
+var FINAL = "\0final";
+var state_default = {
+  name: "state",
+  summary: "State machine diagram (automatic layout)",
+  syntax: `\`\`\`state [TB|LR|BT|RL]
+[*] -> Idle                   \u2190 [*] on the left is the initial pseudo-state
+Idle -> Connecting: connect()  \u2190 text after the colon is the event; it is optional
+Connecting -> Open: SYN-ACK
+Connecting -> Closed: RST
+Open -> Open: retransmit       \u2190 a self-transition draws a loop
+Open -> Closed: close()
+Closed -> [*]                  \u2190 [*] on the right is the final pseudo-state
+\`\`\`
+- One transition per line. A state is a rounded rectangle; the initial pseudo-state is a filled dot, the final one a ringed dot.
+- The text on each side of \`->\` is the state's name; later lines can refer to it by that name alone. A line without an arrow declares a state (with a change marker).
+- A Mermaid \`stateDiagram-v2\` block is an error that shows the line to write: lines such as \`Idle --> Open\` are rejected with their line number.
+- Composite states, parallel regions, entry and exit actions, and history pseudo-states are not drawn.
+- Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space:
+\`\`\`state LR
+[*] -> Idle
+Idle -> Connecting: connect()
++ Connecting -> Polling: no reply
+- Connecting -> Closed
+~ Connecting
+Polling -> Open: reply
+\`\`\`
+  - A marker applies to the transition and to each state on its line. A state is removed when it appears only on - lines, added when it appears only on + lines, and unchanged when it also appears on an unmarked line. ~ State on a line without an arrow marks that state as changed.
+  - ~ on a transition is an error: remove the old transition with - and add the new one with +. The same transition both unmarked and marked is an error too.
+  - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked state with a +, \u2212 or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
+  - A line that starts with a marker and a space is always read as a marker.`,
+  example: "```state LR\n[*] -> Idle\nIdle -> Connecting: connect()\nConnecting -> Open: SYN-ACK\nConnecting -> Closed: RST\nOpen -> Open: retransmit\nOpen -> Closed: close()\nClosed -> [*]\n```",
+  render(text2, { args, uid, ui, video, dir: pageDir = "ltr" }) {
+    const model = parseState(text2);
+    const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
+    const html = `<figure class="am-diagram am-state">${layout3(model, DIRS2.has(dir) ? dir : "TB", uid(), ui, pageDir, video)}</figure>`;
+    return withDelta(html, [...model.nodes.values(), ...model.edges].map((x) => x.state ?? null), { ui, video });
+  }
+};
+function parseState(text2) {
+  const nodes = /* @__PURE__ */ new Map();
+  const edges = [];
+  const lines = /* @__PURE__ */ new Set();
+  const add2 = (id, label, kind2, line, mark) => {
+    const prev = nodes.get(id);
+    const seen = { before: mark !== "+", after: mark !== "-", tilde: mark === "~" };
+    const tildeLine = mark === "~" ? line : void 0;
+    if (!prev) nodes.set(id, { id, label, kind: kind2, line, ...seen, ...tildeLine && { tildeLine } });
+    else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde, ...tildeLine && { tildeLine: prev.tildeLine ?? tildeLine } });
+    return id;
+  };
+  const resolve7 = (name2, line, mark, side) => {
+    if (name2 !== "[*]") return add2(name2, name2, "state", line, mark);
+    return add2(side === "from" ? INITIAL : FINAL, "[*]", side === "from" ? "initial" : "final", line, mark);
+  };
+  for (const { text: raw, line: n } of contentLines(text2)) {
+    const { mark, text: t } = splitMarker(raw);
+    if (t.includes("\0")) throw new ComponentError(`state: a state name cannot contain U+0000: "${raw}"`, n);
+    const state = markState(mark);
+    checkMermaid(t, raw, mark, n);
+    lines.add(n);
+    const at3 = t.indexOf("->");
+    if (at3 === -1) {
+      if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
+      resolve7(t.trim(), n, mark, "from");
+      continue;
+    }
+    if (mark === "~") throw new ComponentError('state: ~ marks a state, not a transition. To change a transition, remove the old one and add the new one: "- A -> B" then "+ A -> C"', n);
+    const from = t.slice(0, at3).trim();
+    const rest = t.slice(at3 + 2);
+    const colon = rest.search(/[:：]/);
+    const to = (colon === -1 ? rest : rest.slice(0, colon)).trim();
+    const label = colon === -1 ? "" : rest.slice(colon + 1).trim();
+    if (to.includes("->")) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
+    if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
+    const fromId = resolve7(from, n, mark, "from");
+    const toId = resolve7(to, n, mark, "to");
+    edges.push({ from: fromId, to: toId, label, line: n, ...state && { state } });
+  }
+  if (!nodes.size) throw new ComponentError("state needs at least one state", 1);
+  checkTransitions(edges, nodes);
+  const settled = new Map([...nodes].map(([id, node]) => {
+    const state = nodeState(node);
+    return [id, state ? { ...node, state } : node];
+  }));
+  return { nodes: settled, edges, lines: [...lines].sort((a3, b) => a3 - b) };
+}
+function checkMermaid(t, raw, mark, line) {
+  if (/^stateDiagram(-v2)?$/i.test(t)) {
+    throw new ComponentError(`"${raw}" is Mermaid syntax; this block is a state diagram already, so write its transitions one line each, for example: [*] -> Idle`, line);
+  }
+  if (/^state\s+.+\{$/.test(t)) {
+    throw new ComponentError(`"${raw}" is a Mermaid composite state, which this component does not draw; write each state on its own or in a transition`, line);
+  }
+  if (t === "}") throw new ComponentError(`"${raw}" closes a Mermaid composite state; this component has no nested states, so remove the braces`, line);
+  const colon = t.search(/[:：]/);
+  const head = colon === -1 ? t : t.slice(0, colon);
+  if (!head.includes("-->")) return;
+  const fixedHead = head.replace(/-->/g, "->").replace(/\s+$/, "");
+  const event = colon === -1 ? "" : t.slice(colon + 1).trim();
+  const fixed2 = event ? `${fixedHead}: ${event}` : fixedHead;
+  throw new ComponentError(`"${raw}" is Mermaid syntax; write ${mark && mark !== "~" ? `${mark} ` : ""}${fixed2}`, line);
+}
+function checkTransitions(edges, nodes) {
+  const keyOf = (e) => `${e.from}\0${e.to}\0${e.label}`;
+  const text2 = (e) => `${nodes.get(e.from).label} -> ${nodes.get(e.to).label}${e.label ? `: ${e.label}` : ""}`;
+  for (const e of edges.filter((x) => x.state)) {
+    const plain = edges.find((x) => !x.state && keyOf(x) === keyOf(e));
+    if (plain) {
+      throw new ComponentError(`state: the transition ${text2(e)} is written unmarked on line ${plain.line} and as ${e.state === "added" ? "+" : "-"} here. Mark every line of that transition, or none`, e.line);
+    }
+  }
+}
+function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
+  const { nodes, edges, lines } = model;
+  const rtl = pageDir === "rtl";
+  const side = rtl ? -1 : 1;
+  const below = rankdir === "LR" || rankdir === "RL";
+  const loops = edges.filter((e) => e.from === e.to);
+  const straight = edges.filter((e) => e.from !== e.to);
+  const boxes = new Map([...nodes.values()].map((n) => {
+    if (n.kind !== "state") return [n.id, { width: DOT, height: DOT, lines: [] }];
+    const { width: width2, height: height2, lines: lines2 } = nodeSize({ label: n.label, shape: "rect" });
+    return [n.id, { width: width2, height: height2, lines: lines2 }];
+  }));
+  const measured = new Map(loops.map((e) => [e, e.label ? edgeText(e.label) : { width: 0, height: 0 }]));
+  const room = /* @__PURE__ */ new Map();
+  const beside = /* @__PURE__ */ new Map();
+  for (const from of new Set(loops.map((e) => e.from))) {
+    const own = loops.filter((e) => e.from === from);
+    const sizes = own.map((e) => measured.get(e));
+    if (below) {
+      room.set(from, { y: loopRoom(sizes.map((s) => s.width), sizes.map((s) => s.height)) });
+      continue;
+    }
+    let offset = 0;
+    beside.set(from, own.map((e, i) => {
+      if (i) offset += Math.max(LOOP_STEP, sizes[i - 1].width + 6);
+      return { edge: e, offset, labelWidth: sizes[i].width, extent: LOOP_OUT + offset + 6 + sizes[i].width };
+    }));
+    room.set(from, { x: Math.max(...beside.get(from).map((spec) => spec.extent)) });
+  }
+  const layoutNodes = new Map([...nodes].map(([key2, n]) => {
+    const box = boxes.get(key2);
+    const extra = room.get(key2) ?? {};
+    return [key2, { ...n, shape: "rect", size: [box.width + (extra.x ?? 0), box.height + (extra.y ?? 0)] }];
+  }));
+  const { g, key } = runLayout({ nodes: layoutNodes, edges: straight, groups: [] }, rankdir, rtl, [], /* @__PURE__ */ new Map());
+  const centre = (nodeId) => {
+    const { x, y: y2 } = g.node(key.get(nodeId));
+    const extra = room.get(nodeId) ?? {};
+    return { x: x - side * (extra.x ?? 0) / 2, y: y2 - (extra.y ?? 0) / 2 };
+  };
+  const stepOf = new Map(lines.map((line, i) => [line, i]));
+  const drawn = straight.map((e, i) => {
+    const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
+    return { e, data, points: clipEnds2(data.points, e, centre, boxes, room, nodes) };
+  });
+  const edgeSvg = drawn.map(({ e, data, points }) => {
+    const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
+    const path = `<path class="am-edge" d="${smoothPath(points)}" marker-end="url(#${head})"/>`;
+    const text2 = e.label ? edgeLabelSvg(e.label, data.x, data.y, pageDir) : "";
+    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text2}</g>`;
+  });
+  const seen = /* @__PURE__ */ new Map();
+  const loopSpecs = loops.map((e) => {
+    const { x, y: y2 } = centre(e.from);
+    const box = boxes.get(e.from);
+    if (below) {
+      const size = measured.get(e);
+      const { depth } = seen.get(e.from) ?? { depth: 0 };
+      seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? Math.max(LOOP_LABEL, 6 + size.height) : 0) });
+      return { e, ...loopBelow({ x, y: y2, height: box.height, depth, side, labelWidth: size.width, labelHeight: size.height }) };
+    }
+    const spec = beside.get(e.from).find((x2) => x2.edge === e);
+    return { e, ...loopBeside({ x, y: y2, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
+  });
+  const loopsSvg = loopSpecs.map(({ e, ...spec }) => {
+    const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
+    const path = `<path class="am-edge" d="${loopPath(spec)}" marker-end="url(#${head})"/>`;
+    const text2 = e.label && spec.label ? edgeLabelSvg(e.label, spec.label.x, spec.label.y, pageDir) : "";
+    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text2}</g>`;
+  });
+  const nodeSvg = [...nodes.values()].map((n) => {
+    const { x, y: y2 } = centre(n.id);
+    const box = boxes.get(n.id);
+    const badgeStep = n.state === "changed" ? stepOf.get(n.tildeLine ?? n.line) : void 0;
+    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y2 - box.height / 2, badgeStep);
+    const keyAttr = n.kind === "state" ? ` data-key="${esc(n.label)}"` : "";
+    const open = `<g class="am-node am-node--state${n.kind === "state" ? "" : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
+    if (n.kind === "initial") return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y2)}" r="${DOT_R}"/>${badge}</g>`;
+    if (n.kind === "final") return `${open}<circle class="am-state-ring" cx="${f(x)}" cy="${f(y2)}" r="${DOT_R}"/><circle class="am-state-core" cx="${f(x)}" cy="${f(y2)}" r="2.8"/>${badge}</g>`;
+    return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y2 - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y2, LH3, ' class="am-node-text"', pageDir)}${badge}</g>`;
+  });
+  const xs = [];
+  const ys = [];
+  const at3 = (x, y2) => {
+    xs.push(x);
+    ys.push(y2);
+  };
+  for (const n of nodes.values()) {
+    const { x, y: y2 } = centre(n.id);
+    const box = boxes.get(n.id);
+    at3(x - box.width / 2, y2 - box.height / 2);
+    at3(x + box.width / 2, y2 + box.height / 2);
+  }
+  for (const { e, data, points } of drawn) {
+    for (const p of points) at3(p.x, p.y);
+    if (e.label) {
+      const { width: w2, height: h } = edgeText(e.label);
+      at3(data.x - w2 / 2, data.y - h / 2);
+      at3(data.x + w2 / 2, data.y + h / 2);
+    }
+  }
+  for (const { e, corners, label: label2 } of loopSpecs) {
+    corners.forEach(([x, y2]) => at3(x, y2));
+    if (label2) {
+      const { width: w2, height: h } = edgeText(e.label);
+      at3(label2.x - w2 / 2, label2.y - h / 2);
+      at3(label2.x + w2 / 2, label2.y + h / 2);
+    }
+  }
+  const margin = 14;
+  const shiftX = margin - Math.min(...xs);
+  const shiftY = margin - Math.min(...ys);
+  const shift = shiftX || shiftY ? ` transform="translate(${f(shiftX)},${f(shiftY)})"` : "";
+  const width = Math.ceil(Math.max(...xs) - Math.min(...xs)) + 2 * margin;
+  const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
+  const names2 = [...nodes.values()].filter((n) => n.kind === "state").slice(0, 8).map((n) => n.label);
+  const label = diagramLabel(ui, "state", names2);
+  const heads = ["added", "removed"].filter((s) => edges.some((e) => e.state === s));
+  const used = /* @__PURE__ */ new Set([
+    ...straight.map((e) => stepOf.get(e.line)),
+    ...loops.map((e) => stepOf.get(e.line)),
+    ...[...nodes.values()].map((n) => stepOf.get(n.line)),
+    ...[...nodes.values()].filter((n) => n.state === "changed").map((n) => stepOf.get(n.tildeLine ?? n.line))
+  ]);
+  const empty = video ? lines.map((line) => used.has(stepOf.get(line)) ? "" : `<g data-step="${stepOf.get(line)}"></g>`).join("") : "";
+  return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g>${empty}</g></svg>`;
+}
+function edgeLabelSvg(label, x, y2, pageDir) {
+  const { lines, width: w2, height: h } = edgeText(label);
+  return `<g class="am-edge-label"><rect x="${f(x - w2 / 2)}" y="${f(y2 - h / 2)}" width="${f(w2)}" height="${f(h)}" rx="3"/>${textLines(lines, x, y2, LH3, "", pageDir)}</g>`;
+}
+function clipEnds2(points, edge, centre, boxes, room, nodes) {
+  const pts = points.map((p) => ({ ...p }));
+  if (room.has(edge.from) && pts.length > 1) pts[0] = clipToBox(centre(edge.from), boxes.get(edge.from), points[1]);
+  if (room.has(edge.to) && pts.length > 1) pts[pts.length - 1] = clipToBox(centre(edge.to), boxes.get(edge.to), points[points.length - 2]);
+  const onCircle = (c2, toward, r) => {
+    const dx = toward.x - c2.x;
+    const dy = toward.y - c2.y;
+    const d = Math.hypot(dx, dy);
+    return d ? { x: c2.x + dx / d * r, y: c2.y + dy / d * r } : { ...c2 };
+  };
+  if (nodes.get(edge.from).kind === "initial" && pts.length > 1) pts[0] = onCircle(centre(edge.from), pts[1], DOT_R);
+  if (nodes.get(edge.to).kind === "final" && pts.length > 1) pts[pts.length - 1] = onCircle(centre(edge.to), pts[pts.length - 2], DOT_R);
+  return pts;
+}
+
 // src/components/er.js
 var FS3 = DRAWING.node;
 var FIELD_FS = DRAWING.field;
 var KEY_FS = DRAWING.cluster;
 var EDGE_FS2 = DRAWING.edge;
-var LH3 = 17;
+var LH4 = 17;
 var HEAD_LH = 20;
 var FIELD_LH = 17;
 var PAD = 11;
 var KEY_GAP = 12;
 var SIGN_W = 14;
 var MIN_WIDTH = 92;
-var LOOP_OUT = 34;
-var LOOP_STEP = 20;
-var LOOP_END = 18;
-var LOOP_LABEL = 24;
-var LOOP_GAP = 6;
-var DIRS2 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
+var DIRS3 = /* @__PURE__ */ new Set(["TB", "LR", "BT", "RL"]);
 var CARDS = ["1\\.\\.\\*", "0\\.\\.1", "\\*", "1"];
 var MARKERS = /* @__PURE__ */ new Set(["PK", "FK", "UK"]);
 var RELATIONSHIP = new RegExp(`^(\\S+)\\s+(${CARDS.join("|")})\\s*--\\s*(${CARDS.join("|")})\\s+(\\S+)\\s*(?::\\s*(.*))?$`);
@@ -7695,7 +8045,7 @@ Order
   render(text2, { args, ui, video, dir: pageDir = "ltr" }) {
     const model = parseEr(text2);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
-    const html = `<figure class="am-diagram am-er">${layout3(model, DIRS2.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
+    const html = `<figure class="am-diagram am-er">${layout4(model, DIRS3.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
     const states = [...model.entities.values()].flatMap((e) => [e.state, ...e.fields.map((x) => x.state)]).concat(model.written.map((rel) => rel.state));
     return withDelta(html, states.map((state) => state ?? null), { ui, video });
   }
@@ -7825,7 +8175,7 @@ function nodeSize2(entity) {
   const rows = entity.fields.map((field) => rowWidth(entity, field));
   return { width: Math.ceil(Math.max(MIN_WIDTH, nameWidth(entity) + 2 * PAD, ...rows)), height: HEAD_LH + entity.fields.length * FIELD_LH + 2 * PAD };
 }
-function layout3(model, rankdir, ui, pageDir = "ltr") {
+function layout4(model, rankdir, ui, pageDir = "ltr") {
   const { entities } = model;
   const rels = relationships(model);
   const loops = rels.filter((rel) => rel.from === rel.to);
@@ -7838,7 +8188,7 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   if (below) {
     for (const name2 of entities.keys()) {
       const own = loops.filter((rel) => rel.from === name2);
-      if (own.length) room.set(name2, loopRoom(own));
+      if (own.length) room.set(name2, loopRoom(own.map((rel) => rel.label ? labelWidth2(rel.label) : 0)));
     }
   }
   const sizes = /* @__PURE__ */ new Map();
@@ -7883,7 +8233,9 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
     seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
     const { x, y: y2 } = centre(rel.from);
     const size = sizes.get(rel.from);
-    return below ? loopBelow(rel, x, y2, size, depth, s) : loopBeside(rel, x, y2, size, nth, s);
+    const lw = rel.label ? labelWidth2(rel.label) : 0;
+    const spec = below ? loopBelow({ x, y: y2, height: size.height, depth, side: s, labelWidth: lw }) : loopBeside({ x, y: y2, width: size.width, nth, side: s, labelWidth: lw });
+    return { rel, ...spec };
   });
   const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line), pageDir));
   const xs = [];
@@ -7916,17 +8268,6 @@ function layout3(model, rankdir, ui, pageDir = "ltr") {
   const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
   return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
 }
-function loopRoom(own) {
-  const steps2 = own.slice(0, -1).reduce((depth, rel) => depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0), 0);
-  return LOOP_OUT + steps2 + (own.at(-1).label ? LOOP_LABEL : 0) + LOOP_GAP;
-}
-function clipToBox(centre, size, toward) {
-  const dx = toward.x - centre.x;
-  const dy = toward.y - centre.y;
-  const k = Math.max(Math.abs(dx) / (size.width / 2), Math.abs(dy) / (size.height / 2));
-  if (k === 0) return { ...centre };
-  return { x: centre.x + dx / k, y: centre.y + dy / k };
-}
 function nodeSvgOf(entity, x, y2, size, step, pageDir) {
   const left = x - size.width / 2;
   const top2 = y2 - size.height / 2;
@@ -7945,38 +8286,8 @@ function nodeSvgOf(entity, x, y2, size, step, pageDir) {
   const badge = badgeSvg(entity.state, rtl ? left : left + size.width, top2);
   return `<g class="am-node am-node--er${entity.hi ? " am-node--hi" : ""}" data-key="${esc(entity.name)}" data-step="${step}"${deltaAttr(entity.state)}><rect class="am-node-shape" x="${f(left)}" y="${f(top2)}" width="${f(size.width)}" height="${f(size.height)}" rx="3"/>${head}${rule}${fields2}${badge}</g>`;
 }
-function loopBeside(rel, x, y2, size, nth, s) {
-  const edge = x + s * size.width / 2;
-  const out = edge + s * LOOP_OUT + s * nth * LOOP_STEP;
-  const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
-  const label = rel.label ? { x: out + s * 6 + s * labelWidth2(rel.label) / 2, y: y2 } : null;
-  return {
-    rel,
-    a: { x: edge, y: ay },
-    b: { x: edge, y: by },
-    c: [{ x: out, y: ay }, { x: out, y: by }],
-    away: { x: s, y: 0 },
-    label,
-    corners: [[out + s * 6 + s * (rel.label ? labelWidth2(rel.label) : 0), by], [out, ay]]
-  };
-}
-function loopBelow(rel, x, y2, size, depth, s) {
-  const bottom = y2 + size.height / 2;
-  const out = bottom + LOOP_OUT + depth;
-  const [ax, bx] = [x - s * LOOP_END / 2, x + s * LOOP_END / 2];
-  const half = Math.max(LOOP_END / 2, rel.label ? labelWidth2(rel.label) / 2 : 0);
-  return {
-    rel,
-    a: { x: ax, y: bottom },
-    b: { x: bx, y: bottom },
-    c: [{ x: ax, y: out }, { x: bx, y: out }],
-    away: { x: 0, y: 1 },
-    label: rel.label ? { x, y: out + 6 + 9 } : null,
-    corners: [[x - half, bottom], [x + half, out + (rel.label ? 6 + 18 : 0)]]
-  };
-}
 function loopSvg({ rel, a: a3, b, c: c2, away, label }, step, pageDir) {
-  const path = `<path class="am-edge" d="M${f(a3.x)},${f(a3.y)} C${f(c2[0].x)},${f(c2[0].y)} ${f(c2[1].x)},${f(c2[1].y)} ${f(b.x)},${f(b.y)}"/>`;
+  const path = `<path class="am-edge" d="${loopPath({ a: a3, b, c: c2 })}"/>`;
   const ends = `${endMark(a3, { x: a3.x + away.x, y: a3.y + away.y }, rel.fromCard)}${endMark(b, { x: b.x + away.x, y: b.y + away.y }, rel.toCard)}`;
   const text2 = label ? labelSvg(rel.label, label.x, label.y, pageDir) : "";
   return `<g data-step="${step}"${deltaAttr(rel.state)}>${path}${ends}${text2}</g>`;
@@ -7986,7 +8297,7 @@ function labelWidth2(text2) {
 }
 function labelSvg(text2, x, y2, pageDir) {
   const w2 = labelWidth2(text2);
-  return `<g class="am-edge-label"><rect x="${f(x - w2 / 2)}" y="${f(y2 - 9)}" width="${f(w2)}" height="18" rx="3"/>${textLines([text2], x, y2, LH3, "", pageDir)}</g>`;
+  return `<g class="am-edge-label"><rect x="${f(x - w2 / 2)}" y="${f(y2 - 9)}" width="${f(w2)}" height="18" rx="3"/>${textLines([text2], x, y2, LH4, "", pageDir)}</g>`;
 }
 function endsSvg(points, rel) {
   if (points.length < 2) return "";
@@ -8020,6 +8331,194 @@ function endMark(point, toward, card) {
   }[card]();
   return `<g class="am-er-end am-edge">${marks}</g>`;
 }
+
+// src/components/class.js
+var RELATION = /^(\S+)\s+(--\|>|\.\.\|>|\*--|o--|-->|\.\.>|--)\s+([^\s:]+)(?:\s*:\s*(.*))?$/;
+var METHOD = /^[+\-#~]?\s*[^:\s(]+\s*\(/;
+var ROW = 20;
+var PAD2 = 12;
+function parseClass(text2) {
+  const classes = /* @__PURE__ */ new Map();
+  const relations = [];
+  let current;
+  for (const { raw, text: line, line: n } of contentLines(text2)) {
+    if (/^\s/.test(raw)) {
+      if (!current) throw new ComponentError("class: write a class or interface before its indented members", n);
+      current.members.push(line);
+      continue;
+    }
+    const relation = line.match(RELATION);
+    if (relation) {
+      relations.push({ from: relation[1], kind: relation[2], to: relation[3], label: relation[4] ?? "", line: n });
+      current = null;
+      continue;
+    }
+    const declaration = line.match(/^(?:(class|interface|abstract|enum)\s+)?(\*?)([^\s:]+)$/);
+    if (!declaration || /--|\.\.>|[{}]/.test(line)) {
+      throw new ComponentError(`class: cannot parse "${line}"; write class User, interface Store, or User --|> Entity`, n);
+    }
+    const [, kind2 = "class", hi, name2] = declaration;
+    if (classes.has(name2)) throw new ComponentError(`class: "${name2}" is declared twice`, n);
+    current = { name: name2, kind: kind2, hi: Boolean(hi), members: [], line: n };
+    classes.set(name2, current);
+  }
+  if (!classes.size) throw new ComponentError("class needs at least one class or interface", 1);
+  for (const relation of relations) {
+    for (const name2 of [relation.from, relation.to]) {
+      if (!classes.has(name2)) throw new ComponentError(`class: no declaration for "${name2}"`, relation.line);
+    }
+  }
+  return { classes, relations };
+}
+var class_default = {
+  name: "class",
+  summary: "UML class diagram (attributes, methods, interfaces and relationships)",
+  syntax: `\`\`\`class [TB|LR|BT|RL]
+abstract Entity
+  +id: string
+class *User
+  -email: string
+  +save(): void
+interface Store
+  +find(id: string): User
+User --|> Entity: extends
+User ..|> Store: implements
+\`\`\`
+- Declare class, interface, abstract or enum at column 0; a bare name is a class. * highlights a declaration.
+- Indent members. Visibility (+ public, - private, # protected, ~ package), types and signatures are shown as written.
+- Attributes and methods occupy separate compartments; a method starts with name( after its optional visibility sign. Parentheses in a property type do not make it a method.
+- Links: --|> inheritance, ..|> realization, *-- composition, o-- aggregation, --> association, ..> dependency, -- plain association.
+- Arrowheads point at the right-hand declaration; diamonds sit at the left-hand declaration. Labels after : are optional.
+- Declare both ends of every link. Self-links and parallel links are supported. The default direction is TB.`,
+  example: "```class LR\ninterface Store\n  +find(id: string): User\nclass UserStore\n  -users: User[]\n  +find(id: string): User\nUserStore ..|> Store: implements\n```",
+  // render lays out measured UML boxes with dagre and emits the same themed SVG hooks as the other diagrams.
+  render(text2, { args = "", uid, ui, dir = "ltr" }) {
+    const { classes, relations } = parseClass(text2);
+    const id = uid();
+    const g = new Uo.graphlib.Graph({ multigraph: true });
+    g.setGraph({ rankdir: args.match(/\b(TB|LR|BT|RL)\b/i)?.[1].toUpperCase() ?? "TB", nodesep: 44, ranksep: 64, marginx: 18, marginy: 18 });
+    g.setDefaultEdgeLabel(() => ({}));
+    const keys = new Map([...classes.keys()].map((name2, i) => [name2, `n${i}`]));
+    for (const c2 of classes.values()) {
+      const stereotype = c2.kind === "class" ? [] : [c2.kind];
+      const attributes = c2.members.filter((m2) => !METHOD.test(m2));
+      const methods = c2.members.filter((m2) => METHOD.test(m2));
+      const groups = [[...stereotype, c2.name], attributes, methods].filter((rows) => rows.length);
+      const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || stereotype.length && !n ? DRAWING.field : DRAWING.node, { bold: c2.hi })));
+      g.setNode(keys.get(c2.name), { ...c2, groups, width: Math.ceil(Math.max(100, ...widths.map((w2) => w2 + 2 * PAD2))), height: groups.reduce((n, rows) => n + rows.length * ROW + PAD2, 0) });
+    }
+    relations.forEach((rel, i) => {
+      g.setEdge(keys.get(rel.from), keys.get(rel.to), {
+        ...rel,
+        width: rel.label ? measure(rel.label, DRAWING.edge) + 12 : 0,
+        height: rel.label ? 20 : 0,
+        labelpos: "c"
+      }, `e${i}`);
+    });
+    Uo.layout(g, { customOrder: orderRanks });
+    if (dir === "rtl") mirrorLayout(g);
+    const edges = g.edges().map((edge) => {
+      const rel = g.edge(edge);
+      const diamond = rel.kind === "*--" || rel.kind === "o--";
+      const marker = diamond ? rel.kind === "*--" ? "filled" : "diamond" : rel.kind.includes("|>") ? "triangle" : "open";
+      const end = rel.kind === "--" ? "" : ` marker-${diamond ? "start" : "end"}="url(#${id}-${marker})"`;
+      const label = rel.label ? `<g class="am-edge-label"><rect x="${f(rel.x - rel.width / 2)}" y="${f(rel.y - 10)}" width="${f(rel.width)}" height="20" rx="3"/>${textLines([rel.label], rel.x, rel.y, ROW, "", dir)}</g>` : "";
+      return `<g data-step="${rel.line - 1}"><path class="am-edge${rel.kind.startsWith("..") ? " am-edge--dashed" : ""}" d="${smoothPath(rel.points)}"${end}/>${label}</g>`;
+    });
+    const nodes = g.nodes().map((key) => {
+      const c2 = g.node(key);
+      const x = c2.x - c2.width / 2;
+      const y2 = c2.y - c2.height / 2;
+      let top2 = y2;
+      const rows = c2.groups.map((group, k) => {
+        const separator = k ? `<path class="am-edge" d="M${f(x)},${f(top2)} h${f(c2.width)}"/>` : "";
+        const text3 = group.map((member, n) => {
+          const kind2 = !k && !n && c2.kind !== "class";
+          return `<text class="am-node-text" x="${f(k ? dir === "rtl" ? x + c2.width - PAD2 : x + PAD2 : c2.x)}" y="${f(top2 + PAD2 / 2 + ROW * (n + 0.5))}" text-anchor="${k ? "start" : "middle"}" dominant-baseline="central"${k || kind2 ? ` style="font-size:${DRAWING.field}px${kind2 ? ";font-style:italic;opacity:0.65" : ""}"` : ""}>${esc(svgLine(member, dir))}</text>`;
+        }).join("");
+        top2 += group.length * ROW + PAD2;
+        return separator + text3;
+      }).join("");
+      return `<g class="am-node am-node--rect${c2.hi ? " am-node--hi" : ""}" data-key="${esc(c2.name)}" data-step="${c2.line - 1}"><rect class="am-node-shape" x="${f(x)}" y="${f(y2)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="3"/>${rows}</g>`;
+    });
+    const defs = `<defs>${[["triangle", "M0,0 L10,5 L0,10 Z"], ["diamond", "M0,5 L6,0 L12,5 L6,10 Z"], ["filled", "M0,5 L6,0 L12,5 L6,10 Z"], ["open", "M1,1 L9,5 L1,9"]].map(([kind2, path]) => `<marker id="${id}-${kind2}" viewBox="-1 -1 14 12" refX="${kind2 === "diamond" || kind2 === "filled" ? 12 : 10}" refY="5" markerWidth="12" markerHeight="10" orient="auto-start-reverse"><path class="${kind2 === "filled" ? "am-arrow" : kind2 === "open" ? "am-edge" : "am-class-hollow"}" d="${path}"/></marker>`).join("")}</defs>`;
+    return `<figure class="am-diagram am-class">${svgOpen(g.graph().width, g.graph().height, diagramLabel(ui, "class", [...classes.keys()]), dir)}${defs}${edges.join("")}${nodes.join("")}</svg></figure>`;
+  }
+};
+
+// src/components/api.js
+function parseApi(text2) {
+  const lines = contentLines(text2);
+  const first = lines.shift();
+  const endpoint = first?.text.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
+  if (!endpoint || (endpoint[1] === "RPC" ? !/^[^/]+\/[^/]+$/.test(endpoint[2]) : !endpoint[2].startsWith("/"))) {
+    throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", first?.line ?? 1);
+  }
+  const sections = [];
+  let current;
+  for (const { raw, text: line, line: n } of lines) {
+    if (/^\s/.test(raw)) {
+      const [spec, ...description] = line.split(/(?<!\\)\|/).map((part) => part.replace(/\\\|/g, "|"));
+      const parts = spec.trim().split(/\s+/);
+      const name2 = parts.shift();
+      const requirement = /^(required|optional)$/.test(parts.at(-1)) ? parts.pop() : "";
+      const type = parts.join(" ");
+      if (!current || !type) throw new ComponentError("api: indent name type [required|optional] | description under a section", n);
+      current.fields.push({ name: name2, type, requirement, description: description.join("|").trim() });
+      continue;
+    }
+    const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
+    if (!section || section[1] === "response" && !section[2]) {
+      throw new ComponentError("api: use path, query, headers, request [Type], or response STATUS [Type]", n);
+    }
+    if (section[1] === "response" && endpoint[1] !== "RPC" && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
+      throw new ComponentError("api: HTTP responses need a status code from 100 to 599, for example response 200 User", n);
+    }
+    if (endpoint[1] === "RPC" && ["path", "query", "headers"].includes(section[1])) {
+      throw new ComponentError("api: RPC contracts use request and response sections", n);
+    }
+    current = { kind: section[1], detail: section[2] ?? "", fields: [] };
+    sections.push(current);
+  }
+  if (!sections.length) throw new ComponentError("api needs at least one request, parameter or response section", first.line);
+  return { method: endpoint[1], target: endpoint[2], sections };
+}
+var api_default = {
+  name: "api",
+  summary: "HTTP API or RPC contract (parameters, request and response fields)",
+  syntax: `\`\`\`api
+POST /users
+headers
+  Authorization string required | Bearer token
+request CreateUserRequest
+  email string required | Email address
+  name string optional
+response 201 User
+  id string required
+response 400 Error
+  message string required
+\`\`\`
+- One endpoint per block: an uppercase HTTP method and /path, or RPC package.Service/Method.
+- Sections: path, query, headers, request [Type], response STATUS [Type]. RPC uses request and response.
+- Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
+- Write \\| for a literal | inside a type, such as string \\| null; the first unescaped | starts the description.
+- required and optional are explicit and visible in the Requirement column. If any field declares one, unspecified fields show a dash; otherwise this column is omitted.
+- A response requires a status (HTTP code 100-599 or RPC status name). A section without fields can describe an empty response, such as response 204.
+- This displays a contract; it does not send requests or import OpenAPI / protobuf files.`,
+  example: "```api\nRPC users.UserService/GetUser\nrequest GetUserRequest\n  id string required\nresponse OK User\n  id string required\n  email string optional\nresponse NOT_FOUND\n```",
+  // render emits semantic tables, escaping every author-supplied contract value and translating the surrounding labels.
+  render(text2, { ui } = {}) {
+    const { method, target, sections } = parseApi(text2);
+    const words3 = ui?.api ?? FALLBACK.ui.api;
+    const body = sections.map(({ kind: kind2, detail, fields: fields2 }) => {
+      const described = fields2.some((field) => field.description);
+      const specified = fields2.some((field) => field.requirement);
+      const table = fields2.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col">${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col">${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${fields2.map((field) => `<tr><th scope="row"><code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td>${esc(field.description)}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : "";
+      return `<section class="am-api-section"><h4>${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
+    }).join("");
+    return `<div class="am-api am-md"><div class="am-api-endpoint" dir="ltr"><strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</div>`;
+  }
+};
 
 // src/components/ask.js
 var OPTION = /^([*-])\s+(.+)$/;
@@ -8127,9 +8626,9 @@ function lineRange(values) {
 }
 
 // src/components/chart-parts.js
-var PAD2 = 8;
+var PAD3 = 8;
 var FS4 = { cat: DRAWING.chartCat, tick: DRAWING.chartTick, val: DRAWING.chartVal, legend: DRAWING.chartLegend };
-var LH4 = 14;
+var LH5 = 14;
 var PLOT_H = 220;
 var MAX_WIDTH = 880;
 var SLOT_MAX = 104;
@@ -8181,7 +8680,7 @@ function valueAxis(m2, { axisX, width, y: y2, W: W3, X: X3 }) {
 }
 function categoryLabel(plan, i, label, cx, catTop, { X: X3, rtl, dir }) {
   if (plan.lines) {
-    return { svg: plan.lines[i].map((l, j) => text("am-ch-cat", X3(cx), catTop + 11 + j * LH4, l, dir, ' text-anchor="middle"')).join(""), tip: "" };
+    return { svg: plan.lines[i].map((l, j) => text("am-ch-cat", X3(cx), catTop + 11 + j * LH5, l, dir, ' text-anchor="middle"')).join(""), tip: "" };
   }
   const shown2 = plan.shown[i];
   const [ax, ay] = [X3(cx + 3), catTop + 4];
@@ -8236,21 +8735,21 @@ function verticalBars(m2) {
   const slot = plan.slot;
   const bw = Math.max(6, Math.min(barMax, Math.floor((slot - Math.min(GUTTER, slot * 0.3) - (count2 - 1) * GAP) / count2)));
   const tickW = Math.max(...range.ticks.map((t) => measure(m2.tick(t), FS4.tick)));
-  const reach = plan.lines ? 0 : Math.max(...plan.shown.map((l, i) => measure(l, FS4.cat) * COS + FS4.cat * SIN - ((i + 0.5) * slot + PAD2 + tickW + 9)));
-  const axisX = PAD2 + Math.max(0, reach) + tickW + 6;
+  const reach = plan.lines ? 0 : Math.max(...plan.shown.map((l, i) => measure(l, FS4.cat) * COS + FS4.cat * SIN - ((i + 0.5) * slot + PAD3 + tickW + 9)));
+  const axisX = PAD3 + Math.max(0, reach) + tickW + 6;
   const legend = legendLayout(m2.names, Math.max(n * slot + tickW, 240));
-  const W3 = Math.ceil(Math.max(axisX + n * slot + PAD2, (legend.width ?? 0) + 2 * PAD2));
-  const plotTop = PAD2 + legend.height + (labels ? 16 : 6);
+  const W3 = Math.ceil(Math.max(axisX + n * slot + PAD3, (legend.width ?? 0) + 2 * PAD3));
+  const plotTop = PAD3 + legend.height + (labels ? 16 : 6);
   const plotBottom = plotTop + PLOT_H;
   const negLabels = labels && range.min < 0;
   const catTop = plotBottom + (negLabels ? 18 : 8);
-  const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls.length)) * LH4 + 4 : Math.max(...plan.shown.map((l) => measure(l, FS4.cat))) * SIN + 12;
-  const height = catTop + catH + PAD2;
+  const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls.length)) * LH5 + 4 : Math.max(...plan.shown.map((l) => measure(l, FS4.cat))) * SIN + 12;
+  const height = catTop + catH + PAD3;
   const X3 = mirror(W3, rtl);
   const rectX = (x, w2) => rtl ? W3 - x - w2 : x;
   const y2 = (v2) => plotTop + (range.max - v2) / (range.max - range.min) * PLOT_H;
   const y0 = y2(0);
-  const body = [legendSvg(legend, PAD2, PAD2, m2, W3)];
+  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
   body.push(...valueAxis(m2, { axisX, width: n * slot, y: y2, W: W3, X: X3 }));
   for (const [i, row] of rows.entries()) {
     const x0 = axisX + i * slot;
@@ -8276,23 +8775,23 @@ function horizontalBars(m2) {
   const lines = rows.map((r) => fitLines(r.label, CAT_WIDTH, 3, FS4.cat));
   const catW = Math.max(...lines.flat().map((l) => measure(l, FS4.cat)));
   const bh = BAR_H[count2];
-  const rowH = Math.max(count2 * bh + (count2 - 1) * GAP + 12, Math.max(...lines.map((ls) => ls.length)) * LH4 + 6);
+  const rowH = Math.max(count2 * bh + (count2 - 1) * GAP + 12, Math.max(...lines.map((ls) => ls.length)) * LH5 + 6);
   const rel = (v2) => (v2 - range.min) / (range.max - range.min) * PLOT_W;
   const widths = rows.map((r) => r.values.map((v2) => labels ? measure(m2.tick(v2), FS4.val) : 0));
   const after = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v2, k) => v2 >= 0 ? rel(v2) + 4 + widths[i][k] - PLOT_W : 0))) : 0;
   const before = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v2, k) => v2 < 0 ? widths[i][k] + 4 - rel(v2) : 0))) : 0;
   const tickHalf = Math.max(...range.ticks.map((t) => measure(m2.tick(t), FS4.tick))) / 2;
-  const catX = PAD2 + catW;
-  const axisX = Math.max(catX + 8 + before, PAD2 + tickHalf);
+  const catX = PAD3 + catW;
+  const axisX = Math.max(catX + 8 + before, PAD3 + tickHalf);
   const legend = legendLayout(m2.names, Math.max(catW + PLOT_W, 240));
-  const W3 = Math.ceil(Math.max(axisX + PLOT_W + Math.max(after, tickHalf) + PAD2, (legend.width ?? 0) + 2 * PAD2));
-  const plotTop = PAD2 + legend.height + 4;
+  const W3 = Math.ceil(Math.max(axisX + PLOT_W + Math.max(after, tickHalf) + PAD3, (legend.width ?? 0) + 2 * PAD3));
+  const plotTop = PAD3 + legend.height + 4;
   const plotBottom = plotTop + n * rowH;
-  const height = plotBottom + 22 + PAD2;
+  const height = plotBottom + 22 + PAD3;
   const X3 = mirror(W3, rtl);
   const x = (v2) => axisX + rel(v2);
   const x0 = x(0);
-  const body = [legendSvg(legend, PAD2, PAD2, m2, W3)];
+  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
   for (const t of range.ticks) {
     const line = t === 0 ? "am-ch-zero" : "am-ch-grid";
     body.push(`<line class="${line}" x1="${f(X3(x(t)))}" y1="${f(plotTop)}" x2="${f(X3(x(t)))}" y2="${f(plotBottom)}"/>`);
@@ -8310,8 +8809,8 @@ function horizontalBars(m2) {
       const end = v2 >= 0 ? x(v2) + 4 : x(v2) - 4;
       return bar + text("am-ch-val", X3(end), by + bh / 2, m2.tick(v2), dir, ` text-anchor="${v2 >= 0 ? "start" : "end"}" dominant-baseline="central"`);
     });
-    const first = top2 + rowH / 2 - (lines[i].length - 1) * LH4 / 2;
-    const name2 = lines[i].map((l, j) => text("am-ch-cat", X3(catX), first + j * LH4, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
+    const first = top2 + rowH / 2 - (lines[i].length - 1) * LH5 / 2;
+    const name2 = lines[i].map((l, j) => text("am-ch-cat", X3(catX), first + j * LH5, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
     body.push(rowGroup(m2, row, i, tooltip(row.label, lines[i].join(" ")), parts.join("") + name2));
   }
   return { width: W3, height, body };
@@ -8319,7 +8818,7 @@ function horizontalBars(m2) {
 
 // src/components/chart-line.js
 var MAX_VALUE_LABELS2 = 12;
-var DOT = 3.5;
+var DOT2 = 3.5;
 var DOT_HI = 5.5;
 var LABEL_GAP = 9;
 var MIN_APART = 13;
@@ -8356,7 +8855,7 @@ function planAxis(rows, slot) {
     const lines = labels.map((l, i) => show2[i] ? wrap(l, room, FS4.cat) : null);
     if (lines.every((ls) => !ls || ls.length <= 2 && ls.every((l) => measure(l, FS4.cat) <= room + 0.5))) return { show: show2, lines, widths: lines.map((ls) => ls ? Math.max(...ls.map((l) => measure(l, FS4.cat))) : 0) };
   }
-  const show = shownRows(rows, Math.max(1, Math.ceil((LH4 + 1) / (slot * SIN))));
+  const show = shownRows(rows, Math.max(1, Math.ceil((LH5 + 1) / (slot * SIN))));
   const shown2 = labels.map((l) => shorten(l, SLANT_MAX, FS4.cat));
   return { show, lines: null, shown: shown2, widths: shown2.map((l) => measure(l, FS4.cat)) };
 }
@@ -8377,7 +8876,7 @@ function valueLabels(m2, X3, x, values, ys, { valleys, end, bottom }) {
 function segment(X3, [x0, y0], [x1, y1], [hi0, hi1], k) {
   const len = Math.hypot(x1 - x0, y1 - y0);
   const [dx, dy] = [(x1 - x0) / len, (y1 - y0) / len];
-  const [r0, r1] = [hi0 ? DOT_HI : DOT, hi1 ? DOT_HI : DOT];
+  const [r0, r1] = [hi0 ? DOT_HI : DOT2, hi1 ? DOT_HI : DOT2];
   return `<path class="am-ch-line am-ch-s${k + 1}" d="M${f(X3(x0 + dx * r0))},${f(y0 + dy * r0)} L${f(X3(x1 - dx * r1))},${f(y1 - dy * r1)}"/>`;
 }
 function lineChart(m2) {
@@ -8397,25 +8896,25 @@ function lineChart(m2) {
     const [left, right] = columnEnd(i) === "end" ? [0, column] : [column, 0];
     return { left: Math.max(half, slanted, left) - (i + 0.5) * slot, right: Math.max(half, right) - (n - i - 0.5) * slot };
   });
-  const axisX = Math.max(PAD2 + tickW + 6, PAD2 + Math.max(...over2.map((o) => o.left)));
+  const axisX = Math.max(PAD3 + tickW + 6, PAD3 + Math.max(...over2.map((o) => o.left)));
   const plotW = n * slot;
   const legend = legendLayout(m2.names, Math.max(plotW + tickW, 240));
-  const W3 = Math.ceil(Math.max(axisX + plotW + Math.max(PAD2, 2 + Math.max(...over2.map((o) => o.right))), (legend.width ?? 0) + 2 * PAD2));
-  const plotTop = PAD2 + legend.height + (anyLabels ? 18 : 6);
+  const W3 = Math.ceil(Math.max(axisX + plotW + Math.max(PAD3, 2 + Math.max(...over2.map((o) => o.right))), (legend.width ?? 0) + 2 * PAD3));
+  const plotTop = PAD3 + legend.height + (anyLabels ? 18 : 6);
   const plotBottom = plotTop + PLOT_H;
   const catTop = plotBottom + (anyLabels ? 22 : 8);
-  const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls ? ls.length : 0)) * LH4 + 4 : Math.max(...plan.shown.map((l, i) => plan.show[i] ? measure(l, FS4.cat) : 0)) * SIN + 12;
-  const height = catTop + catH + PAD2;
+  const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls ? ls.length : 0)) * LH5 + 4 : Math.max(...plan.shown.map((l, i) => plan.show[i] ? measure(l, FS4.cat) : 0)) * SIN + 12;
+  const height = catTop + catH + PAD3;
   const X3 = mirror(W3, rtl);
   const y2 = (v2) => plotTop + (range.max - v2) / (range.max - range.min) * PLOT_H;
   const cx = (i) => axisX + (i + 0.5) * slot;
-  const body = [legendSvg(legend, PAD2, PAD2, m2, W3)];
+  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
   body.push(...valueAxis(m2, { axisX, width: plotW, y: y2, W: W3, X: X3 }));
   for (const [i, row] of rows.entries()) {
     const parts = [];
     if (row.hi) parts.push(`<line class="am-ch-guide" x1="${f(X3(cx(i)))}" y1="${f(plotTop)}" x2="${f(X3(cx(i)))}" y2="${f(plotBottom)}"/>`);
     if (i > 0) parts.push(...row.values.map((v2, k) => segment(X3, [cx(i - 1), y2(rows[i - 1].values[k])], [cx(i), y2(v2)], [rows[i - 1].hi, row.hi], k)));
-    parts.push(...row.values.map((v2, k) => `<circle class="am-ch-dot am-ch-s${k + 1}" cx="${f(X3(cx(i)))}" cy="${f(y2(v2))}" r="${row.hi ? DOT_HI : DOT}"/>`));
+    parts.push(...row.values.map((v2, k) => `<circle class="am-ch-dot am-ch-s${k + 1}" cx="${f(X3(cx(i)))}" cy="${f(y2(v2))}" r="${row.hi ? DOT_HI : DOT2}"/>`));
     if (labelled[i]) {
       const around2 = (j, k) => rows[j]?.values[k];
       const valleys = row.values.map((v2, k) => i > 0 && i < n - 1 && around2(i - 1, k) > v2 && around2(i + 1, k) > v2);
@@ -8454,14 +8953,14 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
   const shares = asShares ? [] : values.map((v2) => percent(v2, total));
   const valueW = Math.max(...shown2.map((s) => measure(s, FS4.legend)));
   const shareW = asShares ? 0 : Math.max(...shares.map((s) => measure(s, FS4.legend)));
-  const heights = lines.map((ls) => Math.max(ls.length * LH4 + ROW_PAD, 24));
+  const heights = lines.map((ls) => Math.max(ls.length * LH5 + ROW_PAD, 24));
   const legendH = heights.reduce((a3, b) => a3 + b, 0);
   const legendW = SW + labelW + COL_GAP + valueW + (asShares ? 0 : COL_GAP + shareW);
-  const H3 = Math.ceil(Math.max(2 * R2, legendH) + 2 * PAD2);
-  const W3 = Math.ceil(PAD2 + 2 * R2 + GAP2 + legendW + PAD2);
-  const [cx, cy] = [PAD2 + R2, H3 / 2];
+  const H3 = Math.ceil(Math.max(2 * R2, legendH) + 2 * PAD3);
+  const W3 = Math.ceil(PAD3 + 2 * R2 + GAP2 + legendW + PAD3);
+  const [cx, cy] = [PAD3 + R2, H3 / 2];
   const X3 = mirror(W3, rtl);
-  const lx = PAD2 + 2 * R2 + GAP2;
+  const lx = PAD3 + 2 * R2 + GAP2;
   const [valueX, shareX] = [lx + SW + labelW + COL_GAP + valueW, lx + legendW];
   const at3 = (r, turn2) => `${f(X3(cx + r * Math.sin(turn2 * TAU)))},${f(cy - r * Math.cos(turn2 * TAU))}`;
   const [outer, inner] = rtl ? [0, 1] : [1, 0];
@@ -8472,11 +8971,11 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
   for (const [i, row] of rows.entries()) {
     const span = total > 0 ? values[i] / total : 0;
     const mid2 = top2 + heights[i] / 2;
-    const first = mid2 - (lines[i].length - 1) * LH4 / 2;
+    const first = mid2 - (lines[i].length - 1) * LH5 / 2;
     const parts = [];
     if (span > 0) parts.push(`<path class="am-ch-slice am-ch-s${i + 1}" d="${slice(turn, turn + span)}"/>`);
     parts.push(`<rect class="am-ch-sw am-ch-s${i + 1}" x="${f(rtl ? W3 - lx - 10 : lx)}" y="${f(mid2 - 5)}" width="10" height="10" rx="2"/>`);
-    parts.push(...lines[i].map((l, j) => text("am-ch-leg", X3(lx + SW), first + j * LH4, l, dir, ' dominant-baseline="central"')));
+    parts.push(...lines[i].map((l, j) => text("am-ch-leg", X3(lx + SW), first + j * LH5, l, dir, ' dominant-baseline="central"')));
     parts.push(text("am-ch-num", X3(valueX), mid2, shown2[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     if (!asShares) parts.push(text("am-ch-num", X3(shareX), mid2, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     body.push(stepGroup(i, `am-ch-row${anyHi ? row.hi ? " is-hi" : " is-dim" : ""}`, tooltip(row.label, lines[i].join(" ")), parts.join("")));
@@ -8605,7 +9104,7 @@ function dataTable({ series, rows }, { type, unit }, words3) {
 }
 
 // src/components/index.js
-var ALL2 = [callout_default, kv_default, timeline_default, annot_default, tree_default, limits_default, chart_default, sequence_default, flow_default, er_default, ask_default];
+var ALL2 = [callout_default, kv_default, timeline_default, annot_default, tree_default, limits_default, chart_default, sequence_default, flow_default, state_default, er_default, class_default, api_default, ask_default];
 var COMPONENTS = new Map(ALL2.map((c2) => [c2.name, c2]));
 var RAW_LANGS = /* @__PURE__ */ new Set(["html", "svg"]);
 
@@ -8911,11 +9410,11 @@ function panelHtml(panel, { cols = 3, grid = true, hints = {} } = {}) {
   const { attrs } = panel;
   const span = Math.min(Number(attrs.span) || 1, cols);
   const rows = Number(attrs.rows) || 1;
-  const layout4 = [
+  const layout5 = [
     grid && span > 1 ? `grid-column: span ${span}` : "",
     grid && rows > 1 ? `grid-row: span ${rows}` : ""
   ].filter(Boolean).join("; ");
-  const style = layout4 ? ` style="${layout4}"` : "";
+  const style = layout5 ? ` style="${layout5}"` : "";
   const hinted = Math.floor(Number(hints.span));
   const data = grid && hinted >= 1 ? ` data-span="${Math.min(hinted, cols)}"` : "";
   const cls = `${span > 1 ? " am-span-wide" : ""}${attrs.bare ? " am-panel--bare" : ""}`;
@@ -11900,7 +12399,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
 }, inputStat = statSync5(htmlFile)) {
   await page.page("Emulation.setEmulatedMedia", { media: "screen" });
   await settle2(page);
-  const layout4 = await page.evaluate(`(async () => {
+  const layout5 = await page.evaluate(`(async () => {
     await document.fonts.ready;
     await new Promise((r) => setTimeout(r, ${SETTLE_MS}));
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -11919,16 +12418,16 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
         .map(box),
     };
   })()`);
-  if (layout4.empty) throw new ExportError("The page is empty: there is nothing to export");
+  if (layout5.empty) throw new ExportError("The page is empty: there is nothing to export");
   try {
     mkdirSync4(folder, { recursive: true });
     if (!statSync5(folder).isDirectory()) throw new Error("not a folder");
   } catch (e) {
     throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
   }
-  const cuts = slicePoints(layout4.height, layout4.boxes, MAX_SLICE);
+  const cuts = slicePoints(layout5.height, layout5.boxes, MAX_SLICE);
   const name2 = sliceName(htmlFile);
-  const bounds = [0, ...cuts, layout4.height];
+  const bounds = [0, ...cuts, layout5.height];
   const written = [];
   for (let i = 1; i < bounds.length; i++) {
     const top2 = bounds[i - 1];
@@ -12134,7 +12633,7 @@ var CLEAN = Object.freeze({
   hintEveryDays: 7
   // the same notice at most once every 7 days
 });
-var DIRS3 = ["pages", "videos", "cache"];
+var DIRS4 = ["pages", "videos", "cache"];
 var HOUR = DAY / 24;
 function walk(dir) {
   let entries;
@@ -12157,11 +12656,11 @@ function walk(dir) {
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 function usage2(home) {
-  const parts = Object.fromEntries(DIRS3.map((d) => {
+  const parts = Object.fromEntries(DIRS4.map((d) => {
     const files = walk(join11(home, d));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
-  return { ...parts, total: DIRS3.reduce((n, d) => n + parts[d].bytes, 0) };
+  return { ...parts, total: DIRS4.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
   const cutoff = now - days * DAY;
@@ -12998,7 +13497,7 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / state / er / sequence / tree each source line is one step;
   timeline, limits, chart rows, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
@@ -13318,7 +13817,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
   am theme check warns about them; the catalog and am theme add reject them.
 - Diagram tokens (optional): node-fill node-stroke node-width node-radius node-shadow node-text, hi-fill hi-stroke hi-text, edge-color edge-width edge-label, actor-fill actor-stroke actor-text, note-fill note-stroke note-width note-radius, cluster-fill cluster-stroke, lifeline-color, series-1 series-2 series-3 series-4 series-5 series-6 (each with a -- prefix).
-  They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
+  They restyle what is inside flow, state, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
   --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus every installed user theme, so the toolbar can switch to any of them and the page opens anywhere; readers without your fonts see the fallback.

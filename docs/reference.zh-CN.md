@@ -36,6 +36,61 @@ A -> B: 标签
 
 每个组件的完整写法：`am help <组件名>`。
 
+## 类图与接口定义
+
+代码结构使用 `class`，数据库实体使用 `er`，HTTP / RPC 接口使用 `api`。完整示例见 [contracts.md](../examples/contracts.md)。
+
+````markdown
+```class LR
+abstract Entity
+  +id: string
+class User
+  -email: string
+  +save(): void
+interface Store
+  +find(id: string): User
+User --|> Entity
+User ..> Store: uses
+```
+````
+
+- 在行首声明 `class`、`interface`、`abstract` 或 `enum`。只写名称时表示普通类；名称前的 `*` 表示高亮。
+- 缩进属性和方法。可见性、类型和签名按原文显示。去掉可见性标记后，以 `名称(` 开头的成员放在方法分区；属性类型中的括号不表示方法。
+- 关系支持 `--|>` 继承、`..|>` 实现、`*--` 组合、`o--` 聚合、`-->` 关联、`..>` 依赖和 `--` 普通关联。箭头在右端，菱形在左端；可用 `: 标签` 标注连线。
+- 关系两端都必须声明。支持自关联和平行连线。方向为 `TB`（默认）、`LR`、`BT` 或 `RL`。
+
+````markdown
+```api
+GET /users/{id}
+path
+  id string required | 用户 ID
+query
+  include string optional
+response 200 User
+  email string required
+response 404 Error
+  message string required
+```
+
+```api
+RPC users.UserService/GetUser
+request GetUserRequest
+  id string required
+response OK User
+  email string \| null optional
+response NOT_FOUND
+```
+````
+
+- 每个 `api` 块定义一个接口。HTTP 使用大写方法和 `/路径`；RPC 使用 `RPC` 和服务方法名。
+- 分区支持 `path`、`query`、`headers`、`request [类型]` 和 `response 状态 [类型]`。RPC 使用 `request` 和 `response`。HTTP 响应状态码为 100 至 599；RPC 支持状态名。响应可以省略字段，表示空响应体。
+- 缩进字段，格式为 `名称 类型 [required|optional] | 说明`。类型、嵌套字段路径和说明按纯文本显示。必填性列直接显示“必填”或“可选”。未声明的字段显示短横线；整张表均未声明时省略此列。
+- 类型中的竖线写成 `\|`。例如 `email string \| null optional | 联系方式` 表示联合类型 `string | null`；第一个未转义的 `|` 开始说明。
+- 标签跟随页面语言。类图复用现有主题、缩放和图示查看器；接口字段使用语义表格。两种组件都支持离线页面。
+- 组件只展示定义，不发送请求，也不导入 OpenAPI 或 protobuf 文件。类图中的 `+` / `-` 表示可见性，不表示变更标记。
+
+完整语法：`am help class`、`am help er`、`am help api`。
+
 ## 在页面上回复
 
 每个页面都有**回复**按钮。读者可以在任意面板上写评论（面板标题栏里的气泡按钮），然后把一段 Markdown 回复复制给 Agent。刷新页面后，选择和评论都还在。读者作答、评论或标注后，页面底部会出现一条栏，显示各项数量，一键复制回复；回复面板默认显示渲染后的回复，将被复制的 Markdown 折叠在下方。
@@ -226,7 +281,7 @@ am export page.html --pdf page.pdf --png out/
 
 标签按你写的原样输出：`zh-tw` 和 `zh_TW` 都会写成 `zh-TW`。空值、`und` 或无效的值会被忽略，由正文决定。
 
-从右到左书写的语言（`he`、`ar`、`fa`、`ur`、`yi`）还会得到 `<html dir="rtl">`。页面整体镜像：正文、面板、表格、大纲条（`left` 和 `right` 随之镜像）和工具栏都从右侧开始；`flow` 和 `sequence` 图按镜像绘制，第一个节点或参与者在右边，箭头指向左边；时间线、树和限制条也从右侧开始。代码块、diff 和行内代码保持从左到右；不含从右到左字母的文字片段（如路径 `src/`、标签开头的键 `lint:`、域名、带符号的数字）也保持从左到右，标点留在原来写的位置。希伯来文有自己的界面文案、常用稿头键（`author`、`date`、`source`、`version` 等）的希伯来文名称，以及“日.月.年”格式的生成日期；其他从右到左的语言使用英文文案。视频页（`am video`）遵循同一规则：标题块、各场景、字幕、和章节条都从右侧开始，整个控制栏（播放键、时钟、进度条、倍速和导出）则像常见播放器那样保持从左到右。导出的 MP4 和 WebM 带有镜像后的画面。
+从右到左书写的语言（`he`、`ar`、`fa`、`ur`、`yi`）还会得到 `<html dir="rtl">`。页面整体镜像：正文、面板、表格、大纲条（`left` 和 `right` 随之镜像）和工具栏都从右侧开始；`flow`、`state`、`er` 和 `sequence` 图按镜像绘制，第一个节点或参与者在右边，箭头指向左边；时间线、树和限制条也从右侧开始。代码块、diff 和行内代码保持从左到右；不含从右到左字母的文字片段（如路径 `src/`、标签开头的键 `lint:`、域名、带符号的数字）也保持从左到右，标点留在原来写的位置。希伯来文有自己的界面文案、常用稿头键（`author`、`date`、`source`、`version` 等）的希伯来文名称，以及“日.月.年”格式的生成日期；其他从右到左的语言使用英文文案。视频页（`am video`）遵循同一规则：标题块、各场景、字幕、和章节条都从右侧开始，整个控制栏（播放键、时钟、进度条、倍速和导出）则像常见播放器那样保持从左到右。导出的 MP4 和 WebM 带有镜像后的画面。
 
 | 正文的文字 | 识别为 |
 | :--- | :--- |
@@ -240,7 +295,7 @@ am export page.html --pdf page.pdf --png out/
 
 打补丁（`am patch`）的页面会保留原来的语言，除非稿件里声明了语言。
 
-图表里的文字按各自文字系统的单位换行：汉字、假名和全角字符一字一单位；用空格分词的文字按词换行；不用空格分词的文字（泰文、老文、高棉文、缅甸文）按词典分词，长句不会把节点撑宽。整行放不下的词会退回到按字形簇（grapheme）拆分，组合符号不会和基字符分开。在 `flow` 的节点或边标签里写字面量 `\n` 可以强制换行；强制换行后的每一行仍按宽度换行。分组标题保持原样，不参与换行。
+图表里的文字按各自文字系统的单位换行：汉字、假名和全角字符一字一单位；用空格分词的文字按词换行；不用空格分词的文字（泰文、老文、高棉文、缅甸文）按词典分词，长句不会把节点撑宽。整行放不下的词会退回到按字形簇（grapheme）拆分，组合符号不会和基字符分开。在 `flow` 或 `state` 的节点或边标签里写字面量 `\n` 可以强制换行；强制换行后的每一行仍按宽度换行。分组标题保持原样，不参与换行。
 
 写作检查按语言走。中文、英文和日文保持原有规则。其他语言只用语言中立的规则：句长（按词数计，中日文按字数计）和段长。不用空格分词的文字，按分词器找到的词计句长，和图表换行用的是同一份文字列表。
 
@@ -282,11 +337,11 @@ am export page.html --pdf page.pdf --png out/
 
 ### 图表变量
 
-主题可以用变量（而不是选择器）改变图表内部的样子：flow、sequence、er，tree 的方框，以及 chart 的柱子、折线和扇区。把它们写进 `tokens`，所有图表都会跟着变。这些变量全部可选：一个都不写的主题，图表和以前完全一样；旧版本会忽略它们。
+主题可以用变量（而不是选择器）改变图表内部的样子：flow、state、sequence、er，tree 的方框，以及 chart 的柱子、折线和扇区。把它们写进 `tokens`，所有图表都会跟着变。这些变量全部可选：一个都不写的主题，图表和以前完全一样；旧版本会忽略它们。
 
 | 部分 | 变量 | 默认值 |
 | :--- | :--- | :--- |
-| 节点（flow、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（tree 方框：`--radius`）、无、`--ink` |
+| 节点（flow、state、er、tree 方框） | `--node-fill`、`--node-stroke`、`--node-width`、`--node-radius`、`--node-shadow`、`--node-text` | `--paper`、`--line`、`--bw`、3px（state：8px；tree 方框：`--radius`）、无、`--ink` |
 | 高亮节点（`*`） | `--hi-fill`、`--hi-stroke`、`--hi-text` | `--accent-bg`、`--accent`、`--accent` |
 | 连线与消息 | `--edge-color`、`--edge-width`、`--edge-label` | `--ink-2`、1.3、`--accent` |
 | 时序图参与者（含 `== 分隔 ==` 的框） | `--actor-fill`、`--actor-stroke`、`--actor-text` | `--node-fill`、`--node-stroke`、`--node-text` |
