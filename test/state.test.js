@@ -108,6 +108,12 @@ test('state: two events between the same states are two transitions, each with i
   assert.equal(m.edges[1].state, 'added');
 });
 
+test('state: an event may contain ->; only a second arrow before the colon is a second transition', () => {
+  const m = parseState('Idle -> Busy: retry -> wait');
+  assert.deepEqual(m.edges.map((e) => [e.from, e.to, e.label]), [['Idle', 'Busy', 'retry -> wait']]);
+  assert.match(render('Idle -> Busy: retry -> wait'), />retry -&gt; wait<\/text>/);
+});
+
 test('state: a Mermaid line and a stateDiagram-v2 header are errors that show the line to write', () => {
   assert.throws(
     () => render('A -> B\nB --> C : go'),

@@ -53,3 +53,13 @@ export function loopRoom(labelWidths) {
 export function loopPath({ a, b, c }) {
   return `M${f(a.x)},${f(a.y)} C${f(c[0].x)},${f(c[0].y)} ${f(c[1].x)},${f(c[1].y)} ${f(b.x)},${f(b.y)}`;
 }
+
+// The point where the line from the centre of a box towards `toward` leaves the box. A loop reserves room in the dagre node,
+// so the edge ends have to be clipped to the smaller drawn box again.
+export function clipToBox(centre, box, toward) {
+  const dx = toward.x - centre.x;
+  const dy = toward.y - centre.y;
+  const k = Math.max(Math.abs(dx) / (box.width / 2), Math.abs(dy) / (box.height / 2));
+  if (k === 0) return { ...centre };
+  return { x: centre.x + dx / k, y: centre.y + dy / k };
+}

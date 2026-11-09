@@ -8,7 +8,7 @@ import { svgLine } from '../bidi.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
 import { badgeSvg } from './flow.js';
-import { LOOP_LABEL, LOOP_STEP, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
+import { LOOP_LABEL, LOOP_STEP, clipToBox, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
 import { DRAWING } from '../themes/type-scale.js';
 
 const FS = DRAWING.node;
@@ -343,15 +343,6 @@ function layout(model, rankdir, ui, pageDir = 'ltr') {
   const height = Math.ceil(Math.max(...ys) - Math.min(...ys)) + 2 * margin;
   const label = diagramLabel(ui, 'er', [...entities.keys()].slice(0, 8));
   return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join('')}</g><g>${loopsSvg.join('')}</g><g>${nodeSvg.join('')}</g></g></svg>`;
-}
-
-// The point where the line from the centre of a box towards `toward` leaves the box.
-function clipToBox(centre, size, toward) {
-  const dx = toward.x - centre.x;
-  const dy = toward.y - centre.y;
-  const k = Math.max(Math.abs(dx) / (size.width / 2), Math.abs(dy) / (size.height / 2));
-  if (k === 0) return { ...centre };
-  return { x: centre.x + dx / k, y: centre.y + dy / k };
 }
 
 function nodeSvgOf(entity, x, y, size, step, pageDir) {

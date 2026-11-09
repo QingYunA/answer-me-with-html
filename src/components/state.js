@@ -5,7 +5,7 @@ import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../s
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta } from './delta.js';
 import { badgeSvg, edgeText, nodeSize, nodeState, runLayout } from './flow.js';
-import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
+import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, clipToBox, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
 
 const LH = 17; // the line height runLayout measured each state label with
 const DOT = 16; // the box dagre reserves for an initial or final pseudo-state
@@ -85,10 +85,11 @@ export function parseState(text) {
     if (mark === '~') throw new ComponentError('state: ~ marks a state, not a transition. To change a transition, remove the old one and add the new one: "- A -> B" then "+ A -> C"', n);
     const from = t.slice(0, at).trim();
     const rest = t.slice(at + 2);
-    if (rest.includes('->')) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     const colon = rest.search(/[:：]/);
     const to = (colon === -1 ? rest : rest.slice(0, colon)).trim();
     const label = colon === -1 ? '' : rest.slice(colon + 1).trim();
+    // The event after the colon is text, not syntax: it may itself contain ->. Only a second arrow before the colon is a second transition.
+    if (to.includes('->')) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
     const fromId = resolve(from, n, mark, 'from');
     const toId = resolve(to, n, mark, 'to');
@@ -284,10 +285,3 @@ function clipEnds(points, edge, centre, boxes, room) {
   return pts;
 }
 
-function clipToBox(centre, box, toward) {
-  const dx = toward.x - centre.x;
-  const dy = toward.y - centre.y;
-  const k = Math.max(Math.abs(dx) / (box.width / 2), Math.abs(dy) / (box.height / 2));
-  if (k === 0) return { ...centre };
-  return { x: centre.x + dx / k, y: centre.y + dy / k };
-}
