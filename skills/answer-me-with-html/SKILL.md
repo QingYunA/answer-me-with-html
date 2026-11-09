@@ -148,6 +148,8 @@ Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); 
 |---|---|---|
 | What connects to what, architecture, decision branches | `flow [LR]` | `A -> B: label`, `A --> C` dashed, `A -> B & C` fan-out, `{decision?}` `(start)` `[(database)]`, `*emphasis`, `group name: A, B`, no node IDs: `{OK?}`, not `B{OK?}` |
 | A data model: entities, their columns and the relations between them | `er [LR]` | entity at column 0, indented `name [type] [PK\|FK\|UK]` fields, `user_id FK -> User`, `User 1--* Order: places` |
+| Classes, code interfaces and their relationships | `class [LR]` | declare `class User` and `interface Store`, indent `+id: string` or `+save(): void`, then `User ..> Store: uses` |
+| An HTTP or RPC interface contract | `api` | `GET /users/{id}` or `RPC users.UserService/GetUser`, sections `path`, `query`, `headers`, `request [Type]`, `response STATUS [Type]`, indented `id string required` or `email string optional` |
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
 | Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |
@@ -163,6 +165,8 @@ Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); 
 | A plan, refactor or PR summary that changes structure | `flow`, `tree` or `er` with change markers | start a line with `+ ` added, `- ` removed, `~ ` changed (a node, field or entity only): `+ A -> B`, `- A -> B`, `~ Node`, tree `+ file.js`, `- dir/`, er `+ Coupon`, `  + phone string`, `+ User 1--* Coupon` |
 | A change to code | diff block | ```` ```diff file=path/to/file.ts ```` and the unified diff inside |
 | Code that does not exist yet, or a command | code block | ```` ```ts title="name · sketch" ```` with the code inside |
+
+For `api`, field syntax is `name type [required|optional] | description`. The first unescaped `|` starts the description; write `\|` only for a literal pipe in a type, such as `string \| null`.
 
 Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.

@@ -36,6 +36,61 @@ A -> B: 标签
 
 每个组件的完整写法：`am help <组件名>`。
 
+## 类图与接口定义
+
+代码结构使用 `class`，数据库实体使用 `er`，HTTP / RPC 接口使用 `api`。完整示例见 [contracts.md](../examples/contracts.md)。
+
+````markdown
+```class LR
+abstract Entity
+  +id: string
+class User
+  -email: string
+  +save(): void
+interface Store
+  +find(id: string): User
+User --|> Entity
+User ..> Store: uses
+```
+````
+
+- 在行首声明 `class`、`interface`、`abstract` 或 `enum`。只写名称时表示普通类；名称前的 `*` 表示高亮。
+- 缩进属性和方法。可见性、类型和签名按原文显示。去掉可见性标记后，以 `名称(` 开头的成员放在方法分区；属性类型中的括号不表示方法。
+- 关系支持 `--|>` 继承、`..|>` 实现、`*--` 组合、`o--` 聚合、`-->` 关联、`..>` 依赖和 `--` 普通关联。箭头在右端，菱形在左端；可用 `: 标签` 标注连线。
+- 关系两端都必须声明。支持自关联和平行连线。方向为 `TB`（默认）、`LR`、`BT` 或 `RL`。
+
+````markdown
+```api
+GET /users/{id}
+path
+  id string required | 用户 ID
+query
+  include string optional
+response 200 User
+  email string required
+response 404 Error
+  message string required
+```
+
+```api
+RPC users.UserService/GetUser
+request GetUserRequest
+  id string required
+response OK User
+  email string \| null optional
+response NOT_FOUND
+```
+````
+
+- 每个 `api` 块定义一个接口。HTTP 使用大写方法和 `/路径`；RPC 使用 `RPC` 和服务方法名。
+- 分区支持 `path`、`query`、`headers`、`request [类型]` 和 `response 状态 [类型]`。RPC 使用 `request` 和 `response`。HTTP 响应状态码为 100 至 599；RPC 支持状态名。响应可以省略字段，表示空响应体。
+- 缩进字段，格式为 `名称 类型 [required|optional] | 说明`。类型、嵌套字段路径和说明按纯文本显示。必填性列直接显示“必填”或“可选”。未声明的字段显示短横线；整张表均未声明时省略此列。
+- 类型中的竖线写成 `\|`。例如 `email string \| null optional | 联系方式` 表示联合类型 `string | null`；第一个未转义的 `|` 开始说明。
+- 标签跟随页面语言。类图复用现有主题、缩放和图示查看器；接口字段使用语义表格。两种组件都支持离线页面。
+- 组件只展示定义，不发送请求，也不导入 OpenAPI 或 protobuf 文件。类图中的 `+` / `-` 表示可见性，不表示变更标记。
+
+完整语法：`am help class`、`am help er`、`am help api`。
+
 ## 在页面上回复
 
 每个页面都有**回复**按钮。读者可以在任意面板上写评论（面板标题栏里的气泡按钮），然后把一段 Markdown 回复复制给 Agent。刷新页面后，选择和评论都还在。读者作答、评论或标注后，页面底部会出现一条栏，显示各项数量，一键复制回复；回复面板默认显示渲染后的回复，将被复制的 Markdown 折叠在下方。
