@@ -14,7 +14,8 @@ const read = (p) => readFileSync(`${ROOT}/${p}`, 'utf8');
 const READMES = ['README.md', 'README.zh-CN.md', 'README.ja.md'];
 
 // Splits a README into its fenced code blocks and the prose around them. A ```` fence holds a
-// ``` fence, so the fence that opens a block is also the one that closes it.
+// ``` fence, so the fence that opens a block is also the one that closes it. Keep both fence lines:
+// their language markers must not drift either.
 function splitFences(text) {
   const code = [];
   const prose = [];
@@ -24,8 +25,9 @@ function splitFences(text) {
     const open = line.match(/^(`{3,})/);
     if (!fence && open) {
       fence = open[1];
-      buf = [];
+      buf = [line];
     } else if (fence && line.trim() === fence) {
+      buf.push(line);
       code.push(buf.join('\n'));
       fence = null;
     } else if (fence) {
@@ -58,17 +60,25 @@ const anchors = (prose) => [
   ...[...prose.matchAll(/\]\(#([^)]+)\)/g)].map((m) => m[1]),
 ];
 
-// Link targets: Markdown links, href / src attributes and srcset candidates. An in-page anchor is
-// local to its language, and the language links at the top are the one row that is allowed to
-// differ; everything else (badges, images, URLs) must be the English README's.
+// Link targets: Markdown links, href / src attributes, srcset candidates and bare URLs. An in-page
+// anchor is local to its language. Only the two language links in the navigation row are normalized;
+// a README link anywhere else must stay identical to the English source.
 function linkTargets(prose) {
   const targets = [];
-  for (const m of prose.matchAll(/\]\(([^)\s]+)\)/g)) targets.push(m[1]);
-  for (const m of prose.matchAll(/(?:href|src)="([^"]+)"/g)) targets.push(m[1]);
-  for (const m of prose.matchAll(/srcset="([^"]+)"/g)) {
-    for (const part of m[1].split(',')) targets.push(part.trim().split(/\s+/)[0]);
+  for (const source of prose.split('\n')) {
+    const languageRow = (source.match(/href="README/g) ?? []).length === 2;
+    const line = languageRow ? source.replace(/href="README(\.[a-z-]+)?\.md"/gi, 'href="README.language"') : source;
+    for (const m of line.matchAll(/\]\(([^)\s]+)\)/g)) targets.push(m[1]);
+    for (const m of line.matchAll(/(?:href|src)="([^"]+)"/g)) targets.push(m[1]);
+    for (const m of line.matchAll(/srcset="([^"]+)"/g)) {
+      for (const part of m[1].split(',')) targets.push(part.trim().split(/\s+/)[0]);
+    }
+    const withoutLinkedUrls = line.replace(/\]\([^)\s]+\)/g, '](').replace(/(?:href|src|srcset)="[^"]+"/g, '');
+    for (const m of withoutLinkedUrls.matchAll(/https?:\/\/[^\s<>"']+/g)) {
+      targets.push(m[0].replace(/[),.;，。、]+$/g, ''));
+    }
   }
-  return targets.filter((t) => !t.startsWith('#') && !/^README(\.[a-z-]+)?\.md$/i.test(t));
+  return targets.filter((t) => !t.startsWith('#'));
 }
 
 const inlineCode = (prose) => [...prose.matchAll(/`[^`\n]+`/g)].map((m) => m[0]);

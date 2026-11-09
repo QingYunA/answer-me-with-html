@@ -32,7 +32,7 @@ test('always-on rule: the README snippets defer the page link format to SKILL.md
 
 // The rule is pasted into a rules file, so an inherited copy has to carry the audience boundary too;
 // otherwise a subagent that inherits it renders a page for an internal report (#320).
-test('always-on rule: both README snippets exclude internal agent-to-agent reports', () => {
+test('always-on rule: README snippets exclude internal agent-to-agent reports', () => {
   const en = read('README.md').split('\n').find((l) => l.includes(MARKER));
   assert.match(en, /[Ii]nternal report to another agent/);
   assert.match(en, /make no page/);
