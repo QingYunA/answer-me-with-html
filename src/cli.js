@@ -345,7 +345,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   await loadMath(src);
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: config.values.scale });
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }
@@ -620,7 +620,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: page.scale });
+      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: page.scale });
     }
   } catch (e) {
     if (e instanceof TtsError) {
@@ -1156,14 +1156,14 @@ function cmdTheme(action, target, opts, ctx) {
   if (!theme.scope.includes('page')) return 0;
 
   const themes = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
+  const config = readConfig(env, themes);
   const files = ['light', 'dark'].map((mode) => {
-    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes });
+    const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes, colophon: config.values.colophon });
     const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
     writePage(file, result.html, env);
     print(`✓ ${file}`);
     return file;
   });
-  const config = readConfig(env, themes);
   if (shouldOpen(opts, env, config.values)) files.forEach((f) => (io.open ?? openFile)(f));
   return 0;
 }
