@@ -3,7 +3,7 @@
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname, basename, extname, sep } from 'node:path';
+import { join, resolve, relative, isAbsolute, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES, frontmatterValue } from './parse.js';
@@ -810,6 +810,13 @@ function unusedPagePath(file) {
   }
 }
 
+// True when target resolves to a path strictly inside dir. A plain prefix test on a filesystem root would build "//" and never
+// match; path.relative copes with the root and with a path that merely shares a prefix (a sibling folder).
+const inside = (dir, target) => {
+  const rel = relative(resolve(dir), resolve(target));
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+};
+
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
 // A page in the managed pages folder (pages/ or pages_dir) is written to a temp file and renamed over the old one, so am serve
 // (src/serve.js) never reloads a half-written page. Elsewhere it is written in place: a rename would replace a symlink with a
@@ -817,9 +824,9 @@ function unusedPagePath(file) {
 function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   const home = resolve(amHome(env));
   const path = resolve(file);
-  if (path.startsWith(home + sep)) ensureHome(home);
+  if (inside(home, path)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
-  if (!path.startsWith(resolve(pages) + sep)) return writeFileSync(file, html);
+  if (!inside(pages, path)) return writeFileSync(file, html);
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
   try {
     writeFileSync(tmp, html);
@@ -837,7 +844,7 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
 function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   const home = amHome(env);
   const pageRoot = pages ?? join(home, 'pages');
-  const inHome = resolve(file).startsWith(resolve(home) + sep);
+  const inHome = inside(home, file);
   const hint = (path) => {
     if (inPlace) return 'Copy the page to a folder this session can write to and patch the copy';
     return inHome
