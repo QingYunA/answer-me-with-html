@@ -14342,7 +14342,8 @@ function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   for (const [k, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k in stored ? "*" : " ";
     const options = spec.type === "bool" ? "on | off" : spec.type === "number" ? `${spec.min}\u2013${spec.max}, step ${spec.step}` : spec.type === "path" ? "a folder path" : configChoices(k, themes2).join(" | ");
-    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
+    const shown2 = showValue(values[k]);
+    print(`${mark} ${k.padEnd(19)}${shown2.length >= 10 ? `${shown2} ` : shown2.padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== "0") print("Note: the AM_NO_OPEN environment variable is set and overrides the open setting.");
   print("* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]");

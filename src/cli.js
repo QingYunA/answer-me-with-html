@@ -1102,7 +1102,8 @@ function cmdConfig(args, { print, fail, env, themes }) {
       : spec.type === 'number' ? `${spec.min}–${spec.max}, step ${spec.step}`
         : spec.type === 'path' ? 'a folder path'
           : configChoices(k, themes).join(' | ');
-    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
+    const shown = showValue(values[k]);
+    print(`${mark} ${k.padEnd(19)}${shown.length >= 10 ? `${shown} ` : shown.padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== '0') print('Note: the AM_NO_OPEN environment variable is set and overrides the open setting.');
   print('* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]');
