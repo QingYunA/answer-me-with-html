@@ -5,6 +5,19 @@
 // The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what
 // shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.
 
+// A diagram is never drawn under MIN_SCALE of its natural width, the floor the planner keeps: below it the text is too small to read,
+// so its figure scrolls sideways instead. This covers what the planner does not size: the plain grid, a phone, a one-panel page and a
+// panel that holds more than the diagram. The svg width follows the reader's text size (page.js), so the floor follows am-scale;
+// restore() puts it back after resetting the inline styles. Printing drops it (base.css).
+const floorDiagrams = () => {
+  for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg')) {
+    const width = Number(svg.getAttribute('width'));
+    if (width > 0) svg.style.minWidth = `${Math.floor(width * MIN_SCALE)}px`;
+  }
+};
+floorDiagrams();
+addEventListener('am-scale', floorDiagrams);
+
 const grid = document.querySelector('.am-grid');
 const panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];
 
@@ -35,6 +48,7 @@ if (panels.length > 1) {
   const restore = () => {
     for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);
     for (const el of original.keys()) restoreStyle(el);
+    floorDiagrams();
   };
 
   // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback

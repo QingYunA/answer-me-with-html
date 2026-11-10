@@ -152,6 +152,33 @@
     });
   }
 
+  // ── Sideways scroll cue ─────────────
+  // Overlay scrollbars (macOS) show nothing until the reader scrolls, so a wide code block or diagram looked cut off. While a box
+  // hides content past its left or right edge it carries am-more-left / am-more-right, and base.css fades that edge. The sides are
+  // physical because a box can read in the other direction than the page (code stays left to right on a right-to-left page); there
+  // scrollLeft counts down from 0, so the hidden amounts use its size.
+  const scrollers = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas), .am-code, .am-annot-scroll');
+  const markMore = (el) => {
+    const hidden = el.scrollWidth - el.clientWidth;
+    let left = false;
+    let right = false;
+    if (hidden > 1) {
+      const atStart = Math.abs(el.scrollLeft);
+      const rtl = getComputedStyle(el).direction === 'rtl';
+      [left, right] = rtl ? [atStart < hidden - 1, atStart > 1] : [atStart > 1, atStart < hidden - 1];
+    }
+    el.classList.toggle('am-more-left', left);
+    el.classList.toggle('am-more-right', right);
+  };
+  if (scrollers.length) {
+    const resized = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => markMore(e.target))) : null;
+    for (const el of scrollers) {
+      el.addEventListener('scroll', () => markMore(el), { passive: true });
+      resized?.observe(el);
+      markMore(el);
+    }
+  }
+
   // ── Diagram Lightbox & Pan-Zoom Viewer ─────────────
   const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');
   const lb = document.querySelector('.am-lightbox');
