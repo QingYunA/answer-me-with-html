@@ -96,10 +96,7 @@
     const wrap = document.createElementNS(XHTML, 'div');
     wrap.setAttribute('xmlns', XHTML);
     const body = getComputedStyle(document.body);
-    const background = body.backgroundImage && body.backgroundImage !== 'none'
-      ? `${body.backgroundColor.includes('rgba(0, 0, 0, 0)') ? '' : `${body.backgroundColor} `}${body.backgroundImage}`
-      : body.backgroundColor;
-    wrap.style.cssText = `width:${width}px;height:${height}px;margin:0;padding:0;box-sizing:border-box;color:${body.color};font-family:${body.fontFamily};font-size:${body.fontSize};line-height:${body.lineHeight};${background && background !== 'rgba(0, 0, 0, 0)' ? `background:${background};` : ''}`;
+    wrap.style.cssText = `width:${width}px;height:${height}px;margin:0;padding:0;box-sizing:border-box;color:${body.color};font-family:${body.fontFamily};font-size:${body.fontSize};line-height:${body.lineHeight};background-color:${body.backgroundColor};background-image:${body.backgroundImage};`;
 
     const style = document.createElementNS(XHTML, 'style');
     style.textContent = `${fontFaceCss()}\n${pseudoCss}`;
@@ -176,7 +173,7 @@
       } catch {
         // A clipboard the browser refuses (a permission, or a sandbox without clipboard-write) still gets the picture as a file.
         download(blob);
-        say(btn.dataset.done, true);
+        say(btn.dataset.downloaded, true);
       }
     } catch {
       say(btn.dataset.failed, true);

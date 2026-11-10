@@ -95,3 +95,60 @@ test('copy-image: the button appears and a click writes a real PNG to the clipbo
   assert.ok(r.size > 1000, `the PNG has real pixels, not an empty canvas (${r.size} bytes)`);
   assert.equal(r.label, 'Copied ✓', 'the button reports the copy');
 });
+
+// A refused clipboard downloads the PNG; the button must say so, not "Copied ✓".
+const CLICK_FALLBACK = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  const revealed = !btn.hidden;
+  let wrote = false;
+  try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote = true; throw new Error('refused'); } }); }
+  catch (e) { navigator.clipboard.write = async () => { wrote = true; throw new Error('refused'); }; }
+  let clicked = 0;
+  const orig = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
+  btn.click();
+  for (let i = 0; i < 200 && !clicked; i++) await sleep(50);
+  HTMLAnchorElement.prototype.click = orig;
+  await sleep(30);
+  return { revealed, wrote, clicked, label: btn.textContent };
+})()`;
+
+test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CLICK_FALLBACK);
+  assert.equal(r.revealed, true, 'the button is revealed');
+  assert.equal(r.wrote, true, 'the clipboard write was attempted');
+  assert.ok(r.clicked >= 1, 'a download was triggered');
+  assert.equal(r.label, 'Downloaded', `the fallback reports a download, not a copy (${JSON.stringify(r)})`);
+});
+
+// A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which
+// breaks if the colour and image are combined in one background shorthand.
+const CLICK_MULTI_BG = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  document.body.style.backgroundColor = 'rgb(10, 20, 30)';
+  document.body.style.backgroundImage = 'linear-gradient(45deg, #123456, #654321), radial-gradient(circle, #222, #444)';
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  let captured = null;
+  Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async (items) => { captured = items; } });
+  btn.click();
+  for (let i = 0; i < 200 && !captured; i++) await sleep(50);
+  if (!captured) return { error: 'no clipboard write' };
+  const blob = await captured[0].getType('image/png');
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(bmp, 0, 0);
+  const px = ctx.getImageData(1, 1, 1, 1).data;
+  return { alpha: px[3], rgb: [px[0], px[1], px[2]] };
+})()`;
+
+test('copy-image: a multi-layer body background stays opaque in the PNG', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CLICK_MULTI_BG);
+  assert.equal(r.error, undefined, `the capture succeeded (${JSON.stringify(r)})`);
+  assert.equal(r.alpha, 255, `the corner is opaque, so the background was drawn (${JSON.stringify(r)})`);
+});
