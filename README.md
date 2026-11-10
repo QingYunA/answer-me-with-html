@@ -18,14 +18,10 @@ Explore Zapply's Chrome extension for autofilling job applications, dedicated jo
     </a>
 </p>
 
-<p align="center">
-  <b>Super Fast&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;Explainer Videos&nbsp;&nbsp;|&nbsp;&nbsp;One File, Offline</b>
-</p>
-
-
-<p align="center">
+<h1 align="center">Answer me with HTML</h1>
+<!-- <p align="center">
   <img src="docs/images/text-vs-page.png" alt="The same TCP question answered in plain text and with the skill: a wall of terminal text on the left, one readable page with diagrams on the right" width="100%">
-</p>
+</p> -->
 
 <p align="center">
   <b>An agent skill. Ask a hard question, get a page you can actually read instead of a wall of text.<br>The model writes about 1/8 of the tokens it would need to hand-write the HTML.</b>
