@@ -16,6 +16,7 @@ if (panels.length > 1) {
   const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line
   const TABLE_COL_MIN = 96; // per table column, px
   const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line
+  const TABLE_WORD_MAX = 160; // a longer word (an id, a path) counts as this wide and may break inside its cell when room is short
   const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line
   const DIAGRAM_MIN = 160;
   const RESIZE_DELAY = 150;
@@ -35,6 +36,7 @@ if (panels.length > 1) {
   const restore = () => {
     for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);
     for (const el of original.keys()) restoreStyle(el);
+    for (const table of tables) table.classList.remove('am-table-fit');
   };
 
   // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback
@@ -49,6 +51,8 @@ if (panels.length > 1) {
   // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word
   // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and
   // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).
+  // A column's floor is its longest word, but no more than TABLE_WORD_MAX: a long id would otherwise hold its column at full width and
+  // leave a prose column one word per line. fitTables() lets such a word break (am-table-fit) when the table is short of room.
   const columnWidths = new Map();
   function comfortableWidth(table, scale) {
     const saved = table.getAttribute('style');
@@ -57,7 +61,7 @@ if (panels.length > 1) {
       return headCells(table).map((cell) => cell.getBoundingClientRect().width);
     };
     const most = columns('max-content');
-    const least = columns('min-content');
+    const least = columns('min-content').map((w) => Math.min(w, TABLE_WORD_MAX * scale));
     if (saved === null) table.removeAttribute('style');
     else table.setAttribute('style', saved);
     // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.
@@ -76,6 +80,7 @@ if (panels.length > 1) {
       const high = want.reduce((s, w) => s + w, 0);
       const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;
       headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });
+      table.classList.toggle('am-table-fit', high > room);
     }
   }
 

@@ -822,6 +822,24 @@ test('e2e: the expand button stays in view when a wide diagram scrolls sideways'
   assert.equal(await evaluate(inView), true, 'expand button stays inside the visible part of a scrolled diagram');
 });
 
+test('e2e: long ids in a table break inside their cells, so a prose column is not left one word per line', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const table = '| Change | Author | Landed | Vehicle | Live? | Verdict | Evidence |\n|---|---|---|---|---|---|---|\n'
+    + '| 1001 End a stuck lease | alice | 10-21 | web_command_1051211795 | only_in_job_58546795927693416 | NOT_EXERCISED | job_1051223399_log_ends_at_plugin_install |\n'
+    + '| 1002 Skip crash with no build | bob | 10-21 | async_tier_1051211796 | unverified | NOT_EXERCISED | key_field_missing_in_check_27030090071 |\n';
+  const { html } = renderDoc(`---\ntitle: Ids in a table\nlang: en\ncols: 3\n---\n## A Wide table {span=2}\n${table}\n## B Neighbour\nShort text.\n`);
+  const file = join(tmp, 'table-ids.html');
+  writeFileSync(file, html);
+  await open(file, 1000);
+  await waitFor(SETTLED, 'the table page to lay out');
+  const state = await evaluate(`(() => {
+    const wrap = document.querySelector('.am-table-wrap');
+    const change = wrap.querySelector('tbody tr td');
+    return { scrolls: wrap.scrollWidth > wrap.clientWidth + 1, fit: wrap.querySelector('table').classList.contains('am-table-fit'), changeWide: change.getBoundingClientRect().width >= 100 };
+  })()`);
+  assert.deepEqual(state, { scrolls: false, fit: true, changeWide: true });
+});
+
 test('e2e: the expand button does not cover a node at the right edge of the drawing', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const { html } = renderDoc('---\ntitle: Expand overlap\nlang: en\ntheme: blueprint\n---\n## A Flow plan {span=2}\n```flow LR\nClient -> Gateway\nGateway -> [(Cache)]: lookup\nCache -> Service: miss\nGateway -> Service\n*Service\n```\n');
