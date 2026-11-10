@@ -1,7 +1,7 @@
 // Data-directory maintenance: usage stats, am clean, cleanup notice; after a render, collects the cleanup and update notices.
 // Notices are printed only for the Agent (one line starting with "! "), which asks the user whether to act; the CLI never deletes automatically.
 import { readdirSync, lstatSync, rmSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename, resolve } from 'node:path';
 import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
 
@@ -14,6 +14,9 @@ export const CLEAN = Object.freeze({
 });
 const DIRS = ['pages', 'videos', 'cache'];
 const HOUR = DAY / 24;   // a serve-state .tmp file this old was left by a write that stopped
+// The name am render gives a page: <slug>-<stamp>.html, with -2, -3 … when a second page lands in the same second.
+// A custom pages_dir may hold other files the user cares about, so cleanup there touches only names this tool wrote.
+const PAGE_FILE = /^[a-z0-9-]+-\d{8}-\d{6}(-\d+)?\.html$/;
 
 // List regular files in a directory. Symlinks and unreadable entries are skipped, so stats never fail on a single file.
 function walk(dir) {
@@ -39,25 +42,33 @@ function walk(dir) {
 
 const sum = (files) => files.reduce((n, f) => n + f.bytes, 0);
 
-export function usage(home) {
+export function usage(home, pages = join(home, 'pages')) {
+  const roots = { pages, videos: join(home, 'videos'), cache: join(home, 'cache') };
   const parts = Object.fromEntries(DIRS.map((d) => {
-    const files = walk(join(home, d));
+    const files = walk(roots[d]);
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 
+// Files in the pages folder that cleanup may delete: only names am render writes when pages is a custom folder.
+const pageVictims = (pages, cutoff, all, custom) =>
+  walk(pages).filter((f) => (all || f.mtime < cutoff) && (!custom || PAGE_FILE.test(basename(f.path))));
+
 // Delete pages, videos and kept drafts (src/cli.js keepDraft) older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
 // temp: the private folder in the system temporary folder (src/home.js); its pages, videos and drafts follow the same rules.
 // The reply state of a served page (src/serve.js, serve-state/) goes with its page: a state whose page is gone cannot be restored.
-export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
+export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join(home, 'pages') } = {}) {
   const cutoff = now - days * DAY;
+  const custom = resolve(pages) !== resolve(join(home, 'pages'));
   const victims = [
-    ...[home, temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
+    ...pageVictims(pages, cutoff, all, custom),
+    ...['videos', 'drafts'].flatMap((d) => walk(join(home, d)).filter((f) => all || f.mtime < cutoff)),
+    ...[temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
     ...walk(join(home, 'cache')),
   ];
   // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
-  const gone = new Set(walk(join(home, 'pages')).filter((f) => all || f.mtime < cutoff).map((f) => f.path));
+  const gone = new Set(pageVictims(pages, cutoff, all, custom).map((f) => f.path));
   const states = walk(join(home, 'serve-state')).filter((f) => {
     // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save. One that is an
     // hour old was left by a process that stopped mid-write, and nothing will rename it.
@@ -65,7 +76,7 @@ export function clean(home, { days = CLEAN.days, all = false, dryRun = false, no
     if (all || f.mtime < cutoff) return true;
     try {
       const file = JSON.parse(readFileSync(f.path, 'utf8'))?.file;
-      return typeof file !== 'string' || gone.has(join(home, 'pages', file)) || !lstatSync(join(home, 'pages', file)).isFile();
+      return typeof file !== 'string' || gone.has(join(pages, file)) || !lstatSync(join(pages, file)).isFile();
     } catch {
       return true;
     }
@@ -94,11 +105,11 @@ export function cleanHint(state, use, now = Date.now()) {
 }
 
 // Called after every render: record the first-use time, return the notices to print, and schedule the background version check when needed.
-export function afterRender({ home, env, config, current, scriptPath, background, now = Date.now() }) {
+export function afterRender({ home, env, config, current, scriptPath, background, now = Date.now(), pages = join(home, 'pages') }) {
   let state = readState(home);
   if (!state.firstSeen) state = writeState(home, { firstSeen: now });
   const hints = [];
-  const c = cleanHint(state, usage(home), now);
+  const c = cleanHint(state, usage(home, pages), now);
   if (c) {
     hints.push(c);
     state = writeState(home, { lastCleanHint: now });

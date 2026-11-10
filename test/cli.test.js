@@ -52,6 +52,24 @@ test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stat
   assert.match(r.out, /STE ✓ 0 warnings/);
 });
 
+test('cli render: pages_dir writes pages into that folder, and the config list shows the path setting', async () => {
+  const outDir = join(dir, 'notes-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const listed = await run(['config']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /pages_dir/);
+  assert.match(listed.out, /a folder path/);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  assert.ok(file.startsWith(outDir), file);
+  // --replace accepts a page in pages_dir (the earlier file is removed once the new one is written).
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  assert.equal(again.code, 0, again.err);
+  assert.ok(again.out.match(/✓ (.+\.html)/)[1].startsWith(outDir));
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
 test('cli render: the injected clock sets the default file name; the injected open runs as configured', async () => {
   const opened = [];
   const now = new Date(2026, 0, 2, 3, 4, 5).getTime();

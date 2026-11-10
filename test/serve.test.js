@@ -56,6 +56,24 @@ function get(path, { method = 'GET', host, headers = {} } = {}) {
 const urlOf = (dir, file, secret = srv.secret) => `/${dir === 'pages' ? 'p' : 'v'}/${pageToken(secret, dir, file)}/${encodeURIComponent(file)}`;
 const eventsOf = (file, secret = srv.secret) => eventLink({ secret }, file);
 
+test('serve: pages_dir serves pages from the configured folder and builds their links', async () => {
+  const customHome = mkdtempSync(join(tmpdir(), 'am-serve-custom-'));
+  const custom = join(customHome, 'custom-pages');
+  mkdirSync(custom, { recursive: true });
+  writeFileSync(join(custom, 'custom.html'), '<h1>Custom</h1>');
+  const other = await startServer({ home: customHome, port: 0, pagesDir: custom });
+  try {
+    const url = `http://127.0.0.1:${other.port}/p/${pageToken(other.secret, 'pages', 'custom.html')}/${encodeURIComponent('custom.html')}`;
+    const r = await fetch(url);
+    assert.equal(r.status, 200);
+    assert.equal(await r.text(), withLiveReload('<h1>Custom</h1>', eventLink({ secret: other.secret }, 'custom.html')));
+    assert.match(serveLink(customHome, join(custom, 'custom.html'), custom), /^http:\/\/127\.0\.0\.1:\d+\/p\//);
+  } finally {
+    await other.close();
+    rmSync(customHome, { recursive: true, force: true });
+  }
+});
+
 test('serve token: deterministic, 22 chars, differs by secret, directory and file', () => {
   const t = pageToken('s1', 'pages', 'a.html');
   assert.equal(t, pageToken('s1', 'pages', 'a.html'));
