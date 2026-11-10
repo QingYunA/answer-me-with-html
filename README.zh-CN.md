@@ -18,9 +18,7 @@ Explore Zapply's Chrome extension for autofilling job applications, dedicated jo
     </a>
 </p>
 
-<p align="center">
-  <b>极速出页&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;讲解视频&nbsp;&nbsp;|&nbsp;&nbsp;单文件离线</b>
-</p>
+<h1 align="center">Answer me with HTML</h1>
 
 <p align="center">
   <b>一个 Agent Skill：遇到复杂问题，Agent 不再甩给你一堵文字墙，而是给你一页能看懂的 HTML。<br>模型要写的 token，只有它直接手写 HTML 的约 1/8。</b>
@@ -39,9 +37,9 @@ Explore Zapply's Chrome extension for autofilling job applications, dedicated jo
   <a href="https://answer-me-with-html.com/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
+<!-- <p align="center">
   <img src="docs/images/text-vs-page-zh.png" alt="同一个 TCP 问题的两种回答：左边是终端里的一堵文字墙，右边是带图表的一页能看懂的页面" width="100%">
-</p>
+</p> -->
 
 装好之后，像平时一样提问就行：
 
