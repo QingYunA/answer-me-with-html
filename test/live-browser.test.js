@@ -29,6 +29,27 @@ Which cache?
 
 ## B Notes
 Version ${version}.
+
+## C Sketch
+\`\`\`ask cards
+Which look?
+* Lead
+  :::html
+  <b class="mock-mark">lead</b>
+  <input type="text" class="mock-field" aria-label="mock">
+  :::
+- Visual
+\`\`\`
+
+## D Nested
+\`\`\`ask
+Which outer?
+* Outer A
+  :::html
+  <div class="am-ask am-ask--cards"><div class="am-ask-card"><label class="am-ask-opt"><input type="radio" name="mock"><span class="am-ask-body"><span class="am-ask-label">Inner</span></span></label><div class="am-ask-preview"><b class="nested-mark">inner</b></div></div></div>
+  :::
+- Outer B
+\`\`\`
 `;
 
 let tmp;
@@ -52,12 +73,15 @@ const until = async (expression, ms = 5000) => {
   }
   return false;
 };
-const render = (version) => {
-  writeFileSync(join(tmp, 'd.md'), draft(version));
-  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'd.md'), '-o', join(home, 'pages', 'live.html'), '--no-open'], {
+const renderTo = (name, version) => {
+  writeFileSync(join(tmp, `${name}.md`), draft(version));
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, `${name}.md`), '-o', join(home, 'pages', `${name}.html`), '--no-open'], {
     env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
   });
 };
+const render = (version) => renderTo('live', version);
+const renderSketch = (version) => renderTo('sketch', version);
+const renderNested = (version) => renderTo('nested', version);
 
 before(async () => {
   if (SKIP) return;
@@ -65,6 +89,8 @@ before(async () => {
   home = join(tmp, 'home');
   mkdirSync(join(home, 'pages'), { recursive: true });
   render(1);
+  renderSketch(1);
+  renderNested(1);
   srv = await startServer({ home, port: 0 });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
@@ -109,4 +135,32 @@ test('live: with the reply bar shown, the "Page updated" notice sits above it, n
   const bar = await evaluate(RECT('.am-reply-bar'));
   assert.ok(notice.bottom <= bar.top, `the notice (bottom ${notice.bottom}) ends above the bar (top ${bar.top})`);
   assert.equal(await evaluate('document.querySelector(\'input[value="Memcached"]\').checked'), true, 'the page did not reload');
+});
+
+test('live: a control inside a preview is not reader input, so the page reloads by itself', { skip: SKIP }, async () => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await send('Page.navigate', { url: pageLink(srv, 'pages', 'sketch.html') });
+  await loaded;
+  await evaluate(`(() => {
+    const field = document.querySelector('.mock-field');
+    field.focus();
+    field.value = 'sketch';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.click();
+  })()`);
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
+  renderSketch(2);
+  assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
+  assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
+});
+
+test('live: a nested cards preview inside another preview is not reader input', { skip: SKIP }, async () => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await send('Page.navigate', { url: pageLink(srv, 'pages', 'nested.html') });
+  await loaded;
+  await evaluate('document.querySelector(".nested-mark").click()');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
+  renderNested(2);
+  assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
+  assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
 });
