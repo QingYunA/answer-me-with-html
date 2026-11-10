@@ -87,7 +87,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
-.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
 .am-md table { width: 100%; border-collapse: collapse; font-size: var(--am-fs-text); }
 .am-md th {
@@ -232,20 +232,25 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* ── timeline ────────────────────────────── */
 .am-timeline { list-style: none; margin: 0; padding: 0; }
 .am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
-.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
-.am-timeline--h li::before {
-  content: ""; position: absolute; top: calc(var(--am-ln-whenHeight) + 7px); left: 0; right: 0; border-top: var(--bw) solid var(--line);
+/* Every item spans the same four rows (date, dot, title, text) through subgrid, so a date that wraps to two lines moves every dot down
+   together instead of running into its own. The axis is drawn from each dot to both edges of its item; the item clips it, and the first
+   and last items leave out their outer half. Do not make the li a size container: Chrome then ignores subgrid. */
+.am-timeline--h { grid-template-rows: repeat(4, auto); }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; overflow-x: clip; }
+.am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after {
+  content: ""; position: absolute; top: calc(50% - var(--bw) / 2); width: 100vw; border-top: var(--bw) solid var(--line);
 }
-.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
-.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
-.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; height: var(--am-ln-whenHeight); }
+.am-timeline--h .am-tl-dot::before { inset-inline-end: calc(100% + var(--bw)); }
+.am-timeline--h .am-tl-dot::after { inset-inline-start: calc(100% + var(--bw)); }
+.am-timeline--h li:first-child .am-tl-dot::before, .am-timeline--h li:last-child .am-tl-dot::after { content: none; }
+.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; min-height: var(--am-ln-whenHeight); align-self: end; }
 .am-tl-dot {
   position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
   border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
 }
 .am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
-.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; }
-.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; }
+.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; overflow-wrap: break-word; min-width: 0; }
+.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; overflow-wrap: break-word; min-width: 0; }
 .am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
 .am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
 .am-timeline--v li:last-child::before { display: none; }
@@ -259,9 +264,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tl-wrap { container-type: inline-size; }
 @container (max-width: 560px) {
   .am-timeline--h { display: block; padding-top: 0; }
-  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
-  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
-    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  .am-timeline--h li { display: block; overflow-x: visible; text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after { content: none; }
+  .am-timeline--h li::before {
+    content: ""; position: absolute; top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
   }
   .am-timeline--h li:last-child::before { display: none; }
   .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }

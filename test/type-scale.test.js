@@ -59,9 +59,9 @@ test('type scale: typeScaleCss scales page text and keeps the toolbar and lightb
 });
 
 test('type scale: a line height plus a fixed offset is a calc, not a scaled combined length', () => {
-  // The timeline rule sits at the bottom of the time label (whenHeight) plus 7px; scaling 31px as a whole drifts at large scales.
+  // The timeline axis is drawn from the dots, so it follows the time label at any scale; no combined whenRule length is needed.
   assert.equal('whenRule' in LINES, false);
-  assert.match(read('src/themes/base.css'), /top: calc\(var\(--am-ln-whenHeight\) \+ 7px\)/);
+  assert.match(read('src/themes/base.css'), /\.am-tl-when \{[^}]*min-height: var\(--am-ln-whenHeight\)/);
   // Each annotation note row is the note line (segLine) plus 1px; 17px scaled as a whole would drift away from its line.
   assert.equal('annotRow' in LINES, false);
   assert.match(read('src/themes/base.css'), /var\(--rows, 0\) \* \(var\(--am-ln-segLine\) \+ 1px\)/);

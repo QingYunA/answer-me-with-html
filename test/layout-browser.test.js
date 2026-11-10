@@ -813,7 +813,8 @@ test('e2e: a horizontal timeline turns vertical on a phone and stays horizontal 
     const items = [...document.querySelector('.am-timeline--h').children].map((li) => ({
       top: li.getBoundingClientRect().top,
       dotLeftOfTitle: li.querySelector('.am-tl-dot').getBoundingClientRect().right <= li.querySelector('.am-tl-title').getBoundingClientRect().left,
-      lineAcross: getComputedStyle(li, '::before').borderTopWidth !== '0px',
+      // The axis is drawn from each dot to both edges of its item (base.css), and the first and last items leave out their outer half.
+      lineAcross: ['::before', '::after'].some((p) => getComputedStyle(li.querySelector('.am-tl-dot'), p).content !== 'none'),
     }));
     return {
       stacked: items.every((it, i) => i === 0 || it.top > items[i - 1].top),

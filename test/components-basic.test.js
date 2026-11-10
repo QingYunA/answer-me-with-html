@@ -91,6 +91,19 @@ test('timeline: a horizontal one sits in a container that base.css queries, so a
   assert.doesNotMatch(css.match(/@media \(max-width: 760px\) \{[\s\S]*?\n\}/)[0], /am-timeline/, 'the phone media query leaves the timeline to its container');
 });
 
+test('timeline: long words wrap inside their step, and every step shares the date, dot, title and text rows', () => {
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  for (const sel of [/\.am-md :not\(pre\) > code \{/, /\.am-tl-title \{/, /\.am-tl-text \{/]) {
+    assert.match(css, new RegExp(`${sel.source}[^}]*overflow-wrap: break-word`), sel.source);
+  }
+  assert.match(css, /\.am-timeline--h li \{[^}]*grid-row: span 4; grid-template-rows: subgrid;/);
+  // A size container on the item makes Chrome drop the subgrid rows.
+  assert.doesNotMatch(css, /\.am-timeline--h li \{[^}]*container/);
+  // The axis uses logical sides, so a right-to-left page mirrors it.
+  assert.match(css, /\.am-timeline--h \.am-tl-dot::before \{ inset-inline-end:/);
+  assert.match(css, /\.am-timeline--h \.am-tl-dot::after \{ inset-inline-start:/);
+});
+
 test('timeline: error when | is missing', () => {
   throwsAt(() => render('timeline', 'a | b\n只有一列'), 2);
 });
