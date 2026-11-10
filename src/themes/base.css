@@ -571,6 +571,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 
 @media print {
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  .am-btn--copy-image { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
 }

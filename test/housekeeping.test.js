@@ -49,6 +49,31 @@ test('clean: by default deletes pages and videos older than 30 days + the whole 
   assert.equal(readState(home).lastClean, NOW);
 });
 
+test('clean: a custom pages_dir loses only generated page files, never the user\'s other files', () => {
+  const custom = join(home, 'my-pages');
+  mkdirSync(custom, { recursive: true });
+  const put = (name, ageDays = 40) => {
+    const p = join(custom, name);
+    writeFileSync(p, 'x');
+    const t = (NOW - ageDays * DAY) / 1000;
+    utimesSync(p, t, t);
+    return p;
+  };
+  const page = put('note-20260101-000000.html');
+  const duplicate = put('note-20260101-000000-2.html');
+  const keepTxt = put('keep.txt');
+  const keepHtml = put('index.html');
+  const fresh = put('fresh-20260102-000000.html', 1);
+  assert.equal(usage(home, custom).pages.count, 5, 'usage counts the custom folder');
+  assert.deepEqual(clean(home, { now: NOW, pages: custom }), { files: 2, bytes: 2 });
+  assert.ok(!existsSync(page) && !existsSync(duplicate));
+  assert.ok(existsSync(keepTxt) && existsSync(keepHtml) && existsSync(fresh));
+  // --all takes every generated page but still leaves the user's own files.
+  clean(home, { all: true, now: NOW, pages: custom });
+  assert.ok(!existsSync(fresh));
+  assert.ok(existsSync(keepTxt) && existsSync(keepHtml));
+});
+
 test('clean: --dry-run deletes nothing; --all deletes every page and video', () => {
   const fresh = file('pages/new.html', 10, 0);
   assert.equal(clean(home, { dryRun: true, all: true, now: NOW }).files, 1);
