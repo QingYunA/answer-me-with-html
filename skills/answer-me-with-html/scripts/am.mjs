@@ -368,6 +368,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tree-col:first-child::before { inset-inline-start: 50%; }
 .am-tree-col:last-child::before { inset-inline-end: 50%; }
 .am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+/* A forest (no single root) has nothing above its columns, so they draw no connectors. */
+.am-tree-cols--free > .am-tree-col { padding-top: 0; }
+.am-tree-cols--free > .am-tree-col::before, .am-tree-cols--free > .am-tree-col::after { content: none; }
 .am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
 .am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
 .am-tree-list ul { margin-inline-start: 16px; }
@@ -4595,10 +4598,20 @@ key: value
       const body = wide ? t.slice(1).trim() : t;
       const m2 = body.match(/^([^:：]+)[:：]\s*(.*)$/);
       if (!m2) throw new ComponentError(`kv line has no colon: "${t}"; expected key: value`, line);
-      return `<div class="am-kv-cell${wide ? " am-kv-cell--wide" : ""}"><dt>${esc(m2[1].trim())}</dt><dd>${mdInline(m2[2])}</dd></div>`;
+      return { wide, key: m2[1].trim(), value: m2[2] };
     });
+    const span = new Array(cells.length).fill(1);
+    let pos = 0;
+    cells.forEach((c2, i) => {
+      if (c2.wide) {
+        if (pos > 0) span[i - 1] += cols - pos;
+        pos = 0;
+      } else pos = (pos + 1) % cols;
+    });
+    if (pos > 0) span[cells.length - 1] += cols - pos;
+    const html = cells.map((c2, i) => `<div class="am-kv-cell${c2.wide ? " am-kv-cell--wide" : ""}"${span[i] > 1 ? ` style="grid-column: span ${span[i]}"` : ""}><dt>${esc(c2.key)}</dt><dd>${mdInline(c2.value)}</dd></div>`);
     if (!cells.length) throw new ComponentError("kv needs at least one key: value line", 1);
-    return `<dl class="am-kv" style="--kv-cols: ${cols}">${cells.join("")}</dl>`;
+    return `<dl class="am-kv" style="--kv-cols: ${cols}">${html.join("")}</dl>`;
   }
 };
 
@@ -5145,10 +5158,12 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   const gaps = ps.slice(1).map((_2, i) => (actorW[i] + actorW[i + 1]) / 2 + 28);
   let extraRight = 0;
   let extraLeft = 0;
+  let msgs = 0;
   const prepared = steps2.map((s) => {
     if (s.kind === "msg") {
+      msgs++;
       const lines2 = s.label ? wrap(s.label, LABEL_MAX, FS) : [];
-      const width2 = Math.max(0, ...lines2.map((l) => measure(l, FS))) + (num ? 34 : 22);
+      const width2 = Math.max(0, ...lines2.map((l) => measure(l, FS))) + (num ? 2 * (10 + 7 * String(msgs).length) : 22);
       const a3 = idx.get(s.from);
       const b = idx.get(s.to);
       if (a3 === b) {

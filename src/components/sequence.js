@@ -73,10 +73,13 @@ function layout({ participants: ps, steps }, { num, id, ui, dir = 'ltr' }) {
   let extraRight = 0;
   let extraLeft = 0;
 
+  let msgs = 0;
   const prepared = steps.map((s) => {
     if (s.kind === 'msg') {
+      msgs++;
       const lines = s.label ? wrap(s.label, LABEL_MAX, FS) : [];
-      const width = Math.max(0, ...lines.map((l) => measure(l, FS))) + (num ? 34 : 22);
+      // The step number sits 6 px from the line and the label is centred, so each side keeps room for the number (about 7 px a digit).
+      const width = Math.max(0, ...lines.map((l) => measure(l, FS))) + (num ? 2 * (10 + 7 * String(msgs).length) : 22);
       const a = idx.get(s.from);
       const b = idx.get(s.to);
       if (a === b) {
