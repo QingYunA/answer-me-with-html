@@ -4,6 +4,20 @@
 
 <h1 align="center">Answer me with HTML</h1>
 
+## Sponsored by Zapply
+
+<a href="https://app.zapply.jobs/onboarding/?ref=github-cta-qingyuna" rel="nofollow sponsored">
+    <img src="apply-faster-banner.png" alt="Apply to jobs in seconds with Zapply.">
+</a>
+
+Explore Zapply's Chrome extension for autofilling job applications, dedicated job board featuring the latest openings, multiple profiles for different resumes and roles, and application tracking with streaks and commitment awards.
+
+<p align="center">
+ <a href="https://app.zapply.jobs/onboarding/?ref=github-cta-qingyuna" rel="nofollow sponsored">
+     <img src="get-started-button.png" alt="Get Started with Zapply" width="260">
+    </a>
+</p>
+
 <p align="center">
   <b>极速出页&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;讲解视频&nbsp;&nbsp;|&nbsp;&nbsp;单文件离线</b>
 </p>

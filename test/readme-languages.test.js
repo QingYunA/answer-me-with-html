@@ -8,8 +8,8 @@ const read = (p) => readFileSync(`${ROOT}/${p}`, 'utf8');
 
 // The READMEs are one document in three languages. The English README is the source: the translated
 // pages keep its code blocks, badges, URLs and link targets verbatim (only the prose is translated),
-// and their in-page anchors follow their own headings. These checks keep the three from drifting
-// apart when one of them is edited.
+// and their in-page anchors follow their own headings. The sponsored CTA is intentionally limited
+// to English and Chinese. These checks keep the three from drifting apart when one of them is edited.
 
 const READMES = ['README.md', 'README.zh-CN.md', 'README.ja.md'];
 const LABELS = { 'README.md': 'English', 'README.zh-CN.md': '简体中文', 'README.ja.md': '日本語' };
@@ -101,9 +101,14 @@ test('readme languages: each navigation row links each language label to its REA
   }
 });
 
-test('readme languages: the Japanese README carries the English one apart from the prose', () => {
-  const en = splitFences(read('README.md'));
-  const ja = splitFences(read('README.ja.md'));
+test('readme languages: the Japanese README carries the English one apart from prose and the sponsored CTA', () => {
+  const enText = read('README.md');
+  const jaText = read('README.ja.md');
+  const sponsoredCta = /## Sponsored by Zapply\n[\s\S]*?<\/p>\n\n/;
+  assert.match(enText, sponsoredCta, 'English sponsored CTA');
+  assert.doesNotMatch(jaText, /## Sponsored by Zapply/, 'Japanese sponsored CTA');
+  const en = splitFences(enText.replace(sponsoredCta, ''));
+  const ja = splitFences(jaText);
   assert.deepEqual(ja.code, en.code, 'code blocks');
   assert.deepEqual(inlineCode(ja.prose), inlineCode(en.prose), 'inline code spans');
   assert.deepEqual(linkTargets(ja.prose), linkTargets(en.prose), 'link targets');
