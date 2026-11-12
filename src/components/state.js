@@ -3,7 +3,7 @@
 import { esc } from '../svg/text.js';
 import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../svg/shapes.js';
 import { ComponentError, contentLines } from './error.js';
-import { splitMarker, markState, deltaAttr, withDelta } from './delta.js';
+import { splitMarker, markState, deltaAttr, withDelta, innerMarkMessage } from './delta.js';
 import { badgeSvg, edgeText, nodeSize, nodeState, runLayout } from './flow.js';
 import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, clipToBox, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
 
@@ -43,7 +43,7 @@ Polling -> Open: reply
   - A marker applies to the transition and to each state on its line. A state is removed when it appears only on - lines, added when it appears only on + lines, and unchanged when it also appears on an unmarked line. ~ State on a line without an arrow marks that state as changed.
   - ~ on a transition is an error: remove the old transition with - and add the new one with +. The same transition both unmarked and marked is an error too.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked state with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
-  - A line that starts with a marker and a space is always read as a marker.`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a state ("A -> + B"), is an error: write it at the start, "+ A -> B".`,
   example: '```state LR\n[*] -> Idle\nIdle -> Connecting: connect()\nConnecting -> Open: SYN-ACK\nConnecting -> Closed: RST\nOpen -> Open: retransmit\nOpen -> Closed: close()\nClosed -> [*]\n```',
   render(text, { args, uid, ui, video, dir: pageDir = 'ltr' }) {
     const model = parseState(text);
@@ -92,6 +92,8 @@ export function parseState(text) {
     // The event after the colon is text, not syntax: it may itself contain ->. Only a second arrow before the colon is a second transition.
     if (to.includes('->')) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
+    const inner = innerMarkMessage('state', [from, to], mark, t);
+    if (inner) throw new ComponentError(inner, n);
     const fromId = resolve(from, n, mark, 'from');
     const toId = resolve(to, n, mark, 'to');
     edges.push({ from: fromId, to: toId, label, line: n, ...(state && { state }) });

@@ -6,7 +6,7 @@ import { svgLine } from '../bidi.js';
 import { overlaps, segmentHits } from '../svg/geometry.js';
 import { crossingWarnings } from './flow-check.js';
 import { ComponentError, contentLines } from './error.js';
-import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
+import { splitMarker, markState, deltaAttr, withDelta, SIGN, innerMarkMessage } from './delta.js';
 import { DRAWING } from '../themes/type-scale.js';
 
 const FS = DRAWING.node;
@@ -75,7 +75,7 @@ Client -> Gateway
   - ~ on a line with an arrow is an error: remove the old link with - and add the new one with +. That is also how a link's label changes. The same link both unmarked and marked is an error too.
   - + group Name: A, B and - group Name: A, B mark a group box. A group that is not removed and holds only removed nodes is a warning. Markers combine with * and every shape bracket.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
-  - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a node ("A -> + B"), is an error: write it at the start, "+ A -> B". To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
   render(text, { args, uid, ui, warn, video, dir: pageDir = 'ltr' }) {
     const model = parseFlow(text);
@@ -112,6 +112,8 @@ export function parseFlow(text) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
+    const inner = innerMarkMessage('flow', chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, 'To keep a name that starts with a marker, use brackets: [NAME]');
+    if (inner) throw new ComponentError(inner, line);
     if (mark === '~' && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);
     }

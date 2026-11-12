@@ -39,6 +39,13 @@ test('state: a line without an arrow declares a state, and a marker alone marks 
   assert.equal(m.nodes.get('C').state, 'added');
 });
 
+test('state: a marker before a state inside the line is an error with the line rewritten, not a second state', () => {
+  throwsAt(() => parseState('[*] -> Idle\nIdle -> + Open: go'), 2);
+  assert.throws(() => parseState('Idle -> + Open: go'), /Write: "\+ Idle -> Open: go"/);
+  assert.throws(() => parseState('+ Idle -> - Open'), /write one line per marker/);
+  assert.equal(parseState('Idle -> +1 retry').nodes.has('+1 retry'), true);
+});
+
 test('state: a state on a marked transition is removed or added unless an unmarked line keeps it', () => {
   const m = parseState('Keep -> Hub\n- Old -> Hub\n+ Hub -> New');
   assert.equal(m.nodes.get('Old').state, 'removed');
