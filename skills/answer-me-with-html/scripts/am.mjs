@@ -5041,6 +5041,7 @@ function scaleSvgBoxes(html, scale = 1) {
   return String(html).replace(SVG_OPEN_BOX, (tag, w2, h) => `<svg viewBox="0 0 ${w2} ${h}" width="${Math.ceil(w2 * scale)}" height="${Math.ceil(h * scale)}"`);
 }
 var mirror = (width, rtl) => rtl ? (x) => width - x : (x) => x;
+var SEARCH_LIMIT = 4e4;
 function orderRanks(g, order) {
   order(g);
   const ranks = {};
@@ -5048,20 +5049,55 @@ function orderRanks(g, order) {
     const { rank, order: at3 } = g.node(v2);
     if (rank !== void 0) (ranks[rank] ??= [])[at3] = v2;
   }
+  const rows = Object.values(ranks);
   const pairs = (as, bs) => as.reduce((n, a3) => n + bs.filter((b) => g.node(b).order < g.node(a3).order).length, 0);
   const crossings2 = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
   const border = (v2) => g.node(v2).dummy === "border";
-  let swapped = true;
-  while (swapped) {
-    swapped = false;
-    for (const rank of Object.values(ranks)) {
-      for (let i = 1; i < rank.length; i++) {
-        const [a3, b] = [rank[i - 1], rank[i]];
-        if (g.parent(a3) !== g.parent(b) || border(a3) || border(b) || crossings2(b, a3) >= crossings2(a3, b)) continue;
-        [rank[i - 1], rank[i]] = [b, a3];
-        g.node(a3).order = i;
-        g.node(b).order = i - 1;
-        swapped = true;
+  const fixed2 = (a3, b) => g.parent(a3) !== g.parent(b) || border(a3) || border(b);
+  let compared = 0;
+  const gain = (a3, b) => {
+    compared++;
+    return crossings2(a3, b) - crossings2(b, a3);
+  };
+  const swap = (row, i) => {
+    [row[i - 1], row[i]] = [row[i], row[i - 1]];
+    g.node(row[i - 1]).order = i - 1;
+    g.node(row[i]).order = i;
+  };
+  const settle3 = () => {
+    let removed = 0;
+    for (let swapped = true; swapped; ) {
+      swapped = false;
+      for (const row of rows) {
+        for (let i = 1; i < row.length; i++) {
+          const won = fixed2(row[i - 1], row[i]) ? 0 : gain(row[i - 1], row[i]);
+          if (won <= 0) continue;
+          swap(row, i);
+          removed += won;
+          swapped = true;
+        }
+      }
+    }
+    return removed;
+  };
+  settle3();
+  for (let better = true; better; ) {
+    better = false;
+    for (const row of rows) {
+      for (let i = 1; i < row.length; i++) {
+        if (compared > SEARCH_LIMIT) return;
+        if (fixed2(row[i - 1], row[i])) continue;
+        const before = rows.map((r) => [...r]);
+        const cost = -gain(row[i - 1], row[i]);
+        swap(row, i);
+        if (settle3() > cost) {
+          better = true;
+          continue;
+        }
+        rows.forEach((r, k) => before[k].forEach((v2, at3) => {
+          r[at3] = v2;
+          g.node(v2).order = at3;
+        }));
       }
     }
   }

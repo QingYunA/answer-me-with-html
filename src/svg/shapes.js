@@ -68,9 +68,15 @@ export function scaleSvgBoxes(html, scale = 1) {
 // (the first node or participant on the right, arrows pointing left). Text is not mirrored, only placed.
 export const mirror = (width, rtl) => (rtl ? (x) => width - x : (x) => x);
 
-// dagre's customOrder for flow and er. dagre sorts each rank by the average position of its neighbours alone, so two edges that
-// leave one node tie and keep the order of the draft, wherever they end. After dagre's order, swap neighbours in a rank for as
-// long as a swap removes crossings. Only nodes with the same parent swap, and group borders stay, so a group keeps its members.
+// dagre's customOrder for flow, er and class. dagre sorts each rank by the average position of its neighbours alone, so two edges
+// that leave one node tie and keep the order of the draft, wherever they end. After dagre's order, swap neighbours in a rank for
+// as long as a swap removes crossings. Only nodes with the same parent swap, and group borders stay, so a group keeps its members.
+// One swap is not always enough: a node at the end of a long edge moves only together with the points of that edge in the ranks
+// before it. So also make each swap that removes nothing or adds crossings, settle again, and keep the result when it has fewer
+// crossings in total. That search stops after SEARCH_LIMIT comparisons, so a diagram with hundreds of edge points still renders
+// at once; a diagram of the usual size needs a few hundred.
+const SEARCH_LIMIT = 40000;
+
 export function orderRanks(g, order) {
   order(g);
   const ranks = {};
@@ -78,20 +84,56 @@ export function orderRanks(g, order) {
     const { rank, order: at } = g.node(v);
     if (rank !== undefined) (ranks[rank] ??= [])[at] = v;
   }
+  const rows = Object.values(ranks);
   const pairs = (as, bs) => as.reduce((n, a) => n + bs.filter((b) => g.node(b).order < g.node(a).order).length, 0);
   const crossings = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
   const border = (v) => g.node(v).dummy === 'border';
-  let swapped = true;
-  while (swapped) {
-    swapped = false;
-    for (const rank of Object.values(ranks)) {
-      for (let i = 1; i < rank.length; i++) {
-        const [a, b] = [rank[i - 1], rank[i]];
-        if (g.parent(a) !== g.parent(b) || border(a) || border(b) || crossings(b, a) >= crossings(a, b)) continue;
-        [rank[i - 1], rank[i]] = [b, a];
-        g.node(a).order = i;
-        g.node(b).order = i - 1;
-        swapped = true;
+  const fixed = (a, b) => g.parent(a) !== g.parent(b) || border(a) || border(b);
+  let compared = 0;
+  // The crossings that go away when the neighbours a, b (a first) change places; negative when the swap adds crossings.
+  const gain = (a, b) => {
+    compared++;
+    return crossings(a, b) - crossings(b, a);
+  };
+  const swap = (row, i) => {
+    [row[i - 1], row[i]] = [row[i], row[i - 1]];
+    g.node(row[i - 1]).order = i - 1;
+    g.node(row[i]).order = i;
+  };
+  const settle = () => {
+    let removed = 0;
+    for (let swapped = true; swapped; ) {
+      swapped = false;
+      for (const row of rows) {
+        for (let i = 1; i < row.length; i++) {
+          const won = fixed(row[i - 1], row[i]) ? 0 : gain(row[i - 1], row[i]);
+          if (won <= 0) continue;
+          swap(row, i);
+          removed += won;
+          swapped = true;
+        }
+      }
+    }
+    return removed;
+  };
+  settle();
+  for (let better = true; better; ) {
+    better = false;
+    for (const row of rows) {
+      for (let i = 1; i < row.length; i++) {
+        if (compared > SEARCH_LIMIT) return;
+        if (fixed(row[i - 1], row[i])) continue;
+        const before = rows.map((r) => [...r]);
+        const cost = -gain(row[i - 1], row[i]);
+        swap(row, i);
+        if (settle() > cost) {
+          better = true;
+          continue;
+        }
+        rows.forEach((r, k) => before[k].forEach((v, at) => {
+          r[at] = v;
+          g.node(v).order = at;
+        }));
       }
     }
   }
