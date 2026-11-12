@@ -140,6 +140,13 @@ test('flow: edges inside a group keep the order of the nodes they end at too', (
   for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
 });
 
+test('flow: a node at the end of a long edge changes places together with the points of that edge', () => {
+  // B and E point at each other, so the edges from B to its other ends are two ranks long. The edge from F to E crossed the one
+  // from B to G: no single swap removes that crossing, G and the middle point of its edge must both move.
+  const src = 'A -> B\nB -> C\nC -> B\nB -> D\nB -> E\nF -> E\nE -> B\nB -> G';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 8), 0, dir);
+});
+
 test('flow: diamond nodes draw as a polygon, databases as a cylinder', () => {
   const svg = render('flow', '{判断?} -> [(DB)]');
   assert.match(svg, /<polygon class="am-node-shape"/);
