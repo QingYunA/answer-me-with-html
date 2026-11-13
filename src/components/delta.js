@@ -30,7 +30,9 @@ export function innerMarkMessage(component, names, mark, text, escape = '') {
   if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
   let fixed = text;
   for (const { name, m } of inner) fixed = fixed.replace(name, m.text);
-  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed}".${escape && ` ${escape.replace('NAME', first)}`}`;
+  // The bracket escape fits a plain name only: a name with * emphasis or shape brackets after the marker means a marked link.
+  const plain = !/^[*[({]/.test(inner[0].m.text);
+  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed}".${escape && plain ? ` ${escape.replace('NAME', first)}` : ''}`;
 }
 
 export const deltaAttr = (state) => (state ? ` data-delta="${state}"` : '');

@@ -92,6 +92,9 @@ test('parseFlow: a marker before a node inside the line is an error with the lin
   at('A -> + B & + C', 1, 'Write: "+ A -> B & C"');
   at('A -> B -> ~ C', 1, 'Write: "~ A -> B -> C"');
   at('A -> + B', 1, 'use brackets: [+ B]');
+  at('A -> + *B: yes', 1, 'Write: "+ A -> *B: yes".');
+  at('A -> + [(Table row)]', 1, 'Write: "+ A -> [(Table row)]".');
+  assert.throws(() => parseFlow('A -> + [(Table row)]'), (e) => !e.message.includes('use brackets'));
   at('A -> - B & + C', 1, 'write one line per marker');
   at('+ A -> - B', 1, 'write one line per marker');
   // The bracket escape and a marker with no space after it stay node text.

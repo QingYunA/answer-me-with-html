@@ -4916,7 +4916,8 @@ function innerMarkMessage(component, names2, mark, text2, escape = "") {
   if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
   let fixed2 = text2;
   for (const { name: name2, m } of inner) fixed2 = fixed2.replace(name2, m.text);
-  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed2}".${escape && ` ${escape.replace("NAME", first)}`}`;
+  const plain = !/^[*[({]/.test(inner[0].m.text);
+  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed2}".${escape && plain ? ` ${escape.replace("NAME", first)}` : ""}`;
 }
 var deltaAttr = (state) => state ? ` data-delta="${state}"` : "";
 function deltaBadge(state, ui) {
