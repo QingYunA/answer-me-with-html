@@ -274,6 +274,22 @@ ${fillerEn('B', 1)}
 ${fillerEn('C', 2)}
 `;
 
+const LONG_API = `---
+title: Long API target
+cols: 3
+lang: en
+---
+## A Endpoint
+\`\`\`api
+GET /v1/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+response 200 User
+  id string
+\`\`\`
+
+${fillerEn('B', 1)}
+${fillerEn('C', 2)}
+`;
+
 // Everything the checks need, read in the page in one call. A "row" is the set of grid children with the same top edge.
 const MEASURE = `(() => {
   const grid = document.querySelector('.am-grid');
@@ -390,6 +406,9 @@ before(() => {
   const longStatus = join(tmp, 'drafts', 'long-status.en.md');
   writeFileSync(longStatus, LONG_STATUS);
   special['long-status.en'] = render(longStatus, 'long-status.en');
+  const longApi = join(tmp, 'drafts', 'long-api.en.md');
+  writeFileSync(longApi, LONG_API);
+  special['long-api.en'] = render(longApi, 'long-api.en');
 });
 
 const launch = async () => {
@@ -645,6 +664,22 @@ test('e2e: one long unbroken status note wraps inside its badge instead of stick
   }
 });
 
+test('e2e: a long API target wraps inside its panel instead of sticking out', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const p = special['long-api.en'];
+  for (const width of [DESKTOP, PHONE]) {
+    await open(p.file, width);
+    if (width > 760) await waitFor(SETTLED, `long-api.en to lay out at ${width}px`);
+    const box = await evaluate(`(() => {
+      const panel = document.querySelector('.am-api-endpoint').closest('.am-panel');
+      const target = document.querySelector('.am-api-endpoint > code').getBoundingClientRect();
+      return { right: target.right - panel.getBoundingClientRect().right, overflow: panel.scrollWidth - panel.clientWidth };
+    })()`);
+    assert.ok(box.right <= 1, `@${width}px: the target ends inside its panel, ${box.right}px past it`);
+    assert.equal(box.overflow, 0, `@${width}px: the panel does not scroll sideways`);
+  }
+});
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nColumns = "getComputedStyle(document.querySelector('.am-grid')).gridTemplateColumns.split(' ').length";
 const plainGrid = (where, m, columns) => {
@@ -813,7 +848,8 @@ test('e2e: a horizontal timeline turns vertical on a phone and stays horizontal 
     const items = [...document.querySelector('.am-timeline--h').children].map((li) => ({
       top: li.getBoundingClientRect().top,
       dotLeftOfTitle: li.querySelector('.am-tl-dot').getBoundingClientRect().right <= li.querySelector('.am-tl-title').getBoundingClientRect().left,
-      lineAcross: getComputedStyle(li, '::before').borderTopWidth !== '0px',
+      // The axis is drawn from each dot to both edges of its item (base.css), and the first and last items leave out their outer half.
+      lineAcross: ['::before', '::after'].some((p) => getComputedStyle(li.querySelector('.am-tl-dot'), p).content !== 'none'),
     }));
     return {
       stacked: items.every((it, i) => i === 0 || it.top > items[i - 1].top),

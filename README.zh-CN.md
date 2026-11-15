@@ -4,9 +4,21 @@
 
 <h1 align="center">Answer me with HTML</h1>
 
+## Sponsored by Zapply
+
+<a href="https://app.zapply.jobs/onboarding/?ref=github-cta-qingyuna" rel="nofollow sponsored">
+    <img src="apply-faster-banner.png" alt="Apply to jobs in seconds with Zapply.">
+</a>
+
+Explore Zapply's Chrome extension for autofilling job applications, dedicated job board featuring the latest openings, multiple profiles for different resumes and roles, and application tracking with streaks and commitment awards.
+
 <p align="center">
-  <b>极速出页&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;讲解视频&nbsp;&nbsp;|&nbsp;&nbsp;单文件离线</b>
+ <a href="https://app.zapply.jobs/onboarding/?ref=github-cta-qingyuna" rel="nofollow sponsored">
+     <img src="get-started-button.png" alt="Get Started with Zapply" width="260">
+    </a>
 </p>
+
+<h1 align="center">Answer me with HTML</h1>
 
 <p align="center">
   <b>一个 Agent Skill：遇到复杂问题，Agent 不再甩给你一堵文字墙，而是给你一页能看懂的 HTML。<br>模型要写的 token，只有它直接手写 HTML 的约 1/8。</b>
@@ -22,12 +34,12 @@
 </p>
 
 <p align="center">
-  <a href="https://answer-me-with-html.com/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a>
+  <a href="https://answer-me-with-html.com/zh/"><b>官网</b></a> · <a href="#安装">安装</a> · <a href="#你说什么会得到什么">示例</a> · <a href="#解释视频">视频</a> · <a href="#高频模式推荐">高频模式</a> · <a href="docs/reference.zh-CN.md">参考文档</a> · <a href="README.md">English</a> · <a href="README.ja.md">日本語</a>
 </p>
 
-<p align="center">
+<!-- <p align="center">
   <img src="docs/images/text-vs-page-zh.png" alt="同一个 TCP 问题的两种回答：左边是终端里的一堵文字墙，右边是带图表的一页能看懂的页面" width="100%">
-</p>
+</p> -->
 
 装好之后，像平时一样提问就行：
 
@@ -258,7 +270,10 @@ Agent 会按信息的形状挑组件：
 | 组件 | 适合什么 |
 | :--- | :--- |
 | `flow` | 架构、调用链、决策分支。自动布局，支持分组、判断框、数据库 |
+| `state` | 状态机：状态与触发迁移的事件，带初始状态、结束状态和自迁移 |
 | `er` | 数据模型：实体带字段（PK / FK / UK）和鸦爪式关系连线 |
+| `class` | UML 类图：属性、方法、接口、继承和关联关系 |
+| `api` | HTTP / RPC 接口定义：参数、请求、响应字段和状态码 |
 | `sequence` | 几方之间按时间顺序来回发消息 |
 | `tree` | 目录、模块、分类体系 |
 | `timeline` | 历史、版本、阶段 |

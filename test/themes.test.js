@@ -81,7 +81,22 @@ test('themes: decoration rules apply only under their own theme', async () => {
   assert.doesNotMatch(html, /data-theme="3b1b"/, 'video-only themes stay out of pages');
 });
 
+// Every mode block sets color-scheme (#395), so the scrollbar and the native controls follow the page mode.
+test('themes: the mode blocks tell the browser the page color scheme', async () => {
+  const { html } = renderDoc(DRAFT);
+  const video = (await renderVideo(VIDEO)).html;
+  for (const page of [html, video]) {
+    const css = page.match(/<style>([\s\S]*?)<\/style>/)[1];
+    assert.match(css, /\[data-mode="light"\] \{\n {2}color-scheme: light;/);
+    assert.match(css, /\[data-mode="dark"\] \{\n {2}color-scheme: dark;/);
+    // auto carries "light dark" outside the media query, so the browser follows the system in either direction.
+    assert.match(css, /\[data-mode="auto"\] \{\n {2}color-scheme: light dark;\n\}/);
+  }
+});
+
 test('themes: a theme with a fixed mode forces it in video', async () => {
   const { html } = await renderVideo(VIDEO, { overrides: { theme: '3b1b', mode: 'light' } });
   assert.match(html, /data-theme="3b1b" data-mode="dark"/);
+  assert.match(html, /html\[data-video\]\[data-theme="3b1b"\][^{]*\{\n {2}color-scheme: dark;/);
+  assert.match(html, /html\[data-video\]\[data-theme="3b1b"\]\[data-mode="auto"\] \{\n {2}color-scheme: light dark;/);
 });

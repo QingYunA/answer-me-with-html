@@ -17,6 +17,8 @@
     "examples",
     "cordis.patch.yml",
     "docs/logo.svg",
+    "apply-faster-banner.png",
+    "get-started-button.png",
     "locale"
   ],
   "dsh": {

@@ -65,7 +65,9 @@ test('waitForLoad: resolves when the page load event arrives', async () => {
 test('devtoolsUrl: the start timeout shows the stderr Chrome printed so far', async () => {
   const chrome = fakeChrome('process.stderr.write("still loading\\n"); setTimeout(() => {}, 60000)');
   try {
-    await assert.rejects(devtoolsUrl(chrome, 300),
+    // The fake Chrome is a Node process that must start and print before the timeout; 300 ms was too short on a busy
+    // machine while other test files run at the same time.
+    await assert.rejects(devtoolsUrl(chrome, 3000),
       (e) => e instanceof ExportError && /did not start in time/.test(e.message) && /still loading/.test(e.message));
   } finally {
     chrome.kill();
