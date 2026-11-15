@@ -104,6 +104,11 @@ test('timeline: long words wrap inside their step, and every step shares the dat
   assert.match(css, /\.am-timeline--h \.am-tl-dot::after \{ inset-inline-start:/);
 });
 
+test('api: a long endpoint target can shrink in its flex row, so the break-word of inline code wraps it inside the panel', () => {
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  assert.match(css, /\.am-api-endpoint > code \{[^}]*min-width: 0/);
+});
+
 test('timeline: error when | is missing', () => {
   throwsAt(() => render('timeline', 'a | b\n只有一列'), 2);
 });

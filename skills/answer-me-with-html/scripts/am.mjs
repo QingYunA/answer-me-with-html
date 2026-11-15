@@ -422,6 +422,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
+/* The target is inline code, whose break-word keeps a flex item at its full word width; min-width: 0 lets it shrink and wrap. */
+.am-api-endpoint > code { min-width: 0; }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
 .am-api .am-api-section h4 code { font-weight: 400; }
 .am-api .am-api-section table { margin: 0; table-layout: fixed; }
