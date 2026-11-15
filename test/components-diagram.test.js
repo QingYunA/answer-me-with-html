@@ -61,6 +61,14 @@ test('sequence: the num argument adds step numbers', () => {
   assert.match(render('sequence', 'A -> B: x', 'num'), /class="am-step"[^>]*>1<\/text>/);
 });
 
+test('sequence: a two-digit step number gets more room than a one-digit one, so it does not run into a centred label', () => {
+  const msgs = (k) => Array.from({ length: k }, () => 'A -> B: x').join('\n');
+  // Nine messages need no more room than one; the tenth widens the gap by the extra digit on both sides of the label.
+  assert.equal(viewBox(render('sequence', msgs(9), 'num'))[0], viewBox(render('sequence', msgs(1), 'num'))[0]);
+  const long = `A -> B: ${'x'.repeat(30)}`;
+  assert.ok(viewBox(render('sequence', `${msgs(8)}\n${long}\nA -> B: x`, 'num'))[0] < viewBox(render('sequence', `${msgs(9)}\n${long}`, 'num'))[0]);
+});
+
 test('sequence: an unparseable line reports its line number', () => {
   throwsAt(() => render('sequence', 'A -> B: ok\nA => B'), 2);
 });
