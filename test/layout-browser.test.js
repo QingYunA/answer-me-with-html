@@ -918,6 +918,24 @@ test('e2e: a page inside a host document gets its theme, mode, style and languag
   assert.deepEqual(await evaluate(ROOT_ATTRS), ['fr', '', 'dark', 'off']);
 });
 
+// The Claude desktop app's root has its own data-theme for its light/dark look (#407). A host value that no toolbar option names
+// is not a page setting: the page's own theme and mode replace it. A host value that is a real option is kept.
+test('e2e: a host root theme or mode that no toolbar option names gives way to the page setting', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\nlang: en\ntheme: shadcn\nmode: dark\n---\n## A Note\nText.\n');
+  const selects = "['theme','mode'].map((n) => document.querySelector(`select[data-am=${n}]`).value)";
+  const foreign = join(tmp, 'host-foreign.html');
+  writeFileSync(foreign, inHost(html, ' data-theme="dark" data-mode="night"'));
+  await open(foreign, DESKTOP);
+  assert.deepEqual(await evaluate("['data-theme','data-mode'].map((a) => document.documentElement.getAttribute(a))"), ['shadcn', 'dark']);
+  assert.deepEqual(await evaluate(selects), ['shadcn', 'dark']);
+  assert.notEqual(await evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()"), '', 'theme variables resolve');
+  const option = join(tmp, 'host-option.html');
+  writeFileSync(option, inHost(html, ' data-theme="paper"'));
+  await open(option, DESKTOP);
+  assert.deepEqual(await evaluate(selects), ['paper', 'dark']);
+});
+
 // An annot block on a right-to-left page: the sentence reads from the right, each note starts at the right edge of its span, and notes that
 // share a row do not run into each other (the rows are chosen from widths estimated for the sans font the sentence is set in).
 const ANNOT_DRAFT = (lang, sentences, head) => `---\nlang: ${lang}\n---\n## A Annot\n\`\`\`annot\n${head}\n${sentences.join('\n')}\n\`\`\`\n`;
