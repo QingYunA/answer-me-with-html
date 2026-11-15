@@ -9,15 +9,34 @@ const OPTION = /^([*-])\s+(.+)$/;
 const PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
 const PREVIEW_CLOSE = /^(\s*):::\s*$/;
 
+const FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+const RAW_PREVIEW = new Set(['html', 'svg']);
+
+// The close of a ``` or ~~~ fence that opens at openIdx in lines that are already dedented to the preview, or -1.
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+
 // The line that closes the preview opened at openIdx, or -1. Only a bare ::: at the same indent closes it, so a ::: line
-// inside raw html or a deeper block stays part of the preview. The parser uses this too, when it finds the close of an ask block.
+// inside raw html or a deeper block stays part of the preview. In a component or Markdown preview, a ``` fence hides its :::
+// lines too; a raw html or svg preview is opaque, and a ``` line with no close stays text. The parser uses this too, when it
+// finds the close of an ask block.
 export function previewEnd(lines, openIdx) {
   const open = lines[openIdx]?.match(PREVIEW_OPEN);
   if (!open) return -1;
   const indent = open[1].length;
+  const raw = RAW_PREVIEW.has(open[2].toLowerCase());
+  const body = lines.map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
   for (let j = openIdx + 1; j < lines.length; j++) {
     const end = lines[j].match(PREVIEW_CLOSE);
     if (end && end[1].length === indent) return j;
+    const mark = raw ? null : body[j].match(FENCE_MARK)?.[1];
+    const close = mark ? fenceClose(body, j, mark) : -1;
+    if (close !== -1) j = close;
   }
   return -1;
 }

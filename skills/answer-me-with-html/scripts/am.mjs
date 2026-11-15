@@ -8569,13 +8569,27 @@ response 400 Error
 var OPTION = /^([*-])\s+(.+)$/;
 var PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
 var PREVIEW_CLOSE = /^(\s*):::\s*$/;
+var FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+var RAW_PREVIEW = /* @__PURE__ */ new Set(["html", "svg"]);
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
 function previewEnd(lines, openIdx) {
   const open = lines[openIdx]?.match(PREVIEW_OPEN);
   if (!open) return -1;
   const indent = open[1].length;
+  const raw = RAW_PREVIEW.has(open[2].toLowerCase());
+  const body = lines.map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
   for (let j = openIdx + 1; j < lines.length; j++) {
     const end = lines[j].match(PREVIEW_CLOSE);
     if (end && end[1].length === indent) return j;
+    const mark = raw ? null : body[j].match(FENCE_MARK)?.[1];
+    const close = mark ? fenceClose(body, j, mark) : -1;
+    if (close !== -1) j = close;
   }
   return -1;
 }
@@ -9452,10 +9466,10 @@ function checkTables(lines, first) {
     return [];
   });
 }
-var FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
-function fenceClose(lines, openIdx, mark) {
+var FENCE_MARK2 = /^ {0,3}(`{3,}|~{3,})/;
+function fenceClose2(lines, openIdx, mark) {
   for (let k = openIdx + 1; k < lines.length; k++) {
-    const end = lines[k].match(FENCE_MARK)?.[1];
+    const end = lines[k].match(FENCE_MARK2)?.[1];
     if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
   }
   return -1;
@@ -9471,9 +9485,9 @@ function findColonClose(lines, openIdx, marker, name2) {
       }
     }
     const line = lines[j];
-    const mark = line.match(FENCE_MARK)?.[1];
+    const mark = line.match(FENCE_MARK2)?.[1];
     if (mark) {
-      const close2 = fenceClose(lines, j, mark);
+      const close2 = fenceClose2(lines, j, mark);
       if (close2 === -1) continue;
       j = close2;
       continue;

@@ -62,6 +62,18 @@ test('ask: a preview can be html or svg, and an option without one has no canvas
   assert.match(svgDoc, /<div class="am-ask-preview"><svg viewBox="0 0 10 10"><circle r="5"\/><\/svg><\/div>/);
 });
 
+test('ask: a ``` fence inside a preview hides its ::: lines, and a raw html preview stays opaque', () => {
+  const body = 'Which?\n* A Code\n  :::callout\n  ```text\n  :::\n  ```\n  :::\n- B none';
+  const fenced = renderDoc(draft('```ask', body)).html;
+  assert.match(fenced, /<div class="am-ask-preview">[\s\S]*:::[\s\S]*<\/div>/);
+  assert.equal(fenced.match(/class="am-ask-opt"/g).length, 2);
+  const colon = renderDoc(`---\ntitle: Fence\nlang: en\n---\n## A Panel\n:::ask\n${body}\n:::\nAfter.\n`).html;
+  assert.equal(colon.match(/class="am-ask-opt"/g).length, 2, 'the :::ask form finds the same close');
+  // In raw html a ``` line is text, not a fence, so the next bare ::: still ends the preview.
+  const raw = renderDoc(draft('```ask', 'Which?\n* A\n  :::html\n  ```\n  <b>x</b>\n  :::\n- B')).html;
+  assert.match(raw, /<div class="am-ask-preview">```\s*<b>x<\/b><\/div>/);
+});
+
 test('ask: a :::ask block takes a preview, like its fenced form', () => {
   const body = 'Which cache?\n* Redis\n  :::html\n  <b class="preview-mark">redis</b>\n  :::\n- Memcached';
   const { html } = renderDoc(`---\ntitle: Cache\nlang: en\n---\n## A Panel\n:::ask\n${body}\n:::\n`);
