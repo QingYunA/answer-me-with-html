@@ -109,19 +109,15 @@ The question, one sentence
   example: '```ask\nWhich cache do we use?\n* Redis | keeps data after a restart\n- Memcached | simpler, no disk\n```',
   // The text the STE check reads: options are list items; the note reads as a second clause of the item. A preview is a picture, not prose.
   lint(text) {
+    // The whole preview, up to the close previewEnd finds, becomes blank lines, so later lines keep their line numbers.
     const out = [];
-    let previewIndent = null;
-    for (const line of String(text).split('\n')) {
-      const open = line.match(PREVIEW_OPEN);
-      const close = line.match(PREVIEW_CLOSE);
-      if (previewIndent !== null) {
-        if (close && close[1].length === previewIndent) previewIndent = null;
-        out.push('');
-        continue;
-      }
-      if (open) {
-        previewIndent = open[1].length;
-        out.push('');
+    const lines = String(text).split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const close = line.match(PREVIEW_OPEN) ? previewEnd(lines, i) : -1;
+      if (close !== -1) {
+        out.push(...Array(close - i + 1).fill(''));
+        i = close;
         continue;
       }
       const option = line.trim().match(OPTION);

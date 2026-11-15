@@ -111,6 +111,13 @@ test('ask: the STE check skips the text inside a preview', () => {
   assert.ok(!warnings.some((w) => w.line === 10), 'the preview text is not checked as page prose');
 });
 
+test('ask: the STE check skips a whole preview, also past a ::: line inside a code fence', () => {
+  const preview = 'Which of the two caches that the team looked at during the review last week do we utilize for the session store and the job queue in production and in staging?';
+  const body = `Which?\n* A Code\n  :::callout\n  \`\`\`text\n  :::\n  ${preview}\n  \`\`\`\n  :::\n- B none`;
+  const warnings = lintDoc(parseDoc(draft('```ask', body)));
+  assert.deepEqual(warnings.filter((w) => w.line >= 8 && w.line <= 13), [], 'no line of the preview is checked as page prose');
+});
+
 test('ask: the suggested tag follows the page language', () => {
   const { html } = renderDoc(`---\ntitle: 缓存\nlang: zh\n---\n## A 面板\n\`\`\`ask\n用哪个缓存？\n* Redis\n- Memcached\n\`\`\`\n`);
   assert.match(html, /<span class="am-ask-tag">建议<\/span>/);
