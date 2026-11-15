@@ -24,9 +24,20 @@ key: value
       const body = wide ? t.slice(1).trim() : t;
       const m = body.match(/^([^:：]+)[:：]\s*(.*)$/);
       if (!m) throw new ComponentError(`kv line has no colon: "${t}"; expected key: value`, line);
-      return `<div class="am-kv-cell${wide ? ' am-kv-cell--wide' : ''}"><dt>${esc(m[1].trim())}</dt><dd>${mdInline(m[2])}</dd></div>`;
+      return { wide, key: m[1].trim(), value: m[2] };
     });
+    // The last cell of a row that a wide cell or the end cuts short takes the rest of the row, so the grid has no empty corner.
+    const span = new Array(cells.length).fill(1);
+    let pos = 0;
+    cells.forEach((c, i) => {
+      if (c.wide) {
+        if (pos > 0) span[i - 1] += cols - pos;
+        pos = 0;
+      } else pos = (pos + 1) % cols;
+    });
+    if (pos > 0) span[cells.length - 1] += cols - pos;
+    const html = cells.map((c, i) => `<div class="am-kv-cell${c.wide ? ' am-kv-cell--wide' : ''}"${span[i] > 1 ? ` style="grid-column: span ${span[i]}"` : ''}><dt>${esc(c.key)}</dt><dd>${mdInline(c.value)}</dd></div>`);
     if (!cells.length) throw new ComponentError('kv needs at least one key: value line', 1);
-    return `<dl class="am-kv" style="--kv-cols: ${cols}">${cells.join('')}</dl>`;
+    return `<dl class="am-kv" style="--kv-cols: ${cols}">${html.join('')}</dl>`;
   },
 };
