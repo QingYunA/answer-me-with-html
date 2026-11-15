@@ -45,6 +45,13 @@ test('kv: key-value pairs, split at the first colon, fullwidth colon, * wide cel
   assert.match(html, /<dt>Owner<\/dt><dd>ASD<\/dd>/);
 });
 
+test('kv: the last cell of a row cut short by a wide cell or by the end takes the rest of the row, so the grid has no empty corner', () => {
+  const spans = (html) => [...html.matchAll(/<div class="am-kv-cell[^"]*"(?: style="grid-column: span (\d+)")?>/g)].map((m) => Number(m[1] ?? 1));
+  assert.deepEqual(spans(render('kv', 'a: 1\nb: 2\n* c: 3\nd: 4\ne: 5', 'cols=3')), [1, 2, 1, 1, 2]);
+  assert.deepEqual(spans(render('kv', 'a: 1\nb: 2\nc: 3\nd: 4', 'cols=2')), [1, 1, 1, 1]);
+  assert.deepEqual(spans(render('kv', 'a: 1\nb: 2\nc: 3', 'cols=1')), [1, 1, 1]);
+});
+
 test('kv: a line without a colon reports its relative line number', () => {
   throwsAt(() => render('kv', 'a: 1\n\n没有冒号'), 3);
 });
@@ -80,6 +87,12 @@ test('timeline: vertical with more than 6 items or the v argument', () => {
   assert.match(render('timeline', 'a | b', 'v'), /am-timeline--v/);
 });
 
+test('tree: a forest (several top-level items) draws no column connectors, since nothing sits above its columns', () => {
+  assert.match(render('tree', 'a/\n  one\nb/\n  two'), /am-tree-cols--free/);
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  assert.match(css, /\.am-tree-cols--free > \.am-tree-col::before, \.am-tree-cols--free > \.am-tree-col::after \{ content: none; \}/);
+});
+
 test('timeline: a horizontal one sits in a container that base.css queries, so a narrow panel makes it vertical', () => {
   assert.match(render('timeline', '1979 | a\n1986 | b'), /^<div class="am-tl-wrap"><ol class="am-timeline am-timeline--h" style="--n: 2">.*<\/ol><\/div>$/s);
   assert.doesNotMatch(render('timeline', 'a | b', 'v'), /am-tl-wrap/);
@@ -89,6 +102,24 @@ test('timeline: a horizontal one sits in a container that base.css queries, so a
   // The video stage shrink-wraps its content, which a size container would collapse to nothing.
   assert.match(readFileSync(new URL('../src/themes/video.css', import.meta.url), 'utf8'), /\.amv-fit \.am-tl-wrap \{ container-type: normal; \}/);
   assert.doesNotMatch(css.match(/@media \(max-width: 760px\) \{[\s\S]*?\n\}/)[0], /am-timeline/, 'the phone media query leaves the timeline to its container');
+});
+
+test('timeline: long words wrap inside their step, and every step shares the date, dot, title and text rows', () => {
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  for (const sel of [/\.am-md :not\(pre\) > code \{/, /\.am-tl-title \{/, /\.am-tl-text \{/]) {
+    assert.match(css, new RegExp(`${sel.source}[^}]*overflow-wrap: break-word`), sel.source);
+  }
+  assert.match(css, /\.am-timeline--h li \{[^}]*grid-row: span 4; grid-template-rows: subgrid;/);
+  // A size container on the item makes Chrome drop the subgrid rows.
+  assert.doesNotMatch(css, /\.am-timeline--h li \{[^}]*container/);
+  // The axis uses logical sides, so a right-to-left page mirrors it.
+  assert.match(css, /\.am-timeline--h \.am-tl-dot::before \{ inset-inline-end:/);
+  assert.match(css, /\.am-timeline--h \.am-tl-dot::after \{ inset-inline-start:/);
+});
+
+test('api: a long endpoint target can shrink in its flex row, so the break-word of inline code wraps it inside the panel', () => {
+  const css = readFileSync(new URL('../src/themes/base.css', import.meta.url), 'utf8');
+  assert.match(css, /\.am-api-endpoint > code \{[^}]*min-width: 0/);
 });
 
 test('timeline: error when | is missing', () => {
