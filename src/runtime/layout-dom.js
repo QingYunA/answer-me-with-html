@@ -61,26 +61,29 @@ if (panels.length > 1) {
       return headCells(table).map((cell) => cell.getBoundingClientRect().width);
     };
     const most = columns('max-content');
-    const least = columns('min-content').map((w) => Math.min(w, TABLE_WORD_MAX * scale));
+    const unbroken = columns('min-content');
+    const least = unbroken.map((w) => Math.min(w, TABLE_WORD_MAX * scale));
     if (saved === null) table.removeAttribute('style');
     else table.setAttribute('style', saved);
     // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.
     const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));
-    columnWidths.set(table, { least, want });
+    // unbroken: the width the table needs without breaking a word. When it is more than the room, a word must break even if the
+    // capped widths fit, so fitTables() turns am-table-fit on then too.
+    columnWidths.set(table, { least, want, unbroken: unbroken.reduce((sum, w) => sum + w, 0) });
     return want.reduce((sum, w) => sum + w, 0);
   }
 
   // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out
   // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.
   function fitTables() {
-    for (const [table, { least, want }] of columnWidths) {
+    for (const [table, { least, want, unbroken }] of columnWidths) {
       // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.
       const room = table.parentElement.clientWidth - want.length;
       const low = least.reduce((s, w) => s + w, 0);
       const high = want.reduce((s, w) => s + w, 0);
       const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;
       headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });
-      table.classList.toggle('am-table-fit', high > room);
+      table.classList.toggle('am-table-fit', high > room || unbroken > room);
     }
   }
 

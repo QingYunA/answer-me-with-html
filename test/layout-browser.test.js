@@ -840,6 +840,24 @@ test('e2e: long ids in a table break inside their cells, so a prose column is no
   assert.deepEqual(state, { scrolls: false, fit: true, changeWide: true });
 });
 
+test('e2e: a table whose unbroken words do not fit breaks them, also when its capped widths fit (two columns, wide screens, code)', { skip: SKIP, timeout: 120000 }, async () => {
+  if (!cdp) await launch();
+  const ids = '| Change | Author | Landed | Vehicle | Live? | Verdict | Evidence |\n|---|---|---|---|---|---|---|\n'
+    + '| 1001 End a stuck lease | alice | 10-21 | web_command_1051211795 | only_in_job_58546795927693416 | NOT_EXERCISED | job_1051223399_log_ends_at_plugin_install |\n'
+    + '| 1002 Skip crash with no build | bob | 10-21 | async_tier_1051211796 | unverified | NOT_EXERCISED | key_field_missing_in_check_27030090071 |\n';
+  const code = ids.replace(/(job_\w+|key_field_\w+)/g, '`$1`');
+  const huge = `| Name | Id |\n|---|---|\n| A short prose cell that reads normally | ${'W'.repeat(120)} |\n`;
+  const { html } = renderDoc(`---\ntitle: Ids that do not fit\nlang: en\ncols: 3\n---\n## A Ids {span=2}\n${ids}\n## B Neighbour\nShort text.\n\n## C Two columns {span=3}\n${huge}\n## D Ids in code {span=2}\n${code}\n## E Neighbour\nShort text.\n`);
+  const file = join(tmp, 'table-ids-fit.html');
+  writeFileSync(file, html);
+  for (const width of [DESKTOP, 1000]) {
+    await open(file, width);
+    await waitFor(SETTLED, `the table page to lay out at ${width}px`);
+    const scrolls = await evaluate(`[...document.querySelectorAll('.am-table-wrap')].map((w) => [w.closest('.am-panel').id, w.scrollWidth - w.clientWidth])`);
+    for (const [panel, px] of scrolls) assert.ok(px <= 1, `@${width}px: the table in ${panel} fits its panel, it scrolls ${px}px`);
+  }
+});
+
 test('e2e: the expand button does not cover a node at the right edge of the drawing', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const { html } = renderDoc('---\ntitle: Expand overlap\nlang: en\ntheme: blueprint\n---\n## A Flow plan {span=2}\n```flow LR\nClient -> Gateway\nGateway -> [(Cache)]: lookup\nCache -> Service: miss\nGateway -> Service\n*Service\n```\n');
