@@ -53,7 +53,8 @@ test('site engine: every page example and every preset renders', () => {
 
 test('fixClock hides the render time in the colophon, so two renders a minute apart compare equal', () => {
   const html = renderDoc('# Clock\n\n## A\nText.\n').html;
-  const later = html.replace(/ · (\d{4}-\d\d-\d\d) \d\d:\d\d/, ' · $1 23:59');
+  // Move the time to another minute: 00:00 unless the page was rendered at 00:00.
+  const later = html.replace(/ · (\d{4}-\d\d-\d\d) (\d\d:\d\d)/, (m, day, time) => ` · ${day} ${time === '00:00' ? '00:01' : '00:00'}`);
   assert.notEqual(later, html, 'the page carries a render time');
   assert.equal(fixClock(later), fixClock(html));
 });
