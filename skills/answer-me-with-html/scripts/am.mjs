@@ -1911,8 +1911,89 @@ var he_default = {
   }
 };
 
+// src/languages/tr.js
+var tr_default = {
+  id: "tr",
+  language: "tr",
+  voice: { say: "tr_TR", espeak: "tr" },
+  ui: {
+    remark: {
+      button: "\u0130\u015Faretle",
+      need: "Kaydetmek i\xE7in bir etiket se\xE7in",
+      hint: "\u0130ste\u011Fe ba\u011Fl\u0131 not",
+      save: "Kaydet",
+      remove: "Kald\u0131r",
+      clear: "T\xFCm i\u015Faretleri temizle",
+      clearConfirm: "{n} i\u015Fareti temizlemek i\xE7in tekrar t\u0131klay\u0131n",
+      section: "\u0130\u015Faretler",
+      kinds: { suggestion: "\xF6neri", keep: "kals\u0131n", question: "soru", concern: "endi\u015Fe" }
+    },
+    theme: "Tema",
+    modeLabel: "Mod",
+    mode: { auto: "Otomatik", light: "A\xE7\u0131k", dark: "Koyu" },
+    scale: { down: "Daha k\xFC\xE7\xFCk yaz\u0131", up: "Daha b\xFCy\xFCk yaz\u0131" },
+    copy: "Kayna\u011F\u0131 kopyala",
+    done: "Kopyaland\u0131 \u2713",
+    copyCode: "Kopyala",
+    update: { button: "Yeni s\xFCr\xFCm {version}", current: "Sizdeki s\xFCr\xFCm {current}. Yeni s\xFCr\xFCm bu sayfa olu\u015Fturulurken bulundu.", whatsNew: "Yenilikler:", run: "Terminalde \xE7al\u0131\u015Ft\u0131r\u0131n:", agent: "Ya da Agent\u2019a s\xF6yleyin:", agentText: "answer-me-with-html\u2019i g\xFCncelle", notes: "Yenilikleri g\xF6r" },
+    live: { updated: "Sayfa g\xFCncellendi", reload: "Yeniden y\xFCkle" },
+    reply: {
+      button: "Yan\u0131tla",
+      comment: "Yorum",
+      commentHint: "Bu panel hakk\u0131ndaki yorumunuz",
+      title: "Yan\u0131t\u0131n\u0131z",
+      hint: "Kopyalay\u0131p Agent ile sohbetinize yap\u0131\u015Ft\u0131r\u0131n; se\xE7imleriniz ve yorumlar\u0131n\u0131zdan devam eder.",
+      copy: "Yan\u0131t\u0131 kopyala",
+      copyFailed: "Kopyalanamad\u0131 \u2014 Cmd/Ctrl+C tu\u015Flar\u0131na bas\u0131n",
+      close: "Kapat",
+      suggested: "\xF6nerilen",
+      empty: "\xD6nce se\xE7enekleri i\u015Faretleyin ya da bir panele yorum yaz\u0131n.",
+      decisions: "Kararlar",
+      comments: "Yorumlar",
+      confirmed: "\xF6neri onayland\u0131",
+      untouched: "yan\u0131tlanmad\u0131; \xF6nerilen",
+      was: "\xF6nceki",
+      typed: '">" ile ba\u015Flayan sat\u0131rlar okuyucunun yazd\u0131\u011F\u0131 metindir.',
+      raw: "Kopyalanacak metni g\xF6ster",
+      preview: "\xD6nizleme",
+      count: { answered: "Yan\u0131tlanan: {n}", comments: "Yorum: {n}", remarks: "\u0130\u015Faret: {n}" }
+    },
+    closeAfter: { closing: "Bu sekme {n} sn i\xE7inde kapanacak", keep: "A\xE7\u0131k kals\u0131n", closeFailed: "Yan\u0131t kopyaland\u0131. Bu sekmeyi art\u0131k kapatabilirsiniz." },
+    toc: "\u0130\xE7indekiler",
+    flow: "Ak\u0131\u015F \u015Femas\u0131",
+    state: "Durum makinesi diyagram\u0131",
+    sequence: "S\u0131ralama diyagram\u0131",
+    er: "Varl\u0131k-ili\u015Fki diyagram\u0131",
+    class: "S\u0131n\u0131f diyagram\u0131",
+    colon: ": ",
+    sep: ", ",
+    expand: "Diyagram\u0131 b\xFCy\xFCt",
+    close: "Kapat",
+    diagram: "Diyagram g\xF6r\xFCnt\xFCleyici",
+    delta: { added: "eklendi", removed: "kald\u0131r\u0131ld\u0131", changed: "de\u011Fi\u015Fti", view: "G\xF6r\xFCn\xFCm", before: "\xD6nce", changes: "De\u011Fi\u015Fiklikler", after: "Sonra" },
+    generated: "Olu\u015Fturan:",
+    limits: { value: "{value} / en fazla {limit}", limit: "en fazla {limit}" },
+    chart: { name: "Grafik", data: "Veri", value: "De\u011Fer", share: "Pay" },
+    api: { path: "Yol parametreleri", query: "Sorgu parametreleri", headers: "Ba\u015Fl\u0131klar", request: "\u0130stek", response: "Yan\u0131t", field: "Alan", type: "T\xFCr", description: "A\xE7\u0131klama", requirement: "Gereklilik", required: "Zorunlu", optional: "\u0130ste\u011Fe ba\u011Fl\u0131" },
+    table: { filter: "Tabloyu filtrele" }
+  },
+  // Player labels. drawn..duration are the title block cells; sheet is the scene header, with {n} and {total} the zero-padded numbers.
+  videoUi: {
+    play: "Oynat",
+    pause: "Duraklat",
+    chapters: "B\xF6l\xFCmler",
+    speed: "H\u0131z",
+    export: "D\u0131\u015Fa aktar",
+    drawn: "\xC7\u0130ZEN",
+    date: "TAR\u0130H",
+    scenes: "SAHNELER",
+    duration: "S\xDCRE",
+    sheet: "PAFTA {n} / {total}"
+  }
+};
+
 // src/languages/registry.js
-var LANGUAGES = Object.freeze([zh_default, zh_Hant_default, en_default, ja_default, he_default]);
+var LANGUAGES = Object.freeze([zh_default, zh_Hant_default, en_default, ja_default, he_default, tr_default]);
 var FALLBACK = en_default;
 var languageIds = () => LANGUAGES.map((l) => l.id);
 function findLanguage(language, script) {
@@ -1930,7 +2011,7 @@ var serifByLanguage = (variable, head) => fontLanguages().map((l) => `${langSele
 var blueprint_default = {
   name: "blueprint",
   summary: "Blueprint drawing",
-  label: { zh: "\u56FE\u7EB8", "zh-Hant": "\u5716\u7D19", en: "Blueprint", ja: "\u56F3\u9762", he: "\u05E9\u05E8\u05D8\u05D5\u05D8" },
+  label: { zh: "\u56FE\u7EB8", "zh-Hant": "\u5716\u7D19", en: "Blueprint", ja: "\u56F3\u9762", he: "\u05E9\u05E8\u05D8\u05D5\u05D8", tr: "Teknik \xE7izim" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -2012,7 +2093,7 @@ var blueprint_default = {
 var shadcn_default = {
   name: "shadcn",
   summary: "shadcn cards",
-  label: { zh: "\u5361\u7247", "zh-Hant": "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9", he: "\u05DB\u05E8\u05D8\u05D9\u05E1\u05D9\u05DD" },
+  label: { zh: "\u5361\u7247", "zh-Hant": "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9", he: "\u05DB\u05E8\u05D8\u05D9\u05E1\u05D9\u05DD", tr: "Kartlar" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -2074,7 +2155,7 @@ var LANGUAGE_SERIF_HEAD = '"Iowan Old Style", Palatino, Georgia';
 var paper_default = {
   name: "paper",
   summary: "Paper, for long reading",
-  label: { zh: "\u7EB8\u5F20", "zh-Hant": "\u7D19\u5F35", en: "Paper", ja: "\u7D19", he: "\u05E0\u05D9\u05D9\u05E8" },
+  label: { zh: "\u7EB8\u5F20", "zh-Hant": "\u7D19\u5F35", en: "Paper", ja: "\u7D19", he: "\u05E0\u05D9\u05D9\u05E8", tr: "K\xE2\u011F\u0131t" },
   // lang-ok: viewer-facing theme labels
   scope: ["page"],
   tokens: {
