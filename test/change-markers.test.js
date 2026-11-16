@@ -90,7 +90,11 @@ test('parseFlow: a marker before a node inside the line is an error with the lin
   at('Observer -> {fix submitted?}\n{fix submitted?} -> + Queue job: yes', 2, 'Write: "+ {fix submitted?} -> Queue job: yes"');
   at('+ Queue job -> + Async job: delay 0', 1, 'Write: "+ Queue job -> Async job: delay 0"');
   at('A -> + B & + C', 1, 'Write: "+ A -> B & C"');
-  at('A -> B -> ~ C', 1, 'Write: "~ A -> B -> C"');
+  // ~ marks a node, not a link, so the hint puts the marked node on a line of its own instead of marking the whole line.
+  at('A -> B -> ~ C', 1, 'write it on a line of its own: "~ C"');
+  assert.throws(() => parseFlow('A -> B -> ~ C'), (e) => !e.message.includes('"~ A -> B -> C"'));
+  // Only the detected endpoint loses its marker; a bracketed name that starts with one stays as written.
+  at('[+ B] -> + B', 1, 'Write: "+ [+ B] -> B"');
   at('A -> + B', 1, 'use brackets: [+ B]');
   at('A -> + *B: yes', 1, 'Write: "+ A -> *B: yes".');
   at('A -> + [(Table row)]', 1, 'Write: "+ A -> [(Table row)]".');

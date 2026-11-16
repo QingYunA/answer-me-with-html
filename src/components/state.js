@@ -80,6 +80,8 @@ export function parseState(text) {
     const at = t.indexOf('->');
     if (at === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
+      const lone = innerMarkMessage('state', [t.trim()], mark, t);
+      if (lone) throw new ComponentError(lone, n);
       resolve(t.trim(), n, mark, 'from');
       continue;
     }

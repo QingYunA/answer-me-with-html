@@ -44,6 +44,10 @@ test('state: a marker before a state inside the line is an error with the line r
   assert.throws(() => parseState('Idle -> + Open: go'), /Write: "\+ Idle -> Open: go"/);
   assert.throws(() => parseState('+ Idle -> - Open'), /write one line per marker/);
   assert.equal(parseState('Idle -> +1 retry').nodes.has('+1 retry'), true);
+  // ~ marks a state, not a transition: the hint puts the state on a line of its own.
+  assert.throws(() => parseState('Idle -> ~ Open'), /write it on a line of its own: "~ Open"/);
+  // A line with no arrow is checked too: "+ - Idle" would otherwise add a second state named "- Idle".
+  assert.throws(() => parseState('Idle\n+ - Idle'), /write one line per marker/);
 });
 
 test('state: a state on a marked transition is removed or added unless an unmarked line keeps it', () => {
