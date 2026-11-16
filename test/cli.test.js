@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync, chmodSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,20 @@ test('cli render: pages_dir writes pages into that folder, and the config list s
   const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
   assert.equal(again.code, 0, again.err);
   assert.ok(again.out.match(/✓ (.+\.html)/)[1].startsWith(outDir));
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
+test('cli render: --replace in a shared pages_dir keeps a private page private', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+  const outDir = join(dir, 'shared-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  chmodSync(file, 0o600);
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  assert.equal(again.code, 0, again.err);
+  const next = again.out.match(/✓ (.+\.html)/)[1];
+  assert.equal(statSync(next).mode & 0o777, 0o600, 'the replaced page keeps its 0600 mode');
   assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
 });
 

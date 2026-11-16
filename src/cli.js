@@ -1,7 +1,7 @@
 // am CLI: render / patch / video / export / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync, chmodSync } from 'node:fs';
 import { VERSION } from './assets.js';
 import { join, resolve, relative, isAbsolute, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -828,8 +828,15 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   mkdirSync(dirname(file), { recursive: true });
   if (!inside(pages, path)) return writeFileSync(file, html);
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
+  // A page being replaced keeps its mode: pages_dir may be a shared folder, so the temp file starts private (0600) and takes the old
+  // page's mode before the rename, instead of the default 0644 that would open a private page to other users.
+  const mode = statSync(file, { throwIfNoEntry: false })?.mode;
   try {
-    writeFileSync(tmp, html);
+    if (mode === undefined) writeFileSync(tmp, html);
+    else {
+      writeFileSync(tmp, html, { mode: 0o600 });
+      chmodSync(tmp, mode & 0o777);
+    }
     renameOver(tmp, file);
   } finally {
     rmSync(tmp, { force: true });

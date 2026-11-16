@@ -1,7 +1,7 @@
 // Data-directory maintenance: usage stats, am clean, cleanup notice; after a render, collects the cleanup and update notices.
 // Notices are printed only for the Agent (one line starting with "! "), which asks the user whether to act; the CLI never deletes automatically.
 import { readdirSync, lstatSync, rmSync, readFileSync } from 'node:fs';
-import { join, basename, resolve } from 'node:path';
+import { join, basename, resolve, relative, isAbsolute } from 'node:path';
 import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
 
@@ -58,12 +58,20 @@ const pageVictims = (pages, cutoff, all, custom) =>
 // Delete pages, videos and kept drafts (src/cli.js keepDraft) older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
 // temp: the private folder in the system temporary folder (src/home.js); its pages, videos and drafts follow the same rules.
 // The reply state of a served page (src/serve.js, serve-state/) goes with its page: a state whose page is gone cannot be restored.
+// True when path is inside dir (not dir itself, and not a sibling that only shares a prefix).
+const insideDir = (dir, path) => {
+  const rel = relative(resolve(dir), resolve(path));
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+};
+
 export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join(home, 'pages') } = {}) {
   const cutoff = now - days * DAY;
   const custom = resolve(pages) !== resolve(join(home, 'pages'));
+  // A pages_dir inside videos/ or drafts/ is cleaned only as pages (with the page-name filter), and each file is counted once.
+  const notPages = (f) => !insideDir(pages, f.path);
   const victims = [
     ...pageVictims(pages, cutoff, all, custom),
-    ...['videos', 'drafts'].flatMap((d) => walk(join(home, d)).filter((f) => all || f.mtime < cutoff)),
+    ...['videos', 'drafts'].flatMap((d) => walk(join(home, d)).filter((f) => notPages(f) && (all || f.mtime < cutoff))),
     ...[temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
     ...walk(join(home, 'cache')),
   ];

@@ -74,6 +74,24 @@ test('clean: a custom pages_dir loses only generated page files, never the user\
   assert.ok(existsSync(keepTxt) && existsSync(keepHtml));
 });
 
+test('clean: a pages_dir inside drafts/ is counted once and keeps the page-name filter', () => {
+  const custom = join(home, 'drafts', 'pages');
+  mkdirSync(custom, { recursive: true });
+  const put = (name) => {
+    const p = join(custom, name);
+    writeFileSync(p, 'x');
+    const t = (NOW - 40 * DAY) / 1000;
+    utimesSync(p, t, t);
+    return p;
+  };
+  const page = put('note-20260101-000000.html');
+  const keep = put('keep.txt');
+  assert.deepEqual(clean(home, { now: NOW, pages: custom, dryRun: true }), { files: 1, bytes: 1 });
+  clean(home, { now: NOW, pages: custom });
+  assert.ok(!existsSync(page));
+  assert.ok(existsSync(keep), 'a file the user put in the pages folder stays, even inside drafts/');
+});
+
 test('clean: --dry-run deletes nothing; --all deletes every page and video', () => {
   const fresh = file('pages/new.html', 10, 0);
   assert.equal(clean(home, { dryRun: true, all: true, now: NOW }).files, 1);
