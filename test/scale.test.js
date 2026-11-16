@@ -83,6 +83,18 @@ test('scale: a raw svg block is not rewritten', () => {
   assert.match(html, /<svg viewBox="0 0 100 50" width="100" height="50"><text>hi<\/text><\/svg>/);
 });
 
+test('scale: an ask preview is scaled once, and a raw preview keeps its own size', () => {
+  const raw = '## A\n```ask\nPick\n* A\n  :::svg\n  <svg viewBox="0 0 100 50" width="100" height="50"><circle r="5"/></svg>\n  :::\n- B\n```\n';
+  const html = renderDoc(raw, {}, {}, { scale: 1.25 }).html;
+  assert.match(html, /<div class="am-ask-preview"><svg viewBox="0 0 100 50" width="100" height="50"><circle r="5"\/><\/svg><\/div>/);
+  const flow = '## A\n```ask\nPick\n* A\n  :::flow\n  A -> B\n  :::\n- B\n```\n';
+  const scaled = renderDoc(flow, {}, {}, { scale: 1.25 }).html;
+  const svg = scaled.match(/<div class="am-ask-preview"><figure class="am-diagram[^"]*"><svg viewBox="0 0 (\d+) (\d+)" width="(\d+)" height="(\d+)"/);
+  assert.ok(svg, 'the component preview draws an svg');
+  assert.equal(svg[3], String(Math.ceil(Number(svg[1]) * 1.25)), 'the component preview takes the scale once');
+  assert.equal(svg[4], String(Math.ceil(Number(svg[2]) * 1.25)));
+});
+
 test('scale: scaleSvgBoxes rewrites exactly the svgOpen pattern', () => {
   const html = svgOpen(101, 50, 'Diagram');
   assert.match(html, /^<svg viewBox="0 0 101 50" width="101" height="50" /);
