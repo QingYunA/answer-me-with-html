@@ -86,8 +86,10 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md li + li { margin-top: 3px; }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
+/* A link inside a component (kv, timeline, tree, ask) sits outside .am-md: give it the same colour, not the browser default (#405). */
+.am-panel a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
-.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
 .am-md table { width: 100%; border-collapse: collapse; font-size: var(--am-fs-text); }
 .am-md th {
@@ -100,6 +102,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
 .am-md tbody tr:nth-child(even) td { background: var(--fill); }
 .am-table-wrap { overflow-x: auto; }
+/* A table short of room (src/runtime/layout-dom.js fitTables) breaks a long word inside its cell rather than hold its column at full width. */
+.am-table-wrap > table.am-table-fit th, .am-table-wrap > table.am-table-fit td, .am-table-wrap > table.am-table-fit :not(pre) > code { overflow-wrap: anywhere; }
 /* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
 .am-md img { max-width: 100%; max-height: 70vh; height: auto; }
 .am-figure { margin: 0; text-align: center; }
@@ -118,6 +122,28 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
 .am-ask-tag { display: inline-block; font-size: var(--am-fs-label); line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 .am-ask-note { display: block; color: var(--ink-2); }
+/* Options with a preview: the block under an option is the card's canvas. A dot grid reads as a drawing surface in every theme. */
+.am-ask-opts { clear: both; }
+.am-ask-card { min-width: 0; }
+.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); align-items: stretch; }
+.am-ask--cards .am-ask-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-ask--cards .am-ask-opt { padding: 9px 11px; }
+.am-ask-preview {
+  padding: 10px; overflow: hidden; border-top: 1px solid var(--line-2);
+  background-color: var(--fill);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-3) 38%, transparent) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.am-ask--cards .am-ask-preview { flex: 1; cursor: pointer; }
+.am-ask-preview > :first-child { margin-top: 0; }
+.am-ask-preview > :last-child { margin-bottom: 0; }
+/* A diagram keeps the card width, also on a phone, where a panel diagram may scroll instead. */
+.am-ask-preview .am-diagram { overflow: visible; }
+.am-ask-preview .am-diagram > svg { max-width: 100%; height: auto; }
+.am-ask-preview > svg { display: block; max-width: 100%; height: auto; }
 /* Comment box under each panel, and the Reply sheet */
 .am-comment-btn {
   display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
@@ -232,20 +258,25 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* ── timeline ────────────────────────────── */
 .am-timeline { list-style: none; margin: 0; padding: 0; }
 .am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
-.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
-.am-timeline--h li::before {
-  content: ""; position: absolute; top: calc(var(--am-ln-whenHeight) + 7px); left: 0; right: 0; border-top: var(--bw) solid var(--line);
+/* Every item spans the same four rows (date, dot, title, text) through subgrid, so a date that wraps to two lines moves every dot down
+   together instead of running into its own. The axis is drawn from each dot to both edges of its item; the item clips it, and the first
+   and last items leave out their outer half. Do not make the li a size container: Chrome then ignores subgrid. */
+.am-timeline--h { grid-template-rows: repeat(4, auto); }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; overflow-x: clip; }
+.am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after {
+  content: ""; position: absolute; top: calc(50% - var(--bw) / 2); width: 100vw; border-top: var(--bw) solid var(--line);
 }
-.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
-.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
-.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; height: var(--am-ln-whenHeight); }
+.am-timeline--h .am-tl-dot::before { inset-inline-end: calc(100% + var(--bw)); }
+.am-timeline--h .am-tl-dot::after { inset-inline-start: calc(100% + var(--bw)); }
+.am-timeline--h li:first-child .am-tl-dot::before, .am-timeline--h li:last-child .am-tl-dot::after { content: none; }
+.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; min-height: var(--am-ln-whenHeight); align-self: end; }
 .am-tl-dot {
   position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
   border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
 }
 .am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
-.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; }
-.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; }
+.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; overflow-wrap: break-word; min-width: 0; }
+.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; overflow-wrap: break-word; min-width: 0; }
 .am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
 .am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
 .am-timeline--v li:last-child::before { display: none; }
@@ -259,9 +290,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tl-wrap { container-type: inline-size; }
 @container (max-width: 560px) {
   .am-timeline--h { display: block; padding-top: 0; }
-  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
-  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
-    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  .am-timeline--h li { display: block; overflow-x: visible; text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after { content: none; }
+  .am-timeline--h li::before {
+    content: ""; position: absolute; top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
   }
   .am-timeline--h li:last-child::before { display: none; }
   .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
@@ -332,6 +364,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tree-col:first-child::before { inset-inline-start: 50%; }
 .am-tree-col:last-child::before { inset-inline-end: 50%; }
 .am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+/* A forest (no single root) has nothing above its columns, so they draw no connectors. */
+.am-tree-cols--free > .am-tree-col { padding-top: 0; }
+.am-tree-cols--free > .am-tree-col::before, .am-tree-cols--free > .am-tree-col::after { content: none; }
 .am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
 .am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
 .am-tree-list ul { margin-inline-start: 16px; }
@@ -346,6 +381,18 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 
 /* ── Diagrams (flow / sequence) ───────────────── */
 .am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+/* A box that hides content past its left or right edge fades that edge (src/runtime/page.js sets the classes). A diagram keeps its
+   top row out of the fade: the expand button sits there at the end edge. */
+.am-more-left, .am-more-right {
+  --am-fade-l: #000; --am-fade-r: #000;
+  mask-image: linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+}
+.am-more-left { --am-fade-l: transparent; }
+.am-more-right { --am-fade-r: transparent; }
+.am-diagram.am-more-left, .am-diagram.am-more-right {
+  mask-image: linear-gradient(#000, #000), linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+  mask-size: 100% 32px, 100% 100%; mask-repeat: no-repeat;
+}
 /* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
 .am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
 .am-diagram text { fill: var(--ink, #16181d); font-size: var(--am-fs-d-node); }
@@ -380,6 +427,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
+/* The target is inline code, whose break-word keeps a flex item at its full word width; min-width: 0 lets it shrink and wrap. */
+.am-api-endpoint > code { min-width: 0; }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
 .am-api .am-api-section h4 code { font-weight: 400; }
 .am-api .am-api-section table { margin: 0; table-layout: fixed; }
@@ -574,6 +623,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-btn--copy-image { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
+  /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */
+  .am-diagram > svg { min-width: 0 !important; max-width: 100% !important; }
+  .am-more-left, .am-more-right { mask-image: none !important; }
 }
 /* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
    (a wide table, a wide diagram): one panel per row instead. */

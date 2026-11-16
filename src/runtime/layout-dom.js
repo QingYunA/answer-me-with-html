@@ -5,6 +5,19 @@
 // The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what
 // shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.
 
+// A diagram is never drawn under MIN_SCALE of its natural width, the floor the planner keeps: below it the text is too small to read,
+// so its figure scrolls sideways instead. This covers what the planner does not size: the plain grid, a phone, a one-panel page and a
+// panel that holds more than the diagram. The svg width follows the reader's text size (page.js), so the floor follows am-scale;
+// restore() puts it back after resetting the inline styles. Printing drops it (base.css).
+const floorDiagrams = () => {
+  for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg')) {
+    const width = Number(svg.getAttribute('width'));
+    if (width > 0) svg.style.minWidth = `${Math.floor(width * MIN_SCALE)}px`;
+  }
+};
+floorDiagrams();
+addEventListener('am-scale', floorDiagrams);
+
 const grid = document.querySelector('.am-grid');
 const panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];
 
@@ -16,6 +29,7 @@ if (panels.length > 1) {
   const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line
   const TABLE_COL_MIN = 96; // per table column, px
   const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line
+  const TABLE_WORD_MAX = 160; // a longer word (an id, a path) counts as this wide and may break inside its cell when room is short
   const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line
   const DIAGRAM_MIN = 160;
   const RESIZE_DELAY = 150;
@@ -35,6 +49,8 @@ if (panels.length > 1) {
   const restore = () => {
     for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);
     for (const el of original.keys()) restoreStyle(el);
+    for (const table of tables) table.classList.remove('am-table-fit');
+    floorDiagrams();
   };
 
   // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback
@@ -49,6 +65,8 @@ if (panels.length > 1) {
   // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word
   // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and
   // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).
+  // A column's floor is its longest word, but no more than TABLE_WORD_MAX: a long id would otherwise hold its column at full width and
+  // leave a prose column one word per line. fitTables() lets such a word break (am-table-fit) when the table is short of room.
   const columnWidths = new Map();
   function comfortableWidth(table, scale) {
     const saved = table.getAttribute('style');
@@ -57,25 +75,29 @@ if (panels.length > 1) {
       return headCells(table).map((cell) => cell.getBoundingClientRect().width);
     };
     const most = columns('max-content');
-    const least = columns('min-content');
+    const unbroken = columns('min-content');
+    const least = unbroken.map((w) => Math.min(w, TABLE_WORD_MAX * scale));
     if (saved === null) table.removeAttribute('style');
     else table.setAttribute('style', saved);
     // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.
     const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));
-    columnWidths.set(table, { least, want });
+    // unbroken: the width the table needs without breaking a word. When it is more than the room, a word must break even if the
+    // capped widths fit, so fitTables() turns am-table-fit on then too.
+    columnWidths.set(table, { least, want, unbroken: unbroken.reduce((sum, w) => sum + w, 0) });
     return want.reduce((sum, w) => sum + w, 0);
   }
 
   // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out
   // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.
   function fitTables() {
-    for (const [table, { least, want }] of columnWidths) {
+    for (const [table, { least, want, unbroken }] of columnWidths) {
       // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.
       const room = table.parentElement.clientWidth - want.length;
       const low = least.reduce((s, w) => s + w, 0);
       const high = want.reduce((s, w) => s + w, 0);
       const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;
       headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });
+      table.classList.toggle('am-table-fit', high > room || unbroken > room);
     }
   }
 
@@ -179,20 +201,24 @@ if (panels.length > 1) {
     if (printing || printQuery.matches) return;
     try {
       // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.
+      // A later pass plans for the width the previous layout left, not the grid's: restoring the grid first would bring back the
+      // grid's scrollbar, so a page whose grid scrolls and whose rows do not (or the reverse) would never settle.
       let planned = -1;
-      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {
+      let laidOut = NaN;
+      for (let pass = 0; pass < 3 && planned !== laidOut; pass++) {
         restore();
         if (matchMedia(SINGLE_COLUMN).matches) return;
-        planned = containerWidth();
+        planned = pass === 0 ? containerWidth() : laidOut;
         const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
         const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);
         const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });
         apply(plan, gap);
         capDiagrams(plan.maxScale);
         fitTables();
+        laidOut = containerWidth();
       }
       // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.
-      if (planned !== containerWidth()) restore();
+      if (planned !== laidOut) restore();
     } catch {
       restore();
     }

@@ -1,10 +1,18 @@
 (() => {
   const root = document.documentElement;
   // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;
-  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.
+  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is kept, except a
+  // theme or mode that no toolbar option names: that is the host's own setting (the Claude desktop app sets data-theme="dark"), and
+  // keeping it would leave the page unstyled.
   const carrier = document.querySelector('.am-toolbar');
+  const listFor = { 'data-theme': 'theme', 'data-mode': 'mode' };
+  const foreign = (attr, value) => {
+    const options = listFor[attr] && document.querySelector(`select[data-am="${listFor[attr]}"]`)?.options;
+    return Boolean(value) && options != null && ![...options].some((o) => o.value === value);
+  };
   for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {
-    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));
+    const own = root.getAttribute(attr);
+    if ((own === null || foreign(attr, own)) && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));
   }
   // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.
   for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {
@@ -152,6 +160,33 @@
     });
   }
 
+  // ── Sideways scroll cue ─────────────
+  // Overlay scrollbars (macOS) show nothing until the reader scrolls, so a wide code block or diagram looked cut off. While a box
+  // hides content past its left or right edge it carries am-more-left / am-more-right, and base.css fades that edge. The sides are
+  // physical because a box can read in the other direction than the page (code stays left to right on a right-to-left page); there
+  // scrollLeft counts down from 0, so the hidden amounts use its size.
+  const scrollers = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas), .am-code, .am-annot-scroll');
+  const markMore = (el) => {
+    const hidden = el.scrollWidth - el.clientWidth;
+    let left = false;
+    let right = false;
+    if (hidden > 1) {
+      const atStart = Math.abs(el.scrollLeft);
+      const rtl = getComputedStyle(el).direction === 'rtl';
+      [left, right] = rtl ? [atStart < hidden - 1, atStart > 1] : [atStart > 1, atStart < hidden - 1];
+    }
+    el.classList.toggle('am-more-left', left);
+    el.classList.toggle('am-more-right', right);
+  };
+  if (scrollers.length) {
+    const resized = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => markMore(e.target))) : null;
+    for (const el of scrollers) {
+      el.addEventListener('scroll', () => markMore(el), { passive: true });
+      resized?.observe(el);
+      markMore(el);
+    }
+  }
+
   // ── Diagram Lightbox & Pan-Zoom Viewer ─────────────
   const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');
   const lb = document.querySelector('.am-lightbox');
@@ -223,6 +258,8 @@
       const vb = svg.viewBox?.baseVal;
       curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);
       curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);
+      // The panel's svg carries the reading floor as min-width (layout-dom.js floorDiagrams); the viewer sizes the clone itself.
+      clone.style.minWidth = '';
       clone.style.width = `${curVw}px`;
       clone.style.height = `${curVh}px`;
       canvas.innerHTML = '';

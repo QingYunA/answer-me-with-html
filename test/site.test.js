@@ -13,7 +13,8 @@ import { CONFIG_KEYS } from '../src/config.js';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (file) => readFileSync(file, 'utf8');
 // The footer names the minute the page was made; two renders can fall in different minutes.
-const fixClock = (html) => html.replace(/ · \d{4}-\d\d-\d\d \d\d:\d\d<\/p>/, ' · CLOCK</footer>');
+// The colophon reads "… VERSION · YYYY-MM-DD HH:MM · ★ Star on GitHub", so the time is followed by " · " (or ends the line in older pages).
+const fixClock = (html) => html.replace(/ · \d{4}-\d\d-\d\d \d\d:\d\d(?= · |<\/p>)/, ' · CLOCK');
 const isPage = (html) => html.startsWith('<!doctype html>') && html.includes('<p class="am-colophon">') && html.includes('id="am-source"');
 
 function listFiles(dir) {
@@ -48,6 +49,14 @@ test('site engine: every page example and every preset renders', () => {
     assert.ok(isPage(r.html), relative(ROOT, file));
     assert.equal(typeof r.ms, 'number');
   }
+});
+
+test('fixClock hides the render time in the colophon, so two renders a minute apart compare equal', () => {
+  const html = renderDoc('# Clock\n\n## A\nText.\n').html;
+  // Move the time to another minute: 00:00 unless the page was rendered at 00:00.
+  const later = html.replace(/ · (\d{4}-\d\d-\d\d) (\d\d:\d\d)/, (m, day, time) => ` · ${day} ${time === '00:00' ? '00:01' : '00:00'}`);
+  assert.notEqual(later, html, 'the page carries a render time');
+  assert.equal(fixClock(later), fixClock(html));
 });
 
 test('site engine: renders the same HTML as src/render.js', () => {

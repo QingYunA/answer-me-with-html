@@ -8,10 +8,10 @@
   <b>超高速&nbsp;&nbsp;|&nbsp;&nbsp;ASD-STE100&nbsp;&nbsp;|&nbsp;&nbsp;解説動画&nbsp;&nbsp;|&nbsp;&nbsp;1 ファイル・オフライン</b>
 </p>
 
-
-<p align="center">
+<h1 align="center">Answer me with HTML</h1>
+<!-- <p align="center">
   <img src="docs/images/text-vs-page.png" alt="同じ TCP の質問に、プレーンテキストとこのスキルで答えたもの。左はターミナルのテキストの壁、右は図の入った読みやすい 1 ページ" width="100%">
-</p>
+</p> -->
 
 <p align="center">
   <b>エージェントスキルです。難しい質問をすると、テキストの壁ではなく、ちゃんと読めるページが返ってきます。<br>モデルが書くトークンは、HTML を手書きする場合の約 1/8 です。</b>
