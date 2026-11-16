@@ -658,8 +658,8 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
-  /* Paper does not scroll: a diagram shrinks to the page again, and nothing fades. */
-  .am-diagram > svg { min-width: 0 !important; }
+  /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */
+  .am-diagram > svg { min-width: 0 !important; max-width: 100% !important; }
   .am-more-left, .am-more-right { mask-image: none !important; }
 }
 /* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one

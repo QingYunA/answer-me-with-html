@@ -158,6 +158,21 @@ test('scroll cue: at the largest reader text size the diagram viewer still cente
   assert.equal(state.inside && state.centered, true, `the drawing sits inside the stage and centered: ${JSON.stringify(state)}`);
 });
 
+test('scroll cue: printed on a page narrower than the phone breakpoint, a wide diagram shrinks to the page instead of being cut off', { skip: SKIP }, async () => {
+  await load(page('fan', FAN), 700);
+  await send('Emulation.setEmulatedMedia', { media: 'print' });
+  try {
+    const state = await evaluate(`(() => {
+      const fig = document.querySelector('#panel-A .am-diagram');
+      const svg = fig.querySelector(':scope > svg');
+      return { svg: Math.round(svg.getBoundingClientRect().width), room: Math.round(fig.getBoundingClientRect().width) };
+    })()`);
+    assert.ok(state.svg <= state.room + 1, `the printed diagram fits its box: ${JSON.stringify(state)}`);
+  } finally {
+    await send('Emulation.setEmulatedMedia', { media: '' });
+  }
+});
+
 test('scroll cue: a wide diagram on a right-to-left page starts at the right and fades its left edge', { skip: SKIP }, async () => {
   await load(page('rtl', RTL_FAN), 1000);
   const state = await evaluate(`(async () => {
