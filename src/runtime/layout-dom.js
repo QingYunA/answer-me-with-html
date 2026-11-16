@@ -81,9 +81,9 @@ if (panels.length > 1) {
     else table.setAttribute('style', saved);
     // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.
     const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));
-    // unbroken: the width the table needs without breaking a word. When it is more than the room, a word must break even if the
-    // capped widths fit, so fitTables() turns am-table-fit on then too.
-    columnWidths.set(table, { least, want, unbroken: unbroken.reduce((sum, w) => sum + w, 0) });
+    // unbroken: each column's longest word. A column the browser lays out is at least that wide, whatever its min-width, so
+    // fitTables() turns am-table-fit on when the columns would not fit at those widths, even if the capped widths do.
+    columnWidths.set(table, { least, want, unbroken });
     return want.reduce((sum, w) => sum + w, 0);
   }
 
@@ -96,8 +96,11 @@ if (panels.length > 1) {
       const low = least.reduce((s, w) => s + w, 0);
       const high = want.reduce((s, w) => s + w, 0);
       const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;
-      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });
-      table.classList.toggle('am-table-fit', high > room || unbroken > room);
+      const widths = want.map((w, i) => Math.ceil(least[i] + (w - least[i]) * k));
+      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${widths[i]}px`; });
+      // Without am-table-fit a column holds its longest word, so a long id can widen the table past the room the widths left.
+      const whole = widths.reduce((s, w, i) => s + Math.max(w, unbroken[i]), 0);
+      table.classList.toggle('am-table-fit', high > room || whole > room);
     }
   }
 
