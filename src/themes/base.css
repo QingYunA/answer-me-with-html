@@ -86,6 +86,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md li + li { margin-top: 3px; }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
+/* A link inside a component (kv, timeline, tree, ask) sits outside .am-md: give it the same colour, not the browser default (#405). */
+.am-panel a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
 .am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
