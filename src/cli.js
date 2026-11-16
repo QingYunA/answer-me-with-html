@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync, c
 import { VERSION } from './assets.js';
 import { join, resolve, relative, isAbsolute, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES, frontmatterValue } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
@@ -832,19 +833,20 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   if (inside(home, path)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
   if (!inside(pages, path)) return writeFileSync(file, html);
-  const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
-  // A page being replaced keeps its mode: pages_dir may be a shared folder, so the temp file starts private (0600) and takes the old
-  // page's mode before the rename, instead of the default 0644 that would open a private page to other users.
+  // pages_dir may be a shared folder another user can write to. The temp file has a random name and is created exclusively ('wx'
+  // refuses an existing path, a planted symlink too), and only a temp file this call created is removed.
+  const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
+  // A page being replaced keeps its mode: the temp file starts private (0600) and takes the old page's mode before the rename,
+  // instead of the default 0644 that would open a private page to other users.
   const mode = statSync(file, { throwIfNoEntry: false })?.mode;
+  let created = false;
   try {
-    if (mode === undefined) writeFileSync(tmp, html);
-    else {
-      writeFileSync(tmp, html, { mode: 0o600 });
-      chmodSync(tmp, mode & 0o777);
-    }
+    writeFileSync(tmp, html, { flag: 'wx', ...(mode === undefined ? {} : { mode: 0o600 }) });
+    created = true;
+    if (mode !== undefined) chmodSync(tmp, mode & 0o777);
     renameOver(tmp, file);
   } finally {
-    rmSync(tmp, { force: true });
+    if (created) rmSync(tmp, { force: true });
   }
 }
 

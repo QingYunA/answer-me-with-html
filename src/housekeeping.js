@@ -50,7 +50,8 @@ const insideDir = (dir, path) => {
 // pages_dir may overlap the data folders. Each file belongs to one of them: a walk of a data folder leaves out a pages_dir nested in it,
 // and a walk of the pages folder leaves out the data folders nested in it (pages_dir set to the data directory itself).
 const DATA_DIRS = ['videos', 'drafts', 'cache', 'serve-state', 'themes'];
-const outsidePages = (root, pages) => (insideDir(root, pages) ? (f) => !insideDir(pages, f.path) : () => true);
+const samePath = (a, b) => resolve(a) === resolve(b);
+const outsidePages = (root, pages) => (insideDir(root, pages) || samePath(root, pages) ? (f) => !insideDir(pages, f.path) : () => true);
 const pageFiles = (home, pages) => {
   const nested = DATA_DIRS.map((d) => join(home, d)).filter((root) => insideDir(pages, root));
   return walk(pages).filter((f) => !nested.some((root) => insideDir(root, f.path)));
@@ -84,7 +85,7 @@ export function clean(home, { days = CLEAN.days, all = false, dryRun = false, no
   ];
   // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
   const gone = new Set(pageVictims(home, pages, cutoff, all, custom).map((f) => f.path));
-  const states = walk(join(home, 'serve-state')).filter((f) => {
+  const states = walk(join(home, 'serve-state')).filter(outsidePages(join(home, 'serve-state'), pages)).filter((f) => {
     // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save. One that is an
     // hour old was left by a process that stopped mid-write, and nothing will rename it.
     if (!f.path.endsWith('.json')) return f.mtime < now - HOUR;

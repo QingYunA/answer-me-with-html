@@ -122,6 +122,30 @@ test('pages_dir overlapping the data folders: each file counted once, user files
   assert.ok(!existsSync(video) && !existsSync(draft), 'videos and drafts are cleaned when pages_dir contains them');
 });
 
+test('pages_dir equal to a data folder, or inside serve-state/: user files and fresh pages stay, each file counted once', () => {
+  const put = (path, ageDays = 40) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, 'x');
+    const t = (NOW - ageDays * DAY) / 1000;
+    utimesSync(path, t, t);
+    return path;
+  };
+  for (const d of ['cache', 'videos', 'drafts']) {
+    const root = join(home, d);
+    const keep = put(join(root, 'keep.txt'));
+    const fresh = put(join(root, 'fresh-20260102-000000.html'), 1);
+    assert.equal(usage(home, root).total, 2, `${d}: each file counted once`);
+    clean(home, { now: NOW, pages: root });
+    assert.ok(existsSync(keep) && existsSync(fresh), `${d}: the user's file and a fresh page stay`);
+    rmSync(root, { recursive: true, force: true });
+  }
+  const states = join(home, 'serve-state', 'pages');
+  const keep = put(join(states, 'keep.txt'), 1);
+  const fresh = put(join(states, 'fresh-20260102-000000.html'), 1);
+  clean(home, { now: NOW + 3 * 3600 * 1000, pages: states });
+  assert.ok(existsSync(keep) && existsSync(fresh), 'the serve-state scan leaves the pages folder alone');
+});
+
 test('clean: --dry-run deletes nothing; --all deletes every page and video', () => {
   const fresh = file('pages/new.html', 10, 0);
   assert.equal(clean(home, { dryRun: true, all: true, now: NOW }).files, 1);

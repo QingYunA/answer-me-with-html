@@ -15,7 +15,9 @@
   if (!btn) return;
   const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';
   const canCopy = typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function';
-  if (!canRasterize || !canCopy || !window.isSecureContext) return; // the button stays hidden
+  // Safari and Firefox also expose the async Clipboard API, but cannot rasterize the page reliably: Chromium only (userAgentData brands).
+  const chromium = Boolean(navigator.userAgentData?.brands?.some((b) => /Chromium/.test(b.brand)));
+  if (!canRasterize || !canCopy || !chromium || !window.isSecureContext) return; // the button stays hidden
 
   const main = document.querySelector('main.am-sheet, main.am-doc');
   if (!main) return;

@@ -114,6 +114,18 @@ const CLICK_FALLBACK = `(async () => {
   return { revealed, wrote, clicked, label: btn.textContent, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
 })()`;
 
+test('copy-image: a browser that is not Chromium keeps the button hidden, even with the async Clipboard API', { skip: SKIP }, async () => {
+  // Safari and Firefox expose ClipboardItem and clipboard.write but no navigator.userAgentData; hide it before the page script runs.
+  const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source: "Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true });" });
+  try {
+    await load(pathToFileURL(file).href);
+    assert.equal(await evaluate('typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function"'), true, 'the Clipboard API is there');
+    assert.equal(await evaluate('document.querySelector(\'[data-am="copy-image"]\').hidden'), true, 'the button stays hidden');
+  } finally {
+    await send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  }
+});
+
 test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
   await load(pathToFileURL(file).href);
   const r = await evaluate(CLICK_FALLBACK);
