@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync6, chmodSync as chmodSync2 } from "node:fs";
+import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync6, chmodSync as chmodSync2, openSync as openSync2, closeSync as closeSync2 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.5.11";
@@ -13143,7 +13143,7 @@ var insideDir = (dir, path) => {
   return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep3}`) && !isAbsolute4(rel);
 };
 var DATA_DIRS = ["videos", "drafts", "cache", "serve-state", "themes"];
-var samePath = (a3, b) => resolve6(a3) === resolve6(b);
+var samePath = (a3, b) => relative2(resolve6(a3), resolve6(b)) === "";
 var outsidePages = (root, pages) => insideDir(root, pages) || samePath(root, pages) ? (f2) => !insideDir(pages, f2.path) : () => true;
 var pageFiles = (home, pages) => {
   const nested = DATA_DIRS.map((d) => join11(home, d)).filter((root) => insideDir(pages, root));
@@ -14577,13 +14577,18 @@ function writePage(file, html, env, pages = join13(amHome(env), "pages")) {
   if (!inside(pages, path)) return writeFileSync8(file, html);
   const tmp = join13(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
   const mode = statSync6(file, { throwIfNoEntry: false })?.mode;
+  let fd = null;
   let created = false;
   try {
-    writeFileSync8(tmp, html, { flag: "wx", ...mode === void 0 ? {} : { mode: 384 } });
+    fd = openSync2(tmp, "wx", mode === void 0 ? 438 : 384);
     created = true;
+    writeFileSync8(fd, html);
+    closeSync2(fd);
+    fd = null;
     if (mode !== void 0) chmodSync2(tmp, mode & 511);
     renameOver(tmp, file);
   } finally {
+    if (fd !== null) closeSync2(fd);
     if (created) rmSync7(tmp, { force: true });
   }
 }

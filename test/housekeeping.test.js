@@ -146,6 +146,14 @@ test('pages_dir equal to a data folder, or inside serve-state/: user files and f
   assert.ok(existsSync(keep) && existsSync(fresh), 'the serve-state scan leaves the pages folder alone');
 });
 
+test('pages_dir that names a data folder in another case is the same folder on Windows', { skip: process.platform !== 'win32' && 'case-insensitive Windows paths' }, () => {
+  const keep = join(home, 'cache', 'keep.txt');
+  mkdirSync(dirname(keep), { recursive: true });
+  writeFileSync(keep, 'x');
+  clean(home, { now: NOW, pages: join(home, 'CACHE') });
+  assert.ok(existsSync(keep), 'the cache scan treats CACHE as the pages folder and leaves keep.txt');
+});
+
 test('clean: --dry-run deletes nothing; --all deletes every page and video', () => {
   const fresh = file('pages/new.html', 10, 0);
   assert.equal(clean(home, { dryRun: true, all: true, now: NOW }).files, 1);

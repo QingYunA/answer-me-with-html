@@ -50,7 +50,8 @@ const insideDir = (dir, path) => {
 // pages_dir may overlap the data folders. Each file belongs to one of them: a walk of a data folder leaves out a pages_dir nested in it,
 // and a walk of the pages folder leaves out the data folders nested in it (pages_dir set to the data directory itself).
 const DATA_DIRS = ['videos', 'drafts', 'cache', 'serve-state', 'themes'];
-const samePath = (a, b) => resolve(a) === resolve(b);
+// relative() is '' for the same folder, also for spellings that differ only in case on Windows, where resolve() keeps the case.
+const samePath = (a, b) => relative(resolve(a), resolve(b)) === '';
 const outsidePages = (root, pages) => (insideDir(root, pages) || samePath(root, pages) ? (f) => !insideDir(pages, f.path) : () => true);
 const pageFiles = (home, pages) => {
   const nested = DATA_DIRS.map((d) => join(home, d)).filter((root) => insideDir(pages, root));
