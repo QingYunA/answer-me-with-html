@@ -1,5 +1,6 @@
 // Narration voice-over. Fallback order: ElevenLabs (with ELEVENLABS_API_KEY) → system TTS (macOS say / Linux espeak-ng) → captions only.
-// --voice local uses a local OpenAI-compatible /v1/audio/speech service (AM_TTS_URL) instead, only when given explicitly.
+// --voice local uses a local OpenAI-compatible /v1/audio/speech service (AM_TTS_URL) instead, only when given explicitly;
+// --voice cmd runs a command-line TTS (AM_TTS_CMD) once per line, for hosts where no server may listen on a port.
 // --audio-map reads one existing file per line. Every source produces 22050 Hz mono 16-bit PCM, cached by text + source in
 // AM_HOME/cache/tts/ (including mapped audio content), so re-renders do not synthesize or decode unchanged audio again.
 import { spawn, spawnSync } from 'node:child_process';
@@ -29,7 +30,7 @@ export class TtsError extends Error {
 }
 
 // Pick the voice-over actually used. Returns { name, synth(text) → Int16Array } or null (captions only).
-export function pickProvider(choice, env, { platform = process.platform, which = hasCommand } = {}) {
+export function pickProvider(choice, env, { platform = process.platform, which = hasCommand, timeoutMs = LOCAL_TIMEOUT_MS } = {}) {
   const eleven = () => elevenLabs(env);
   const system = () => systemVoice(platform, which);
   if (choice === 'off') return null;
@@ -38,6 +39,7 @@ export function pickProvider(choice, env, { platform = process.platform, which =
     return eleven();
   }
   if (choice === 'local') return localSpeech(env);
+  if (choice === 'cmd') return commandVoice(env, { which, timeoutMs });
   if (choice === 'system') {
     const p = system();
     if (!p) throw new TtsError('No system TTS found: macOS has say built in; on Linux install espeak-ng');
@@ -151,6 +153,99 @@ function localSpeech(env) {
   };
 }
 
+// A command-line TTS (edge-tts, piper, a kokoro CLI, say), run once per line. AM_TTS_CMD is a command template that am splits
+// into words itself, like a shell would but without running one: narration comes from untrusted drafts, so it never passes
+// through a shell. In each word, {text} is the line, {text_file} a file holding it, {out} where the command writes its audio and
+// {lang} the line's language tag; the line is also written to the command's stdin. The audio may be any format ffmpeg reads;
+// without ffmpeg it must be 16-bit PCM WAV.
+const CMD_EXAMPLE = 'edge-tts --voice zh-CN-XiaoxiaoNeural --file {text_file} --write-media {out}';
+function commandVoice(env, { which, timeoutMs }) {
+  const template = env.AM_TTS_CMD?.trim();
+  if (!template) throw new TtsError(`voice=cmd needs the AM_TTS_CMD environment variable: a command that writes the audio of one line to {out}, such as ${CMD_EXAMPLE} (pip install edge-tts)`);
+  if (!template.includes('{out}')) throw new TtsError(`AM_TTS_CMD must name {out}, the file the command writes its audio to, such as ${CMD_EXAMPLE}`);
+  commandArgs(template, {}); // report a quoting mistake before any line is read
+  const usesLanguage = template.includes('{lang}');
+  return {
+    name: 'cmd',
+    voice: 'cmd',
+    id: `cmd:${template}`,
+    concurrency: 2,
+    usesLanguage,
+    synth: (text, { language } = {}) => withTemp(async (out) => {
+      const textFile = `${out}.txt`;
+      writeFileSync(textFile, text);
+      const [program, ...args] = commandArgs(template, { text, text_file: textFile, out, lang: language ?? '' });
+      await runCommandTts(program, args, text, timeoutMs);
+      let buf;
+      try {
+        buf = readFileSync(out);
+      } catch {
+        buf = Buffer.alloc(0);
+      }
+      if (!buf.length) throw new TtsError(`AM_TTS_CMD finished but wrote no audio to {out} for the line "${text}"`);
+      const samples = trimSilence(await mappedSamples(buf, out, 'the audio AM_TTS_CMD wrote', { which, runCommand: run }));
+      if (!samples.some((x) => Math.abs(x) >= SILENCE)) {
+        throw new TtsError(`AM_TTS_CMD wrote only silence for the line "${text}" (macOS say does this inside a sandbox)`);
+      }
+      return samples;
+    }),
+  };
+}
+
+// Split a command template into words: whitespace separates words, '…' and "…" group them, and nothing else is special, so a
+// Windows path keeps its backslashes. Placeholders are filled in after the split, so each value stays inside its own word.
+export function commandArgs(template, values) {
+  const words = [];
+  let word = null;
+  for (let i = 0; i < template.length; i++) {
+    const ch = template[i];
+    if (ch === '"' || ch === "'") {
+      const end = template.indexOf(ch, i + 1);
+      if (end < 0) throw new TtsError(`AM_TTS_CMD has an unclosed ${ch}`);
+      word = (word ?? '') + template.slice(i + 1, end);
+      i = end;
+    } else if (/\s/.test(ch)) {
+      if (word !== null) words.push(word);
+      word = null;
+    } else {
+      word = (word ?? '') + ch;
+    }
+  }
+  if (word !== null) words.push(word);
+  return words.map((w) => w.replace(/\{(text|text_file|out|lang)\}/g, (_, key) => values[key] ?? `{${key}}`));
+}
+
+// The timeout rejects at the deadline on its own: a command may ignore SIGTERM, and a child it started may keep stderr open, so
+// 'close' may come late or never. SIGKILL ends the command itself; its pipes are closed so nothing waits on them.
+function runCommandTts(program, args, text, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const p = spawn(program, args, { stdio: ['pipe', 'ignore', 'pipe'], windowsHide: true });
+    let err = '';
+    let settled = false;
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
+    const timer = setTimeout(() => {
+      p.kill('SIGKILL');
+      p.stdin.destroy();
+      p.stderr.destroy();
+      settle(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+    p.stderr.on('data', (d) => { err = (err + d).slice(-4000); }); // the end: a Python traceback names the error last
+    p.stdin.on('error', () => {}); // a command that does not read stdin may exit before taking the text
+    p.stdin.end(text);
+    p.on('error', (e) => settle(new TtsError(e.code === 'ENOENT'
+      ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD`
+      : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`)));
+    p.on('close', (code) => settle(code === 0 ? null
+      : new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(' | ').slice(-300)}`)));
+  });
+}
+
 export function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}) {
   const mapFile = resolve(mapPath);
   let source;
@@ -212,7 +307,7 @@ export function audioMapProvider(mapPath, { which = hasCommand, runCommand = run
       } catch (e) {
         throw new TtsError(`Cannot read audio file for narration line "${key}": ${entry.file}: ${e.message}`);
       }
-      const samples = await mappedSamples(buf, entry.file, { which, runCommand });
+      const samples = await mappedSamples(buf, entry.file, `audio map file ${entry.file}`, { which, runCommand });
       const trimmed = trimSilence(samples);
       if (!trimmed.some((x) => Math.abs(x) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
       return trimmed;
@@ -220,22 +315,23 @@ export function audioMapProvider(mapPath, { which = hasCommand, runCommand = run
   };
 }
 
-async function mappedSamples(buf, file, { which, runCommand }) {
+// Decode the audio read from file: 16-bit PCM WAV directly, anything else through ffmpeg. label names the audio in messages.
+async function mappedSamples(buf, file, label, { which, runCommand }) {
   if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
     try {
       return readWav(buf, { downmix: true });
     } catch (e) {
-      if (!which('ffmpeg')) throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
+      if (!which('ffmpeg')) throw new TtsError(`Cannot decode ${label} (needs 16-bit PCM WAV): ${e.message}`);
     }
   } else if (!which('ffmpeg')) {
-    throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
+    throw new TtsError(`${label[0].toUpperCase()}${label.slice(1)} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
   }
   return withTemp(async (out) => {
     try {
       await runCommand('ffmpeg', ['-v', 'error', '-y', '-i', file, '-ac', '1', '-ar', String(SAMPLE_RATE), '-c:a', 'pcm_s16le', out]);
       return readWav(readFileSync(out));
     } catch (e) {
-      throw new TtsError(`Cannot convert audio map file ${file} with ffmpeg: ${e.message}`);
+      throw new TtsError(`Cannot convert ${label} with ffmpeg: ${e.message}`);
     }
   });
 }

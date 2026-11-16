@@ -43,7 +43,7 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off | --audio-map <file.json>]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|cmd|system|off | --audio-map <file.json>]
                       [--mp4] [--webm] [--no-open] [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am export <page.html> [--pdf <file.pdf>] [--png <dir>]
@@ -191,7 +191,7 @@ Client -> Server: ACK
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
-- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | cmd | system | off.
   The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
   the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
   A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
@@ -203,6 +203,11 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
+  cmd runs a command-line TTS once per line, with no server: AM_TTS_CMD is the command, split into words by am and run
+  without a shell. In each word {text} is the line, {text_file} a file holding it, {out} the file the command writes its audio to
+  (required) and {lang} the line's language tag; the line is also written to its stdin. Audio that is not 16-bit PCM WAV needs ffmpeg.
+  Example (edge-tts reads with Microsoft's online voices, so it needs the network; pip install edge-tts):
+      AM_TTS_CMD='edge-tts --voice zh-CN-XiaoxiaoNeural --file {text_file} --write-media {out}' am video draft.md --voice cmd
   --audio-map lines.json reads ready-made audio from a JSON object of narration line to audio file, for example
   {"First the client sends SYN.":"audio/01.mp3"}. Relative audio paths start at the map file's folder. Keys ignore > and [ ]
   markers and extra whitespace. Non-WAV audio needs ffmpeg; every line needs an entry and every audio file must exist.
