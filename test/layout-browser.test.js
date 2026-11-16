@@ -840,7 +840,7 @@ test('e2e: long ids in a table break inside their cells, so a prose column is no
   assert.deepEqual(state, { scrolls: false, fit: true, changeWide: true });
 });
 
-test('e2e: a table whose unbroken words do not fit breaks them, also when its capped widths fit (two columns, wide screens, code)', { skip: SKIP, timeout: 120000 }, async () => {
+test('e2e: a table whose unbroken words do not fit breaks them, also when its capped widths fit (two columns, wide screens, code)', { skip: SKIP, timeout: 180000 }, async () => {
   if (!cdp) await launch();
   const ids = '| Change | Author | Landed | Vehicle | Live? | Verdict | Evidence |\n|---|---|---|---|---|---|---|\n'
     + '| 1001 End a stuck lease | alice | 10-21 | web_command_1051211795 | only_in_job_58546795927693416 | NOT_EXERCISED | job_1051223399_log_ends_at_plugin_install |\n'
@@ -850,7 +850,9 @@ test('e2e: a table whose unbroken words do not fit breaks them, also when its ca
   const { html } = renderDoc(`---\ntitle: Ids that do not fit\nlang: en\ncols: 3\n---\n## A Ids {span=2}\n${ids}\n## B Neighbour\nShort text.\n\n## C Two columns {span=3}\n${huge}\n## D Ids in code {span=2}\n${code}\n## E Neighbour\nShort text.\n`);
   const file = join(tmp, 'table-ids-fit.html');
   writeFileSync(file, html);
-  for (const width of [DESKTOP, 1000]) {
+  // 1485 to 1550 px: the panels get their comfortable widths, but the long ids are wider than their columns' share, so the columns
+  // grow past the panel unless the words break.
+  for (const width of [DESKTOP, TABLET, 1485, 1500, 1520, 1535, 1550, 1600]) {
     await open(file, width);
     await waitFor(SETTLED, `the table page to lay out at ${width}px`);
     const scrolls = await evaluate(`[...document.querySelectorAll('.am-table-wrap')].map((w) => [w.closest('.am-panel').id, w.scrollWidth - w.clientWidth])`);
