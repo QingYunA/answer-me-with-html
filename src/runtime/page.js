@@ -1,10 +1,18 @@
 (() => {
   const root = document.documentElement;
   // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;
-  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.
+  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is kept, except a
+  // theme or mode that no toolbar option names: that is the host's own setting (the Claude desktop app sets data-theme="dark"), and
+  // keeping it would leave the page unstyled.
   const carrier = document.querySelector('.am-toolbar');
+  const listFor = { 'data-theme': 'theme', 'data-mode': 'mode' };
+  const foreign = (attr, value) => {
+    const options = listFor[attr] && document.querySelector(`select[data-am="${listFor[attr]}"]`)?.options;
+    return Boolean(value) && options != null && ![...options].some((o) => o.value === value);
+  };
   for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {
-    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));
+    const own = root.getAttribute(attr);
+    if ((own === null || foreign(attr, own)) && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));
   }
   // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.
   for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {

@@ -822,6 +822,58 @@ test('e2e: the expand button stays in view when a wide diagram scrolls sideways'
   assert.equal(await evaluate(inView), true, 'expand button stays inside the visible part of a scrolled diagram');
 });
 
+test('e2e: long ids in a table break inside their cells, so a prose column is not left one word per line', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const table = '| Change | Author | Landed | Vehicle | Live? | Verdict | Evidence |\n|---|---|---|---|---|---|---|\n'
+    + '| 1001 End a stuck lease | alice | 10-21 | web_command_1051211795 | only_in_job_58546795927693416 | NOT_EXERCISED | job_1051223399_log_ends_at_plugin_install |\n'
+    + '| 1002 Skip crash with no build | bob | 10-21 | async_tier_1051211796 | unverified | NOT_EXERCISED | key_field_missing_in_check_27030090071 |\n';
+  const { html } = renderDoc(`---\ntitle: Ids in a table\nlang: en\ncols: 3\n---\n## A Wide table {span=2}\n${table}\n## B Neighbour\nShort text.\n`);
+  const file = join(tmp, 'table-ids.html');
+  writeFileSync(file, html);
+  await open(file, 1000);
+  await waitFor(SETTLED, 'the table page to lay out');
+  const state = await evaluate(`(() => {
+    const wrap = document.querySelector('.am-table-wrap');
+    const change = wrap.querySelector('tbody tr td');
+    return { scrolls: wrap.scrollWidth > wrap.clientWidth + 1, fit: wrap.querySelector('table').classList.contains('am-table-fit'), changeWide: change.getBoundingClientRect().width >= 100 };
+  })()`);
+  assert.deepEqual(state, { scrolls: false, fit: true, changeWide: true });
+});
+
+test('e2e: a table whose unbroken words do not fit breaks them, also when its capped widths fit (two columns, wide screens, code)', { skip: SKIP, timeout: 120000 }, async () => {
+  if (!cdp) await launch();
+  const ids = '| Change | Author | Landed | Vehicle | Live? | Verdict | Evidence |\n|---|---|---|---|---|---|---|\n'
+    + '| 1001 End a stuck lease | alice | 10-21 | web_command_1051211795 | only_in_job_58546795927693416 | NOT_EXERCISED | job_1051223399_log_ends_at_plugin_install |\n'
+    + '| 1002 Skip crash with no build | bob | 10-21 | async_tier_1051211796 | unverified | NOT_EXERCISED | key_field_missing_in_check_27030090071 |\n';
+  const code = ids.replace(/(job_\w+|key_field_\w+)/g, '`$1`');
+  const huge = `| Name | Id |\n|---|---|\n| A short prose cell that reads normally | ${'W'.repeat(120)} |\n`;
+  const { html } = renderDoc(`---\ntitle: Ids that do not fit\nlang: en\ncols: 3\n---\n## A Ids {span=2}\n${ids}\n## B Neighbour\nShort text.\n\n## C Two columns {span=3}\n${huge}\n## D Ids in code {span=2}\n${code}\n## E Neighbour\nShort text.\n`);
+  const file = join(tmp, 'table-ids-fit.html');
+  writeFileSync(file, html);
+  for (const width of [DESKTOP, 1000]) {
+    await open(file, width);
+    await waitFor(SETTLED, `the table page to lay out at ${width}px`);
+    const scrolls = await evaluate(`[...document.querySelectorAll('.am-table-wrap')].map((w) => [w.closest('.am-panel').id, w.scrollWidth - w.clientWidth])`);
+    for (const [panel, px] of scrolls) assert.ok(px <= 1, `@${width}px: the table in ${panel} fits its panel, it scrolls ${px}px`);
+  }
+});
+
+test('e2e: the data table of a chart breaks a long label when it is short of room, like a table in text', { skip: SKIP, timeout: 120000 }, async () => {
+  if (!cdp) await launch();
+  const rows = ['job_1051223399_log_ends_at_plugin_install_and_keeps_going_until_the_nightly_run_stops', 'key_field_missing_in_check_27030090071_of_the_nightly_run_on_the_main_branch_today', 'async_tier_1051211796_web_command_1051211795_only_in_job_58546795927693416_retry']
+    .map((id, i) => `${id} | ${10 + i} | ${20 + i} | ${30 + i} | ${40 + i} | ${50 + i}`).join('\n');
+  // The data table opens on a click; render it open, so the layout measures it at load and the check does not depend on timing.
+  const html = renderDoc(`---\ntitle: Chart ids\nlang: en\ncols: 3\n---\n## A Chart {span=2}\n\`\`\`chart bar\n | p50 | p75 | p90 | p95 | p99\n${rows}\n\`\`\`\n\n## B Neighbour\nShort text.\n`).html
+    .replace('<details class="am-ch-data"', '<details open class="am-ch-data"');
+  const file = join(tmp, 'chart-ids.html');
+  writeFileSync(file, html);
+  await open(file, 900);
+  await waitFor(SETTLED, 'the chart page to lay out');
+  const state = await evaluate(`(() => { const w = document.querySelector('.am-ch-data .am-table-wrap'); return { scrolls: w.scrollWidth - w.clientWidth, fit: w.querySelector('table').classList.contains('am-table-fit') }; })()`);
+  assert.equal(state.fit, true, 'the chart data table is short of room');
+  assert.ok(state.scrolls <= 1, `the chart data table fits its panel, it scrolls ${state.scrolls}px`);
+});
+
 test('e2e: the expand button does not cover a node at the right edge of the drawing', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const { html } = renderDoc('---\ntitle: Expand overlap\nlang: en\ntheme: blueprint\n---\n## A Flow plan {span=2}\n```flow LR\nClient -> Gateway\nGateway -> [(Cache)]: lookup\nCache -> Service: miss\nGateway -> Service\n*Service\n```\n');
@@ -916,6 +968,24 @@ test('e2e: a page inside a host document gets its theme, mode, style and languag
   writeFileSync(own, inHost(html, ' lang="fr" data-theme=""'));
   await open(own, DESKTOP);
   assert.deepEqual(await evaluate(ROOT_ATTRS), ['fr', '', 'dark', 'off']);
+});
+
+// The Claude desktop app's root has its own data-theme for its light/dark look (#407). A host value that no toolbar option names
+// is not a page setting: the page's own theme and mode replace it. A host value that is a real option is kept.
+test('e2e: a host root theme or mode that no toolbar option names gives way to the page setting', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const { html } = renderDoc('---\nlang: en\ntheme: shadcn\nmode: dark\n---\n## A Note\nText.\n');
+  const selects = "['theme','mode'].map((n) => document.querySelector(`select[data-am=${n}]`).value)";
+  const foreign = join(tmp, 'host-foreign.html');
+  writeFileSync(foreign, inHost(html, ' data-theme="dark" data-mode="night"'));
+  await open(foreign, DESKTOP);
+  assert.deepEqual(await evaluate("['data-theme','data-mode'].map((a) => document.documentElement.getAttribute(a))"), ['shadcn', 'dark']);
+  assert.deepEqual(await evaluate(selects), ['shadcn', 'dark']);
+  assert.notEqual(await evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()"), '', 'theme variables resolve');
+  const option = join(tmp, 'host-option.html');
+  writeFileSync(option, inHost(html, ' data-theme="paper"'));
+  await open(option, DESKTOP);
+  assert.deepEqual(await evaluate(selects), ['paper', 'dark']);
 });
 
 // An annot block on a right-to-left page: the sentence reads from the right, each note starts at the right edge of its span, and notes that
