@@ -4917,6 +4917,20 @@ function splitMarker(text2) {
   return m ? { mark: m[1], text: m[2] } : { mark: null, text: text2 };
 }
 var markState = (mark) => STATE_OF[mark] ?? null;
+function innerMarkMessage(component, names2, mark, text2, escape = "", link = names2.length > 1) {
+  const inner = names2.map((name2) => ({ name: name2, m: splitMarker(name2) })).filter(({ m }) => m.mark);
+  if (!inner.length) return null;
+  const first = inner[0].name;
+  const marks = new Set([mark, ...inner.map(({ m }) => m.mark)].filter(Boolean));
+  const head = `${component}: "${first}" has a change marker inside the line, so "${inner[0].m.mark} " would become part of the name and draw a second box.`;
+  if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
+  if ([...marks][0] === "~" && link) return `${head} ~ marks a node, not a link: write it on a line of its own: "~ ${inner[0].m.text}"`;
+  const quote = (name2) => name2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let fixed2 = text2;
+  for (const { name: name2, m } of inner) fixed2 = fixed2.replace(new RegExp(`(?<!\\[)${quote(name2)}(?!\\])`), m.text);
+  const plain = !/^[*[({]/.test(inner[0].m.text);
+  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed2}".${escape && plain ? ` ${escape.replace("NAME", first)}` : ""}`;
+}
 var deltaAttr = (state) => state ? ` data-delta="${state}"` : "";
 function deltaBadge(state, ui) {
   if (!state) return "";
@@ -7510,7 +7524,7 @@ Client -> Gateway
   - ~ on a line with an arrow is an error: remove the old link with - and add the new one with +. That is also how a link's label changes. The same link both unmarked and marked is an error too.
   - + group Name: A, B and - group Name: A, B mark a group box. A group that is not removed and holds only removed nodes is a warning. Markers combine with * and every shape bracket.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, \u2212 or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
-  - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a node ("A -> + B"), is an error: write it at the start, "+ A -> B". To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: "```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```",
   render(text2, { args, uid, ui, warn, video, dir: pageDir = "ltr" }) {
     const model = parseFlow(text2);
@@ -7544,6 +7558,8 @@ function parseFlow(text2) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
+    const inner = innerMarkMessage("flow", chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, "To keep a name that starts with a marker, use brackets: [NAME]", chain.length > 1);
+    if (inner) throw new ComponentError(inner, line);
     if (mark === "~" && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);
     }
@@ -7997,7 +8013,7 @@ Polling -> Open: reply
   - A marker applies to the transition and to each state on its line. A state is removed when it appears only on - lines, added when it appears only on + lines, and unchanged when it also appears on an unmarked line. ~ State on a line without an arrow marks that state as changed.
   - ~ on a transition is an error: remove the old transition with - and add the new one with +. The same transition both unmarked and marked is an error too.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked state with a +, \u2212 or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
-  - A line that starts with a marker and a space is always read as a marker.`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a state ("A -> + B"), is an error: write it at the start, "+ A -> B".`,
   example: "```state LR\n[*] -> Idle\nIdle -> Connecting: connect()\nConnecting -> Open: SYN-ACK\nConnecting -> Closed: RST\nOpen -> Open: retransmit\nOpen -> Closed: close()\nClosed -> [*]\n```",
   render(text2, { args, uid, ui, video, dir: pageDir = "ltr" }) {
     const model = parseState(text2);
@@ -8031,6 +8047,8 @@ function parseState(text2) {
     const at3 = t.indexOf("->");
     if (at3 === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
+      const lone = innerMarkMessage("state", [t.trim()], mark, t, "", false);
+      if (lone) throw new ComponentError(lone, n);
       resolve9(t.trim(), n, mark, "from");
       continue;
     }
@@ -8042,6 +8060,8 @@ function parseState(text2) {
     const label = colon === -1 ? "" : rest.slice(colon + 1).trim();
     if (to.includes("->")) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
+    const inner = innerMarkMessage("state", [from, to], mark, t, "", true);
+    if (inner) throw new ComponentError(inner, n);
     const fromId = resolve9(from, n, mark, "from");
     const toId = resolve9(to, n, mark, "to");
     edges.push({ from: fromId, to: toId, label, line: n, ...state && { state } });
