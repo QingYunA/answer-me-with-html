@@ -4917,14 +4917,14 @@ function splitMarker(text2) {
   return m ? { mark: m[1], text: m[2] } : { mark: null, text: text2 };
 }
 var markState = (mark) => STATE_OF[mark] ?? null;
-function innerMarkMessage(component, names2, mark, text2, escape = "") {
+function innerMarkMessage(component, names2, mark, text2, escape = "", link = names2.length > 1) {
   const inner = names2.map((name2) => ({ name: name2, m: splitMarker(name2) })).filter(({ m }) => m.mark);
   if (!inner.length) return null;
   const first = inner[0].name;
   const marks = new Set([mark, ...inner.map(({ m }) => m.mark)].filter(Boolean));
   const head = `${component}: "${first}" has a change marker inside the line, so "${inner[0].m.mark} " would become part of the name and draw a second box.`;
   if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
-  if ([...marks][0] === "~" && names2.length > 1) return `${head} ~ marks a node, not a link: write it on a line of its own: "~ ${inner[0].m.text}"`;
+  if ([...marks][0] === "~" && link) return `${head} ~ marks a node, not a link: write it on a line of its own: "~ ${inner[0].m.text}"`;
   const quote = (name2) => name2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   let fixed2 = text2;
   for (const { name: name2, m } of inner) fixed2 = fixed2.replace(new RegExp(`(?<!\\[)${quote(name2)}(?!\\])`), m.text);
@@ -7558,7 +7558,7 @@ function parseFlow(text2) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
-    const inner = innerMarkMessage("flow", chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, "To keep a name that starts with a marker, use brackets: [NAME]");
+    const inner = innerMarkMessage("flow", chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, "To keep a name that starts with a marker, use brackets: [NAME]", chain.length > 1);
     if (inner) throw new ComponentError(inner, line);
     if (mark === "~" && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);
@@ -8047,7 +8047,7 @@ function parseState(text2) {
     const at3 = t.indexOf("->");
     if (at3 === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
-      const lone = innerMarkMessage("state", [t.trim()], mark, t);
+      const lone = innerMarkMessage("state", [t.trim()], mark, t, "", false);
       if (lone) throw new ComponentError(lone, n);
       resolve9(t.trim(), n, mark, "from");
       continue;
@@ -8060,7 +8060,7 @@ function parseState(text2) {
     const label = colon === -1 ? "" : rest.slice(colon + 1).trim();
     if (to.includes("->")) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
-    const inner = innerMarkMessage("state", [from, to], mark, t);
+    const inner = innerMarkMessage("state", [from, to], mark, t, "", true);
     if (inner) throw new ComponentError(inner, n);
     const fromId = resolve9(from, n, mark, "from");
     const toId = resolve9(to, n, mark, "to");

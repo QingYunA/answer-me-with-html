@@ -92,6 +92,8 @@ test('parseFlow: a marker before a node inside the line is an error with the lin
   at('A -> + B & + C', 1, 'Write: "+ A -> B & C"');
   // ~ marks a node, not a link, so the hint puts the marked node on a line of its own instead of marking the whole line.
   at('A -> B -> ~ C', 1, 'write it on a line of its own: "~ C"');
+  // A bracketed endpoint is not checked as a name, but the line still has a link.
+  at('[A] -> ~ B', 1, 'write it on a line of its own: "~ B"');
   assert.throws(() => parseFlow('A -> B -> ~ C'), (e) => !e.message.includes('"~ A -> B -> C"'));
   // Only the detected endpoint loses its marker; a bracketed name that starts with one stays as written.
   at('[+ B] -> + B', 1, 'Write: "+ [+ B] -> B"');

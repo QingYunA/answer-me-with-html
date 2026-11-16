@@ -112,7 +112,7 @@ export function parseFlow(text) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
-    const inner = innerMarkMessage('flow', chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, 'To keep a name that starts with a marker, use brackets: [NAME]');
+    const inner = innerMarkMessage('flow', chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, 'To keep a name that starts with a marker, use brackets: [NAME]', chain.length > 1);
     if (inner) throw new ComponentError(inner, line);
     if (mark === '~' && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);

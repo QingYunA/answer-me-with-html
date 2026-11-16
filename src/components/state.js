@@ -80,7 +80,7 @@ export function parseState(text) {
     const at = t.indexOf('->');
     if (at === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
-      const lone = innerMarkMessage('state', [t.trim()], mark, t);
+      const lone = innerMarkMessage('state', [t.trim()], mark, t, '', false);
       if (lone) throw new ComponentError(lone, n);
       resolve(t.trim(), n, mark, 'from');
       continue;
@@ -94,7 +94,7 @@ export function parseState(text) {
     // The event after the colon is text, not syntax: it may itself contain ->. Only a second arrow before the colon is a second transition.
     if (to.includes('->')) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
-    const inner = innerMarkMessage('state', [from, to], mark, t);
+    const inner = innerMarkMessage('state', [from, to], mark, t, '', true);
     if (inner) throw new ComponentError(inner, n);
     const fromId = resolve(from, n, mark, 'from');
     const toId = resolve(to, n, mark, 'to');
