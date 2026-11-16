@@ -175,7 +175,7 @@ Server -> Client: SYN-ACK
 | すべてのエージェント | `/answer-me-with-html config open off`、または「ブラウザーを開かないで」と言うだけです |
 | ターミナル | 表示は `am config`、変更は `am config set open off`、デフォルトに戻すには `am config reset` |
 
-設定は `open`（ページをブラウザーで開く）、`theme`、`mode`（ライトまたはダーク）、`style`（文章チェック）、`scale`（ページの文字サイズ。図とグラフも合わせて大きくなります）、`update_check`、`close_after_reply`（返信をコピーしたらタブを閉じる）、`voice`（動画のナレーション）です。デフォルトと値：[リファレンス](docs/reference.md#settings)。
+設定は `open`（ページをブラウザーで開く）、`theme`、`mode`（ライトまたはダーク）、`style`（文章チェック）、`scale`（ページの文字サイズ。図とグラフも合わせて大きくなります）、`pages_dir`（ページの出力先フォルダー）、`update_check`、`close_after_reply`（返信をコピーしたらタブを閉じる）、`voice`（動画のナレーション）です。デフォルトと値：[リファレンス](docs/reference.md#settings)。
 
 ## 常時モード（推奨）
 
