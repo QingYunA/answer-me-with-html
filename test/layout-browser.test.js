@@ -230,8 +230,8 @@ tickets -> code: build it
 \`\`\`
 `;
 
-// A page whose grid gets narrower once it is laid out (a stand-in for a scrollbar that appears with the new row heights), so the width
-// the layout was planned for never holds. And a page with an image inside the grid, whose late load changes panel heights.
+// A plain page for the test whose grid width changes on every read, so the width the layout was planned for never holds.
+// And a page with an image inside the grid, whose late load changes panel heights.
 const UNSTABLE = {
   'unstable.en': `---
 title: Unstable width
@@ -240,11 +240,7 @@ lang: en
 ---
 ${fillerEn('A', 1)}
 ${fillerEn('B', 2)}
-## C Style
-\`\`\`html
-<style>.am-grid[style*="display: flex"] { max-width: 900px; }</style>
-<img alt="dot" width="20" height="20" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20'/%3E%3C/svg%3E">
-\`\`\``,
+${fillerEn('C', 3)}`,
   'image.en': `---
 title: Image in a panel
 cols: 3
@@ -729,10 +725,23 @@ test('e2e: a late resize or media change cannot lay the page out again between b
 test('e2e: when the width keeps changing under the layout, the page falls back to the grid instead of oversized columns', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const p = special['unstable.en'];
-  await open(p.file, DESKTOP);
-  await sleep(RESIZE_DELAY_MS * 2);
-  plainGrid('unstable.en', await measure(), await evaluate(nColumns));
-  assert.equal(await evaluate('document.querySelectorAll(".am-panel[style*=width], .am-panel[style*=flex]").length'), 0, 'no widths from the layout script');
+  // The grid comes out 10 px narrower on every read, as if each layout pass moved it again.
+  const { identifier } = await page('Page.addScriptToEvaluateOnNewDocument', { source: `{
+    const rect = Element.prototype.getBoundingClientRect;
+    let reads = 0;
+    Element.prototype.getBoundingClientRect = function () {
+      const r = rect.call(this);
+      return this.classList.contains('am-grid') ? new DOMRect(r.x, r.y, r.width - 10 * ++reads, r.height) : r;
+    };
+  }` });
+  try {
+    await open(p.file, DESKTOP);
+    await sleep(RESIZE_DELAY_MS * 2);
+    plainGrid('unstable.en', await measure(), await evaluate(nColumns));
+    assert.equal(await evaluate('document.querySelectorAll(".am-panel[style*=width], .am-panel[style*=flex]").length'), 0, 'no widths from the layout script');
+  } finally {
+    await page('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+  }
 });
 
 // Counts changes to the grid's attributes and children, which is what a layout pass does (it restores the markup first).

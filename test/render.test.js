@@ -379,6 +379,11 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
       this.el.setAttribute('class', list.join(' '));
     }
     contains(c) { return this.values().includes(c); }
+    toggle(c, force = !this.contains(c)) {
+      if (force) this.add(c);
+      else this.remove(c);
+      return force;
+    }
     values() { return (this.el.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean); }
   }
 
