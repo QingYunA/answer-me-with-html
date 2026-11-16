@@ -3,6 +3,7 @@
 
 import { themeNames, AUTO } from './themes/registry.js';
 import { COMPONENTS } from './components/index.js';
+import { previewEnd } from './components/ask.js';
 import { parseAttrs, coerce, unquote } from './attrs.js';
 
 export { parseAttrs };
@@ -172,7 +173,7 @@ function splitSections(lines, start, errors) {
     const colonName = colon?.[2].toLowerCase();
     if (colon && COMPONENTS.has(colonName)) {
       flushMd();
-      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      const close = findColonClose(lines, i, colon[1], colonName);
       if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
       current.blocks.push({ type: 'fence', lang: colonName, args: (colon[3] ?? '').trim(), text: lines.slice(i + 1, close).join('\n'), line: i + 1 });
       i = close;
@@ -272,6 +273,54 @@ function checkTables(lines, first) {
     }
     return [];
   });
+}
+
+const FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+
+/** The close line of a code fence that opens at openIdx, or -1. */
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+
+/**
+ * The close of a `:::` block. A block may hold another one, as an ask preview does, so nested opens and closes balance before the
+ * outer close; a ``` fence inside the block hides its `:::` lines from the count, like it does at the top level. A lone ``` line
+ * with no close stays text, as it did before blocks could nest. Inside an ask block a preview is opaque: its raw html or svg may
+ * write `:::` lines, and ask's own preview rule (the next bare `:::` at the same indent) is what ends it.
+ */
+function findColonClose(lines, openIdx, marker, name) {
+  const stack = [marker.length];
+  for (let j = openIdx + 1; j < lines.length; j++) {
+    if (name === 'ask') {
+      const end = previewEnd(lines, j);
+      if (end !== -1) {
+        j = end;
+        continue;
+      }
+    }
+    const line = lines[j];
+    const mark = line.match(FENCE_MARK)?.[1];
+    if (mark) {
+      const close = fenceClose(lines, j, mark);
+      if (close === -1) continue;
+      j = close;
+      continue;
+    }
+    const open = line.match(COLON_OPEN);
+    if (open) {
+      stack.push(open[1].length);
+      continue;
+    }
+    const close = line.match(COLON_CLOSE);
+    if (!close || close[1].length < stack[stack.length - 1]) continue;
+    stack.pop();
+    if (!stack.length) return j;
+  }
+  return -1;
 }
 
 function findFenceClose(lines, openIdx, marker) {

@@ -154,6 +154,28 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
 .am-ask-tag { display: inline-block; font-size: var(--am-fs-label); line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 .am-ask-note { display: block; color: var(--ink-2); }
+/* Options with a preview: the block under an option is the card's canvas. A dot grid reads as a drawing surface in every theme. */
+.am-ask-opts { clear: both; }
+.am-ask-card { min-width: 0; }
+.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); align-items: stretch; }
+.am-ask--cards .am-ask-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-ask--cards .am-ask-opt { padding: 9px 11px; }
+.am-ask-preview {
+  padding: 10px; overflow: hidden; border-top: 1px solid var(--line-2);
+  background-color: var(--fill);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-3) 38%, transparent) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.am-ask--cards .am-ask-preview { flex: 1; cursor: pointer; }
+.am-ask-preview > :first-child { margin-top: 0; }
+.am-ask-preview > :last-child { margin-bottom: 0; }
+/* A diagram keeps the card width, also on a phone, where a panel diagram may scroll instead. */
+.am-ask-preview .am-diagram { overflow: visible; }
+.am-ask-preview .am-diagram > svg { max-width: 100%; height: auto; }
+.am-ask-preview > svg { display: block; max-width: 100%; height: auto; }
 /* Comment box under each panel, and the Reply sheet */
 .am-comment-btn {
   display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
@@ -671,7 +693,7 @@ table.am-mark { background: none; }
 .am-remark-kind::before { content: attr(data-n); margin-inline-end: 5px; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--am-fs-label); }
 @media print { .am-remark-pop { display: none !important; } }
 `;
-var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is kept, except a\n  // theme or mode that no toolbar option names: that is the host's own setting (the Claude desktop app sets data-theme=\"dark\"), and\n  // keeping it would leave the page unstyled.\n  const carrier = document.querySelector('.am-toolbar');\n  const listFor = { 'data-theme': 'theme', 'data-mode': 'mode' };\n  const foreign = (attr, value) => {\n    const options = listFor[attr] && document.querySelector(`select[data-am=\"${listFor[attr]}\"]`)?.options;\n    return Boolean(value) && options != null && ![...options].some((o) => o.value === value);\n  };\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    const own = root.getAttribute(attr);\n    if ((own === null || foreign(attr, own)) && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  // \u2500\u2500 Text size \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  // A\u2212 / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow\n  // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no\n  // second copy of the numbers. A reader's choice is remembered in this browser and wins over the page's own scale; where storage\n  // is off (am serve, file://) it lasts for this tab, and the click still works.\n  const scaleDown = document.querySelector('[data-am=\"scale-down\"]');\n  const scaleUp = document.querySelector('[data-am=\"scale-up\"]');\n  if (scaleDown && scaleUp) {\n    const min = Number(scaleDown.dataset.min);\n    const max = Number(scaleDown.dataset.max);\n    const step = Number(scaleDown.dataset.step);\n    const storeKey = 'am-scale';\n    let value;\n\n    const inRange = (n) => Number.isFinite(n) && n >= min && n <= max;\n    const savedScale = () => {\n      try {\n        return Number(localStorage.getItem(storeKey));\n      } catch {\n        return NaN;\n      }\n    };\n    const saveScale = (n) => {\n      try {\n        localStorage.setItem(storeKey, String(n));\n      } catch {\n        // Storage may be off (am serve, file://); the size then lasts until the tab closes.\n      }\n    };\n\n    const updateButtons = () => {\n      const setUnavailable = (btn, unavailable) => {\n        if (unavailable) btn.setAttribute('aria-disabled', 'true');\n        else btn.removeAttribute('aria-disabled');\n      };\n      setUnavailable(scaleDown, value <= min);\n      setUnavailable(scaleUp, value >= max);\n    };\n\n    // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.\n    const setScale = (next, remember = false) => {\n      value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));\n      root.style.setProperty('--am-scale', String(value));\n      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role=\"img\"]')) {\n        const box = svg.viewBox?.baseVal;\n        if (!box || !(box.width > 0) || !(box.height > 0)) continue;\n        svg.setAttribute('width', String(Math.ceil(box.width * value)));\n        svg.setAttribute('height', String(Math.ceil(box.height * value)));\n      }\n      updateButtons();\n      if (remember) saveScale(value);\n      window.dispatchEvent(new Event('am-scale'));\n    };\n\n    // A page with no stored choice is left exactly as it was rendered: no inline variable, no svg rewrite, no extra layout pass.\n    value = parseFloat(getComputedStyle(root).getPropertyValue('--am-scale')) || 1;\n    updateButtons();\n    const saved = savedScale();\n    if (inRange(saved) && saved !== value) setScale(saved);\n    scaleDown.hidden = false;\n    scaleUp.hidden = false;\n    scaleDown.addEventListener('click', () => {\n      if (scaleDown.getAttribute('aria-disabled') === 'true') return;\n      setScale(value - step, true);\n    });\n    scaleUp.addEventListener('click', () => {\n      if (scaleUp.getAttribute('aria-disabled') === 'true') return;\n      setScale(value + step, true);\n    });\n  }\n\n  // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size\n  // buttons, so open at that end: Theme, Mode and A\u2212 / A+ are reached by scrolling toward the start. A reader scroll leaves the\n  // position we set, so a later resize does not pull the toolbar back.\n  if (carrier) {\n    const rtl = getComputedStyle(carrier).direction === 'rtl';\n    let lastProgrammatic = null;\n    let readerScrolled = false;\n    const scrollToEnd = () => {\n      if (carrier.scrollWidth <= carrier.clientWidth) return;\n      // Chrome keeps a right-to-left box's scrollLeft negative; the browser clamps either value to the real end.\n      carrier.scrollTo({ left: rtl ? -carrier.scrollWidth : carrier.scrollWidth });\n      lastProgrammatic = carrier.scrollLeft;\n    };\n    carrier.addEventListener('scroll', () => {\n      if (Math.abs(carrier.scrollLeft - lastProgrammatic) > 1) readerScrolled = true;\n    });\n    scrollToEnd();\n    addEventListener('resize', () => {\n      if (!readerScrolled) scrollToEnd();\n    });\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is\n  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,\n  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and\n  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have).\n  const flasher = (btn) => {\n    const idle = btn.textContent;\n    let clicks = 0;\n    return () => {\n      btn.textContent = btn.dataset.done;\n      const mine = ++clicks;\n      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);\n    };\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  if (copyBtn) {\n    const flash = flasher(copyBtn);\n    copyBtn.addEventListener('click', async () => {\n      const nodes = document.querySelectorAll('#am-source');\n      await copyText(nodes[nodes.length - 1]?.value ?? '');\n      flash();\n    });\n  }\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    const flash = flasher(btn);\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash();\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      // Every option starts unselected, so an ask the reader never clicked has no answer: the reply names the suggestion\n      // instead of passing it off as the reader's choice.\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const suggested = d.suggested.join(', ') || '\u2014';\n      const why = !d.touched ? `${ui.untouched}: ${suggested}` : same ? ui.confirmed : `${ui.was}: ${suggested}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  // A page served by `am serve` runs without localStorage and the phone may discard its tab, so it keeps the answers on the\n  // server: data-am-save names the write route and data-am-state carries what the server already holds for this page version.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before\n  };\n  // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    if (serve?.restored?.reply) return serve.restored.reply;\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n    if (serve) saveSoon({ reply: state });\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started\n    // with the suggestion selected and saved it untouched, and that state must come back unselected.\n    if (state?.touched && Array.isArray(state.picked) && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the\n  // same record as the answers (reply.js), so a re-opened page finds them again.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {});\n  };\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    const restored = serve?.restored?.remark;\n    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).\n  const drafts = new Map();\n  const clearBtn = document.createElement('button');\n  clearBtn.type = 'button';\n  clearBtn.className = 'am-btn am-btn--remark-clear';\n  clearBtn.textContent = ui.clear;\n  // Clear all drops saved marks and drafts, so it shows while either exists.\n  const toClear = () => marks.size + drafts.size;\n  const showClear = () => { clearBtn.hidden = toClear() === 0; };\n  btn.insertAdjacentElement('afterend', clearBtn);\n  let clearTimer = null;\n  let clearArmed = false;\n  const resetClear = () => {\n    if (clearTimer !== null) clearTimeout(clearTimer);\n    clearTimer = null;\n    clearArmed = false;\n    clearBtn.classList.remove('is-armed');\n    clearBtn.textContent = ui.clear;\n    showClear();\n  };\n  const armClear = () => {\n    clearArmed = true;\n    clearBtn.classList.add('is-armed');\n    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());\n    clearTimer = setTimeout(resetClear, 4000);\n  };\n  clearBtn.addEventListener('click', () => {\n    if (!clearArmed) {\n      armClear();\n      return;\n    }\n    for (const el of document.querySelectorAll('.am-mark')) unpaint(el);\n    marks.clear();\n    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.\n    drafts.clear();\n    try {\n      localStorage.removeItem(storeKey);\n    } catch {\n      // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.\n    }\n    if (serve) saveSoon({ remark: [] });\n    resetClear();\n    document.dispatchEvent(new Event('am-remark-change'));\n  });\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    if (serve) saveSoon({ remark: [...marks.values()] });\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n    showClear();\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  showClear();\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1\u20134 pick a kind from the keyboard and\n  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  let keepDraft = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    keepDraft?.();\n    keepDraft = null;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    const draft = drafts.get(key);\n    let kind = draft?.kind ?? mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });\n    keepDraft = () => {\n      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });\n      else drafts.delete(key);\n      showClear();\n    };\n    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };\n    keep.addEventListener('click', () => {\n      done();\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        done();\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const choose = (k) => {\n      kind = k;\n      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));\n      keep.disabled = false;\n      need.hidden = true;\n    };\n    const kindBtns = KINDS.map((k, i) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.dataset.n = i + 1;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => choose(k));\n      return kb;\n    });\n    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind\n    // only while the focus is outside the note.\n    pop.onkeydown = (e) => {\n      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {\n        e.preventDefault();\n        if (!keep.disabled) keep.click();\n        return;\n      }\n      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;\n      e.preventDefault();\n      choose(KINDS[Number(e.key) - 1]);\n      note.focus();\n    };\n    actions.append(need);\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block\n  // that already had a tabindex keeps it; only the ones the mode added lose it again.\n  const pickKey = (e) => {\n    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;\n    e.preventDefault();\n    open(e.target);\n  };\n  const focusable = (on) => {\n    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys\n    for (const el of keyMap().keys()) {\n      if (on && !el.hasAttribute('tabindex')) {\n        el.tabIndex = 0;\n        el.setAttribute('data-am-pick', '');\n      } else if (!on && el.hasAttribute('data-am-pick')) {\n        el.removeAttribute('tabindex');\n        el.removeAttribute('data-am-pick');\n      }\n    }\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    document.body[toggle]('keydown', pickKey);\n    focusable(on);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  // The width floors are text sizes (px at scale 1). They take the page scale on every pass, so a runtime change of --am-scale re-plans.\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const pageScale = () => {\n    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--am-scale'));\n    return Number.isFinite(scale) && scale > 0 ? scale : 1;\n  };\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table, scale) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    const scale = pageScale();\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t, scale) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN * scale + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN * scale, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN * scale, shrunk, tableCols * TABLE_COL_MIN * scale + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.\n  addEventListener('am-scale', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n// The outline rail of a doc page (src/templates/doc.js): the markup already works without a script, <details> opens the list and the\n// links jump. This adds the hover dwell, the open direction, the keys, the tap outside and the marking of the current section.\n(() => {\n  const nav = document.querySelector('nav.am-toc');\n  const box = nav && nav.querySelector('details.am-outline');\n  if (!box) return;\n  const sum = box.querySelector('summary');\n  const links = Array.from(box.querySelectorAll('.am-outline-list a'));\n  const ticks = Array.from(box.querySelectorAll('.am-tick'));\n  const LIST_W = 240; // keep in step with .am-outline-list in src/themes/base.css\n  const EDGE = 10; // the 6px gap to the rail plus a margin to the viewport edge\n  let current = '';\n  let byHover = false;\n  let dwell = 0;\n  let leave = 0;\n\n  // Open away from the body when the room outside the rail fits the list; otherwise over the body. Never past the viewport.\n  const place = () => {\n    const r = sum.getBoundingClientRect();\n    const right = r.left + r.width / 2 > innerWidth / 2;\n    const room = right ? innerWidth - r.right : r.left;\n    nav.dataset.flow = room >= Math.min(LIST_W, innerWidth - 48) + EDGE ? 'out' : 'in';\n  };\n  const setOpen = (open) => {\n    if (open) place();\n    box.open = open;\n    if (!open) byHover = false;\n  };\n  const peek = (tick) => ticks.forEach((t) => t.classList.toggle('is-peek', t === tick));\n  const currentLink = () => links.find((a) => a.getAttribute('aria-current') === 'true') || links[0];\n\n  const mark = (id) => {\n    current = id;\n    ticks.forEach((t) => t.classList.toggle('is-current', t.dataset.id === id));\n    links.forEach((a) => {\n      if (a.getAttribute('href') === `#panel-${id}`) a.setAttribute('aria-current', 'true');\n      else a.removeAttribute('aria-current');\n    });\n  };\n  const sections = ticks.map((t) => document.getElementById(`panel-${t.dataset.id}`)).filter(Boolean);\n  if (sections.length) mark(sections[0].id.slice(6));\n  if (sections.length && 'IntersectionObserver' in window) {\n    // A thin band a third of the way down the viewport: the section across it is the one being read.\n    const seen = new Set();\n    const io = new IntersectionObserver((entries) => {\n      entries.forEach((e) => (e.isIntersecting ? seen.add(e.target) : seen.delete(e.target)));\n      const hit = sections.filter((s) => seen.has(s)).pop();\n      if (hit && hit.id.slice(6) !== current) mark(hit.id.slice(6));\n    }, { rootMargin: '-30% 0px -65% 0px' });\n    sections.forEach((s) => io.observe(s));\n  }\n\n  place();\n  addEventListener('resize', place);\n\n  // Mouse: dwelling on the rail opens the list, leaving it closes a list opened that way. A tap or click opens it for good.\n  box.addEventListener('pointerenter', (e) => {\n    clearTimeout(leave);\n    if (e.pointerType !== 'mouse' || box.open) return;\n    dwell = setTimeout(() => { setOpen(true); byHover = true; }, 300);\n  });\n  box.addEventListener('pointerleave', () => {\n    clearTimeout(dwell);\n    // A link the keyboard moved into keeps the list open; focusout closes it once the focus leaves the nav.\n    if (byHover) leave = setTimeout(() => { if (!nav.contains(document.activeElement)) setOpen(false); }, 250);\n  });\n  sum.addEventListener('click', (e) => {\n    clearTimeout(dwell);\n    if (box.open && byHover) { e.preventDefault(); byHover = false; return; }\n    place();\n  });\n  box.addEventListener('toggle', () => { if (box.open) peek(null); });\n\n  // Keyboard: the summary opens with Enter or Space (native); arrows move through the links; Esc closes and returns to the rail.\n  sum.addEventListener('focus', () => {\n    if (sum.matches(':focus-visible')) peek(ticks.find((t) => t.dataset.id === current));\n  });\n  sum.addEventListener('blur', () => peek(null));\n  nav.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape' && box.open) {\n      e.preventDefault();\n      setOpen(false);\n      sum.focus();\n      return;\n    }\n    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;\n    const at = links.indexOf(document.activeElement);\n    if (at < 0 && e.target !== sum) return;\n    e.preventDefault();\n    if (!box.open) setOpen(true);\n    let next;\n    if (e.key === 'Home') next = links[0];\n    else if (e.key === 'End') next = links[links.length - 1];\n    else if (at < 0) next = e.key === 'ArrowDown' ? currentLink() : links[links.length - 1];\n    else next = links[Math.min(links.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];\n    next.focus();\n  });\n  nav.addEventListener('focusout', (e) => {\n    if (box.open && e.relatedTarget && !nav.contains(e.relatedTarget)) setOpen(false);\n  });\n\n  // Choosing a section or tapping outside closes the list.\n  links.forEach((a) => a.addEventListener('click', () => setOpen(false)));\n  document.addEventListener('pointerdown', (e) => { if (box.open && !nav.contains(e.target)) setOpen(false); });\n  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && box.open && !nav.contains(e.target)) setOpen(false); });\n})();\n})();\n";
+var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is kept, except a\n  // theme or mode that no toolbar option names: that is the host's own setting (the Claude desktop app sets data-theme=\"dark\"), and\n  // keeping it would leave the page unstyled.\n  const carrier = document.querySelector('.am-toolbar');\n  const listFor = { 'data-theme': 'theme', 'data-mode': 'mode' };\n  const foreign = (attr, value) => {\n    const options = listFor[attr] && document.querySelector(`select[data-am=\"${listFor[attr]}\"]`)?.options;\n    return Boolean(value) && options != null && ![...options].some((o) => o.value === value);\n  };\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    const own = root.getAttribute(attr);\n    if ((own === null || foreign(attr, own)) && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  // \u2500\u2500 Text size \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  // A\u2212 / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow\n  // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no\n  // second copy of the numbers. A reader's choice is remembered in this browser and wins over the page's own scale; where storage\n  // is off (am serve, file://) it lasts for this tab, and the click still works.\n  const scaleDown = document.querySelector('[data-am=\"scale-down\"]');\n  const scaleUp = document.querySelector('[data-am=\"scale-up\"]');\n  if (scaleDown && scaleUp) {\n    const min = Number(scaleDown.dataset.min);\n    const max = Number(scaleDown.dataset.max);\n    const step = Number(scaleDown.dataset.step);\n    const storeKey = 'am-scale';\n    let value;\n\n    const inRange = (n) => Number.isFinite(n) && n >= min && n <= max;\n    const savedScale = () => {\n      try {\n        return Number(localStorage.getItem(storeKey));\n      } catch {\n        return NaN;\n      }\n    };\n    const saveScale = (n) => {\n      try {\n        localStorage.setItem(storeKey, String(n));\n      } catch {\n        // Storage may be off (am serve, file://); the size then lasts until the tab closes.\n      }\n    };\n\n    const updateButtons = () => {\n      const setUnavailable = (btn, unavailable) => {\n        if (unavailable) btn.setAttribute('aria-disabled', 'true');\n        else btn.removeAttribute('aria-disabled');\n      };\n      setUnavailable(scaleDown, value <= min);\n      setUnavailable(scaleUp, value >= max);\n    };\n\n    // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.\n    const setScale = (next, remember = false) => {\n      value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));\n      root.style.setProperty('--am-scale', String(value));\n      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role=\"img\"]')) {\n        const box = svg.viewBox?.baseVal;\n        if (!box || !(box.width > 0) || !(box.height > 0)) continue;\n        svg.setAttribute('width', String(Math.ceil(box.width * value)));\n        svg.setAttribute('height', String(Math.ceil(box.height * value)));\n      }\n      updateButtons();\n      if (remember) saveScale(value);\n      window.dispatchEvent(new Event('am-scale'));\n    };\n\n    // A page with no stored choice is left exactly as it was rendered: no inline variable, no svg rewrite, no extra layout pass.\n    value = parseFloat(getComputedStyle(root).getPropertyValue('--am-scale')) || 1;\n    updateButtons();\n    const saved = savedScale();\n    if (inRange(saved) && saved !== value) setScale(saved);\n    scaleDown.hidden = false;\n    scaleUp.hidden = false;\n    scaleDown.addEventListener('click', () => {\n      if (scaleDown.getAttribute('aria-disabled') === 'true') return;\n      setScale(value - step, true);\n    });\n    scaleUp.addEventListener('click', () => {\n      if (scaleUp.getAttribute('aria-disabled') === 'true') return;\n      setScale(value + step, true);\n    });\n  }\n\n  // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size\n  // buttons, so open at that end: Theme, Mode and A\u2212 / A+ are reached by scrolling toward the start. A reader scroll leaves the\n  // position we set, so a later resize does not pull the toolbar back.\n  if (carrier) {\n    const rtl = getComputedStyle(carrier).direction === 'rtl';\n    let lastProgrammatic = null;\n    let readerScrolled = false;\n    const scrollToEnd = () => {\n      if (carrier.scrollWidth <= carrier.clientWidth) return;\n      // Chrome keeps a right-to-left box's scrollLeft negative; the browser clamps either value to the real end.\n      carrier.scrollTo({ left: rtl ? -carrier.scrollWidth : carrier.scrollWidth });\n      lastProgrammatic = carrier.scrollLeft;\n    };\n    carrier.addEventListener('scroll', () => {\n      if (Math.abs(carrier.scrollLeft - lastProgrammatic) > 1) readerScrolled = true;\n    });\n    scrollToEnd();\n    addEventListener('resize', () => {\n      if (!readerScrolled) scrollToEnd();\n    });\n  }\n\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      document.execCommand('copy');\n      ta.remove();\n    }\n  };\n  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is\n  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,\n  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and\n  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have).\n  const flasher = (btn) => {\n    const idle = btn.textContent;\n    let clicks = 0;\n    return () => {\n      btn.textContent = btn.dataset.done;\n      const mine = ++clicks;\n      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);\n    };\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  if (copyBtn) {\n    const flash = flasher(copyBtn);\n    copyBtn.addEventListener('click', async () => {\n      const nodes = document.querySelectorAll('#am-source');\n      await copyText(nodes[nodes.length - 1]?.value ?? '');\n      flash();\n    });\n  }\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    const flash = flasher(btn);\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      await copyText([...lines].map((l) => l.textContent).join('\\n'));\n      flash();\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      // Every option starts unselected, so an ask the reader never clicked has no answer: the reply names the suggestion\n      // instead of passing it off as the reader's choice.\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const suggested = d.suggested.join(', ') || '\u2014';\n      const why = !d.touched ? `${ui.untouched}: ${suggested}` : same ? ui.confirmed : `${ui.was}: ${suggested}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  // A page served by `am serve` runs without localStorage and the phone may discard its tab, so it keeps the answers on the\n  // server: data-am-save names the write route and data-am-state carries what the server already holds for this page version.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before\n  };\n  // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // A preview may draw a mock panel; it gets no comment box and cannot shadow the real panel's id.\n  const panels = [...document.querySelectorAll('.am-panel')].filter((panel) => !panel.closest('.am-ask-preview'));\n  // An ask inside a preview is part of the drawing, not a decision of the page.\n  const asks = [...document.querySelectorAll('.am-ask')].filter((a) => !a.closest('.am-ask-preview'));\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    if (serve?.restored?.reply) return serve.restored.reply;\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n    if (serve) saveSoon({ reply: state });\n  };\n  // A preview can hold a mock form; those controls are a picture, not the reader's answer.\n  const inputsOf = (ask) => [...ask.querySelectorAll('input')].filter((i) => !i.closest('.am-ask-preview'));\n  const picked = (ask) => inputsOf(ask).filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = inputsOf(ask);\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started\n    // with the suggestion selected and saved it untouched, and that state must come back unselected.\n    if (state?.touched && Array.isArray(state.picked) && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = (e) => {\n      if (e?.target?.closest?.('.am-ask-preview')) return;\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(e); });\n    // In cards the whole card looks clickable, so a click on its preview picks the option too. A control in the drawing is not the answer.\n    ask.addEventListener('click', (e) => {\n      if (!ask.classList.contains('am-ask--cards')) return;\n      if (!e.target.closest?.('.am-ask-preview') || e.target.closest('input, button, a, select, textarea, summary, label')) return;\n      const input = e.target.closest('.am-ask-card')?.querySelector('input');\n      if (!input) return;\n      const wasPicked = input.checked;\n      input.click();\n      // A radio that is already on sends no change event, and the click still confirms the suggestion.\n      if (wasPicked && input.type === 'radio') answer();\n    });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: inputsOf(ask).filter((i) => i.hasAttribute('data-suggested')).map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the\n  // same record as the answers (reply.js), so a re-opened page finds them again.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {});\n  };\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    const restored = serve?.restored?.remark;\n    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).\n  const drafts = new Map();\n  const clearBtn = document.createElement('button');\n  clearBtn.type = 'button';\n  clearBtn.className = 'am-btn am-btn--remark-clear';\n  clearBtn.textContent = ui.clear;\n  // Clear all drops saved marks and drafts, so it shows while either exists.\n  const toClear = () => marks.size + drafts.size;\n  const showClear = () => { clearBtn.hidden = toClear() === 0; };\n  btn.insertAdjacentElement('afterend', clearBtn);\n  let clearTimer = null;\n  let clearArmed = false;\n  const resetClear = () => {\n    if (clearTimer !== null) clearTimeout(clearTimer);\n    clearTimer = null;\n    clearArmed = false;\n    clearBtn.classList.remove('is-armed');\n    clearBtn.textContent = ui.clear;\n    showClear();\n  };\n  const armClear = () => {\n    clearArmed = true;\n    clearBtn.classList.add('is-armed');\n    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());\n    clearTimer = setTimeout(resetClear, 4000);\n  };\n  clearBtn.addEventListener('click', () => {\n    if (!clearArmed) {\n      armClear();\n      return;\n    }\n    for (const el of document.querySelectorAll('.am-mark')) unpaint(el);\n    marks.clear();\n    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.\n    drafts.clear();\n    try {\n      localStorage.removeItem(storeKey);\n    } catch {\n      // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.\n    }\n    if (serve) saveSoon({ remark: [] });\n    resetClear();\n    document.dispatchEvent(new Event('am-remark-change'));\n  });\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    if (serve) saveSoon({ remark: [...marks.values()] });\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n    showClear();\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  showClear();\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1\u20134 pick a kind from the keyboard and\n  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  let keepDraft = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    keepDraft?.();\n    keepDraft = null;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    const draft = drafts.get(key);\n    let kind = draft?.kind ?? mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });\n    keepDraft = () => {\n      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });\n      else drafts.delete(key);\n      showClear();\n    };\n    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };\n    keep.addEventListener('click', () => {\n      done();\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        done();\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const choose = (k) => {\n      kind = k;\n      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));\n      keep.disabled = false;\n      need.hidden = true;\n    };\n    const kindBtns = KINDS.map((k, i) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.dataset.n = i + 1;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => choose(k));\n      return kb;\n    });\n    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind\n    // only while the focus is outside the note.\n    pop.onkeydown = (e) => {\n      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {\n        e.preventDefault();\n        if (!keep.disabled) keep.click();\n        return;\n      }\n      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;\n      e.preventDefault();\n      choose(KINDS[Number(e.key) - 1]);\n      note.focus();\n    };\n    actions.append(need);\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block\n  // that already had a tabindex keeps it; only the ones the mode added lose it again.\n  const pickKey = (e) => {\n    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;\n    e.preventDefault();\n    open(e.target);\n  };\n  const focusable = (on) => {\n    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys\n    for (const el of keyMap().keys()) {\n      if (on && !el.hasAttribute('tabindex')) {\n        el.tabIndex = 0;\n        el.setAttribute('data-am-pick', '');\n      } else if (!on && el.hasAttribute('data-am-pick')) {\n        el.removeAttribute('tabindex');\n        el.removeAttribute('data-am-pick');\n      }\n    }\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    document.body[toggle]('keydown', pickKey);\n    focusable(on);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  // The width floors are text sizes (px at scale 1). They take the page scale on every pass, so a runtime change of --am-scale re-plans.\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const pageScale = () => {\n    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--am-scale'));\n    return Number.isFinite(scale) && scale > 0 ? scale : 1;\n  };\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table, scale) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    const scale = pageScale();\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t, scale) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN * scale + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN * scale, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN * scale, shrunk, tableCols * TABLE_COL_MIN * scale + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.\n  addEventListener('am-scale', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n// The outline rail of a doc page (src/templates/doc.js): the markup already works without a script, <details> opens the list and the\n// links jump. This adds the hover dwell, the open direction, the keys, the tap outside and the marking of the current section.\n(() => {\n  const nav = document.querySelector('nav.am-toc');\n  const box = nav && nav.querySelector('details.am-outline');\n  if (!box) return;\n  const sum = box.querySelector('summary');\n  const links = Array.from(box.querySelectorAll('.am-outline-list a'));\n  const ticks = Array.from(box.querySelectorAll('.am-tick'));\n  const LIST_W = 240; // keep in step with .am-outline-list in src/themes/base.css\n  const EDGE = 10; // the 6px gap to the rail plus a margin to the viewport edge\n  let current = '';\n  let byHover = false;\n  let dwell = 0;\n  let leave = 0;\n\n  // Open away from the body when the room outside the rail fits the list; otherwise over the body. Never past the viewport.\n  const place = () => {\n    const r = sum.getBoundingClientRect();\n    const right = r.left + r.width / 2 > innerWidth / 2;\n    const room = right ? innerWidth - r.right : r.left;\n    nav.dataset.flow = room >= Math.min(LIST_W, innerWidth - 48) + EDGE ? 'out' : 'in';\n  };\n  const setOpen = (open) => {\n    if (open) place();\n    box.open = open;\n    if (!open) byHover = false;\n  };\n  const peek = (tick) => ticks.forEach((t) => t.classList.toggle('is-peek', t === tick));\n  const currentLink = () => links.find((a) => a.getAttribute('aria-current') === 'true') || links[0];\n\n  const mark = (id) => {\n    current = id;\n    ticks.forEach((t) => t.classList.toggle('is-current', t.dataset.id === id));\n    links.forEach((a) => {\n      if (a.getAttribute('href') === `#panel-${id}`) a.setAttribute('aria-current', 'true');\n      else a.removeAttribute('aria-current');\n    });\n  };\n  const sections = ticks.map((t) => document.getElementById(`panel-${t.dataset.id}`)).filter(Boolean);\n  if (sections.length) mark(sections[0].id.slice(6));\n  if (sections.length && 'IntersectionObserver' in window) {\n    // A thin band a third of the way down the viewport: the section across it is the one being read.\n    const seen = new Set();\n    const io = new IntersectionObserver((entries) => {\n      entries.forEach((e) => (e.isIntersecting ? seen.add(e.target) : seen.delete(e.target)));\n      const hit = sections.filter((s) => seen.has(s)).pop();\n      if (hit && hit.id.slice(6) !== current) mark(hit.id.slice(6));\n    }, { rootMargin: '-30% 0px -65% 0px' });\n    sections.forEach((s) => io.observe(s));\n  }\n\n  place();\n  addEventListener('resize', place);\n\n  // Mouse: dwelling on the rail opens the list, leaving it closes a list opened that way. A tap or click opens it for good.\n  box.addEventListener('pointerenter', (e) => {\n    clearTimeout(leave);\n    if (e.pointerType !== 'mouse' || box.open) return;\n    dwell = setTimeout(() => { setOpen(true); byHover = true; }, 300);\n  });\n  box.addEventListener('pointerleave', () => {\n    clearTimeout(dwell);\n    // A link the keyboard moved into keeps the list open; focusout closes it once the focus leaves the nav.\n    if (byHover) leave = setTimeout(() => { if (!nav.contains(document.activeElement)) setOpen(false); }, 250);\n  });\n  sum.addEventListener('click', (e) => {\n    clearTimeout(dwell);\n    if (box.open && byHover) { e.preventDefault(); byHover = false; return; }\n    place();\n  });\n  box.addEventListener('toggle', () => { if (box.open) peek(null); });\n\n  // Keyboard: the summary opens with Enter or Space (native); arrows move through the links; Esc closes and returns to the rail.\n  sum.addEventListener('focus', () => {\n    if (sum.matches(':focus-visible')) peek(ticks.find((t) => t.dataset.id === current));\n  });\n  sum.addEventListener('blur', () => peek(null));\n  nav.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape' && box.open) {\n      e.preventDefault();\n      setOpen(false);\n      sum.focus();\n      return;\n    }\n    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;\n    const at = links.indexOf(document.activeElement);\n    if (at < 0 && e.target !== sum) return;\n    e.preventDefault();\n    if (!box.open) setOpen(true);\n    let next;\n    if (e.key === 'Home') next = links[0];\n    else if (e.key === 'End') next = links[links.length - 1];\n    else if (at < 0) next = e.key === 'ArrowDown' ? currentLink() : links[links.length - 1];\n    else next = links[Math.min(links.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];\n    next.focus();\n  });\n  nav.addEventListener('focusout', (e) => {\n    if (box.open && e.relatedTarget && !nav.contains(e.relatedTarget)) setOpen(false);\n  });\n\n  // Choosing a section or tapping outside closes the list.\n  links.forEach((a) => a.addEventListener('click', () => setOpen(false)));\n  document.addEventListener('pointerdown', (e) => { if (box.open && !nav.contains(e.target)) setOpen(false); });\n  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && box.open && !nav.contains(e.target)) setOpen(false); });\n})();\n})();\n";
 var TABLE_JS = "(() => {\n  const NUMBER = /^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i;\n  const FORMATTED_NUMBER = /^[+-]?\\$?(?:(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d*)?|\\.\\d+)%?$/;\n  const INTEGER = /^[+-]?\\d+$/;\n  const ZERO_FRACTION = /^[+-]?\\d+\\.0*$/;\n  const DATE = /^\\d{4}-\\d{2}-\\d{2}(?:[T ]\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,3})?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$/;\n  const INTERACTIVE = 'a, button, input, select, textarea, details, audio[controls], video[controls], [contenteditable], [tabindex]';\n  const validDate = (text) => {\n    if (!DATE.test(text)) return false;\n    const [year, month, day] = text.slice(0, 10).split('-').map(Number);\n    const date = new Date(0);\n    date.setUTCHours(0, 0, 0, 0);\n    date.setUTCFullYear(year, month - 1, day);\n    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && Number.isFinite(Date.parse(text));\n  };\n  const numberValue = (text) => {\n    let normalized = text;\n    if (FORMATTED_NUMBER.test(text)) normalized = text.replace(/[$,%]/g, '');\n    else if (!NUMBER.test(text)) return null;\n    if (INTEGER.test(normalized)) return BigInt(normalized);\n    if (ZERO_FRACTION.test(normalized)) return BigInt(normalized.slice(0, normalized.indexOf('.')));\n    const value = Number(normalized);\n    return Number.isFinite(value) ? value : null;\n  };\n  const typedValue = (text) => {\n    const number = numberValue(text);\n    if (number !== null) return number;\n    return validDate(text) ? Date.parse(text) : null;\n  };\n  const relayout = () => window.dispatchEvent(new Event('resize'));\n\n  for (const table of document.querySelectorAll('table[data-am-table]')) {\n    const options = new Set(table.dataset.amTable.split(/\\s+/));\n    const body = table.tBodies[0];\n    if (!body) continue;\n\n    if (options.has('filter')) {\n      const controls = table.parentElement.previousElementSibling;\n      const input = controls?.classList.contains('am-table-controls') ? controls.querySelector('[data-am-table-filter]') : null;\n      if (input) {\n        controls.hidden = false;\n        input.addEventListener('input', () => {\n          const query = input.value.trim().toLocaleLowerCase();\n          for (const row of body.rows) row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);\n          relayout();\n        });\n      }\n    }\n\n    if (!options.has('sort')) continue;\n    const headers = [...(table.tHead?.rows[0]?.cells ?? [])];\n    headers.forEach((head, column) => {\n      const button = document.createElement('button');\n      button.type = 'button';\n      button.className = 'am-table-sort';\n      button.setAttribute('aria-label', head.textContent.trim());\n      const moved = [...head.childNodes].filter((child) => !(child.nodeType === 1 && (child.matches(INTERACTIVE) || child.querySelector(INTERACTIVE))));\n      head.insertBefore(button, moved[0] ?? null);\n      button.append(...moved);\n      button.addEventListener('click', () => {\n        const direction = head.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';\n        for (const cell of headers) cell.removeAttribute('aria-sort');\n        head.setAttribute('aria-sort', direction);\n        const rows = [...body.rows];\n        const texts = rows.map((row) => row.cells[column]?.textContent.trim() ?? '');\n        const numeric = texts.every((text) => numberValue(text) !== null);\n        const dates = texts.every(validDate);\n        const byValue = head.getAttribute('align') === 'right' || numeric || dates;\n        const sorted = rows.map((row, index) => ({ row, index, text: texts[index], value: byValue ? typedValue(texts[index]) : null }));\n        sorted.sort((a, b) => {\n          let compared;\n          if (byValue && (a.value !== null || b.value !== null)) {\n            if (a.value === null) compared = 1;\n            else if (b.value === null) compared = -1;\n            else compared = a.value < b.value ? -1 : a.value > b.value ? 1 : 0;\n          }\n          compared ??= a.text.localeCompare(b.text);\n          return compared === 0 ? a.index - b.index : direction === 'ascending' ? compared : -compared;\n        });\n        body.append(...sorted.map(({ row }) => row));\n        relayout();\n      });\n    });\n  }\n})();\n";
 var TABLE_CSS = `.am-table-controls { margin: 0 0 8px; }
 .am-table-filter { display: flex; align-items: center; gap: 8px; font-size: var(--am-fs-small); color: var(--ink-2); }
@@ -1206,7 +1228,7 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
   }
 })();
 `;
-var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
+var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input. A control inside an option preview is a picture, not an answer.\n  let input = false;\n  const inPreview = (el) => Boolean(el.closest?.('.am-ask-preview'));\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar') && !inPreview(e.target)) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => {\n    if (e.target.closest?.('.am-ask input') && !inPreview(e.target)) input = true;\n    // In cards the preview picks its option too (src/runtime/reply.js); a control in the drawing does not.\n    else if (e.target.closest?.('.am-ask--cards .am-ask-preview') && !inPreview(e.target) && !e.target.closest('input, button, a, select, textarea, summary, label')) input = true;\n  }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
 var CLOSE_AFTER_CSS = "/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the\n   window in the top layer and stays hidden unless open. */\n.am-closing { display: none; }\n.am-closing:popover-open {\n  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  padding: 10px 14px; font-size: var(--am-fs-text); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n@media print {\n  .am-closing { display: none !important; }\n}\n";
 var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src/render.js adds this script after the page script. When the reply is copied,
 // the reply sheet closes and a popover counts down to closing the tab. Browsers close only a tab no link has moved on, so a tab that
@@ -2152,15 +2174,15 @@ import { basename, join } from "node:path";
 var HEX = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 var FN = /^(rgba?|hsla?)\(\s*([^)]*)\)$/i;
 function parseColor(value) {
-  const v2 = String(value).trim();
-  const hex = v2.match(HEX);
+  const v = String(value).trim();
+  const hex = v.match(HEX);
   if (hex) {
     let h2 = hex[1];
     if (h2.length <= 4) h2 = [...h2].map((c2) => c2 + c2).join("");
     const n = [0, 2, 4, 6].map((i) => parseInt(h2.slice(i, i + 2) || "ff", 16));
     return [n[0], n[1], n[2], n[3] / 255];
   }
-  const fn2 = v2.match(FN);
+  const fn2 = v.match(FN);
   if (!fn2) return null;
   const parts = fn2[2].split(/[\s,/]+/).filter(Boolean);
   if (parts.length < 3 || parts.length > 4) return null;
@@ -2178,13 +2200,13 @@ function parseColor(value) {
 }
 var over = ([r, g, b, a3], [br2, bg, bb]) => [r * a3 + br2 * (1 - a3), g * a3 + bg * (1 - a3), b * a3 + bb * (1 - a3), 1];
 var luminance = ([r, g, b]) => {
-  const c2 = [r, g, b].map((x) => x / 255).map((x) => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+  const c2 = [r, g, b].map((x2) => x2 / 255).map((x2) => x2 <= 0.03928 ? x2 / 12.92 : ((x2 + 0.055) / 1.055) ** 2.4);
   return 0.2126 * c2[0] + 0.7152 * c2[1] + 0.0722 * c2[2];
 };
 function contrast(fg, bg, base = [255, 255, 255, 1]) {
   const back = over(bg, base);
-  const [x, y2] = [luminance(over(fg, back)), luminance(back)];
-  return (Math.max(x, y2) + 0.05) / (Math.min(x, y2) + 0.05);
+  const [x2, y] = [luminance(over(fg, back)), luminance(back)];
+  return (Math.max(x2, y) + 0.05) / (Math.min(x2, y) + 0.05);
 }
 
 // src/themes/font-list.js
@@ -2199,9 +2221,9 @@ var FONT_NAMES = Object.freeze(Object.keys(FONTS));
 
 // src/version.js
 var SEMVER = /^v?(\d+)\.(\d+)\.(\d+)$/;
-function parseVersion(v2) {
-  const m2 = String(v2).trim().match(SEMVER);
-  return m2 ? m2.slice(1, 4).map(Number) : null;
+function parseVersion(v) {
+  const m = String(v).trim().match(SEMVER);
+  return m ? m.slice(1, 4).map(Number) : null;
 }
 function newer(a3, b) {
   const pa = parseVersion(a3);
@@ -2269,9 +2291,9 @@ var LENGTH = /^(?:\d+|\d*\.\d+)(?:px|em)?$/;
 var LANGS = languageIds();
 var UNSAFE_VALUE = /[;{}<]/;
 function shadowOk(value) {
-  const v2 = value.trim();
-  if (v2 === "none") return true;
-  let rest = v2;
+  const v = value.trim();
+  if (v === "none") return true;
+  let rest = v;
   while (rest) {
     if (!/^drop-shadow\(/i.test(rest)) return false;
     let depth = 0;
@@ -2303,12 +2325,12 @@ function normalizeTheme(name2, data, builtinNames = []) {
       return {};
     }
     const out = {};
-    for (const [k, v2] of Object.entries(g)) {
-      out[k] = v2;
+    for (const [k, v] of Object.entries(g)) {
+      out[k] = v;
       if (!k.startsWith("--")) errors.push(`${where}: "${k}" must start with --`);
-      else if (typeof v2 !== "string" || UNSAFE_VALUE.test(v2)) errors.push(`${where}: ${k} must be a string without ; { } <`);
-      else if (diagramTokenProblem(k, v2)) errors.push(`${where}: ${k} ${diagramTokenProblem(k, v2)}`);
-      else if (LENGTH_TOKENS.includes(k) && /^[\d.]+$/.test(v2.trim())) out[k] = `${v2.trim()}px`;
+      else if (typeof v !== "string" || UNSAFE_VALUE.test(v)) errors.push(`${where}: ${k} must be a string without ; { } <`);
+      else if (diagramTokenProblem(k, v)) errors.push(`${where}: ${k} ${diagramTokenProblem(k, v)}`);
+      else if (LENGTH_TOKENS.includes(k) && /^[\d.]+$/.test(v.trim())) out[k] = `${v.trim()}px`;
     }
     return out;
   };
@@ -2322,11 +2344,11 @@ function normalizeTheme(name2, data, builtinNames = []) {
   const css = cssField("css", data.css, errors);
   let video;
   if (data.video !== void 0) {
-    const v2 = data.video && typeof data.video === "object" ? data.video : {};
-    const vt2 = v2.tokens ?? {};
+    const v = data.video && typeof data.video === "object" ? data.video : {};
+    const vt2 = v.tokens ?? {};
     video = {
       tokens: { common: group("video.tokens.common", vt2.common), light: group("video.tokens.light", vt2.light), dark: group("video.tokens.dark", vt2.dark) },
-      css: cssField("video.css", v2.css, errors)
+      css: cssField("video.css", v.css, errors)
     };
   }
   const label = labelField(data.label, name2, errors);
@@ -2365,7 +2387,7 @@ function requiresField(requires, errors) {
 function labelField(label, name2, errors) {
   if (label === void 0) return Object.fromEntries(LANGS.map((l) => [l, name2]));
   if (typeof label === "string") return Object.fromEntries(LANGS.map((l) => [l, label]));
-  if (!label || typeof label !== "object" || Object.values(label).some((v2) => typeof v2 !== "string")) {
+  if (!label || typeof label !== "object" || Object.values(label).some((v) => typeof v !== "string")) {
     errors.push(`label must be a string or an object of ${LANGS.join(" / ")} strings`);
     return Object.fromEntries(LANGS.map((l) => [l, name2]));
   }
@@ -2380,8 +2402,8 @@ function cssField(where, css, errors) {
   }
   if (/<\/style/i.test(css)) errors.push(`${where} must not contain </style>`);
   const text2 = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  for (const m2 of text2.matchAll(/(?:^|[{};])\s*([^{};]+?)\s*\{/g)) {
-    const prelude = m2[1];
+  for (const m of text2.matchAll(/(?:^|[{};])\s*([^{};]+?)\s*\{/g)) {
+    const prelude = m[1];
     if (prelude.startsWith("@")) continue;
     const bad = prelude.split(",").map((s) => s.trim()).find((s) => !s.startsWith("&"));
     if (bad !== void 0) errors.push(`${where}: selector "${bad}" must start with & (the theme's root)`);
@@ -2393,11 +2415,11 @@ function externalResources(css) {
   if (typeof css !== "string") return [];
   const text2 = css.replace(/\/\*[\s\S]*?\*\//g, "");
   const found = [];
-  for (const m2 of text2.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
-    if (/^(?:https?:|\/\/)/i.test(m2[2].trim())) found.push(`url(${m2[2].trim()})`);
+  for (const m of text2.matchAll(/url\(\s*(['"]?)\s*([^'")]*)/gi)) {
+    if (/^(?:https?:|\/\/)/i.test(m[2].trim())) found.push(`url(${m[2].trim()})`);
   }
-  for (const m2 of text2.matchAll(/(?:-webkit-)?image-set\(([^;{}]*)/gi)) {
-    for (const s of m2[1].matchAll(/(['"])\s*((?:https?:|\/\/)[^'"]*)\1/gi)) found.push(`image-set(${s[2].trim()})`);
+  for (const m of text2.matchAll(/(?:-webkit-)?image-set\(([^;{}]*)/gi)) {
+    for (const s of m[1].matchAll(/(['"])\s*((?:https?:|\/\/)[^'"]*)\1/gi)) found.push(`image-set(${s[2].trim()})`);
   }
   if (/@import\b/i.test(text2)) found.push("@import");
   if (/@font-face\b/i.test(text2)) found.push("@font-face");
@@ -2405,7 +2427,7 @@ function externalResources(css) {
   return found;
 }
 function themeLinks(theme) {
-  const groups = (where, tokens) => ["common", "light", "dark"].flatMap((mode) => Object.entries(tokens?.[mode] ?? {}).map(([k, v2]) => ({ where: `${where}.${mode} ${k}`, text: v2 })));
+  const groups = (where, tokens) => ["common", "light", "dark"].flatMap((mode) => Object.entries(tokens?.[mode] ?? {}).map(([k, v]) => ({ where: `${where}.${mode} ${k}`, text: v })));
   const sources = [
     { where: "css", text: theme?.css },
     { where: "video.css", text: theme?.video?.css },
@@ -2507,7 +2529,7 @@ function readUserThemes(home, builtinNames) {
     if (!DENIED.has(e.code)) throw e;
     return { themes: themes2, broken, warning: `Cannot read the themes folder ${dir} (${e.code}); using the built-in themes only` };
   }
-  for (const f2 of files.filter((x) => x.toLowerCase().endsWith(".json")).sort()) {
+  for (const f2 of files.filter((x2) => x2.toLowerCase().endsWith(".json")).sort()) {
     const { name: name2, theme, errors } = readThemeFile(join(dir, f2), builtinNames);
     if (errors.length) broken.set(name2, { file: `themes/${f2}`, reason: errors.join("; ") });
     else themes2.push(theme);
@@ -2568,15 +2590,15 @@ function loadThemes(home, { extra } = {}) {
 }
 
 // node_modules/marked/lib/marked.esm.js
-function v() {
+function H() {
   return { async: false, breaks: false, extensions: null, gfm: true, hooks: null, pedantic: false, renderer: null, silent: false, tokenizer: null, walkTokens: null };
 }
-var y = v();
-function ee(a3) {
-  y = a3;
+var S = H();
+function se(a3) {
+  S = a3;
 }
 var B = { exec: () => null };
-function I(a3) {
+function D(a3) {
   let e = [];
   return (t) => {
     let n = Math.max(0, Math.min(3, t - 1)), s = e[n];
@@ -2590,107 +2612,107 @@ function c(a3, e = "") {
   }, getRegex: () => new RegExp(t, e) };
   return n;
 }
-var Me = ((a3 = "") => {
+var Te = ((a3 = "") => {
   try {
     return !!new RegExp("(?<=1)(?<!1)" + a3);
   } catch {
     return false;
   }
 })();
-var T = { codeRemoveIndent: /^(?: {0,3}\t| {1,4})/gm, outputLinkReplace: /\\([\[\]])/g, indentCodeCompensation: /^(\s+)(?:```)/, beginningSpace: /^\s+/, endingHash: /#$/, startingSpaceChar: /^ /, endingSpaceChar: / $/, endingSpaceTabChar: /[ \t]$/, nonSpaceChar: /[^ ]/, newLineCharGlobal: /\n/g, tabCharGlobal: /\t/g, leadingSpaceTab: /^[ \t]+/, multipleSpaceGlobal: /\s+/g, blankLine: /^[ \t]*$/, doubleBlankLine: /\n[ \t]*\n[ \t]*$/, blockquoteStart: /^ {0,3}>/, blockquoteSetextReplace: /\n {0,3}((?:=+|-+) *)(?=\n|$)/g, blockquoteSetextReplace2: /^ {0,3}>[ \t]?/gm, blockquoteMarkerWhitespace: /^( {0,3}>)([ \t]+)/gm, listReplaceNesting: /^ {1,4}(?=( {4})*[^ ])/g, listIsTask: /^\[[ xX]\] +\S/, listReplaceTask: /^\[[ xX]\] +/, listTaskCheckbox: /\[[ xX]\]/, anyLine: /\n.*\n/, hrefBrackets: /^<(.*)>$/, tableDelimiter: /[:|]/, tableAlignChars: /^\||\| *$/g, tableRowBlankLine: /\n[ \t]*$/, tableAlignRight: /^ *-+: *$/, tableAlignCenter: /^ *:-+: *$/, tableAlignLeft: /^ *:-+ *$/, startATag: /^<a /i, endATag: /^<\/a>/i, startPreScriptTag: /^<(pre|code|kbd|script)(\s|>)/i, endPreScriptTag: /^<\/(pre|code|kbd|script)(\s|>)/i, startAngleBracket: /^</, endAngleBracket: />$/, pedanticHrefTitle: /^([^'"]*[^\s])\s+(['"])(.*)\2/, unicodeAlphaNumeric: /[\p{L}\p{N}]/u, numericCharacterReference: /&#(?:(\d{1,7})|[Xx]([A-Fa-f0-9]{1,6}));/, numericCharacterReferenceOrAmpersand: /&#(?:(\d{1,7})|[Xx]([A-Fa-f0-9]{1,6}));|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, escapeTest: /[&<>"']/, escapeReplace: /[&<>"']/g, escapeTestNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/, escapeReplaceNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, caret: /(^|[^\[])\^/g, percentDecode: /%25/g, findPipe: /\|/g, splitPipe: / \|/, slashPipe: /\\\|/g, carriageReturn: /\r\n|\r/g, spaceLine: /^ +$/gm, notSpaceStart: /^\S*/, endingNewline: /\n$/, listItemRegex: (a3) => new RegExp(`^( {0,3}${a3})((?:[	 ][^\\n]*)?(?:\\n|$))`), nextBulletRegex: I((a3) => new RegExp(`^ {0,${a3}}(?:[*+-]|\\d{1,9}[.)])((?:[ 	][^\\n]*)?(?:\\n|$))`)), hrRegex: I((a3) => new RegExp(`^ {0,${a3}}((?:-[ 	]*){3,}|(?:_[ 	]*){3,}|(?:\\*[ 	]*){3,})(?:\\n+|$)`)), fencesBeginRegex: I((a3) => new RegExp(`^ {0,${a3}}(?:\`\`\`|~~~)`)), headingBeginRegex: I((a3) => new RegExp(`^ {0,${a3}}#{1,6}(?:\\s|$)`)), pedanticHeadingBeginRegex: I((a3) => new RegExp(`^ {0,${a3}}#`)), htmlBeginRegex: I((a3) => new RegExp(`^ {0,${a3}}(?:</?(?:${K})(?: +|$|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)`, "i")), blockquoteBeginRegex: I((a3) => new RegExp(`^ {0,${a3}}>`)) };
-var Ce = /^(?:[ \t]*(?:\n|$))+/;
-var Ee = /^((?: {4}| {0,3}\t)[^\n]+(?:\n(?:[ \t]*(?:\n|$))*)?)+/;
-var Ie = /^ {0,3}(`{3,}(?=[^`\n]*(?:\n|$))|~{3,})([^\n]*)(?:\n|$)(?:|([\s\S]*?)(?:\n|$))(?: {0,3}\1[~`]* *(?=\n|$)|$)/;
-var U = /^ {0,3}((?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/;
-var Be = /^ {0,3}(#{1,6})(?=\s|$)(.*)(?:\n+|$)/;
-var ne = / {0,3}(?:[*+-]|\d{1,9}[.)])/;
-var me = /^(?!bull |blockCode|fences|blockquote|heading|html|table)((?:.|\n(?!\s*?\n|bull |fences|blockquote|heading|hr|html|table))+?)\n {0,3}(=+|-+) *(?:\n+|$)/;
-var xe = c(me).replace(/bull/g, ne).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}(?:\s|$)/).replace(/hr/g, / {0,3}(?:(?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/\|table/g, "").getRegex();
-var De = c(me).replace(/bull/g, ne).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}(?:\s|$)/).replace(/hr/g, / {0,3}(?:(?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/table/g, / {0,3}\|?(?:[:\- ]*\|)+[\:\- ]*\n/).getRegex();
-var re = /^([^\n]+(?:\n(?!hr|heading|lheading|blockquote|fences|list|html|table|[ \t]+\n)[^\n]+)*)/;
-var qe = /^[^\n]+/;
-var se = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\])+/;
-var Ze = c(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n[ \t]*)?| *\n[ \t]*)(title))? *(?:\n+|$)/).replace("label", se).replace("title", /(?:"(?:\\"?|[^"\\])*"|'[^'\n]*(?:\n[^'\n]+)*\n?'|\([^()]*\))/).getRegex();
-var ve = c(/^(bull)([ \t][^\n]*?)?(?:\n|$)/).replace(/bull/g, ne).getRegex();
+var T = { codeRemoveIndent: /^(?: {0,3}\t| {1,4})/gm, outputLinkReplace: /\\([\[\]])/g, indentCodeCompensation: /^(\s+)(?:```)/, beginningSpace: /^\s+/, endingHash: /#$/, startingSpaceChar: /^ /, endingSpaceChar: / $/, endingSpaceTabChar: /[ \t]$/, nonSpaceChar: /[^ ]/, newLineCharGlobal: /\n/g, tabCharGlobal: /\t/g, leadingSpaceTab: /^[ \t]+/, multipleSpaceGlobal: /\s+/g, blankLine: /^[ \t]*$/, doubleBlankLine: /\n[ \t]*\n[ \t]*$/, blockquoteStart: /^ {0,3}>/, blockquoteSetextReplace: /\n {0,3}((?:=+|-+)[ \t]*)(?=\n|$)/g, blockquoteSetextReplace2: /^ {0,3}>[ \t]?/gm, blockquoteMarkerWhitespace: /^( {0,3}>)([ \t]+)/gm, listReplaceNesting: /^ {1,4}(?=( {4})*[^ ])/g, listIsTask: /^\[[ xX]\][ \t]+\S/, listReplaceTask: /^\[[ xX]\][ \t]+/, listTaskCheckbox: /\[[ xX]\]/, anyLine: /\n.*\n/, hrefBrackets: /^<(.*)>$/, tableDelimiter: /[:|]/, tableAlignChars: /^\||\| *$/g, tableRowBlankLine: /\n[ \t]*$/, tableAlignRight: /^ *-+: *$/, tableAlignCenter: /^ *:-+: *$/, tableAlignLeft: /^ *:-+ *$/, startATag: /^<a /i, endATag: /^<\/a>/i, startPreScriptTag: /^<(pre|code|kbd|script)(\s|>)/i, endPreScriptTag: /^<\/(pre|code|kbd|script)(\s|>)/i, startAngleBracket: /^</, endAngleBracket: />$/, pedanticHrefTitle: /^([^'"]*[^\s])\s+(['"])(.*)\2/, unicodeAlphaNumeric: /[\p{L}\p{N}]/u, numericCharacterReference: /&#(?:(\d{1,7})|[Xx]([A-Fa-f0-9]{1,6}));/, numericCharacterReferenceOrAmpersand: /&#(?:(\d{1,7})|[Xx]([A-Fa-f0-9]{1,6}));|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, escapeTest: /[&<>"']/, escapeReplace: /[&<>"']/g, escapeTestNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/, escapeReplaceNoEncode: /[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/g, caret: /(^|[^\[])\^/g, percentDecode: /%25/g, findPipe: /\|/g, splitPipe: / \|/, slashPipe: /\\\|/g, carriageReturn: /\r\n|\r/g, spaceLine: /^ +$/gm, notSpaceStart: /^\S*/, endingNewline: /\n$/, listItemRegex: (a3) => new RegExp(`^( {0,3}${a3})((?:[	 ][^\\n]*)?(?:\\n|$))`), nextBulletRegex: D((a3) => new RegExp(`^ {0,${a3}}(?:[*+-]|\\d{1,9}[.)])((?:[ 	][^\\n]*)?(?:\\n|$))`)), hrRegex: D((a3) => new RegExp(`^ {0,${a3}}((?:-[ 	]*){3,}|(?:_[ 	]*){3,}|(?:\\*[ 	]*){3,})(?:\\n+|$)`)), fencesBeginRegex: D((a3) => new RegExp(`^ {0,${a3}}(?:\`\`\`|~~~)`)), headingBeginRegex: D((a3) => new RegExp(`^ {0,${a3}}#{1,6}(?:\\s|$)`)), pedanticHeadingBeginRegex: D((a3) => new RegExp(`^ {0,${a3}}#`)), htmlBeginRegex: D((a3) => new RegExp(`^ {0,${a3}}(?:</?(?:${K})(?: +|$|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)`, "i")), blockquoteBeginRegex: D((a3) => new RegExp(`^ {0,${a3}}>`)) };
+var ve = /^(?:[ \t]*(?:\n|$))+/;
+var Ze = /^((?: {4}| {0,3}\t)[^\n]+(?:\n(?:[ \t]*(?:\n|$))*)?)+/;
+var He = /^ {0,3}(`{3,}(?=[^`\n]*(?:\n|$))|~{3,})([^\n]*)(?:\n|$)(?:|([\s\S]*?)(?:\n|$))(?: {0,3}(?:(?=`)\1`*|(?=~)\1~*) *(?=\n|$)|$)/;
+var W = /^ {0,3}((?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/;
+var je = /^ {0,3}(#{1,6})(?=\s|$)(.*)(?:\n+|$)/;
+var oe = / {0,3}(?:[*+-]|\d{1,9}[.)])/;
+var Oe = /^(?!bull |blockCode|fences|blockquote|heading|html|table)((?:.|\n(?!\s*?\n|bull |fences|blockquote|heading|hr|html|table))+?)\n {0,3}(=+|-+)[ \t]*(?:\n+|$)/;
+var we = c(Oe).replace(/bull/g, oe).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}(?:\s|$)/).replace(/hr/g, / {0,3}(?:(?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/\|table/g, "").getRegex();
+var Ge = c(Oe).replace(/bull/g, oe).replace(/blockCode/g, /(?: {4}| {0,3}\t)/).replace(/fences/g, / {0,3}(?:`{3,}|~{3,})/).replace(/blockquote/g, / {0,3}>/).replace(/heading/g, / {0,3}#{1,6}(?:\s|$)/).replace(/hr/g, / {0,3}(?:(?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/).replace(/html/g, / {0,3}<[^\n>]+>\n/).replace(/table/g, / {0,3}\|?(?:[:\- ]*\|)+[\:\- ]*\n/).getRegex();
+var ae = /^([^\n]+(?:\n(?!hr|heading|lheading|blockquote|fences|list|html|table|[ \t]+\n)[^\n]+)*)/;
+var Ne = /^[^\n]+/;
+var le = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\\n]|\n(?![ \t]*\n))+/;
+var Fe = c(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n[ \t]*)?| *\n[ \t]*)(title))? *(?:\n+|$)/).replace("label", le).replace("title", /(?:"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\\n]|\n(?!\n))*'|\((?:\\[\s\S]|[^()\\])*\))/).getRegex();
+var Qe = c(/^(bull)([ \t][^\n]*?)?(?:\n|$)/).replace(/bull/g, oe).getRegex();
 var K = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
-var ie = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
-var He = c("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n*|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>[^\\n]*\\n*|$)|<![A-Z][\\s\\S]*?(?:>[^\\n]*\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>[^\\n]*\\n*|$)|</?(tag)(?:[ \\t]+|\\n|/?>|$)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!(?:script|pre|style|textarea)(?![a-z0-9-]))([a-z][a-z0-9-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</[a-z][a-z0-9-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", ie).replace("tag", K).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
-var be = (a3) => c(re).replace("hr", U).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", a3).replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex();
-var Ge = be(/ {0,3}(?:[*+-]|1[.)])[ \t]+[^ \t\n]/);
-var Ne = be(/ {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]|\n|$)/);
-var Qe = c(/^( {0,3}> ?(?:(?![ \t]*(?:\n|$))(paragraph)|[^\n]*)(?:\n|$))+/).replace("paragraph", Ne).getRegex();
-var oe = { blockquote: Qe, code: Ee, def: Ze, fences: Ie, heading: Be, hr: U, html: He, lheading: xe, list: ve, newline: Ce, paragraph: Ge, table: B, text: qe };
-var ke = c("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", U).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex();
-var je = { ...oe, lheading: De, table: ke, paragraph: c(re).replace("hr", U).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", ke).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]+[^ \\t\\n]").replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex() };
-var Fe = { ...oe, html: c(`^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))`).replace("comment", ie).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: B, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: c(re).replace("hr", U).replace("heading", ` *#{1,6} *[^
-]`).replace("lheading", xe).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
-var Ue = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
-var Ke = /^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/;
-var Re = /^( {2,}|\\)\n(?!\s*$)[ \t]*/;
-var We = /^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/;
+var ue = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
+var Ue = c("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n*|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>[^\\n]*\\n*|$)|<![A-Z][\\s\\S]*?(?:>[^\\n]*\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>[^\\n]*\\n*|$)|</?(tag)(?:[ \\t]+|\\n|/?>|$)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!(?:script|pre|style|textarea)(?![a-z0-9-]))([a-z][a-z0-9-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</[a-z][a-z0-9-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))", "i").replace("comment", ue).replace("tag", K).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
+var Pe = (a3) => c(ae).replace("hr", W).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("|table", "").replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", a3).replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex();
+var We = Pe(/ {0,3}(?:[*+-]|1[.)])[ \t]+[^ \t\n]/);
+var Ke = Pe(/ {0,3}(?:[*+-]|\d{1,9}[.)])(?:[ \t]|\n|$)/);
+var Xe = c(/^( {0,3}> ?(?:(?![ \t]*(?:\n|$))(paragraph)|[^\n]*)(?:\n|$))+/).replace("paragraph", Ke).getRegex();
+var pe = { blockquote: Xe, code: Ze, def: Fe, fences: He, heading: je, hr: W, html: Ue, lheading: we, list: Qe, newline: ve, paragraph: We, table: B, text: Ne };
+var xe = c("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr", W).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("blockquote", " {0,3}>").replace("code", "(?: {4}| {0,3}	)[^\\n]").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]").replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex();
+var Ve = { ...pe, lheading: Ge, table: xe, paragraph: c(ae).replace("hr", W).replace("heading", " {0,3}#{1,6}(?:\\s|$)").replace("|lheading", "").replace("table", xe).replace("blockquote", " {0,3}>").replace("fences", " {0,3}(?:`{3,}(?=[^`\\n]*(?:\\n|$))|~~~)[^\\n]*(?:\\n|$)").replace("list", " {0,3}(?:[*+-]|1[.)])[ \\t]+[^ \\t\\n]").replace("html", " {0,3}(?:</?(?:tag)(?: +|\\n|/?>)|<(?:(?:script|pre|style|textarea)(?:[\\s>]|$)|!--)|<\\?|<![A-Za-z]|<!\\[CDATA\\[)").replace("tag", K).getRegex() };
+var Je = { ...pe, html: c(`^ *(?:comment(?: *\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1>(?: *\\n{2,}|\\s*$)|<tag(?:"[^"]*"|'[^']*'|\\s[^'"/>\\s]*)*?/?>(?: *\\n{2,}|\\s*$))`).replace("comment", ue).replace(/tag/g, "(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(), def: /^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/, heading: /^(#{1,6})(.*)(?:\n+|$)/, fences: B, lheading: /^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/, paragraph: c(ae).replace("hr", W).replace("heading", ` *#{1,6} *[^
+]`).replace("lheading", we).replace("|table", "").replace("blockquote", " {0,3}>").replace("|fences", "").replace("|list", "").replace("|html", "").replace("|tag", "").getRegex() };
+var Ye = /^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/;
+var et = /^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/;
+var Se = /^( {2,}|\\)\n(?!\s*$)[ \t]*/;
+var tt = /^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/;
 var $ = /[\p{P}\p{S}]/u;
-var H = /[\s\p{P}\p{S}]/u;
-var W = /[^\s\p{P}\p{S}]/u;
-var Xe = c(/^((?![*_])punctSpace)/, "u").replace(/punctSpace/g, H).getRegex();
-var Ve = /[\p{Pi}\p{Ps}"']/u;
-var Te = /(?!~)[\p{P}\p{S}]/u;
-var Je = /(?!~)[\s\p{P}\p{S}]/u;
-var Ye = /(?:[^\s\p{P}\p{S}]|~)/u;
-var et = c(/link|precode-code|html/, "g").replace("link", /\[(?:[^\[\]`]|(?<a>`+)[^`]+\k<a>(?!`))*?\]\((?:\\[\s\S]|[^\\\(\)]|\((?:\\[\s\S]|[^\\\(\)])*\))*\)/).replace("precode-", Me ? "(?<!`)()" : "(^^|[^`])").replace("code", /(?<b>`+)[^`]+\k<b>(?!`)/).replace("html", /<(?! )[^<>]*?>/).getRegex();
-var Oe = /^(?:\*+(?:((?!\*)punct)|([^\s*]))?)|^_+(?:((?!_)punct)|([^\s_]))?/;
-var tt = c(Oe, "u").replace(/punct/g, $).getRegex();
-var nt = c(Oe, "u").replace(/punct/g, Te).getRegex();
-var rt = /^(?:\*+(?:((?!\*)(?!openQuote)punct)|([^\s*]))?)|^_+(?:((?!_)(?!openQuote)punct)|([^\s_]))?/;
-var st = c(rt, "u").replace(/openQuote/g, Ve).replace(/punct/g, $).getRegex();
-var we = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)punctSpace(\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|notPunctSpace(\\*+)(?=notPunctSpace)";
-var it = c(we, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, $).getRegex();
-var ot = c(we, "gu").replace(/notPunctSpace/g, Ye).replace(/punctSpace/g, Je).replace(/punct/g, Te).getRegex();
-var at = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)[\\s](\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|(?:(?!\\*)punct|notPunctSpace)(\\*+)(?!\\*)(?=notPunctSpace)";
-var lt = c(at, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, $).getRegex();
-var ut = c("^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)punctSpace(_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)", "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, $).getRegex();
-var pt = "^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)[\\s](_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)|(?:(?!_)punct|notPunctSpace)(_+)(?!_)(?=notPunctSpace)";
-var ct = c(pt, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, $).getRegex();
-var ht = c(/^~~?(?:((?!~)punct)|[^\s~])/, "u").replace(/punct/g, $).getRegex();
-var dt = "^[^~]+(?=[^~])|(?!~)punct(~~?)(?=[\\s]|$)|notPunctSpace(~~?)(?!~)(?=punctSpace|$)|(?!~)punctSpace(~~?)(?=notPunctSpace)|[\\s](~~?)(?!~)(?=punct)|(?!~)punct(~~?)(?!~)(?=punct)|notPunctSpace(~~?)(?=notPunctSpace)";
-var kt = c(dt, "gu").replace(/notPunctSpace/g, W).replace(/punctSpace/g, H).replace(/punct/g, $).getRegex();
-var gt = c(/\\(punct)/, "gu").replace(/punct/g, $).getRegex();
-var ft = c(/(`+)(?:[^`]|[^`][\s\S]*?[^`])\1(?!`)|`+|\\(punct)/, "gu").replace(/punct/g, $).getRegex();
-var mt = c(/^<(scheme:[^\s\x00-\x1f<>]*|email)>/).replace("scheme", /[a-zA-Z][a-zA-Z0-9+.-]{1,31}/).replace("email", /[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+(@)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?![-_])/).getRegex();
-var xt = c(ie).replace("(?:-->|$)", "-->").getRegex();
-var bt = c("^comment|^</[a-zA-Z][a-zA-Z0-9-]*\\s*>|^<[a-zA-Z][a-zA-Z0-9-]*(?:attribute)*?\\s*/?>|^<\\?[\\s\\S]*?\\?>|^<![a-zA-Z]+\\s[\\s\\S]*?>|^<!\\[CDATA\\[[\\s\\S]*?\\]\\]>").replace("comment", xt).replace("attribute", /\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*"[^"]*"|\s*=\s*'[^']*'|\s*=\s*[^\s"'=<>`]+)?/).getRegex();
-var Pe = /\[(?:\\[\s\S]|[^\[\]\\])*\]/;
-var Y = c(/(?:\[(?:brackets|\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+(?!`)[^`]*?`+(?!`)|``+(?=\])|[^\[\]\\`])*?/).replace("brackets", Pe).getRegex();
-var Rt = c(/^!?\[(label)\]\([ \t\n]*(href)(?:(?:[ \t]+(?:\n[ \t]*)?|\n[ \t]*)(title))?[ \t\n]*\)/).replace("label", Y).replace("href", /<(?:\\.|[^\n<>\\])+>|[^ \t\n\x00-\x1f]+|(?=\))/).replace("title", /"(?:\\"?|[^"\\])*"|'(?:\\'?|[^'\\])*'|\((?:\\\)?|[^)\\])*\)/).getRegex();
-var Tt = c(/^!?\[(label)\]\[(ref)\]/).replace("label", Y).replace("ref", se).getRegex();
-var Ot = c(/^!?\[(ref)\](?:\[\])?/).replace("ref", se).getRegex();
-var ge = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\]){1,999}/;
-var wt = c(/(?:[^\[\]\\`]*(?:\[(?:brackets|\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+(?!`)[^`]*?`+(?!`)|``+(?=\]))){0,999}?[^\[\]\\`]*?/).replace("brackets", Pe).getRegex();
-var Pt = c("reflink|nolink(?!\\()", "g").replace("reflink", c(/^!?\[(label)\]\[(ref)\]/).replace("label", wt).replace("ref", ge).getRegex()).replace("nolink", c(/^!?\[(ref)\](?:\[\])?/).replace("ref", ge).getRegex()).getRegex();
-var fe = /[hH][tT][tT][pP][sS]?|[fF][tT][pP]/;
-var yt = /[A-Za-z0-9._+-]+@[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![\w-])/;
-var St = c(/(?:mailto:email|xmpp:email(?:\/[A-Za-z0-9@.]+)?)/).replace(/email/g, yt).getRegex();
-var ae = { _backpedal: B, anyPunctuation: gt, anyPunctuationOutsideCode: ft, autolink: mt, blockSkip: et, br: Re, code: Ke, del: B, delLDelim: B, delRDelim: B, emStrongLDelim: tt, emStrongRDelimAst: it, emStrongRDelimUnd: ut, escape: Ue, link: Rt, nolink: Ot, punctuation: Xe, reflink: Tt, reflinkSearch: Pt, tag: bt, text: We, url: B };
-var _t = { ...ae, emStrongLDelim: st, emStrongRDelimAst: lt, emStrongRDelimUnd: ct, link: c(/^!?\[(label)\]\((.*?)\)/).replace("label", Y).getRegex(), reflink: c(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", Y).getRegex() };
-var te = { ...ae, emStrongRDelimAst: ot, emStrongLDelim: nt, delLDelim: ht, delRDelim: kt, url: c(/^emailProtocol|^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("emailProtocol", St).replace("protocol", fe).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![\w-])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: c(/^(?:[^a-zA-Z0-9](?=emailProtocol)|(`+|~+|[^`~])(?:(?=[`~])|(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9](?=emailProtocol)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@))))/).replace("protocol", fe).replace(/emailProtocol/g, /(?:mailto|xmpp):/).getRegex() };
-var $t = { ...te, br: c(Re).replace("{2,}", "*").getRegex(), text: c(te.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
-var X = { normal: oe, gfm: je, pedantic: Fe };
-var G = { normal: ae, gfm: te, breaks: $t, pedantic: _t };
-var Lt = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
-var ye = (a3) => Lt[a3];
+var j = /[\s\p{P}\p{S}]/u;
+var X = /[^\s\p{P}\p{S}]/u;
+var nt = c(/^((?![*_])punctSpace)/, "u").replace(/punctSpace/g, j).getRegex();
+var rt = /[\p{Pi}\p{Ps}"']/u;
+var ye = /(?!~)[\p{P}\p{S}]/u;
+var st = /(?!~)[\s\p{P}\p{S}]/u;
+var it = /(?:[^\s\p{P}\p{S}]|~)/u;
+var ot = c(/link|precode-code|html/, "g").replace("link", /\[(?:[^\[\]`]|(?<a>`+)[^`]+\k<a>(?!`))*?\]\((?:\\[\s\S]|[^\\\(\)]|\((?:\\[\s\S]|[^\\\(\)])*\))*\)/).replace("precode-", Te ? "(?<!`)()" : "(^^|[^`])").replace("code", /(?<b>`+)[^`]+\k<b>(?!`)/).replace("html", /<(?! )[^<>]*?>/).getRegex();
+var _e = /^(?:\*+(?:((?!\*)punct)|([^\s*]))?)|^_+(?:((?!_)punct)|([^\s_]))?/;
+var at = c(_e, "u").replace(/punct/g, $).getRegex();
+var lt = c(_e, "u").replace(/punct/g, ye).getRegex();
+var ut = /^(?:\*+(?:((?!\*)(?!openQuote)punct)|([^\s*]))?)|^_+(?:((?!_)(?!openQuote)punct)|([^\s_]))?/;
+var pt = c(ut, "u").replace(/openQuote/g, rt).replace(/punct/g, $).getRegex();
+var $e = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)punctSpace(\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|notPunctSpace(\\*+)(?=notPunctSpace)";
+var ct = c($e, "gu").replace(/notPunctSpace/g, X).replace(/punctSpace/g, j).replace(/punct/g, $).getRegex();
+var ht = c($e, "gu").replace(/notPunctSpace/g, it).replace(/punctSpace/g, st).replace(/punct/g, ye).getRegex();
+var dt = "^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)punct(\\*+)(?=[\\s]|$)|notPunctSpace(\\*+)(?!\\*)(?=punctSpace|$)|(?!\\*)[\\s](\\*+)(?=notPunctSpace)|[\\s](\\*+)(?!\\*)(?=punct)|(?!\\*)punct(\\*+)(?!\\*)(?=punct)|(?:(?!\\*)punct|notPunctSpace)(\\*+)(?!\\*)(?=notPunctSpace)";
+var gt = c(dt, "gu").replace(/notPunctSpace/g, X).replace(/punctSpace/g, j).replace(/punct/g, $).getRegex();
+var kt = c("^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)punctSpace(_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)", "gu").replace(/notPunctSpace/g, X).replace(/punctSpace/g, j).replace(/punct/g, $).getRegex();
+var ft = "^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)punct(_+)(?=[\\s]|$)|notPunctSpace(_+)(?!_)(?=punctSpace|$)|(?!_)[\\s](_+)(?=notPunctSpace)|[\\s](_+)(?!_)(?=punct)|(?!_)punct(_+)(?!_)(?=punct)|(?:(?!_)punct|notPunctSpace)(_+)(?!_)(?=notPunctSpace)";
+var mt = c(ft, "gu").replace(/notPunctSpace/g, X).replace(/punctSpace/g, j).replace(/punct/g, $).getRegex();
+var xt = c(/^~~?(?:((?!~)punct)|[^\s~])/, "u").replace(/punct/g, $).getRegex();
+var bt = "^[^~]+(?=[^~])|(?!~)punct(~~?)(?=[\\s]|$)|notPunctSpace(~~?)(?!~)(?=punctSpace|$)|(?!~)punctSpace(~~?)(?=notPunctSpace)|[\\s](~~?)(?!~)(?=punct)|(?!~)punct(~~?)(?!~)(?=punct)|notPunctSpace(~~?)(?=notPunctSpace)";
+var Rt = c(bt, "gu").replace(/notPunctSpace/g, X).replace(/punctSpace/g, j).replace(/punct/g, $).getRegex();
+var Tt = c(/\\(punct)/, "gu").replace(/punct/g, $).getRegex();
+var Ot = c(/(`+)(?:[^`]|[^`][\s\S]*?[^`])\1(?!`)|`+|\\(punct)/, "gu").replace(/punct/g, $).getRegex();
+var wt = c(/^<(scheme:[^\s\x00-\x1f<>]*|email)>/).replace("scheme", /[a-zA-Z][a-zA-Z0-9+.-]{1,31}/).replace("email", /[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+(@)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?![-_])/).getRegex();
+var Pt = c(ue).replace("(?:-->|$)", "-->").getRegex();
+var St = c("^comment|^</[a-zA-Z][a-zA-Z0-9-]*\\s*>|^<[a-zA-Z][a-zA-Z0-9-]*(?:attribute)*?\\s*/?>|^<\\?[\\s\\S]*?\\?>|^<![a-zA-Z]+\\s[\\s\\S]*?>|^<!\\[CDATA\\[[\\s\\S]*?\\]\\]>").replace("comment", Pt).replace("attribute", /\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*"[^"]*"|\s*=\s*'[^']*'|\s*=\s*[^\s"'=<>`]+)?/).getRegex();
+var Le = /\[(?:\\[\s\S]|[^\[\]\\])*\]/;
+var re = c(/(?:\[(?:brackets|\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+(?!`)[^`]*?`+(?!`)|``+(?=\])|[^\[\]\\`])*?/).replace("brackets", Le).getRegex();
+var yt = c(/^!?\[(label)\]\([ \t\n]*(href)(?:(?:[ \t]+(?:\n[ \t]*)?|\n[ \t]*)(title))?[ \t\n]*\)/).replace("label", re).replace("href", /<(?:\\.|[^\n<>\\])+>|[^ \t\n\x00-\x1f]+|(?=\))/).replace("title", /"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|\((?:\\[\s\S]|[^)\\])*\)/).getRegex();
+var _t = c(/^!?\[(label)\]\[(ref)\]/).replace("label", re).replace("ref", le).getRegex();
+var $t = c(/^!?\[(ref)\](?:\[\])?/).replace("ref", le).getRegex();
+var be = /(?!\s*\])(?:\\[\s\S]|[^\[\]\\]){1,999}/;
+var Lt = c(/(?:[^\[\]\\`]*(?:\[(?:brackets|\\[\s\S]|[^\[\]\\])*\]|\\[\s\S]|`+(?!`)[^`]*?`+(?!`)|``+(?=\]))){0,999}?[^\[\]\\`]*?/).replace("brackets", Le).getRegex();
+var Ct = c("reflink|nolink(?!\\()", "g").replace("reflink", c(/^!?\[(label)\]\[(ref)\]/).replace("label", Lt).replace("ref", be).getRegex()).replace("nolink", c(/^!?\[(ref)\](?:\[\])?/).replace("ref", be).getRegex()).getRegex();
+var Re = /[hH][tT][tT][pP][sS]?|[fF][tT][pP]/;
+var It = /[A-Za-z0-9._+-]+@[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![\w-])/;
+var At = c(/(?:mailto:email|xmpp:email(?:\/[A-Za-z0-9@.]+)?)/).replace(/email/g, It).getRegex();
+var ce = { _backpedal: B, anyPunctuation: Tt, anyPunctuationOutsideCode: Ot, autolink: wt, blockSkip: ot, br: Se, code: et, del: B, delLDelim: B, delRDelim: B, emStrongLDelim: at, emStrongRDelimAst: ct, emStrongRDelimUnd: kt, escape: Ye, link: yt, nolink: $t, punctuation: nt, reflink: _t, reflinkSearch: Ct, tag: St, text: tt, url: B };
+var Et = { ...ce, emStrongLDelim: pt, emStrongRDelimAst: gt, emStrongRDelimUnd: mt, link: c(/^!?\[(label)\]\((.*?)\)/).replace("label", re).getRegex(), reflink: c(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label", re).getRegex() };
+var ie = { ...ce, emStrongRDelimAst: ht, emStrongLDelim: lt, delLDelim: xt, delRDelim: Rt, url: c(/^emailProtocol|^((?:protocol):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/).replace("emailProtocol", At).replace("protocol", Re).replace("email", /[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![\w-])/).getRegex(), _backpedal: /(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/, del: /^(~~?)(?=[^\s~])((?:\\[\s\S]|[^\\])*?(?:\\[\s\S]|[^\s~\\]))\1(?=[^~]|$)/, text: c(/^(?:[^a-zA-Z0-9](?=emailProtocol)|(`+|~+|[^`~])(?:(?=[`~])|(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|protocol:\/\/|wwwStart|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9](?=emailProtocol)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@))))/).replace("protocol", Re).replace(/emailProtocol/g, /(?:mailto|xmpp):/).replace("wwwStart", Te ? "(?<![^\\s*_~(])www\\." : "www\\.").getRegex() };
+var zt = { ...ie, br: c(Se).replace("{2,}", "*").getRegex(), text: c(ie.text).replace("\\b_", "\\b_| {2,}\\n").replace(/\{2,\}/g, "*").getRegex() };
+var V = { normal: pe, gfm: Ve, pedantic: Je };
+var G = { normal: ce, gfm: ie, breaks: zt, pedantic: Et };
+var Mt = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+var Ce = (a3) => Mt[a3];
 function P(a3, e) {
   if (e) {
-    if (T.escapeTest.test(a3)) return a3.replace(T.escapeReplace, ye);
-  } else if (T.escapeTestNoEncode.test(a3)) return a3.replace(T.escapeReplaceNoEncode, ye);
+    if (T.escapeTest.test(a3)) return a3.replace(T.escapeReplace, Ce);
+  } else if (T.escapeTestNoEncode.test(a3)) return a3.replace(T.escapeReplaceNoEncode, Ce);
   return a3;
 }
-function Se(a3) {
+function Ie(a3) {
   return T.numericCharacterReference.test(a3) ? a3.replace(T.numericCharacterReferenceOrAmpersand, (e, t, n) => {
     if (t === void 0 && n === void 0) return "&amp;";
     let s = t === void 0 ? Number.parseInt(n, 16) : Number.parseInt(t, 10);
     return s === 0 || s > 1114111 || s >= 55296 && s <= 57343 ? "\uFFFD" : s === 38 ? "&amp;" : String.fromCodePoint(s);
   }) : a3;
 }
-function le(a3) {
+function he(a3) {
   try {
     a3 = encodeURI(a3).replace(T.percentDecode, "%");
   } catch {
@@ -2698,10 +2720,10 @@ function le(a3) {
   }
   return a3;
 }
-function ue(a3, e) {
+function de(a3, e) {
   let t = a3.replace(T.findPipe, (r, o, i) => {
-    let l = false, u = o;
-    for (; --u >= 0 && i[u] === "\\"; ) l = !l;
+    let l = false, p = o;
+    for (; --p >= 0 && i[p] === "\\"; ) l = !l;
     return l ? "|" : " |";
   }), n = t.split(T.splitPipe), s = 0;
   if (n[0].trim() || n.shift(), n.length > 0 && !n.at(-1)?.trim() && n.pop(), e) if (n.length > e) n.splice(e);
@@ -2709,7 +2731,7 @@ function ue(a3, e) {
   for (; s < n.length; s++) n[s] = n[s].trim().replace(T.slashPipe, "|");
   return n;
 }
-function z(a3, e, t) {
+function L(a3, e, t) {
   let n = a3.length;
   if (n === 0) return "";
   let s = 0;
@@ -2721,17 +2743,17 @@ function z(a3, e, t) {
   }
   return a3.slice(0, n - s);
 }
-function pe(a3) {
+function ge(a3) {
   let e = a3.split(`
 `), t = e.length - 1;
   for (; t >= 0 && T.blankLine.test(e[t]); ) t--;
   return e.length - t <= 2 ? a3 : e.slice(0, t + 1).join(`
 `);
 }
-function N(a3) {
-  return a3.trim().toLowerCase().toUpperCase().toLowerCase();
+function F(a3) {
+  return a3.trim().replace(T.multipleSpaceGlobal, " ").toLowerCase().toUpperCase().toLowerCase();
 }
-function ce(a3, e) {
+function ke(a3, e) {
   if (a3.indexOf(e[0]) === -1 && a3.indexOf(e[1]) === -1) return -1;
   let t = 0;
   for (let n = 0; n < a3.length; n++) if (a3[n] === "\\") n++;
@@ -2739,7 +2761,37 @@ function ce(a3, e) {
   else if (a3[n] === e[1] && (t--, t < 0)) return n;
   return t > 0 ? -2 : -1;
 }
-function V(a3, e = 0) {
+var N = /* @__PURE__ */ new WeakMap();
+function fe(a3) {
+  let e = { "*": -1, _: -1 }, t = -1, n = a3.length;
+  for (let s = 0; s < n; s++) {
+    let r = a3[s];
+    if (r !== "*" && r !== "_" && r !== "~") continue;
+    let o = s === 0 ? `
+` : a3[s - 1], i = s + 1;
+    for (; i < n && a3[i] === r; ) i++;
+    o !== " " && o !== "	" && o !== `
+` && o !== "\r" && o !== "\f" && (r === "~" ? t = s : e[r] = s), s = i - 1;
+  }
+  return { maskedSrc: a3, lastPossibleEmStrongCloserIndex: e, lastPossibleDelCloserIndex: t };
+}
+function Ae(a3, e) {
+  let t = fe(e), n = N.get(a3);
+  n ? n.push(t) : N.set(a3, [t]);
+}
+function Ee(a3) {
+  let e = N.get(a3);
+  e && (e.pop(), e.length === 0 && N.delete(a3));
+}
+function ze(a3, e, t) {
+  let n = N.get(a3)?.at(-1);
+  return n && n.maskedSrc === e ? n.lastPossibleEmStrongCloserIndex[t] : fe(e).lastPossibleEmStrongCloserIndex[t];
+}
+function Me(a3, e) {
+  let t = N.get(a3)?.at(-1);
+  return t && t.maskedSrc === e ? t.lastPossibleDelCloserIndex : fe(e).lastPossibleDelCloserIndex;
+}
+function J(a3, e = 0) {
   let t = e, n = "";
   for (let s of a3) if (s === "	") {
     let r = 4 - t % 4;
@@ -2747,20 +2799,20 @@ function V(a3, e = 0) {
   } else n += s, t++;
   return n;
 }
-function _e(a3, e, t, n, s) {
-  let r = e.href, o = e.title || null, i = a3[1].replace(s.other.outputLinkReplace, "$1"), l = a3[0].charAt(0) === "!", u = n.state.inLink, h = n.state.linkEmitted, p = n.state.inRawBlock;
+function De(a3, e, t, n, s) {
+  let r = e.href, o = e.title || null, i = a3[1].replace(s.other.outputLinkReplace, "$1"), l = a3[0].charAt(0) === "!", p = n.state.inLink, h = n.state.linkEmitted, u = n.state.inRawBlock;
   n.state.inLink = true, n.state.linkEmitted = false;
-  let d = n.inlineTokens(i), g = n.state.linkEmitted;
-  if (n.state.linkEmitted = h, n.state.inLink = u, !l) {
-    if (g) {
-      n.state.inRawBlock = p;
+  let d = n.inlineTokens(i), k = n.state.linkEmitted;
+  if (n.state.linkEmitted = h, n.state.inLink = p, !l) {
+    if (k) {
+      n.state.inRawBlock = u;
       return;
     }
     n.state.linkEmitted = true;
   }
   return { type: l ? "image" : "link", raw: t, href: r, title: o, text: i, tokens: d };
 }
-function At(a3, e, t) {
+function Dt(a3, e, t) {
   let n = a3.match(t.other.indentCodeCompensation);
   if (n === null) return e;
   let s = n[1];
@@ -2773,7 +2825,7 @@ function At(a3, e, t) {
   }).join(`
 `);
 }
-function $e(a3, e, t, n) {
+function Be(a3, e, t, n) {
   if (!e.includes("<")) return false;
   for (let s = 0; s < e.length; s++) {
     if (e[s] === "\\") {
@@ -2801,7 +2853,7 @@ var _ = class {
   rules;
   lexer;
   constructor(e) {
-    this.options = e || y;
+    this.options = e || S;
   }
   space(e) {
     let t = this.rules.block.newline.exec(e);
@@ -2810,14 +2862,14 @@ var _ = class {
   code(e) {
     let t = this.rules.block.code.exec(e);
     if (t) {
-      let n = this.options.pedantic ? t[0] : pe(t[0]), s = n.replace(this.rules.other.codeRemoveIndent, "");
+      let n = this.options.pedantic ? t[0] : ge(t[0]), s = n.replace(this.rules.other.codeRemoveIndent, "");
       return { type: "code", raw: n, codeBlockStyle: "indented", text: s };
     }
   }
   fences(e) {
     let t = this.rules.block.fences.exec(e);
     if (t) {
-      let n = t[0], s = At(n, t[3] || "", this.rules);
+      let n = t[0], s = Dt(n, t[3] || "", this.rules);
       return { type: "code", raw: n, lang: t[2] ? t[2].trim().replace(this.rules.inline.anyPunctuation, "$1") : t[2], text: s };
     }
   }
@@ -2826,64 +2878,64 @@ var _ = class {
     if (t) {
       let n = t[2].trim();
       if (this.rules.other.endingHash.test(n)) {
-        let s = z(n, "#");
+        let s = L(n, "#");
         (this.options.pedantic || !s || this.rules.other.endingSpaceTabChar.test(s)) && (n = s.trim());
       }
-      return { type: "heading", raw: z(t[0], `
+      return { type: "heading", raw: L(t[0], `
 `), depth: t[1].length, text: n, tokens: this.lexer.inline(n) };
     }
   }
   hr(e) {
     let t = this.rules.block.hr.exec(e);
-    if (t) return { type: "hr", raw: z(t[0], `
+    if (t) return { type: "hr", raw: L(t[0], `
 `) };
   }
   blockquote(e) {
     let t = this.rules.block.blockquote.exec(e);
     if (t) {
-      let n = z(t[0], `
+      let n = L(t[0], `
 `).split(`
 `), s = "", r = "", o = [];
       for (; n.length > 0; ) {
-        let i = false, l = [], u;
-        for (u = 0; u < n.length; u++) if (this.rules.other.blockquoteStart.test(n[u])) l.push(n[u]), i = true;
-        else if (!i) l.push(n[u]);
+        let i = false, l = [], p;
+        for (p = 0; p < n.length; p++) if (this.rules.other.blockquoteStart.test(n[p])) l.push(n[p]), i = true;
+        else if (!i) l.push(n[p]);
         else break;
-        n = n.slice(u);
+        n = n.slice(p);
         let h = l.join(`
-`), p = h.replace(this.rules.other.blockquoteMarkerWhitespace, (k, b, x) => b + V(x, b.length)).replace(this.rules.other.blockquoteSetextReplace, `
+`), u = h.replace(this.rules.other.blockquoteMarkerWhitespace, (g, b, m) => b + J(m, b.length)).replace(this.rules.other.blockquoteSetextReplace, `
     $1`).replace(this.rules.other.blockquoteSetextReplace2, "");
         s = s ? `${s}
 ${h}` : h, r = r ? `${r}
-${p}` : p;
+${u}` : u;
         let d = this.lexer.state.top;
-        if (this.lexer.state.top = true, this.lexer.blockTokens(p, o, true), this.lexer.state.top = d, n.length === 0) break;
-        let g = o.at(-1);
-        if (g?.type === "code" || g?.type === "heading" || g?.type === "hr" || g?.type === "html") break;
-        if (g?.type === "blockquote") {
-          let k = g, b = n.join(`
-`), x = k.raw + `
-` + b.replace(this.rules.other.blockquoteSetextReplace2, ""), f2 = this.blockquote(x);
+        if (this.lexer.state.top = true, this.lexer.blockTokens(u, o, true), this.lexer.state.top = d, n.length === 0) break;
+        let k = o.at(-1);
+        if (k?.type === "code" || k?.type === "heading" || k?.type === "hr" || k?.type === "html" || k?.type === "table") break;
+        if (k?.type === "blockquote") {
+          let g = k, b = n.join(`
+`), m = g.raw + `
+` + b.replace(this.rules.other.blockquoteSetextReplace2, ""), f2 = this.blockquote(m);
           o[o.length - 1] = f2;
-          let S2 = x.substring(f2.raw.length).replace(/^\n/, ""), R3 = S2 ? S2.split(`
-`).length : 0, C = R3 ? n.slice(0, -R3) : n;
-          C.length > 0 && (s = `${s}
-${C.join(`
-`)}`), r = r.substring(0, r.length - k.text.length) + f2.text;
+          let y = m.substring(f2.raw.length).replace(/^\n/, ""), R3 = y ? y.split(`
+`).length : 0, A2 = R3 ? n.slice(0, -R3) : n;
+          if (A2.length > 0 && (s = `${s}
+${A2.join(`
+`)}`), r = r.substring(0, r.length - g.text.length) + f2.text, n = n.slice(A2.length), n.length > 0 && this.rules.other.blockquoteStart.test(n[0])) continue;
           break;
-        } else if (g?.type === "list") {
-          let k = g, b = k.raw + `
+        } else if (k?.type === "list") {
+          let g = k, b = g.raw + `
 ` + n.join(`
-`), x = this.list(b);
-          o[o.length - 1] = x;
-          let f2 = x.raw.length > k.raw.length ? b.slice(k.raw.length + 1, x.raw.length).split(`
+`), m = this.list(b);
+          o[o.length - 1] = m;
+          let f2 = m.raw.length > g.raw.length ? b.slice(g.raw.length + 1, m.raw.length).split(`
 `).length : 0;
           if (f2 > 0) {
-            let S2 = n.slice(0, f2).join(`
+            let y = n.slice(0, f2).join(`
 `);
             s = `${s}
-${S2}`, r = `${r}
-${S2}`;
+${y}`, r = `${r}
+${y}`;
           }
           n = n.slice(f2);
           continue;
@@ -2897,62 +2949,62 @@ ${S2}`;
     if (t) {
       let n = e, s = () => n.length - e.length, r = t[1].trim(), o = r.length > 1, i = { type: "list", raw: "", ordered: o, start: o ? +r.slice(0, -1) : "", loose: false, items: [] };
       r = o ? `\\d{1,9}\\${r.slice(-1)}` : `\\${r}`, this.options.pedantic && (r = o ? r : "[*+-]");
-      let l = this.rules.other.listItemRegex(r), u = false;
+      let l = this.rules.other.listItemRegex(r), p = false;
       for (; e; ) {
-        let p = false, d = "";
+        let u = false, d = "";
         if (!(t = l.exec(e)) || this.rules.block.hr.test(e)) break;
-        let g = s();
+        let k = s();
         e = e.substring(t[0].length);
-        let k = t[2].split(`
-`, 1)[0], b = t[1].length, x = this.options.pedantic ? V(k, b) : k.replace(this.rules.other.leadingSpaceTab, (Q2) => V(Q2, b)), f2 = e.split(`
-`, 1)[0], S2 = !x.trim(), R3 = 0;
-        if (this.options.pedantic ? (R3 = 2, d = x.trimStart()) : S2 ? R3 = b + 1 : (R3 = x.search(this.rules.other.nonSpaceChar), R3 = R3 > 4 ? 1 : R3, d = x.slice(R3), R3 += b), S2 && this.rules.other.blankLine.test(f2) && (e = e.substring(f2.length + 1), p = true), !p) {
-          let Q2 = this.rules.other.nextBulletRegex(R3), E = this.rules.other.hrRegex(R3), j = this.rules.other.fencesBeginRegex(R3), F = this.options.pedantic ? this.rules.other.pedanticHeadingBeginRegex(R3) : this.rules.other.headingBeginRegex(R3), Le2 = this.rules.other.htmlBeginRegex(R3), Ae2 = this.rules.other.blockquoteBeginRegex(R3);
+        let g = t[2].split(`
+`, 1)[0], b = t[1].length, m = this.options.pedantic ? J(g, b) : g.replace(this.rules.other.leadingSpaceTab, (v) => J(v, b)), f2 = e.split(`
+`, 1)[0], y = !m.trim(), R3 = 0;
+        if (this.options.pedantic ? (R3 = 2, d = m.trimStart()) : y ? R3 = b + 1 : (R3 = m.search(this.rules.other.nonSpaceChar), R3 = R3 > 4 ? 1 : R3, d = m.slice(R3), R3 += b), y && this.rules.other.blankLine.test(f2) && (e = e.substring(f2.length + 1), u = true), !u) {
+          let v = this.rules.other.nextBulletRegex(R3), Q2 = this.rules.other.hrRegex(R3), ee2 = this.rules.other.fencesBeginRegex(R3), te2 = this.options.pedantic ? this.rules.other.pedanticHeadingBeginRegex(R3) : this.rules.other.headingBeginRegex(R3), M2 = this.rules.other.htmlBeginRegex(R3), ne2 = this.rules.other.blockquoteBeginRegex(R3);
           for (; e; ) {
-            let he2 = e.split(`
+            let U2 = e.split(`
 `, 1)[0], Z2;
-            if (f2 = he2, this.options.pedantic ? (f2 = f2.replace(this.rules.other.listReplaceNesting, "  "), Z2 = f2) : Z2 = f2.replace(this.rules.other.leadingSpaceTab, (de2) => V(de2)), j.test(f2) || F.test(f2) || Le2.test(f2) || Ae2.test(f2) || Q2.test(f2) || E.test(f2)) break;
+            if (f2 = U2, this.options.pedantic ? (f2 = f2.replace(this.rules.other.listReplaceNesting, "  "), Z2 = f2) : Z2 = f2.replace(this.rules.other.leadingSpaceTab, (me2) => J(me2)), ee2.test(f2) || te2.test(f2) || M2.test(f2) || ne2.test(f2) || v.test(f2) || Q2.test(f2)) break;
             if (Z2.search(this.rules.other.nonSpaceChar) >= R3 || !f2.trim()) d += `
 ` + Z2.slice(R3);
             else {
-              if (S2 || x.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || j.test(x) || F.test(x) || E.test(x)) break;
-              let ze2 = !this.options.pedantic && /^ {0,3}(?:=+|-+) *$/.test(f2) && this.rules.block.lheading.test(`${x}
+              if (y || m.replace(this.rules.other.tabCharGlobal, "    ").search(this.rules.other.nonSpaceChar) >= 4 || ee2.test(m) || te2.test(m) || M2.test(m) || Q2.test(m)) break;
+              let qe2 = !this.options.pedantic && /^ {0,3}(?:=+|-+) *$/.test(f2) && this.rules.block.lheading.test(`${m}
 ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
               d += `
-` + ze2;
+` + qe2;
             }
-            S2 = !f2.trim(), e = e.substring(he2.length + 1), x = Z2.slice(R3);
+            y = !f2.trim(), e = e.substring(U2.length + 1), m = Z2.slice(R3);
           }
         }
-        let C = n.slice(g, s());
-        i.loose || (u ? i.loose = true : this.rules.other.doubleBlankLine.test(C) && (u = true)), i.items.push({ type: "list_item", raw: C, task: !!this.options.gfm && this.rules.other.listIsTask.test(d), loose: false, text: d, tokens: [] });
+        let A2 = n.slice(k, s());
+        i.loose || (p ? i.loose = true : this.rules.other.doubleBlankLine.test(A2) && (p = true)), i.items.push({ type: "list_item", raw: A2, task: !!this.options.gfm && this.rules.other.listIsTask.test(d), loose: false, text: d, tokens: [] });
       }
       let h = i.items.at(-1);
       if (h) h.raw = h.raw.trimEnd(), h.text = h.text.trimEnd();
       else return;
       i.raw = n.slice(0, s()).trimEnd();
-      for (let p of i.items) if (this.lexer.state.top = false, p.tokens = this.lexer.blockTokens(p.text, []), !i.loose) {
-        let d = p.tokens.filter((k) => k.type === "space"), g = d.length > 0 && d.some((k) => this.rules.other.anyLine.test(k.raw));
-        i.loose = g;
+      for (let u of i.items) if (this.lexer.state.top = false, u.tokens = this.lexer.blockTokens(u.text, []), !i.loose) {
+        let d = u.tokens.filter((g) => g.type === "space"), k = d.length > 0 && d.some((g) => this.rules.other.anyLine.test(g.raw));
+        i.loose = k;
       }
-      for (let p of i.items) {
-        let d = p.tokens[0];
-        if (p.task && (d?.type === "text" || d?.type === "paragraph")) {
-          p.text = p.text.replace(this.rules.other.listReplaceTask, ""), d.raw = d.raw.replace(this.rules.other.listReplaceTask, ""), d.text = d.text.replace(this.rules.other.listReplaceTask, "");
-          for (let k = this.lexer.inlineQueue.length - 1; k >= 0; k--) if (this.rules.other.listIsTask.test(this.lexer.inlineQueue[k].src)) {
-            this.lexer.inlineQueue[k].src = this.lexer.inlineQueue[k].src.replace(this.rules.other.listReplaceTask, "");
+      for (let u of i.items) {
+        let d = u.tokens[0];
+        if (u.task && (d?.type === "text" || d?.type === "paragraph")) {
+          u.text = u.text.replace(this.rules.other.listReplaceTask, ""), d.raw = d.raw.replace(this.rules.other.listReplaceTask, ""), d.text = d.text.replace(this.rules.other.listReplaceTask, "");
+          for (let g = this.lexer.inlineQueue.length - 1; g >= 0; g--) if (this.rules.other.listIsTask.test(this.lexer.inlineQueue[g].src)) {
+            this.lexer.inlineQueue[g].src = this.lexer.inlineQueue[g].src.replace(this.rules.other.listReplaceTask, "");
             break;
           }
-          let g = this.rules.other.listTaskCheckbox.exec(p.raw);
-          if (g) {
-            let k = { type: "checkbox", raw: g[0] + " ", checked: g[0] !== "[ ]" };
-            p.checked = k.checked, i.loose ? p.tokens[0] && ["paragraph", "text"].includes(p.tokens[0].type) && "tokens" in p.tokens[0] && p.tokens[0].tokens ? (p.tokens[0].raw = k.raw + p.tokens[0].raw, p.tokens[0].text = k.raw + p.tokens[0].text, p.tokens[0].tokens.unshift(k)) : p.tokens.unshift({ type: "paragraph", raw: k.raw, text: k.raw, tokens: [k] }) : p.tokens.unshift(k);
+          let k = this.rules.other.listTaskCheckbox.exec(u.raw);
+          if (k) {
+            let g = { type: "checkbox", raw: k[0] + " ", checked: k[0] !== "[ ]" };
+            u.checked = g.checked, i.loose ? u.tokens[0] && ["paragraph", "text"].includes(u.tokens[0].type) && "tokens" in u.tokens[0] && u.tokens[0].tokens ? (u.tokens[0].raw = g.raw + u.tokens[0].raw, u.tokens[0].text = g.raw + u.tokens[0].text, u.tokens[0].tokens.unshift(g)) : u.tokens.unshift({ type: "paragraph", raw: g.raw, text: g.raw, tokens: [g] }) : u.tokens.unshift(g);
           }
-        } else p.task && (p.task = false);
+        } else u.task && (u.task = false);
       }
-      if (i.loose) for (let p of i.items) {
-        p.loose = true;
-        for (let d of p.tokens) d.type === "text" && (d.type = "paragraph");
+      if (i.loose) for (let u of i.items) {
+        u.loose = true;
+        for (let d of u.tokens) d.type === "text" && (d.type = "paragraph");
       }
       return i;
     }
@@ -2960,29 +3012,29 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
   html(e) {
     let t = this.rules.block.html.exec(e);
     if (t) {
-      let n = pe(t[0]);
+      let n = ge(t[0]);
       return { type: "html", block: true, raw: n, pre: t[1] === "pre" || t[1] === "script" || t[1] === "style", text: n };
     }
   }
   def(e) {
     let t = this.rules.block.def.exec(e);
     if (t) {
-      if (!this.rules.other.startAngleBracket.test(t[2]) && ce(t[2], "()") !== -1) return;
-      let n = N(t[1]).replace(this.rules.other.multipleSpaceGlobal, " "), s = t[2] ? t[2].replace(this.rules.other.hrefBrackets, "$1").replace(this.rules.inline.anyPunctuation, "$1") : "", r = t[3] ? t[3].substring(1, t[3].length - 1).replace(this.rules.inline.anyPunctuation, "$1") : t[3];
-      return { type: "def", tag: n, raw: z(t[0], `
+      if (!this.rules.other.startAngleBracket.test(t[2]) && ke(t[2], "()") !== -1) return;
+      let n = F(t[1]), s = t[2] ? t[2].replace(this.rules.other.hrefBrackets, "$1").replace(this.rules.inline.anyPunctuation, "$1") : "", r = t[3] ? t[3].substring(1, t[3].length - 1).replace(this.rules.inline.anyPunctuation, "$1") : t[3];
+      return { type: "def", tag: n, raw: L(t[0], `
 `), href: s, title: r };
     }
   }
   table(e) {
     let t = this.rules.block.table.exec(e);
     if (!t || !this.rules.other.tableDelimiter.test(t[2])) return;
-    let n = ue(t[1]), s = t[2].replace(this.rules.other.tableAlignChars, "").split("|"), r = t[3]?.trim() ? t[3].replace(this.rules.other.tableRowBlankLine, "").split(`
-`) : [], o = { type: "table", raw: z(t[0], `
+    let n = de(t[1]), s = t[2].replace(this.rules.other.tableAlignChars, "").split("|"), r = t[3]?.trim() ? t[3].replace(this.rules.other.tableRowBlankLine, "").split(`
+`) : [], o = { type: "table", raw: L(t[0], `
 `), header: [], align: [], rows: [] };
     if (n.length === s.length) {
       for (let i of s) this.rules.other.tableAlignRight.test(i) ? o.align.push("right") : this.rules.other.tableAlignCenter.test(i) ? o.align.push("center") : this.rules.other.tableAlignLeft.test(i) ? o.align.push("left") : o.align.push(null);
       for (let i = 0; i < n.length; i++) o.header.push({ text: n[i], tokens: this.lexer.inline(n[i]), header: true, align: o.align[i] });
-      for (let i of r) o.rows.push(ue(i, o.header.length).map((l, u) => ({ text: l, tokens: this.lexer.inline(l), header: false, align: o.align[u] })));
+      for (let i of r) o.rows.push(de(i, o.header.length).map((l, p) => ({ text: l, tokens: this.lexer.inline(l), header: false, align: o.align[p] })));
       return o;
     }
   }
@@ -2990,7 +3042,7 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
     let t = this.rules.block.lheading.exec(e);
     if (t) {
       let n = t[1].trim();
-      return { type: "heading", raw: z(t[0], `
+      return { type: "heading", raw: L(t[0], `
 `), depth: t[2].charAt(0) === "=" ? 1 : 2, text: n, tokens: this.lexer.inline(n) };
     }
   }
@@ -3019,39 +3071,41 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
     let t = this.rules.inline.link.exec(e);
     if (t) {
       let n = t[0].charAt(0) === "!" ? 2 : 1;
-      if (!this.options.pedantic && $e(e, t[1], n, this.rules)) return;
+      if (!this.options.pedantic && Be(e, t[1], n, this.rules)) return;
       let s = t[2].trim();
       if (!this.options.pedantic && this.rules.other.startAngleBracket.test(s)) {
         if (!this.rules.other.endAngleBracket.test(s)) return;
-        let i = z(s.slice(0, -1), "\\");
-        if ((s.length - i.length) % 2 === 0) return;
+        let l = L(s.slice(0, -1), "\\");
+        if ((s.length - l.length) % 2 === 0) return;
       } else {
-        let i = ce(t[2], "()");
-        if (i === -2) return;
-        if (i > -1) {
-          let u = (t[0].indexOf("!") === 0 ? 5 : 4) + t[1].length + i;
-          t[2] = t[2].substring(0, i), t[0] = t[0].substring(0, u).trim(), t[3] = "";
+        let l = ke(t[2], "()");
+        if (l === -2) return;
+        if (l > -1) {
+          let h = (t[0].indexOf("!") === 0 ? 5 : 4) + t[1].length + l;
+          t[2] = t[2].substring(0, l), t[0] = t[0].substring(0, h).trim(), t[3] = "";
         }
       }
-      let r = t[2], o = "";
+      let r = L(t[0].slice(0, -1), "\\");
+      if ((t[0].length - r.length) % 2 === 0) return;
+      let o = t[2], i = "";
       if (this.options.pedantic) {
-        let i = this.rules.other.pedanticHrefTitle.exec(r);
-        i && (r = i[1], o = i[3]);
-      } else o = t[3] ? t[3].slice(1, -1) : "";
-      return r = r.trim(), this.rules.other.startAngleBracket.test(r) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(s) ? r = r.slice(1) : r = r.slice(1, -1)), _e(t, { href: r && r.replace(this.rules.inline.anyPunctuation, "$1"), title: o && o.replace(this.rules.inline.anyPunctuation, "$1") }, t[0], this.lexer, this.rules);
+        let l = this.rules.other.pedanticHrefTitle.exec(o);
+        l && (o = l[1], i = l[3]);
+      } else i = t[3] ? t[3].slice(1, -1) : "";
+      return o = o.trim(), this.rules.other.startAngleBracket.test(o) && (this.options.pedantic && !this.rules.other.endAngleBracket.test(s) ? o = o.slice(1) : o = o.slice(1, -1)), De(t, { href: o && o.replace(this.rules.inline.anyPunctuation, "$1"), title: i && i.replace(this.rules.inline.anyPunctuation, "$1") }, t[0], this.lexer, this.rules);
     }
   }
   reflink(e, t) {
     let n;
     if ((n = this.rules.inline.reflink.exec(e)) || (n = this.rules.inline.nolink.exec(e))) {
       let s = n[0].charAt(0) === "!" ? 2 : 1;
-      if (!this.options.pedantic && $e(e, n[1], s, this.rules)) return;
-      let r = (n[2] || n[1]).replace(this.rules.other.multipleSpaceGlobal, " "), o = t[N(r)];
-      if (!o) {
-        let i = n[0].charAt(0);
-        return { type: "text", raw: i, text: i };
+      if (!this.options.pedantic && Be(e, n[1], s, this.rules)) return;
+      let r = t[F(n[2] || n[1])];
+      if (!r) {
+        let o = n[0].charAt(0);
+        return { type: "text", raw: o, text: o };
       }
-      return _e(n, o, n[0], this.lexer, this.rules);
+      return De(n, r, n[0], this.lexer, this.rules);
     }
   }
   emStrong(e, t, n = "") {
@@ -3059,34 +3113,39 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
     if (!s || !s[1] && !s[2] && !s[3] && !s[4]) return;
     let r = s[0][0], o = n === r, i = t.length - e.length, l = i;
     for (; !this.options.pedantic && l > 0 && t[l - 1] === r; ) l--;
-    let u = [...t.slice(Math.max(0, l - 2), l)].at(-1) ?? "", h = u === "*" || u === "_" || !!this.rules.inline.punctuation.exec(u);
-    l < i && (n = u);
-    let p = l < i ? h : !!this.rules.inline.punctuation.exec(n);
+    let p = [...t.slice(Math.max(0, l - 2), l)].at(-1) ?? "", h = p === "*" || p === "_" || !!this.rules.inline.punctuation.exec(p);
+    l < i && (n = p);
+    let u = l < i ? h : !!this.rules.inline.punctuation.exec(n);
     if (s[4] && n.match(this.rules.other.unicodeAlphaNumeric)) return;
     let d = s[1] || s[3] || "";
-    if (!d || !n || p) {
-      let g = [...s[0]].length - 1, k, b, x = g, f2 = 0, S2 = i - l + g, R3 = !this.options.pedantic && !!u.trim() && (!!d || r === "*" && !h), C = r === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd;
-      for (C.lastIndex = 0, t = t.slice(-1 * e.length + g); (s = C.exec(t)) !== null; ) {
-        if (k = s[1] || s[2] || s[3] || s[4] || s[5] || s[6], !k) continue;
-        if (b = [...k].length, s[3] || s[4]) {
-          x += b;
+    if (!d || !n || u) {
+      let k = [...s[0]].length - 1, g, b, m = k, f2 = 0, y = i - l + k, R3 = !this.options.pedantic && !!p.trim() && (!!d || r === "*" && !h);
+      if (r !== "*" && r !== "_") return;
+      let A2 = r === "*" ? this.rules.inline.emStrongRDelimAst : this.rules.inline.emStrongRDelimUnd, v = ze(this, t, r), Q2 = t.length - e.length + k;
+      if (v < Q2) return;
+      t = t.slice(-1 * e.length + k);
+      let ee2 = v - Q2;
+      for (A2.lastIndex = 0; (s = A2.exec(t)) !== null && !(s.index > ee2); ) {
+        if (g = s[1] || s[2] || s[3] || s[4] || s[5] || s[6], !g) continue;
+        if (b = [...g].length, s[3] || s[4]) {
+          m += b;
           continue;
         } else if (s[5] || s[6] || R3) {
           if (o && (s[5] || s[6])) break;
-          if (S2 % 3 && !((S2 + b) % 3)) {
+          if (y % 3 && !((y + b) % 3)) {
             f2 += b;
             continue;
           }
         }
-        if (x -= b, x > 0) continue;
-        b = Math.min(b, b + x + f2);
-        let Q2 = [...s[0]][0].length, E = e.slice(0, g + s.index + Q2 + b);
-        if (Math.min(g, b) % 2) {
-          let F = E.slice(1, -1);
-          return { type: "em", raw: E, text: F, tokens: this.lexer.inlineTokens(F) };
+        if (m -= b, m > 0) continue;
+        b = Math.min(b, b + m + f2);
+        let te2 = [...s[0]][0].length, M2 = e.slice(0, k + s.index + te2 + b);
+        if (Math.min(k, b) % 2) {
+          let U2 = M2.slice(1, -1);
+          return { type: "em", raw: M2, text: U2, tokens: this.lexer.inlineTokens(U2) };
         }
-        let j = E.slice(2, -2);
-        return { type: "strong", raw: E, text: j, tokens: this.lexer.inlineTokens(j) };
+        let ne2 = M2.slice(2, -2);
+        return { type: "strong", raw: M2, text: ne2, tokens: this.lexer.inlineTokens(ne2) };
       }
     }
   }
@@ -3105,17 +3164,20 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
     let s = this.rules.inline.delLDelim.exec(e);
     if (!s) return;
     if (!(s[1] || "") || !n || this.rules.inline.punctuation.exec(n)) {
-      let o = [...s[0]].length - 1, i, l, u = o, h = this.rules.inline.delRDelim;
-      for (h.lastIndex = 0, t = t.slice(-1 * e.length + o); (s = h.exec(t)) !== null; ) {
+      let o = [...s[0]].length - 1, i, l, p = o, h = this.rules.inline.delRDelim, u = Me(this, t), d = t.length - e.length + o;
+      if (u < d) return;
+      t = t.slice(-1 * e.length + o);
+      let k = u - d;
+      for (h.lastIndex = 0; (s = h.exec(t)) !== null && !(s.index > k); ) {
         if (i = s[1] || s[2] || s[3] || s[4] || s[5] || s[6], !i || (l = [...i].length, l !== o)) continue;
         if (s[3] || s[4]) {
-          u += l;
+          p += l;
           continue;
         }
-        if (u -= l, u > 0) continue;
-        l = Math.min(l, l + u);
-        let p = [...s[0]][0].length, d = e.slice(0, o + s.index + p + l), g = d.slice(o, -o);
-        return { type: "del", raw: d, text: g, tokens: this.lexer.inlineTokens(g) };
+        if (p -= l, p > 0) continue;
+        l = Math.min(l, l + p);
+        let g = [...s[0]][0].length, b = e.slice(0, o + s.index + g + l), m = b.slice(o, -o);
+        return { type: "del", raw: b, text: m, tokens: this.lexer.inlineTokens(m) };
       }
     }
   }
@@ -3145,7 +3207,7 @@ ${f2}`) ? `    ${Z2.replace(/^ {0,3}/, "")}` : f2;
     let t = this.rules.inline.text.exec(e);
     if (t) {
       let n = this.lexer.state.inRawBlock;
-      return { type: "text", raw: t[0], text: n ? t[0] : Se(t[0]), escaped: n };
+      return { type: "text", raw: t[0], text: n ? t[0] : Ie(t[0]), escaped: n };
     }
   }
 };
@@ -3156,12 +3218,12 @@ var O = class a {
   inlineQueue;
   tokenizer;
   constructor(e) {
-    this.tokens = [], this.tokens.links = /* @__PURE__ */ Object.create(null), this.options = e || y, this.options.tokenizer = this.options.tokenizer || new _(), this.tokenizer = this.options.tokenizer, this.tokenizer.options = this.options, this.tokenizer.lexer = this, this.inlineQueue = [], this.state = { inLink: false, inRawBlock: false, linkEmitted: false, linkParenPossible: true, top: true };
-    let t = { other: T, block: X.normal, inline: G.normal };
-    this.options.pedantic ? (t.block = X.pedantic, t.inline = G.pedantic) : this.options.gfm && (t.block = X.gfm, this.options.breaks ? t.inline = G.breaks : t.inline = G.gfm), this.tokenizer.rules = t;
+    this.tokens = [], this.tokens.links = /* @__PURE__ */ Object.create(null), this.options = e || S, this.options.tokenizer = this.options.tokenizer || new _(), this.tokenizer = this.options.tokenizer, this.tokenizer.options = this.options, this.tokenizer.lexer = this, this.inlineQueue = [], this.state = { inLink: false, inRawBlock: false, linkEmitted: false, linkParenPossible: true, top: true };
+    let t = { other: T, block: V.normal, inline: G.normal };
+    this.options.pedantic ? (t.block = V.pedantic, t.inline = G.pedantic) : this.options.gfm && (t.block = V.gfm, this.options.breaks ? t.inline = G.breaks : t.inline = G.gfm), this.tokenizer.rules = t;
   }
   static get rules() {
-    return { block: X, inline: G };
+    return { block: V, inline: G };
   }
   static lex(e, t) {
     return new a(t).lex(e);
@@ -3248,9 +3310,9 @@ var O = class a {
       }
       let o = e;
       if (this.options.extensions?.startBlock) {
-        let i = 1 / 0, l = e.slice(1), u;
+        let i = 1 / 0, l = e.slice(1), p;
         this.options.extensions.startBlock.forEach((h) => {
-          u = h.call({ lexer: this }, l), typeof u == "number" && u >= 0 && (i = Math.min(i, u));
+          p = h.call({ lexer: this }, l), typeof p == "number" && p >= 0 && (i = Math.min(i, p));
         }), i < 1 / 0 && i >= 0 && (o = e.substring(0, i + 1));
       }
       if (this.state.top && (r = this.tokenizer.paragraph(o))) {
@@ -3286,7 +3348,7 @@ var O = class a {
     for (let n of e.matchAll(this.tokenizer.rules.inline.blockSkip)) if (t.test(n[0]) && e.charAt(n.index - 1) !== "!") return true;
     for (let n of e.matchAll(this.tokenizer.rules.inline.reflinkSearch)) {
       let s = n[0], r = s.lastIndexOf("[");
-      if (!(s.charAt(0) === "!" || !Object.hasOwn(this.tokens.links, N(s.slice(r + 1, -1)))) && !(r > 1 && this.linkInText(s.slice(1, r - 1)))) return true;
+      if (!(s.charAt(0) === "!" || !Object.hasOwn(this.tokens.links, F(s.slice(r + 1, -1)))) && !(r > 1 && this.linkInText(s.slice(1, r - 1)))) return true;
     }
     return false;
   }
@@ -3301,7 +3363,16 @@ var O = class a {
     }
   }
   #e(e, t) {
-    let n = e.includes("*") || e.includes("_") || e.includes("~") || this.options.hooks?.emStrongMask || this.tokenizer.emStrong !== _.prototype.emStrong || this.tokenizer.del !== _.prototype.del ? this.#t(e) : e, s = false, r = "", o = 1 / 0;
+    let n = e.includes("*") || e.includes("_") || e.includes("~") || this.options.hooks?.emStrongMask || this.tokenizer.emStrong !== _.prototype.emStrong || this.tokenizer.del !== _.prototype.del ? this.#n(e) : e;
+    Ae(this.tokenizer, n);
+    try {
+      return this.#t(e, n, t);
+    } finally {
+      Ee(this.tokenizer);
+    }
+  }
+  #t(e, t, n) {
+    let s = false, r = "", o = 1 / 0;
     for (; e; ) {
       if (e.length < o) o = e.length;
       else {
@@ -3310,60 +3381,60 @@ var O = class a {
       }
       s || (r = ""), s = false;
       let i;
-      if (this.options.extensions?.inline?.some((u) => (i = u.call({ lexer: this }, e, t)) ? (e = e.substring(i.raw.length), t.push(i), true) : false)) continue;
+      if (this.options.extensions?.inline?.some((p) => (i = p.call({ lexer: this }, e, n)) ? (e = e.substring(i.raw.length), n.push(i), true) : false)) continue;
       if (i = this.tokenizer.escape(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.tag(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.link(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.reflink(e, this.tokens.links)) {
         e = e.substring(i.raw.length);
-        let u = t.at(-1);
-        i.type === "text" && u?.type === "text" ? (u.raw += i.raw, u.text += i.text) : t.push(i);
+        let p = n.at(-1);
+        i.type === "text" && p?.type === "text" ? (p.raw += i.raw, p.text += i.text) : n.push(i);
         continue;
       }
-      if (i = this.tokenizer.emStrong(e, n, r)) {
-        e = e.substring(i.raw.length), t.push(i);
+      if (i = this.tokenizer.emStrong(e, t, r)) {
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.codespan(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.br(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
-      if (i = this.tokenizer.del(e, n, r)) {
-        e = e.substring(i.raw.length), t.push(i);
+      if (i = this.tokenizer.del(e, t, r)) {
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (i = this.tokenizer.autolink(e)) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       if (!this.state.inLink && (i = this.tokenizer.url(e))) {
-        e = e.substring(i.raw.length), t.push(i);
+        e = e.substring(i.raw.length), n.push(i);
         continue;
       }
       let l = e;
       if (this.options.extensions?.startInline) {
-        let u = 1 / 0, h = e.slice(1), p;
+        let p = 1 / 0, h = e.slice(1), u;
         this.options.extensions.startInline.forEach((d) => {
-          p = d.call({ lexer: this }, h), typeof p == "number" && p >= 0 && (u = Math.min(u, p));
-        }), u < 1 / 0 && u >= 0 && (l = e.substring(0, u + 1));
+          u = d.call({ lexer: this }, h), typeof u == "number" && u >= 0 && (p = Math.min(p, u));
+        }), p < 1 / 0 && p >= 0 && (l = e.substring(0, p + 1));
       }
       if (i = this.tokenizer.inlineText(l)) {
         e = e.substring(i.raw.length), i.raw.slice(-1) !== "_" && (r = i.raw.slice(-1)), s = true;
-        let u = t.at(-1);
-        u?.type === "text" ? (u.raw += i.raw, u.text += i.text) : t.push(i);
+        let p = n.at(-1);
+        p?.type === "text" ? (p.raw += i.raw, p.text += i.text) : n.push(i);
         continue;
       }
       if (e) {
@@ -3371,14 +3442,14 @@ var O = class a {
         break;
       }
     }
-    return t;
+    return n;
   }
-  #t(e) {
+  #n(e) {
     let t = e;
     if (this.tokens.links && e.includes("[")) {
       let n = this.tokenizer.rules.inline.reflinkSearch, s = (r) => {
         let o = r.lastIndexOf("[");
-        if (!Object.hasOwn(this.tokens.links, N(r.slice(o + 1, -1)))) return r;
+        if (!Object.hasOwn(this.tokens.links, F(r.slice(o + 1, -1)))) return r;
         if (o > 1 && r.charAt(0) !== "!") {
           let i = r.slice(1, o - 1);
           if (this.linkInText(i)) return "[" + i.replace(n, s) + "][" + "a".repeat(r.length - o - 2) + "]";
@@ -3398,11 +3469,11 @@ var O = class a {
     else throw new Error(t);
   }
 };
-var L = class {
+var C = class {
   options;
   parser;
   constructor(e) {
-    this.options = e || y;
+    this.options = e || S;
   }
   space(e) {
     return "";
@@ -3498,7 +3569,7 @@ ${e}</tr>
     return `<del>${this.parser.parseInline(e)}</del>`;
   }
   link({ href: e, title: t, text: n, tokens: s, autolink: r }) {
-    let o = r ? P(n, true) : this.parser.parseInline(s), i = le(e);
+    let o = r ? P(n, true) : this.parser.parseInline(s), i = he(e);
     if (i === null) return o;
     e = P(i, r);
     let l = '<a href="' + e + '"';
@@ -3506,7 +3577,7 @@ ${e}</tr>
   }
   image({ href: e, title: t, text: n, tokens: s }) {
     s && (n = this.parser.parseInline(s, this.parser.textRenderer));
-    let r = le(e);
+    let r = he(e);
     if (r === null) return P(n);
     e = r;
     let o = `<img src="${P(e)}" alt="${P(n)}"`;
@@ -3516,7 +3587,7 @@ ${e}</tr>
     return "tokens" in e && e.tokens ? this.parser.parseInline(e.tokens) : "escaped" in e && e.escaped ? e.text : P(e.text);
   }
 };
-var M = class {
+var E = class {
   parser;
   strong({ text: e, tokens: t }) {
     return t ? this.parser.parseInline(t, this) : e;
@@ -3554,7 +3625,7 @@ var w = class a2 {
   renderer;
   textRenderer;
   constructor(e) {
-    this.options = e || y, this.options.renderer = this.options.renderer || new L(), this.renderer = this.options.renderer, this.renderer.options = this.options, this.renderer.parser = this, this.textRenderer = new M(), this.textRenderer.parser = this;
+    this.options = e || S, this.options.renderer = this.options.renderer || new C(), this.renderer = this.options.renderer, this.renderer.options = this.options, this.renderer.parser = this, this.textRenderer = new E(), this.textRenderer.parser = this;
   }
   static parse(e, t) {
     return new a2(t).parse(e);
@@ -3701,11 +3772,11 @@ var w = class a2 {
     return n;
   }
 };
-var A = class {
+var I = class {
   options;
   block;
   constructor(e) {
-    this.options = e || y;
+    this.options = e || S;
   }
   static passThroughHooks = /* @__PURE__ */ new Set(["preprocess", "postprocess", "processAllTokens", "emStrongMask"]);
   static passThroughHooksRespectAsync = /* @__PURE__ */ new Set(["preprocess", "postprocess", "processAllTokens"]);
@@ -3728,50 +3799,50 @@ var A = class {
     return e ? w.parse : w.parseInline;
   }
 };
-function D(a3, e) {
+function z(a3, e) {
   if (Array.isArray(e)) for (let t = 0; t < e.length; t++) a3.push(e[t]);
   else a3.push(e);
 }
-var J = class {
-  defaults = v();
+var Y = class {
+  defaults = H();
   options = this.setOptions;
   parse = this.parseMarkdown(true);
   parseInline = this.parseMarkdown(false);
   Parser = w;
-  Renderer = L;
-  TextRenderer = M;
+  Renderer = C;
+  TextRenderer = E;
   Lexer = O;
   Tokenizer = _;
-  Hooks = A;
+  Hooks = I;
   constructor(...e) {
     this.use(...e);
   }
   walkTokens(e, t) {
     let n = [];
-    for (let s of e) switch (D(n, t.call(this, s)), s.type) {
+    for (let s of e) switch (z(n, t.call(this, s)), s.type) {
       case "table": {
         let r = s;
-        for (let o of r.header) D(n, this.walkTokens(o.tokens, t));
-        for (let o of r.rows) for (let i of o) D(n, this.walkTokens(i.tokens, t));
+        for (let o of r.header) z(n, this.walkTokens(o.tokens, t));
+        for (let o of r.rows) for (let i of o) z(n, this.walkTokens(i.tokens, t));
         break;
       }
       case "list": {
         let r = s;
-        D(n, this.walkTokens(r.items, t));
+        z(n, this.walkTokens(r.items, t));
         break;
       }
       default: {
         let r = s;
         this.defaults.extensions?.childTokens?.[r.type] ? this.defaults.extensions.childTokens[r.type].forEach((o) => {
           let i = r[o].flat(1 / 0);
-          D(n, this.walkTokens(i, t));
-        }) : r.tokens && D(n, this.walkTokens(r.tokens, t));
+          z(n, this.walkTokens(i, t));
+        }) : r.tokens && z(n, this.walkTokens(r.tokens, t));
       }
     }
     return n;
   }
   use(...e) {
-    let t = this.defaults.extensions || { renderers: {}, childTokens: {} };
+    let t = this.defaults.extensions || { renderers: /* @__PURE__ */ Object.create(null), childTokens: /* @__PURE__ */ Object.create(null) };
     return e.forEach((n) => {
       let s = { ...n };
       if (s.async = this.defaults.async || s.async || false, n.extensions && (n.extensions.forEach((r) => {
@@ -3790,14 +3861,14 @@ var J = class {
         }
         "childTokens" in r && r.childTokens && (t.childTokens[r.name] = r.childTokens);
       }), s.extensions = t), n.renderer) {
-        let r = this.defaults.renderer || new L(this.defaults);
+        let r = this.defaults.renderer || new C(this.defaults);
         for (let o in n.renderer) {
           if (!(o in r)) throw new Error(`renderer '${o}' does not exist`);
           if (["options", "parser"].includes(o)) continue;
-          let i = o, l = n.renderer[i], u = r[i];
+          let i = o, l = n.renderer[i], p = r[i];
           r[i] = (...h) => {
-            let p = l.apply(r, h);
-            return p === false && (p = u.apply(r, h)), p || "";
+            let u = l.apply(r, h);
+            return u === false && (u = p.apply(r, h)), u === false ? "" : u ?? "";
           };
         }
         s.renderer = r;
@@ -3807,34 +3878,34 @@ var J = class {
         for (let o in n.tokenizer) {
           if (!(o in r)) throw new Error(`tokenizer '${o}' does not exist`);
           if (["options", "rules", "lexer"].includes(o)) continue;
-          let i = o, l = n.tokenizer[i], u = r[i];
+          let i = o, l = n.tokenizer[i], p = r[i];
           r[i] = (...h) => {
-            let p = l.apply(r, h);
-            return p === false && (p = u.apply(r, h)), p;
+            let u = l.apply(r, h);
+            return u === false && (u = p.apply(r, h)), u;
           };
         }
         s.tokenizer = r;
       }
       if (n.hooks) {
-        let r = this.defaults.hooks || new A();
+        let r = this.defaults.hooks || new I();
         for (let o in n.hooks) {
           if (!(o in r)) throw new Error(`hook '${o}' does not exist`);
           if (["options", "block"].includes(o)) continue;
-          let i = o, l = n.hooks[i], u = r[i];
-          A.passThroughHooks.has(o) ? r[i] = (h) => {
-            if (r.options.async && A.passThroughHooksRespectAsync.has(o)) return (async () => {
+          let i = o, l = n.hooks[i], p = r[i];
+          I.passThroughHooks.has(o) ? r[i] = (h) => {
+            if (r.options.async && I.passThroughHooksRespectAsync.has(o)) return (async () => {
               let d = await l.call(r, h);
-              return u.call(r, d);
+              return p.call(r, d);
             })();
-            let p = l.call(r, h);
-            return u.call(r, p);
+            let u = l.call(r, h);
+            return p.call(r, u);
           } : r[i] = (...h) => {
             if (r.options.async) return (async () => {
               let d = await l.apply(r, h);
-              return d === false && (d = await u.apply(r, h)), d;
+              return d === false && (d = await p.apply(r, h)), d;
             })();
-            let p = l.apply(r, h);
-            return p === false && (p = u.apply(r, h)), p;
+            let u = l.apply(r, h);
+            return u === false && (u = p.apply(r, h)), u;
           };
         }
         s.hooks = r;
@@ -3843,7 +3914,7 @@ var J = class {
         let r = this.defaults.walkTokens, o = n.walkTokens;
         s.walkTokens = function(i) {
           let l = [];
-          return l.push(o.call(this, i)), r && D(l, r.call(this, i)), l;
+          return z(l, o.call(this, i)), r && z(l, r.call(this, i)), l;
         };
       }
       this.defaults = { ...this.defaults, ...s };
@@ -3865,17 +3936,17 @@ var J = class {
       if (typeof n > "u" || n === null) return i(new Error("marked(): input parameter is undefined or null"));
       if (typeof n != "string") return i(new Error("marked(): input parameter is of type " + Object.prototype.toString.call(n) + ", string expected"));
       if (o.hooks && (o.hooks.options = o, o.hooks.block = e), o.async) return (async () => {
-        let l = o.hooks ? await o.hooks.preprocess(n) : n, h = await (o.hooks ? await o.hooks.provideLexer(e) : e ? O.lex : O.lexInline)(l, o), p = o.hooks ? await o.hooks.processAllTokens(h) : h;
-        o.walkTokens && await Promise.all(this.walkTokens(p, o.walkTokens));
-        let g = await (o.hooks ? await o.hooks.provideParser(e) : e ? w.parse : w.parseInline)(p, o);
-        return o.hooks ? await o.hooks.postprocess(g) : g;
+        let l = o.hooks ? await o.hooks.preprocess(n) : n, h = await (o.hooks ? await o.hooks.provideLexer(e) : e ? O.lex : O.lexInline)(l, o), u = o.hooks ? await o.hooks.processAllTokens(h) : h;
+        o.walkTokens && await Promise.all(this.walkTokens(u, o.walkTokens));
+        let k = await (o.hooks ? await o.hooks.provideParser(e) : e ? w.parse : w.parseInline)(u, o);
+        return o.hooks ? await o.hooks.postprocess(k) : k;
       })().catch(i);
       try {
         o.hooks && (n = o.hooks.preprocess(n));
-        let u = (o.hooks ? o.hooks.provideLexer(e) : e ? O.lex : O.lexInline)(n, o);
-        o.hooks && (u = o.hooks.processAllTokens(u)), o.walkTokens && this.walkTokens(u, o.walkTokens);
-        let p = (o.hooks ? o.hooks.provideParser(e) : e ? w.parse : w.parseInline)(u, o);
-        return o.hooks && (p = o.hooks.postprocess(p)), p;
+        let p = (o.hooks ? o.hooks.provideLexer(e) : e ? O.lex : O.lexInline)(n, o);
+        o.hooks && (p = o.hooks.processAllTokens(p)), o.walkTokens && this.walkTokens(p, o.walkTokens);
+        let u = (o.hooks ? o.hooks.provideParser(e) : e ? w.parse : w.parseInline)(p, o);
+        return o.hooks && (u = o.hooks.postprocess(u)), u;
       } catch (l) {
         return i(l);
       }
@@ -3893,38 +3964,38 @@ Please report this to https://github.com/markedjs/marked.`, e) {
     };
   }
 };
-var q = new J();
-function m(a3, e) {
+var q = new Y();
+function x(a3, e) {
   return q.parse(a3, e);
 }
-m.options = m.setOptions = function(a3) {
-  return q.setOptions(a3), m.defaults = q.defaults, ee(m.defaults), m;
+x.options = x.setOptions = function(a3) {
+  return q.setOptions(a3), x.defaults = q.defaults, se(x.defaults), x;
 };
-m.getDefaults = v;
-m.defaults = y;
-function zt(...a3) {
-  return q.use(...a3), m.defaults = q.defaults, ee(m.defaults), m;
+x.getDefaults = H;
+x.defaults = S;
+function Bt(...a3) {
+  return q.use(...a3), x.defaults = q.defaults, se(x.defaults), x;
 }
-m.use = zt;
-m.walkTokens = function(a3, e) {
+x.use = Bt;
+x.walkTokens = function(a3, e) {
   return q.walkTokens(a3, e);
 };
-m.parseInline = q.parseInline;
-m.Parser = w;
-m.parser = w.parse;
-m.Renderer = L;
-m.TextRenderer = M;
-m.Lexer = O;
-m.lexer = O.lex;
-m.Tokenizer = _;
-m.Hooks = A;
-m.parse = m;
-var Tn = m.options;
-var On = m.setOptions;
-var wn = m.walkTokens;
-var Pn = m.parseInline;
-var Sn = w.parse;
-var _n = O.lex;
+x.parseInline = q.parseInline;
+x.Parser = w;
+x.parser = w.parse;
+x.Renderer = C;
+x.TextRenderer = E;
+x.Lexer = O;
+x.lexer = O.lex;
+x.Tokenizer = _;
+x.Hooks = I;
+x.parse = x;
+var _n = x.options;
+var $n = x.setOptions;
+var Ln = x.walkTokens;
+var Cn = x.parseInline;
+var An = w.parse;
+var En = O.lex;
 
 // src/themes/type-scale.js
 var SCALE = Object.freeze({ min: 0.8, max: 1.5, step: 0.05 });
@@ -4060,15 +4131,15 @@ function tokenize(str, maxWidth, size, opts) {
       out.push(ch);
       i++;
     } else if (/\s/u.test(ch)) {
-      let j = i;
-      while (j < chars.length && /\s/u.test(chars[j])) j++;
-      out.push(chars.slice(i, j).join(""));
-      i = j;
+      let j2 = i;
+      while (j2 < chars.length && /\s/u.test(chars[j2])) j2++;
+      out.push(chars.slice(i, j2).join(""));
+      i = j2;
     } else {
-      let j = i;
-      while (j < chars.length && !/\s/u.test(chars[j]) && !HAN_KANA.test(chars[j])) j++;
-      out.push(...runUnits(chars.slice(i, j).join(""), maxWidth, size, opts));
-      i = j;
+      let j2 = i;
+      while (j2 < chars.length && !/\s/u.test(chars[j2]) && !HAN_KANA.test(chars[j2])) j2++;
+      out.push(...runUnits(chars.slice(i, j2).join(""), maxWidth, size, opts));
+      i = j2;
     }
   }
   return out;
@@ -4135,28 +4206,28 @@ function tagEnd(text2, from) {
   }
   return i < text2.length ? i + 1 : -1;
 }
-function readMatch(text2, m2) {
-  if (m2[1]) {
-    const end2 = m2[1] === "!--" ? -1 : text2.indexOf(">", m2.index);
-    return { reason: m2[1] === "!--" ? "comment" : "bogus", tag: { text: end2 === -1 ? m2[0] : text2.slice(m2.index, end2 + 1), label: m2[0] } };
+function readMatch(text2, m) {
+  if (m[1]) {
+    const end2 = m[1] === "!--" ? -1 : text2.indexOf(">", m.index);
+    return { reason: m[1] === "!--" ? "comment" : "bogus", tag: { text: end2 === -1 ? m[0] : text2.slice(m.index, end2 + 1), label: m[0] } };
   }
-  const end = tagEnd(text2, m2.index + m2[0].length);
-  return { reason: end === -1 ? "open" : null, tag: { text: end === -1 ? m2[0] : text2.slice(m2.index, end), close: m2[2] === "/", name: m2[3].toLowerCase() } };
+  const end = tagEnd(text2, m.index + m[0].length);
+  return { reason: end === -1 ? "open" : null, tag: { text: end === -1 ? m[0] : text2.slice(m.index, end), close: m[2] === "/", name: m[3].toLowerCase() } };
 }
 function mapTags(text2, decide, note2) {
   let out = "";
   let last = 0;
-  for (const m2 of text2.matchAll(SCAN)) {
-    if (m2.index < last || !m2[1] && !m2[3]) continue;
-    const { reason: reason2, tag } = readMatch(text2, m2);
-    out += text2.slice(last, m2.index) + (reason2 ? hide(tag, reason2, note2) : decide(tag));
-    last = m2.index + tag.text.length;
+  for (const m of text2.matchAll(SCAN)) {
+    if (m.index < last || !m[1] && !m[3]) continue;
+    const { reason: reason2, tag } = readMatch(text2, m);
+    out += text2.slice(last, m.index) + (reason2 ? hide(tag, reason2, note2) : decide(tag));
+    last = m.index + tag.text.length;
   }
   return out + text2.slice(last);
 }
 var readTag = (text2) => {
-  const m2 = /^<(\/?)([A-Za-z][^\s/>]*)/.exec(text2);
-  if (m2) return { text: text2, close: m2[1] === "/", name: m2[2].toLowerCase() };
+  const m = /^<(\/?)([A-Za-z][^\s/>]*)/.exec(text2);
+  if (m) return { text: text2, close: m[1] === "/", name: m[2].toLowerCase() };
   const bogus = /^<[?!](?!--)\[?\w*/.exec(text2);
   return bogus && { text: text2, label: bogus[0] };
 };
@@ -4235,11 +4306,11 @@ function relexReason(raw) {
     const comment = special[1] === "<!--";
     return comment && raw.includes("-->") ? null : { reason: comment ? "comment" : "bogus", at: special[1], label: special[1] };
   }
-  const m2 = OPENING.exec(raw);
-  if (!m2) return null;
-  const tag = { close: m2[1] === "/", name: m2[2].toLowerCase() };
+  const m = OPENING.exec(raw);
+  if (!m) return null;
+  const tag = { close: m[1] === "/", name: m[2].toLowerCase() };
   const reason2 = kind(tag.name, false) ?? (tag.name === "pre" && !tag.close && !/<\/pre>/i.test(raw) ? "unclosed" : null);
-  return reason2 && { reason: reason2, at: m2[0].trim(), label: shown(tag) };
+  return reason2 && { reason: reason2, at: m[0].trim(), label: shown(tag) };
 }
 function relex(token, { reason: reason2, at: at3, label }, { lex, note: note2 }) {
   note2(at3, REASON[reason2](label));
@@ -4415,13 +4486,13 @@ var NUMERIC_KEYS = /* @__PURE__ */ new Set(["cols", "span"]);
 var ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 function parseAttrs(text2) {
   const attrs = {};
-  for (const m2 of text2.matchAll(ATTR_TOKEN)) {
-    attrs[m2[1]] = m2[2] === void 0 ? true : coerce(m2[1], unquote(m2[2]));
+  for (const m of text2.matchAll(ATTR_TOKEN)) {
+    attrs[m[1]] = m[2] === void 0 ? true : coerce(m[1], unquote(m[2]));
   }
   return attrs;
 }
-function unquote(v2) {
-  const s = v2.trim();
+function unquote(v) {
+  const s = v.trim();
   return /^(["']).*\1$/.test(s) ? s.slice(1, -1) : s;
 }
 function coerce(key, value) {
@@ -4446,8 +4517,8 @@ function collectHtmlNotes(render, { math: math2 = true } = {}) {
     mathOn = outerMath;
   }
 }
-var marked = new J({ gfm: true });
-var inline = new J({ gfm: true });
+var marked = new Y({ gfm: true });
+var inline = new Y({ gfm: true });
 var TABLE_ATTR = /^\{table\s+([^{}]*)\}$/;
 var tableUi;
 var tableInteractive = true;
@@ -4604,9 +4675,9 @@ key: value
     const cells = contentLines(text2).map(({ text: t, line }) => {
       const wide = t.startsWith("*");
       const body = wide ? t.slice(1).trim() : t;
-      const m2 = body.match(/^([^:：]+)[:：]\s*(.*)$/);
-      if (!m2) throw new ComponentError(`kv line has no colon: "${t}"; expected key: value`, line);
-      return { wide, key: m2[1].trim(), value: m2[2] };
+      const m = body.match(/^([^:：]+)[:：]\s*(.*)$/);
+      if (!m) throw new ComponentError(`kv line has no colon: "${t}"; expected key: value`, line);
+      return { wide, key: m[1].trim(), value: m[2] };
     });
     const span = new Array(cells.length).fill(1);
     let pos = 0;
@@ -4700,16 +4771,16 @@ function sentenceHtml(sentence, line, rtl) {
   let out = "";
   let plain = "";
   let last = 0;
-  for (const m2 of sentence.matchAll(SEG)) {
-    const before = sentence.slice(last, m2.index);
+  for (const m of sentence.matchAll(SEG)) {
+    const before = sentence.slice(last, m.index);
     out += esc(before);
     plain += before;
-    const [, seg, bang, note2] = m2;
-    const x = measure(plain, TEXT_SIZE, { mono: !rtl });
-    const noteHtml2 = note2.trim() ? `<span class="am-seg-n" style="--row: ${placeNote(rows, x, x + measure(note2, NOTE_SIZE) + NOTE_GAP)}">${esc(note2.trim())}</span>` : "";
+    const [, seg, bang, note2] = m;
+    const x2 = measure(plain, TEXT_SIZE, { mono: !rtl });
+    const noteHtml2 = note2.trim() ? `<span class="am-seg-n" style="--row: ${placeNote(rows, x2, x2 + measure(note2, NOTE_SIZE) + NOTE_GAP)}">${esc(note2.trim())}</span>` : "";
     out += `<span class="am-seg${bang ? " am-seg--err" : ""}"><span class="am-seg-t">${esc(seg)}</span>${noteHtml2}</span>`;
     plain += seg;
-    last = m2.index + m2[0].length;
+    last = m.index + m[0].length;
   }
   out += esc(sentence.slice(last));
   const wrapCls = rows.length ? "" : " am-annot-line--wrap";
@@ -4732,8 +4803,8 @@ var STATES = Object.keys(SIGN);
 var EN_DELTA = { added: "added", removed: "removed", changed: "changed", view: "View", before: "Before", changes: "Changes", after: "After" };
 var labelsOf = (ui) => ({ ...EN_DELTA, ...ui?.delta });
 function splitMarker(text2) {
-  const m2 = text2.match(/^([+\-~]) +(\S.*)$/);
-  return m2 ? { mark: m2[1], text: m2[2] } : { mark: null, text: text2 };
+  const m = text2.match(/^([+\-~]) +(\S.*)$/);
+  return m ? { mark: m[1], text: m[2] } : { mark: null, text: text2 };
 }
 var markState = (mark) => STATE_OF[mark] ?? null;
 var deltaAttr = (state) => state ? ` data-delta="${state}"` : "";
@@ -4742,12 +4813,12 @@ function deltaBadge(state, ui) {
   return `<span class="am-delta-badge am-delta-badge--${state}" role="img" aria-label="${esc(labelsOf(ui)[state])}">${SIGN[state]}</span>`;
 }
 function withDelta(html, states, { ui, video = false } = {}) {
-  const used = STATES.map((s) => [s, states.filter((x) => x === s).length]).filter(([, n]) => n > 0);
+  const used = STATES.map((s) => [s, states.filter((x2) => x2 === s).length]).filter(([, n]) => n > 0);
   if (!used.length) return html;
   const t = labelsOf(ui);
   const word = (s, n) => n === 1 ? t[s] : t.counts?.[s] ?? t[s];
   const counts = used.map(([s, n]) => `<span class="am-delta-count am-delta-count--${s}">${SIGN[s]}${n} ${esc(word(s, n))}</span>`).join(" ");
-  const views = ["before", "changes", "after"].map((v2) => `<button type="button" data-view="${v2}" aria-pressed="${v2 === "changes"}">${esc(t[v2])}</button>`).join("");
+  const views = ["before", "changes", "after"].map((v) => `<button type="button" data-view="${v}" aria-pressed="${v === "changes"}">${esc(t[v])}</button>`).join("");
   const switcher = video ? "" : `<span class="am-delta-switch" role="group" aria-label="${esc(t.view)}" hidden>${views}</span>`;
   const open = html.indexOf(">");
   const close = html.lastIndexOf("</");
@@ -4836,7 +4907,7 @@ var HIDDEN_IN = { before: "added", after: "removed" };
 function lineAttrs(siblings, i, cols) {
   const n = siblings.length;
   return Object.entries(HIDDEN_IN).map(([view, hidden]) => {
-    const shown2 = siblings.map((x) => x.state !== hidden);
+    const shown2 = siblings.map((x2) => x2.state !== hidden);
     const first = shown2.indexOf(true);
     const last = shown2.lastIndexOf(true);
     const natural = cols ? n === 1 ? "none" : i === 0 ? "start" : i === n - 1 ? "end" : "full" : i < n - 1 ? "full" : "short";
@@ -4875,14 +4946,14 @@ function niceScale(peak) {
   const target = peak * 1.4;
   const pow = 10 ** Math.floor(Math.log10(target));
   const integral = Number.isInteger(peak);
-  const nice = NICE_MAX.map((m2) => m2 * pow).find((m2) => m2 >= target - 1e-9) ?? 10 * pow;
+  const nice = NICE_MAX.map((m) => m * pow).find((m) => m >= target - 1e-9) ?? 10 * pow;
   const max = integral ? Math.ceil(nice) : nice;
   const stepPow = 10 ** Math.floor(Math.log10(max));
   const step = [...NICE_STEP.map((s) => s * stepPow / 10), ...NICE_STEP.map((s) => s * stepPow)].find((s) => max / s <= 7 && Number.isInteger(round(max / s)) && (integral ? s >= 1 : true)) ?? max;
   return { max: round(max), step: round(step) };
 }
 var round = (n) => Math.round(n * 1e3) / 1e3;
-var pct = (v2, max) => `${Math.round(v2 / max * 1e4) / 100}%`;
+var pct = (v, max) => `${Math.round(v / max * 1e4) / 100}%`;
 var NUM = /^(?:max\s+)?(-?\d+(?:\.\d+)?)$/i;
 var limits_default = {
   name: "limits",
@@ -4919,7 +4990,7 @@ function rowHtml({ label, value, limit, unit, note: note2 }, side = "left", word
   const valText = `${value !== null ? fill(words3.value, value, limit) : fill(words3.limit, value, limit)}${unit ? ` ${unit}` : ""}`;
   const ticks = [];
   if (step > 0 && max > 0) {
-    for (let v2 = 0; v2 <= max + 1e-9; v2 += step) ticks.push(`<span style="${side}: ${pct(round(v2), max)}">${round(v2)}</span>`);
+    for (let v = 0; v <= max + 1e-9; v += step) ticks.push(`<span style="${side}: ${pct(round(v), max)}">${round(v)}</span>`);
   }
   return `<div class="am-lim${over2 ? " is-over" : ""}">
 <div class="am-lim-head"><span>${esc(label)}${note2 ? `<span class="am-lim-note">${esc(note2)}</span>` : ""}</span><span class="am-lim-val">${esc(valText)}</span></div>
@@ -4991,9 +5062,9 @@ function isolateLtrRuns(html) {
     }
     run2 = [];
   };
-  for (const m2 of String(html).matchAll(TOKEN)) {
-    const tok = m2[0];
-    const name2 = m2[1]?.toLowerCase();
+  for (const m of String(html).matchAll(TOKEN)) {
+    const tok = m[0];
+    const name2 = m[1]?.toLowerCase();
     if (skip) {
       out.push(tok);
       if (name2 === skip) depth += tok.startsWith("</") ? -1 : tok.endsWith("/>") ? 0 : 1;
@@ -5030,8 +5101,8 @@ function smoothPath(points) {
   const m0 = mid(points[0], points[1]);
   parts.push(`L${f(m0.x)},${f(m0.y)}`);
   for (let i = 1; i < points.length - 1; i++) {
-    const m2 = mid(points[i], points[i + 1]);
-    parts.push(`Q${f(points[i].x)},${f(points[i].y)} ${f(m2.x)},${f(m2.y)}`);
+    const m = mid(points[i], points[i + 1]);
+    parts.push(`Q${f(points[i].x)},${f(points[i].y)} ${f(m.x)},${f(m.y)}`);
   }
   const last = points.at(-1);
   parts.push(`L${f(last.x)},${f(last.y)}`);
@@ -5039,7 +5110,7 @@ function smoothPath(points) {
 }
 function arrowDefs(uid, variants = []) {
   const marker = (name2, cls) => `<marker id="${uid}-arrow${name2}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="am-arrow${cls}" d="M0,0 L10,5 L0,10 z"/></marker>`;
-  return `<defs>${[marker("", ""), ...variants.map((v2) => marker(`-${v2}`, ` am-arrow--${v2}`))].join("")}</defs>`;
+  return `<defs>${[marker("", ""), ...variants.map((v) => marker(`-${v}`, ` am-arrow--${v}`))].join("")}</defs>`;
 }
 function textLines(lines, cx, cy, lineHeight, attrs = "", dir = "ltr") {
   const top2 = cy - (lines.length - 1) * lineHeight / 2;
@@ -5061,19 +5132,19 @@ function scaleSvgBoxes(html, scale = 1) {
   if (scale === 1) return html;
   return String(html).replace(SVG_OPEN_BOX, (tag, w2, h) => `<svg viewBox="0 0 ${w2} ${h}" width="${Math.ceil(w2 * scale)}" height="${Math.ceil(h * scale)}"`);
 }
-var mirror = (width, rtl) => rtl ? (x) => width - x : (x) => x;
+var mirror = (width, rtl) => rtl ? (x2) => width - x2 : (x2) => x2;
 var SEARCH_LIMIT = 4e4;
 function orderRanks(g, order) {
   order(g);
   const ranks = {};
-  for (const v2 of g.nodes()) {
-    const { rank, order: at3 } = g.node(v2);
-    if (rank !== void 0) (ranks[rank] ??= [])[at3] = v2;
+  for (const v of g.nodes()) {
+    const { rank, order: at3 } = g.node(v);
+    if (rank !== void 0) (ranks[rank] ??= [])[at3] = v;
   }
   const rows = Object.values(ranks);
   const pairs = (as, bs) => as.reduce((n, a3) => n + bs.filter((b) => g.node(b).order < g.node(a3).order).length, 0);
   const crossings2 = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
-  const border = (v2) => g.node(v2).dummy === "border";
+  const border = (v) => g.node(v).dummy === "border";
   const fixed2 = (a3, b) => g.parent(a3) !== g.parent(b) || border(a3) || border(b);
   let compared = 0;
   const gain = (a3, b) => {
@@ -5115,9 +5186,9 @@ function orderRanks(g, order) {
           better = true;
           continue;
         }
-        rows.forEach((r, k) => before[k].forEach((v2, at3) => {
-          r[at3] = v2;
-          g.node(v2).order = at3;
+        rows.forEach((r, k) => before[k].forEach((v, at3) => {
+          r[at3] = v;
+          g.node(v).order = at3;
         }));
       }
     }
@@ -5125,8 +5196,8 @@ function orderRanks(g, order) {
 }
 function mirrorLayout(g) {
   const flip = mirror(g.graph().width, true);
-  for (const v2 of g.nodes()) {
-    const node = g.node(v2);
+  for (const v of g.nodes()) {
+    const node = g.node(v);
     node.x = flip(node.x);
   }
   for (const e of g.edges()) {
@@ -5157,19 +5228,19 @@ function parseSequence(text2) {
   };
   const steps2 = [];
   for (const { text: t, line } of contentLines(text2)) {
-    let m2;
-    if (m2 = t.match(RE.participants)) {
-      m2[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add2);
-    } else if (m2 = t.match(RE.note)) {
-      const over2 = m2[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+    let m;
+    if (m = t.match(RE.participants)) {
+      m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean).forEach(add2);
+    } else if (m = t.match(RE.note)) {
+      const over2 = m[1].split(/[,，]/).map((s) => s.trim()).filter(Boolean);
       over2.forEach(add2);
-      steps2.push({ kind: "note", over: over2, text: m2[2].trim(), line });
-    } else if (m2 = t.match(RE.divider)) {
-      steps2.push({ kind: "divider", text: m2[1], line });
-    } else if (m2 = t.match(RE.msg)) {
-      add2(m2[1]);
-      add2(m2[3]);
-      steps2.push({ kind: "msg", from: m2[1], to: m2[3], dashed: m2[2] === "-->", label: (m2[4] ?? "").trim(), line });
+      steps2.push({ kind: "note", over: over2, text: m[2].trim(), line });
+    } else if (m = t.match(RE.divider)) {
+      steps2.push({ kind: "divider", text: m[1], line });
+    } else if (m = t.match(RE.msg)) {
+      add2(m[1]);
+      add2(m[3]);
+      steps2.push({ kind: "msg", from: m[1], to: m[3], dashed: m[2] === "-->", label: (m[4] ?? "").trim(), line });
     } else {
       throw new ComponentError(`sequence cannot parse "${t}". Write a message as A -> B: label (--> is a dashed return) and a note as note A: text`, line);
     }
@@ -5215,7 +5286,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
         else extraRight = Math.max(extraRight, width2 + 40);
       } else {
         const [lo, hi] = [Math.min(a3, b), Math.max(a3, b)];
-        const span = gaps.slice(lo, hi).reduce((x, y3) => x + y3, 0);
+        const span = gaps.slice(lo, hi).reduce((x2, y2) => x2 + y2, 0);
         if (span < width2) gaps[hi - 1] += width2 - span;
       }
       return { ...s, lines: lines2, a: a3, b };
@@ -5236,7 +5307,7 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   const X3 = mirror(width, rtl);
   const dx = rtl ? -1 : 1;
   const body = [];
-  let y2 = TOP + ACTOR_H + 22;
+  let y = TOP + ACTOR_H + 22;
   let n = 0;
   for (const [k, s] of prepared.entries()) {
     const start = body.length;
@@ -5244,20 +5315,20 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
       n++;
       const cls = `am-edge${s.dashed ? " am-edge--dashed" : ""}`;
       const marker = ` marker-end="url(#${id}-arrow)"`;
-      const step = num ? `<text class="am-step" x="${f(X3(xs[s.a]) + dx * (s.b >= s.a ? 6 : -6))}" y="${f(y2 + s.lines.length * LH - 6)}" text-anchor="${s.b >= s.a ? "start" : "end"}">${n}</text>` : "";
+      const step = num ? `<text class="am-step" x="${f(X3(xs[s.a]) + dx * (s.b >= s.a ? 6 : -6))}" y="${f(y + s.lines.length * LH - 6)}" text-anchor="${s.b >= s.a ? "start" : "end"}">${n}</text>` : "";
       if (s.a === s.b) {
-        const x = X3(xs[s.a]);
-        const labelX = x + dx * 40;
-        body.push(s.lines.map((l, k2) => `<text x="${f(labelX)}" y="${f(y2 + k2 * LH + 4)}" dominant-baseline="central">${esc(svgLine(l, dir))}</text>`).join(""));
-        body.push(`<path class="${cls}" d="M${f(x)},${f(y2)} H${f(x + dx * 30)} V${f(y2 + 20)} H${f(x + dx * 2)}"${marker}/>`, step);
-        y2 += Math.max(s.lines.length * LH, 20) + 28;
+        const x2 = X3(xs[s.a]);
+        const labelX = x2 + dx * 40;
+        body.push(s.lines.map((l, k2) => `<text x="${f(labelX)}" y="${f(y + k2 * LH + 4)}" dominant-baseline="central">${esc(svgLine(l, dir))}</text>`).join(""));
+        body.push(`<path class="${cls}" d="M${f(x2)},${f(y)} H${f(x2 + dx * 30)} V${f(y + 20)} H${f(x2 + dx * 2)}"${marker}/>`, step);
+        y += Math.max(s.lines.length * LH, 20) + 28;
       } else {
-        y2 += s.lines.length * LH;
+        y += s.lines.length * LH;
         const [x1, x2] = [X3(xs[s.a]), X3(xs[s.b])];
         const mx = (x1 + x2) / 2;
-        body.push(s.lines.map((l, k2) => `<text x="${f(mx)}" y="${f(y2 - 10 - (s.lines.length - 1 - k2) * LH)}" text-anchor="middle">${esc(svgLine(l, dir))}</text>`).join(""));
-        body.push(`<path class="${cls}" d="M${f(x1)},${f(y2)} L${f(x2 + (x2 > x1 ? -2 : 2))},${f(y2)}"${marker}/>`, step);
-        y2 += 24;
+        body.push(s.lines.map((l, k2) => `<text x="${f(mx)}" y="${f(y - 10 - (s.lines.length - 1 - k2) * LH)}" text-anchor="middle">${esc(svgLine(l, dir))}</text>`).join(""));
+        body.push(`<path class="${cls}" d="M${f(x1)},${f(y)} L${f(x2 + (x2 > x1 ? -2 : 2))},${f(y)}"${marker}/>`, step);
+        y += 24;
       }
     } else if (s.kind === "note") {
       const xsOver = s.over.map((p) => X3(xs[idx.get(p)]));
@@ -5266,38 +5337,38 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
       const w2 = Math.max(s.w, hi - lo + 40);
       const h = s.lines.length * LH + 12;
       const cx = (lo + hi) / 2;
-      body.push(`<rect class="am-note" x="${f(cx - w2 / 2)}" y="${f(y2)}" width="${f(w2)}" height="${f(h)}" rx="2"/>`);
-      body.push(textLines(s.lines, cx, y2 + h / 2, LH, ` style="font-size:${NOTE_FS}px"`, dir));
-      y2 += h + 16;
+      body.push(`<rect class="am-note" x="${f(cx - w2 / 2)}" y="${f(y)}" width="${f(w2)}" height="${f(h)}" rx="2"/>`);
+      body.push(textLines(s.lines, cx, y + h / 2, LH, ` style="font-size:${NOTE_FS}px"`, dir));
+      y += h + 16;
     } else {
       const w2 = Math.max(...s.lines.map((l) => measure(l, NOTE_FS))) + 20;
-      body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y2 + 10)}" x2="${f(width - MARGIN)}" y2="${f(y2 + 10)}"/>`);
-      body.push(`<rect class="am-actor" x="${f(width / 2 - w2 / 2)}" y="${f(y2)}" width="${f(w2)}" height="20" rx="2"/>`);
-      body.push(textLines(s.lines.slice(0, 1), width / 2, y2 + 10, LH, ` class="am-actor-text" style="font-size:${NOTE_FS}px"`, dir));
-      y2 += 34;
+      body.push(`<line class="am-lifeline" x1="${MARGIN}" y1="${f(y + 10)}" x2="${f(width - MARGIN)}" y2="${f(y + 10)}"/>`);
+      body.push(`<rect class="am-actor" x="${f(width / 2 - w2 / 2)}" y="${f(y)}" width="${f(w2)}" height="20" rx="2"/>`);
+      body.push(textLines(s.lines.slice(0, 1), width / 2, y + 10, LH, ` class="am-actor-text" style="font-size:${NOTE_FS}px"`, dir));
+      y += 34;
     }
     body.splice(start, body.length - start, `<g data-step="${k}">${body.slice(start).join("")}</g>`);
   }
-  const height = y2 + 6;
+  const height = y + 6;
   const actors = ps.map((p, i) => {
-    const x = X3(xs[i]);
-    return `<line class="am-lifeline" x1="${f(x)}" y1="${TOP + ACTOR_H}" x2="${f(x)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x, TOP + ACTOR_H / 2, LH, ' class="am-actor-text" font-weight="600"', dir)}</g>`;
+    const x2 = X3(xs[i]);
+    return `<line class="am-lifeline" x1="${f(x2)}" y1="${TOP + ACTOR_H}" x2="${f(x2)}" y2="${f(height - 4)}"/><g data-key="${esc(p)}"><rect class="am-actor" x="${f(x2 - actorW[i] / 2)}" y="${TOP}" width="${f(actorW[i])}" height="${ACTOR_H}" rx="2"/>${textLines([p], x2, TOP + ACTOR_H / 2, LH, ' class="am-actor-text" font-weight="600"', dir)}</g>`;
   });
   return `${svgOpen(width, height, diagramLabel(ui, "sequence", ps), dir)}${arrowDefs(id)}${actors.join("")}${body.join("")}</svg>`;
 }
 
 // node_modules/@dagrejs/dagre/dist/dagre.esm.js
 var Te2 = Object.defineProperty;
-var Sn2 = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
+var Sn = (e, n, t) => n in e ? Te2(e, n, { enumerable: true, configurable: true, writable: true, value: t }) : e[n] = t;
 var Mn = (e, n) => {
   for (var t in n) Te2(e, t, { get: n[t], enumerable: true });
 };
-var je2 = (e, n, t) => Sn2(e, typeof n != "symbol" ? n + "" : n, t);
+var je2 = (e, n, t) => Sn(e, typeof n != "symbol" ? n + "" : n, t);
 var ie2 = {};
 Mn(ie2, { Graph: () => T2, alg: () => H2 });
-var Pn2 = Object.defineProperty;
+var Pn = Object.defineProperty;
 var Se2 = (e, n) => {
-  for (var t in n) Pn2(e, t, { get: n[t], enumerable: true });
+  for (var t in n) Pn(e, t, { get: n[t], enumerable: true });
 };
 var Q = class {
   constructor(e) {
@@ -5504,8 +5575,8 @@ function oe2(e, n) {
   return z2(e, n.v, n.w, n.name);
 }
 var Dn = {};
-Se2(Dn, { read: () => Bn, write: () => An });
-function An(e) {
+Se2(Dn, { read: () => Bn, write: () => An2 });
+function An2(e) {
   let n = { options: { directed: e.isDirected(), multigraph: e.isMultigraph(), compound: e.isCompound() }, nodes: Vn(e), edges: Yn(e) }, t = e.graph();
   return t !== void 0 && (n.value = structuredClone(t)), n;
 }
@@ -5530,7 +5601,7 @@ function Bn(e) {
   }), n;
 }
 var H2 = {};
-Se2(H2, { CycleException: () => K2, bellmanFord: () => Me2, components: () => zn, dijkstra: () => J2, dijkstraAll: () => $n, findCycles: () => Un, floydWarshall: () => Kn, isAcyclic: () => Zn, postorder: () => nt2, preorder: () => tt2, prim: () => rt2, shortestPaths: () => ot2, tarjan: () => Fe2, topsort: () => De2 });
+Se2(H2, { CycleException: () => K2, bellmanFord: () => Me2, components: () => zn, dijkstra: () => J2, dijkstraAll: () => $n2, findCycles: () => Un, floydWarshall: () => Kn, isAcyclic: () => Zn, postorder: () => nt2, preorder: () => tt2, prim: () => rt2, shortestPaths: () => ot2, tarjan: () => Fe2, topsort: () => De2 });
 var Wn = () => 1;
 function Me2(e, n, t, r) {
   return Xn(e, String(n), t || Wn, r || function(o) {
@@ -5653,7 +5724,7 @@ function qn(e, n, t, r) {
   }
   return o;
 }
-function $n(e, n, t) {
+function $n2(e, n, t) {
   return e.nodes().reduce(function(r, o) {
     return r[o] = J2(e, o, n, t), r;
   }, {});
@@ -5756,12 +5827,12 @@ function et2(e, n, t, r, o) {
   }), s = {};
   return n.forEach(function(a3) {
     if (!e.hasNode(a3)) throw new Error("Graph does not have node: " + a3);
-    o = Ae(e, a3, t === "post", s, i, r, o);
+    o = Ae2(e, a3, t === "post", s, i, r, o);
   }), o;
 }
-function Ae(e, n, t, r, o, i, s) {
+function Ae2(e, n, t, r, o, i, s) {
   return n in r || (r[n] = true, t || (s = i(s, n)), o(n).forEach(function(a3) {
-    s = Ae(e, a3, t, r, o, i, s);
+    s = Ae2(e, a3, t, r, o, i, s);
   }), t && (s = i(s, n))), s;
 }
 function Ve2(e, n, t) {
@@ -5826,7 +5897,7 @@ function it2(e, n, t, r) {
   return J2(e, n, t, r);
 }
 var T2 = Q;
-function M2(e, n, t, r) {
+function M(e, n, t, r) {
   let o = r;
   for (; e.hasNode(o); ) o = $2(r);
   return t.dummy = n, e.setNode(o, t), o;
@@ -5853,7 +5924,7 @@ function se2(e, n) {
   return o === 0 || Math.abs(i) * s > Math.abs(o) * a3 ? (i < 0 && (a3 = -a3), l = a3 * o / i, u = a3) : (o < 0 && (s = -s), l = s, u = s * i / o), { x: t + l, y: r + u };
 }
 function P2(e) {
-  let n = D2(de(e) + 1).map(() => []);
+  let n = D2(de2(e) + 1).map(() => []);
   return e.nodes().forEach((t) => {
     let r = e.node(t), o = r.rank;
     o !== void 0 && (n[o] || (n[o] = []), n[o][r.order] = t);
@@ -5863,14 +5934,14 @@ function Be2(e) {
   let n = e.nodes().map((r) => {
     let o = e.node(r).rank;
     return o === void 0 ? Number.MAX_VALUE : o;
-  }), t = S(Math.min, n);
+  }), t = S2(Math.min, n);
   e.nodes().forEach((r) => {
     let o = e.node(r);
     Object.hasOwn(o, "rank") && (o.rank -= t);
   });
 }
 function We2(e) {
-  let n = e.nodes().map((s) => e.node(s).rank).filter((s) => s !== void 0), t = S(Math.min, n), r = [];
+  let n = e.nodes().map((s) => e.node(s).rank).filter((s) => s !== void 0), t = S2(Math.min, n), r = [];
   e.nodes().forEach((s) => {
     let a3 = e.node(s).rank - t;
     r[a3] || (r[a3] = []), r[a3].push(s);
@@ -5882,7 +5953,7 @@ function We2(e) {
 }
 function ae2(e, n, t, r) {
   let o = { width: 0, height: 0 };
-  return arguments.length >= 4 && (o.rank = t, o.order = r), M2(e, "border", o, n);
+  return arguments.length >= 4 && (o.rank = t, o.order = r), M(e, "border", o, n);
 }
 function st2(e, n = Xe2) {
   let t = [];
@@ -5893,20 +5964,20 @@ function st2(e, n = Xe2) {
   return t;
 }
 var Xe2 = 65535;
-function S(e, n) {
+function S2(e, n) {
   if (n.length > Xe2) {
     let t = st2(n);
     return e(...t.map((r) => e(...r)));
   } else return e(...n);
 }
-function de(e) {
+function de2(e) {
   let t = e.nodes().map((r) => {
     let o = e.node(r).rank;
     return o === void 0 ? Number.MIN_VALUE : o;
   });
-  return S(Math.max, t);
+  return S2(Math.max, t);
 }
-function ze(e, n) {
+function ze2(e, n) {
   let t = { lhs: [], rhs: [] };
   return e.forEach((r) => {
     n(r) ? t.lhs.push(r) : t.rhs.push(r);
@@ -5949,17 +6020,17 @@ function He2(e, n) {
   return e.reduce((t, r, o) => (t[r] = n[o], t), {});
 }
 var V2 = "\0";
-function ee2(e, n, t) {
+function ee(e, n, t) {
   var u, d, c2, f2, h, g;
   if (!(e && n && t && n.dummy === "edge" && t.dummy === "edge" && n.edgeObj && t.edgeObj && e[n.edgeObj.v] && e[t.edgeObj.v] && e[n.edgeObj.w] && e[t.edgeObj.w])) return 0;
   let r = true;
   n.edgeObj.w === t.edgeObj.w && (r = false);
-  let o = r ? (d = (u = e[n.edgeObj.v]) == null ? void 0 : u.rank) != null ? d : NaN + 1 : (f2 = (c2 = e[n.edgeObj.w]) == null ? void 0 : c2.rank) != null ? f2 : NaN - 1, i = Object.entries(e).find((m2) => {
-    var L2, y2;
-    return ((L2 = m2[1].edgeObj) == null ? void 0 : L2.v) === n.edgeObj.v && ((y2 = m2[1].edgeObj) == null ? void 0 : y2.w) === n.edgeObj.w && m2[1].rank === o;
-  }), s = Object.entries(e).find((m2) => {
-    var L2, y2;
-    return ((L2 = m2[1].edgeObj) == null ? void 0 : L2.v) === t.edgeObj.v && ((y2 = m2[1].edgeObj) == null ? void 0 : y2.w) === t.edgeObj.w && m2[1].rank === o;
+  let o = r ? (d = (u = e[n.edgeObj.v]) == null ? void 0 : u.rank) != null ? d : NaN + 1 : (f2 = (c2 = e[n.edgeObj.w]) == null ? void 0 : c2.rank) != null ? f2 : NaN - 1, i = Object.entries(e).find((m) => {
+    var L2, y;
+    return ((L2 = m[1].edgeObj) == null ? void 0 : L2.v) === n.edgeObj.v && ((y = m[1].edgeObj) == null ? void 0 : y.w) === n.edgeObj.w && m[1].rank === o;
+  }), s = Object.entries(e).find((m) => {
+    var L2, y;
+    return ((L2 = m[1].edgeObj) == null ? void 0 : L2.v) === t.edgeObj.v && ((y = m[1].edgeObj) == null ? void 0 : y.w) === t.edgeObj.w && m[1].rank === o;
   });
   if (!i || !s) return 0;
   let a3 = (h = i[1].order) != null ? h : NaN, l = (g = s[1].order) != null ? g : NaN;
@@ -5974,11 +6045,11 @@ var ce2 = class {
   }
   dequeue() {
     let n = this._sentinel, t = n._prev;
-    if (t !== n) return qe2(t), t;
+    if (t !== n) return qe(t), t;
   }
   enqueue(n) {
     let t = this._sentinel;
-    n._prev && n._next && qe2(n), n._next = t._next, t._next._prev = n, t._next = n, n._prev = t;
+    n._prev && n._next && qe(n), n._next = t._next, t._next._prev = n, t._next = n, n._prev = t;
   }
   toString() {
     let n = [], t = this._sentinel, r = t._prev;
@@ -5986,7 +6057,7 @@ var ce2 = class {
     return "[" + n.join(", ") + "]";
   }
 };
-function qe2(e) {
+function qe(e) {
   e._prev._next = e._next, e._next._prev = e._prev, delete e._next, delete e._prev;
 }
 function dt2(e, n) {
@@ -6018,10 +6089,10 @@ function fe2(e, n, t, r, o) {
   let i = [], s = o ? i : void 0;
   return (e.inEdges(r.v) || []).forEach((a3) => {
     let l = e.edge(a3), u = e.node(a3.v);
-    o && i.push({ v: a3.v, w: a3.w }), u.out -= l, he(n, t, u);
+    o && i.push({ v: a3.v, w: a3.w }), u.out -= l, he2(n, t, u);
   }), (e.outEdges(r.v) || []).forEach((a3) => {
     let l = e.edge(a3), u = a3.w, d = e.node(u);
-    d.in -= l, he(n, t, d);
+    d.in -= l, he2(n, t, d);
   }), e.removeNode(r.v), s;
 }
 function ct2(e, n) {
@@ -6036,10 +6107,10 @@ function ct2(e, n) {
   });
   let i = ft2(o + r + 3).map(() => new $e2()), s = r + 1;
   return t.nodes().forEach((a3) => {
-    he(i, s, t.node(a3));
+    he2(i, s, t.node(a3));
   }), { graph: t, buckets: i, zeroIdx: s };
 }
-function he(e, n, t) {
+function he2(e, n, t) {
   var r, o, i;
   t.out ? t.in ? (i = e[t.out - t.in + n]) == null || i.enqueue(t) : (o = e[e.length - 1]) == null || o.enqueue(t) : (r = e[0]) == null || r.enqueue(t);
 }
@@ -6103,7 +6174,7 @@ function pt2(e, n) {
   if (i === r + 1) return;
   e.removeEdge(n);
   let u, d, c2;
-  for (c2 = 0, ++r; r < i; ++c2, ++r) a3.points = [], d = { width: 0, height: 0, edgeLabel: a3, edgeObj: n, rank: r }, u = M2(e, "edge", d, "_d"), r === l && (d.width = a3.width, d.height = a3.height, d.dummy = "edge-label", d.labelpos = a3.labelpos), e.setEdge(t, u, { weight: a3.weight }, s), c2 === 0 && e.graph().dummyChains.push(u), t = u;
+  for (c2 = 0, ++r; r < i; ++c2, ++r) a3.points = [], d = { width: 0, height: 0, edgeLabel: a3, edgeObj: n, rank: r }, u = M(e, "edge", d, "_d"), r === l && (d.width = a3.width, d.height = a3.height, d.dummy = "edge-label", d.labelpos = a3.labelpos), e.setEdge(t, u, { weight: a3.weight }, s), c2 === 0 && e.graph().dummyChains.push(u), t = u;
   e.setEdge(t, o, { weight: a3.weight }, s);
 }
 function Qe2(e) {
@@ -6112,28 +6183,28 @@ function Qe2(e) {
     for (e.setEdge(t.edgeObj, r); t.dummy; ) o = e.successors(n)[0], e.removeNode(n), r.points.push({ x: t.x, y: t.y }), t.dummy === "edge-label" && (r.x = t.x, r.y = t.y, r.width = t.width, r.height = t.height), n = o, t = e.node(n);
   });
 }
-function U2(e) {
+function U(e) {
   let n = {};
   function t(r) {
     let o = e.node(r);
     if (Object.hasOwn(n, r)) return o.rank;
     n[r] = true;
-    let i = e.outEdges(r), s = i ? i.map((l) => l == null ? Number.POSITIVE_INFINITY : t(l.w) - e.edge(l).minlen) : [], a3 = S(Math.min, s);
+    let i = e.outEdges(r), s = i ? i.map((l) => l == null ? Number.POSITIVE_INFINITY : t(l.w) - e.edge(l).minlen) : [], a3 = S2(Math.min, s);
     return a3 === Number.POSITIVE_INFINITY && (a3 = 0), o.rank = a3;
   }
   e.sources().forEach(t);
 }
-function A2(e, n) {
+function A(e, n) {
   return e.node(n.w).rank - e.node(n.v).rank - e.edge(n).minlen;
 }
-var ne2 = Et;
-function Et(e) {
+var ne = Et2;
+function Et2(e) {
   let n = new T2({ directed: false }), t = e.nodes();
   if (t.length === 0) throw new Error("Graph must have at least one node");
   let r = t[0], o = e.nodeCount();
   n.setNode(r, {});
   let i, s;
-  for (; Lt2(n, e) < o && (i = yt2(n, e), !!i); ) s = n.hasNode(i.v) ? A2(e, i) : -A2(e, i), wt2(n, e, s);
+  for (; Lt2(n, e) < o && (i = yt2(n, e), !!i); ) s = n.hasNode(i.v) ? A(e, i) : -A(e, i), wt2(n, e, s);
   return n;
 }
 function Lt2(e, n) {
@@ -6141,7 +6212,7 @@ function Lt2(e, n) {
     let o = n.nodeEdges(r);
     o && o.forEach((i) => {
       let s = i.v, a3 = r === s ? i.w : s;
-      !e.hasNode(a3) && !A2(n, i) && (e.setNode(a3, {}), e.setEdge(r, a3, {}), t(a3));
+      !e.hasNode(a3) && !A(n, i) && (e.setNode(a3, {}), e.setEdge(r, a3, {}), t(a3));
     });
   }
   return e.nodes().forEach(t), e.nodeCount();
@@ -6149,7 +6220,7 @@ function Lt2(e, n) {
 function yt2(e, n) {
   return n.edges().reduce((r, o) => {
     let i = Number.POSITIVE_INFINITY;
-    return e.hasNode(o.v) !== e.hasNode(o.w) && (i = A2(n, o)), i < r[0] ? [i, o] : r;
+    return e.hasNode(o.v) !== e.hasNode(o.w) && (i = A(n, o)), i < r[0] ? [i, o] : r;
   }, [Number.POSITIVE_INFINITY, null])[1];
 }
 function wt2(e, n, t) {
@@ -6164,8 +6235,8 @@ Y2.leaveEdge = rn;
 Y2.enterEdge = on;
 Y2.exchangeEdges = sn;
 function Y2(e) {
-  e = Ye2(e), U2(e);
-  let n = ne2(e);
+  e = Ye2(e), U(e);
+  let n = ne(e);
   pe2(n), ge2(n, e);
   let t, r;
   for (; t = rn(n); ) r = on(n, e, t), sn(n, e, t, r);
@@ -6187,8 +6258,8 @@ function nn(e, n, t) {
     if (c2 !== o) {
       let f2 = d === i, h = n.edge(u).weight;
       if (a3 += f2 ? h : -h, xt2(e, t, c2)) {
-        let m2 = e.edge(t, c2).cutvalue;
-        a3 += f2 ? -m2 : m2;
+        let m = e.edge(t, c2).cutvalue;
+        a3 += f2 ? -m : m;
       }
     }
   }), a3;
@@ -6211,7 +6282,7 @@ function on(e, n, t) {
   let r = t.v, o = t.w;
   n.hasEdge(r, o) || (r = t.w, o = t.v);
   let i = e.node(r), s = e.node(o), a3 = i, l = false;
-  return i.lim > s.lim && (a3 = s, l = true), n.edges().filter((d) => l === Ze2(e, e.node(d.v), a3) && l !== Ze2(e, e.node(d.w), a3)).reduce((d, c2) => A2(n, c2) < A2(n, d) ? c2 : d);
+  return i.lim > s.lim && (a3 = s, l = true), n.edges().filter((d) => l === Ze2(e, e.node(d.v), a3) && l !== Ze2(e, e.node(d.w), a3)).reduce((d, c2) => A(n, c2) < A(n, d) ? c2 : d);
 }
 function sn(e, n, t, r) {
   let o = t.v, i = t.w;
@@ -6241,7 +6312,7 @@ function _t2(e) {
       an(e);
       break;
     case "tight-tree":
-      Ct(e);
+      Ct2(e);
       break;
     case "longest-path":
       Ot2(e);
@@ -6252,9 +6323,9 @@ function _t2(e) {
       an(e);
   }
 }
-var Ot2 = U2;
-function Ct(e) {
-  U2(e), ne2(e);
+var Ot2 = U;
+function Ct2(e) {
+  U(e), ne(e);
 }
 function an(e) {
   en(e);
@@ -6297,7 +6368,7 @@ function Rt2(e) {
   return e.children(V2).forEach(r), n;
 }
 function un(e) {
-  let n = M2(e, "root", {}, "_root"), t = It(e), r = Object.values(t), o = S(Math.max, r) - 1, i = 2 * o + 1;
+  let n = M(e, "root", {}, "_root"), t = It2(e), r = Object.values(t), o = S2(Math.max, r) - 1, i = 2 * o + 1;
   e.graph().nestingRoot = n, e.edges().forEach((a3) => e.edge(a3).minlen *= i);
   let s = St2(e) + 1;
   e.children(V2).forEach((a3) => {
@@ -6315,11 +6386,11 @@ function cn(e, n, t, r, o, i, s) {
   e.setParent(l, s), d.borderTop = l, e.setParent(u, s), d.borderBottom = u, a3.forEach((f2) => {
     var b;
     cn(e, n, t, r, o, i, f2);
-    let h = e.node(f2), g = h.borderTop ? h.borderTop : f2, m2 = h.borderBottom ? h.borderBottom : f2, L2 = h.borderTop ? r : 2 * r, y2 = g !== m2 ? 1 : o - ((b = i[s]) != null ? b : 0) + 1;
-    e.setEdge(l, g, { weight: L2, minlen: y2, nestingEdge: true }), e.setEdge(m2, u, { weight: L2, minlen: y2, nestingEdge: true });
+    let h = e.node(f2), g = h.borderTop ? h.borderTop : f2, m = h.borderBottom ? h.borderBottom : f2, L2 = h.borderTop ? r : 2 * r, y = g !== m ? 1 : o - ((b = i[s]) != null ? b : 0) + 1;
+    e.setEdge(l, g, { weight: L2, minlen: y, nestingEdge: true }), e.setEdge(m, u, { weight: L2, minlen: y, nestingEdge: true });
   }), e.parent(s) || e.setEdge(n, l, { weight: 0, minlen: o + ((c2 = i[s]) != null ? c2 : 0) });
 }
-function It(e) {
+function It2(e) {
   let n = {};
   function t(r, o) {
     let i = e.children(r);
@@ -6348,20 +6419,20 @@ function Pt2(e) {
   e.children(V2).forEach(n);
 }
 function hn(e, n, t, r, o, i) {
-  let s = { width: 0, height: 0, rank: i, borderType: n }, a3 = o[n][i - 1], l = M2(e, "border", s, t);
+  let s = { width: 0, height: 0, rank: i, borderType: n }, a3 = o[n][i - 1], l = M(e, "border", s, t);
   o[n][i] = l, e.setParent(l, r), a3 && e.setEdge(a3, l, { weight: 1 });
 }
 function pn(e) {
   var t;
   let n = (t = e.graph().rankdir) == null ? void 0 : t.toLowerCase();
-  (n === "lr" || n === "rl") && En(e);
+  (n === "lr" || n === "rl") && En2(e);
 }
 function mn(e) {
   var t;
   let n = (t = e.graph().rankdir) == null ? void 0 : t.toLowerCase();
-  (n === "bt" || n === "rl") && Ft(e), (n === "lr" || n === "rl") && (Dt(e), En(e));
+  (n === "bt" || n === "rl") && Ft(e), (n === "lr" || n === "rl") && (Dt2(e), En2(e));
 }
-function En(e) {
+function En2(e) {
   e.nodes().forEach((n) => gn(e.node(n))), e.edges().forEach((n) => gn(e.edge(n)));
 }
 function gn(e) {
@@ -6369,16 +6440,16 @@ function gn(e) {
   e.width = e.height, e.height = n;
 }
 function Ft(e) {
-  e.nodes().forEach((n) => me2(e.node(n))), e.edges().forEach((n) => {
+  e.nodes().forEach((n) => me(e.node(n))), e.edges().forEach((n) => {
     var r;
     let t = e.edge(n);
-    (r = t.points) == null || r.forEach(me2), Object.hasOwn(t, "y") && me2(t);
+    (r = t.points) == null || r.forEach(me), Object.hasOwn(t, "y") && me(t);
   });
 }
-function me2(e) {
+function me(e) {
   e.y = -e.y;
 }
-function Dt(e) {
+function Dt2(e) {
   e.nodes().forEach((n) => Ee2(e.node(n))), e.edges().forEach((n) => {
     var r;
     let t = e.edge(n);
@@ -6389,20 +6460,20 @@ function Ee2(e) {
   let n = e.x;
   e.x = e.y, e.y = n;
 }
-function Le(e, n = null) {
-  let t = {}, r = e.nodes().filter((d) => !e.children(d).length), o = r.map((d) => e.node(d).rank), i = S(Math.max, o), s = D2(i + 1).map(() => []);
+function Le2(e, n = null) {
+  let t = {}, r = e.nodes().filter((d) => !e.children(d).length), o = r.map((d) => e.node(d).rank), i = S2(Math.max, o), s = D2(i + 1).map(() => []);
   function a3(d) {
     if (t[d]) return;
     t[d] = true;
     let c2 = e.node(d);
     s[c2.rank].push(d);
     let f2 = e.successors(d);
-    f2 && [...f2].sort((g, m2) => u(g, m2)).forEach(a3);
+    f2 && [...f2].sort((g, m) => u(g, m)).forEach(a3);
   }
   r.sort((d, c2) => e.node(d).rank - e.node(c2).rank).forEach(a3);
   function u(d, c2) {
     let f2 = e.node(d), h = e.node(c2);
-    return ee2(n, f2, h);
+    return ee(n, f2, h);
   }
   return s;
 }
@@ -6457,7 +6528,7 @@ function Yt(e) {
   let n = [];
   function t(o) {
     return (i) => {
-      i.merged || (i.barycenter === void 0 || o.barycenter === void 0 || i.barycenter >= o.barycenter) && Bt(o, i);
+      i.merged || (i.barycenter === void 0 || o.barycenter === void 0 || i.barycenter >= o.barycenter) && Bt2(o, i);
     };
   }
   function r(o) {
@@ -6471,26 +6542,26 @@ function Yt(e) {
   }
   return n.filter((o) => !o.merged).map((o) => W2(o, ["vs", "i", "barycenter", "weight"]));
 }
-function Bt(e, n) {
+function Bt2(e, n) {
   let t = 0, r = 0;
   e.weight && (t += e.barycenter * e.weight, r += e.weight), n.weight && (t += n.barycenter * n.weight, r += n.weight), e.vs = n.vs.concat(e.vs), e.barycenter = t / r, e.weight = r, e.i = Math.min(n.i, e.i), n.merged = true;
 }
 function Ge2(e, n, t, r, o) {
   let i = {}, s = null, a3 = null, l = o;
   typeof n == "boolean" ? (l = n, i = {}) : n && (i = n, s = t != null ? t : null, a3 = r != null ? r : null);
-  let u = ze(e, (y2) => Object.hasOwn(y2, "barycenter")), d = u.lhs, c2 = u.rhs.sort((y2, b) => b.i - y2.i), f2 = [], h = 0, g = 0, m2 = 0;
+  let u = ze2(e, (y) => Object.hasOwn(y, "barycenter")), d = u.lhs, c2 = u.rhs.sort((y, b) => b.i - y.i), f2 = [], h = 0, g = 0, m = 0;
   d.sort(Wt(a3, s, !!l));
-  for (let [y2, b] of Object.entries(i)) {
-    let p = d.findIndex((E) => E.vs[0] === y2);
+  for (let [y, b] of Object.entries(i)) {
+    let p = d.findIndex((E2) => E2.vs[0] === y);
     d.splice(p + 1, 0, b);
   }
-  m2 = Ln(f2, c2, m2), d.forEach((y2) => {
-    m2 += y2.vs.length, f2.push(y2.vs), h += y2.barycenter * y2.weight, g += y2.weight, m2 = Ln(f2, c2, m2);
+  m = Ln2(f2, c2, m), d.forEach((y) => {
+    m += y.vs.length, f2.push(y.vs), h += y.barycenter * y.weight, g += y.weight, m = Ln2(f2, c2, m);
   });
   let L2 = { vs: f2.flat(1) };
   return g && (L2.barycenter = h / g, L2.weight = g), L2;
 }
-function Ln(e, n, t) {
+function Ln2(e, n, t) {
   let r;
   for (; n.length && (r = n[n.length - 1]).i <= t; ) n.pop(), e.push(r.vs), t++;
   return t;
@@ -6500,46 +6571,46 @@ function Wt(e, n, t) {
     if (r.barycenter < o.barycenter) return -1;
     if (r.barycenter > o.barycenter) return 1;
     if (e && (typeof r.vs[0] == "string" || typeof o.vs[0] == "string")) {
-      let i = e.node(r.vs[0]), s = e.node(o.vs[0]), a3 = ee2(n, i, s);
+      let i = e.node(r.vs[0]), s = e.node(o.vs[0]), a3 = ee(n, i, s);
       if (a3 !== 0) return a3;
     }
     return t ? o.i - r.i : r.i - o.i;
   };
 }
-function te2(e, n, t, r, o) {
-  var y2, b, p, E, w2, k, _2, O2, j, R3, I2;
+function te(e, n, t, r, o) {
+  var y, b, p, E2, w2, k, _2, O2, j2, R3, I2;
   let i = null, s = o;
   typeof r == "boolean" ? (s = r, i = null) : r !== void 0 && (i = r);
   let a3 = e.children(n), l = e.node(n), u = l ? l.borderLeft : void 0, d = l ? l.borderRight : void 0, c2 = {};
-  u && (a3 = a3.filter((v2) => v2 !== u && v2 !== d));
+  u && (a3 = a3.filter((v) => v !== u && v !== d));
   let f2 = we2(e, a3);
-  f2.forEach((v2) => {
-    if (e.children(v2.v).length) {
-      let { result: x } = te2(e, v2.v, t, i, s);
-      c2[v2.v] = x, Object.hasOwn(x, "barycenter") && zt2(v2, x);
+  f2.forEach((v) => {
+    if (e.children(v.v).length) {
+      let { result: x2 } = te(e, v.v, t, i, s);
+      c2[v.v] = x2, Object.hasOwn(x2, "barycenter") && zt2(v, x2);
     }
   });
   let h = Ne2(f2, t);
   Xt(h, c2);
-  let g = {}, m2 = false;
-  for (let v2 = 0; v2 < h.length; v2++) for (let x = v2 + 1; x < h.length; x++) if (!(!h[v2] || !h[x] || !((y2 = h[v2]) != null && y2.barycenter) || !((b = h[x]) != null && b.barycenter)) && ((p = h[v2]) == null ? void 0 : p.barycenter) === h[x].barycenter) {
-    let G2 = (w2 = (E = h[v2]) == null ? void 0 : E.vs[0]) != null ? w2 : "", N2 = (_2 = (k = h[x]) == null ? void 0 : k.vs[0]) != null ? _2 : "", C = e.node(G2), B2 = e.node(N2);
-    if (C.dummy === "edge" && B2.dummy === "edge" && ((O2 = C.edgeObj) == null ? void 0 : O2.v) === ((j = B2.edgeObj) == null ? void 0 : j.v) && ((R3 = C.edgeObj) == null ? void 0 : R3.w) === ((I2 = B2.edgeObj) == null ? void 0 : I2.w)) if (C.edgeLabel.reversed) {
-      g[N2] = h[v2], h.splice(v2, 1), v2--;
+  let g = {}, m = false;
+  for (let v = 0; v < h.length; v++) for (let x2 = v + 1; x2 < h.length; x2++) if (!(!h[v] || !h[x2] || !((y = h[v]) != null && y.barycenter) || !((b = h[x2]) != null && b.barycenter)) && ((p = h[v]) == null ? void 0 : p.barycenter) === h[x2].barycenter) {
+    let G2 = (w2 = (E2 = h[v]) == null ? void 0 : E2.vs[0]) != null ? w2 : "", N2 = (_2 = (k = h[x2]) == null ? void 0 : k.vs[0]) != null ? _2 : "", C2 = e.node(G2), B2 = e.node(N2);
+    if (C2.dummy === "edge" && B2.dummy === "edge" && ((O2 = C2.edgeObj) == null ? void 0 : O2.v) === ((j2 = B2.edgeObj) == null ? void 0 : j2.v) && ((R3 = C2.edgeObj) == null ? void 0 : R3.w) === ((I2 = B2.edgeObj) == null ? void 0 : I2.w)) if (C2.edgeLabel.reversed) {
+      g[N2] = h[v], h.splice(v, 1), v--;
       break;
-    } else g[G2] || (g[G2] = h[x], h.splice(x, 1), x--);
-    else m2 = true;
+    } else g[G2] || (g[G2] = h[x2], h.splice(x2, 1), x2--);
+    else m = true;
   }
   let L2 = Ge2(h, g, i, e, s);
   if (u && d) {
     L2.vs = [u, L2.vs, d].flat(1);
-    let v2 = e.predecessors(u);
-    if (v2 && v2.length) {
-      let x = e.node(v2[0]), G2 = e.predecessors(d), N2 = e.node(G2[0]);
-      Object.hasOwn(L2, "barycenter") || (L2.barycenter = 0, L2.weight = 0), L2.barycenter = (L2.barycenter * L2.weight + x.order + N2.order) / (L2.weight + 2), L2.weight += 2;
+    let v = e.predecessors(u);
+    if (v && v.length) {
+      let x2 = e.node(v[0]), G2 = e.predecessors(d), N2 = e.node(G2[0]);
+      Object.hasOwn(L2, "barycenter") || (L2.barycenter = 0, L2.weight = 0), L2.barycenter = (L2.barycenter * L2.weight + x2.order + N2.order) / (L2.weight + 2), L2.weight += 2;
     }
   }
-  return Object.defineProperty(L2, "result", { value: L2, enumerable: false, configurable: true, writable: true }), Object.defineProperty(L2, "usedBias", { value: m2, enumerable: false, configurable: true, writable: true }), L2;
+  return Object.defineProperty(L2, "result", { value: L2, enumerable: false, configurable: true, writable: true }), Object.defineProperty(L2, "usedBias", { value: m, enumerable: false, configurable: true, writable: true }), L2;
 }
 function Xt(e, n) {
   e.forEach((t) => {
@@ -6587,15 +6658,15 @@ function re2(e, n = {}, t = null) {
     n.customOrder(e, re2);
     return;
   }
-  let r = de(e), o = yn(e, D2(1, r + 1), "inEdges"), i = yn(e, D2(r - 1, -1, -1), "outEdges"), s = Le(e, t);
-  if (wn2(e, s), n.disableOptimalOrderHeuristic) return;
+  let r = de2(e), o = yn(e, D2(1, r + 1), "inEdges"), i = yn(e, D2(r - 1, -1, -1), "outEdges"), s = Le2(e, t);
+  if (wn(e, s), n.disableOptimalOrderHeuristic) return;
   let a3 = Number.POSITIVE_INFINITY, l, u = n.constraints || [];
   for (let d = 0, c2 = 0; c2 < 4; ++d, ++c2) {
     qt(d % 2 ? o : i, d % 4 >= 2, u, t), s = P2(e);
     let f2 = ye2(e, s);
     f2 < a3 ? (c2 = 0, l = Object.assign({}, s), a3 = f2) : f2 === a3 && (l = structuredClone(s));
   }
-  wn2(e, l);
+  wn(e, l);
 }
 function yn(e, n, t) {
   let r = /* @__PURE__ */ new Map(), o = (i, s) => {
@@ -6613,11 +6684,11 @@ function qt(e, n, t, r) {
   let o = true, i = new T2();
   e.forEach(function(s) {
     t.forEach((d) => i.setEdge(d.left, d.right));
-    let a3 = s.graph().root, { result: l, usedBias: u } = te2(s, a3, i, r, o);
+    let a3 = s.graph().root, { result: l, usedBias: u } = te(s, a3, i, r, o);
     n && u && (o = !o), l.vs.forEach((d, c2) => s.node(d).order = c2), ke2(s, i, l.vs);
   });
 }
-function wn2(e, n) {
+function wn(e, n) {
   Object.values(n).forEach((t) => t.forEach((r, o) => e.node(r).order = o));
 }
 function $t2(e, n) {
@@ -6627,10 +6698,10 @@ function $t2(e, n) {
     return i.forEach((d, c2) => {
       let f2 = Jt(e, d), h = f2 ? e.node(f2).order : l;
       (f2 || d === u) && (i.slice(a3, c2 + 1).forEach((g) => {
-        let m2 = e.predecessors(g);
-        m2 && m2.forEach((L2) => {
-          let y2 = e.node(L2), b = y2.order;
-          (b < s || h < b) && !(y2.dummy && e.node(g).dummy) && Gn(t, L2, g);
+        let m = e.predecessors(g);
+        m && m.forEach((L2) => {
+          let y = e.node(L2), b = y.order;
+          (b < s || h < b) && !(y.dummy && e.node(g).dummy) && Gn(t, L2, g);
         });
       }), a3 = c2 + 1, s = h);
     }), i;
@@ -6649,10 +6720,10 @@ function Ut(e, n) {
       let h = a3[f2];
       if (h !== void 0 && e.node(h).dummy) {
         let g = e.predecessors(h);
-        g && g.forEach((m2) => {
-          if (m2 === void 0) return;
-          let L2 = e.node(m2);
-          L2.dummy && (L2.order < d || L2.order > c2) && Gn(t, m2, h);
+        g && g.forEach((m) => {
+          if (m === void 0) return;
+          let L2 = e.node(m);
+          L2.dummy && (L2.order < d || L2.order > c2) && Gn(t, m, h);
         });
       }
     });
@@ -6663,9 +6734,9 @@ function Ut(e, n) {
       if (r(f2)) {
         let g = e.predecessors(f2);
         if (g && g.length) {
-          let m2 = g[0];
-          if (m2 === void 0) return;
-          d = e.node(m2).order, i(l, c2, h, u, d), c2 = h, u = d;
+          let m = g[0];
+          if (m === void 0) return;
+          d = e.node(m).order, i(l, c2, h, u, d), c2 = h, u = d;
         }
       }
       i(l, c2, l.length, d, a3.length);
@@ -6705,15 +6776,15 @@ function Qt(e, n, t, r, o) {
     let u = -1, d = -1, c2 = false, f2 = l, h = l.findIndex((g) => (o == null ? void 0 : o.includes(g)) || Nn(g, e, o));
     h > 0 && (f2 = [l[h], ...l.slice(0, h), ...l.slice(h + 1)], c2 = true), f2.forEach((g) => {
       var L2;
-      let m2 = r(g);
-      if (m2 && m2.length) {
-        o != null && o.includes(g) && (m2 = m2.filter((p) => Nn(p, e, o)));
-        let y2 = m2.sort((p, E) => {
-          let w2 = a3[p], k = a3[E];
+      let m = r(g);
+      if (m && m.length) {
+        o != null && o.includes(g) && (m = m.filter((p) => Nn(p, e, o)));
+        let y = m.sort((p, E2) => {
+          let w2 = a3[p], k = a3[E2];
           return (w2 !== void 0 ? w2 : 0) - (k !== void 0 ? k : 0);
-        }), b = (y2.length - 1) / 2;
-        for (let p = Math.floor(b), E = Math.ceil(b); p <= E; ++p) {
-          let w2 = y2[p];
+        }), b = (y.length - 1) / 2;
+        for (let p = Math.floor(b), E2 = Math.ceil(b); p <= E2; ++p) {
+          let w2 = y[p];
           if (w2 === void 0) continue;
           let k = a3[w2];
           if (k !== void 0 && s[g] === g && u < k && a3[w2] !== d && !Kt(t, g, w2)) {
@@ -6728,32 +6799,32 @@ function Qt(e, n, t, r, o) {
 function Zt(e, n, t, r, o = false) {
   let i = {}, s = er(e, n, t, o), a3 = o ? "borderLeft" : "borderRight";
   function l(h, g) {
-    let m2 = s.nodes().slice(), L2 = {}, y2 = m2.pop();
-    for (; y2; ) {
-      if (L2[y2]) h(y2);
+    let m = s.nodes().slice(), L2 = {}, y = m.pop();
+    for (; y; ) {
+      if (L2[y]) h(y);
       else {
-        L2[y2] = true, m2.push(y2);
-        for (let b of g(y2)) m2.push(b);
+        L2[y] = true, m.push(y);
+        for (let b of g(y)) m.push(b);
       }
-      y2 = m2.pop();
+      y = m.pop();
     }
   }
   function u(h) {
     let g = s.inEdges(h);
-    g ? i[h] = g.reduce((m2, L2) => {
+    g ? i[h] = g.reduce((m, L2) => {
       var p;
-      let y2 = (p = i[L2.v]) != null ? p : 0, b = s.edge(L2);
-      return Math.max(m2, y2 + (b !== void 0 ? b : 0));
+      let y = (p = i[L2.v]) != null ? p : 0, b = s.edge(L2);
+      return Math.max(m, y + (b !== void 0 ? b : 0));
     }, 0) : i[h] = 0;
   }
   function d(h) {
-    let g = s.outEdges(h), m2 = Number.POSITIVE_INFINITY;
-    g && (m2 = g.reduce((y2, b) => {
-      let p = i[b.w], E = s.edge(b);
-      return Math.min(y2, (p !== void 0 ? p : 0) - (E !== void 0 ? E : 0));
+    let g = s.outEdges(h), m = Number.POSITIVE_INFINITY;
+    g && (m = g.reduce((y, b) => {
+      let p = i[b.w], E2 = s.edge(b);
+      return Math.min(y, (p !== void 0 ? p : 0) - (E2 !== void 0 ? E2 : 0));
     }, Number.POSITIVE_INFINITY));
     let L2 = e.node(h);
-    m2 !== Number.POSITIVE_INFINITY && L2.borderType !== a3 && (i[h] = Math.max(i[h] !== void 0 ? i[h] : 0, m2));
+    m !== Number.POSITIVE_INFINITY && L2.borderType !== a3 && (i[h] = Math.max(i[h] !== void 0 ? i[h] : 0, m));
   }
   function c2(h) {
     return s.predecessors(h) || [];
@@ -6762,9 +6833,9 @@ function Zt(e, n, t, r, o = false) {
     return s.successors(h) || [];
   }
   return l(u, c2), l(d, f2), Object.keys(r).forEach((h) => {
-    var m2;
+    var m;
     let g = t[h];
-    g !== void 0 && (i[h] = (m2 = i[g]) != null ? m2 : 0);
+    g !== void 0 && (i[h] = (m = i[g]) != null ? m : 0);
   }), i;
 }
 function er(e, n, t, r) {
@@ -6798,13 +6869,13 @@ function nr(e, n) {
   }, [Number.POSITIVE_INFINITY, null])[1];
 }
 function tr(e, n) {
-  let t = Object.values(n), r = S(Math.min, t), o = S(Math.max, t);
+  let t = Object.values(n), r = S2(Math.min, t), o = S2(Math.max, t);
   ["u", "d"].forEach((i) => {
     ["l", "r"].forEach((s) => {
       let a3 = i + s, l = e[a3];
       if (!l || l === n) return;
-      let u = Object.values(l), d = r - S(Math.min, u);
-      s !== "l" && (d = o - S(Math.max, u)), d && (e[a3] = X2(l, (c2) => c2 + d));
+      let u = Object.values(l), d = r - S2(Math.min, u);
+      s !== "l" && (d = o - S2(Math.max, u)), d && (e[a3] = X2(l, (c2) => c2 + d));
     });
   });
 }
@@ -6898,59 +6969,59 @@ function _n2(e, n, t) {
   }
 }
 function In(e, n, t) {
-  var y2;
+  var y;
   let r = e.nodes().filter((b) => e.children(b).length), o = {};
   r.forEach((b) => {
     let p = e.node(b);
     if (p && p.rankdir) {
-      let E = new T2({ multigraph: true, compound: true });
-      E.setGraph({ rankdir: p.rankdir });
+      let E2 = new T2({ multigraph: true, compound: true });
+      E2.setGraph({ rankdir: p.rankdir });
       let w2 = e.children(b);
       w2.forEach((G2) => {
         let N2 = { ...e.node(G2) };
-        E.setNode(G2, N2);
-        let C = e.parent(G2);
-        C && C !== b && w2.includes(C) && E.setParent(G2, C);
+        E2.setNode(G2, N2);
+        let C2 = e.parent(G2);
+        C2 && C2 !== b && w2.includes(C2) && E2.setParent(G2, C2);
       });
       let k = /* @__PURE__ */ new Set();
       e.edges().forEach((G2) => {
-        let N2 = _n2(e, G2.v, b), C = _n2(e, G2.w, b);
-        if (N2 === G2.v && C === G2.w) E.setEdge(G2, { ...e.edge(G2) });
-        else if (N2 && C && N2 !== C) {
-          let B2 = `${N2}\0${C}`;
-          k.has(B2) || (k.add(B2), E.setEdge(N2, C, { ...e.edge(G2) }));
+        let N2 = _n2(e, G2.v, b), C2 = _n2(e, G2.w, b);
+        if (N2 === G2.v && C2 === G2.w) E2.setEdge(G2, { ...e.edge(G2) });
+        else if (N2 && C2 && N2 !== C2) {
+          let B2 = `${N2}\0${C2}`;
+          k.has(B2) || (k.add(B2), E2.setEdge(N2, C2, { ...e.edge(G2) }));
         }
-      }), In(E, n, t);
-      let _2 = Rn(E);
-      Cn(_2, n, t, null), Tn2(E, _2);
-      let O2 = 1 / 0, j = 1 / 0, R3 = -1 / 0, I2 = -1 / 0;
-      E.nodes().forEach((G2) => {
+      }), In(E2, n, t);
+      let _2 = Rn(E2);
+      Cn2(_2, n, t, null), Tn(E2, _2);
+      let O2 = 1 / 0, j2 = 1 / 0, R3 = -1 / 0, I2 = -1 / 0;
+      E2.nodes().forEach((G2) => {
         if (G2 === b) return;
-        let N2 = E.node(G2);
-        N2 && typeof N2.x == "number" && typeof N2.y == "number" && typeof N2.width == "number" && typeof N2.height == "number" && (O2 = Math.min(O2, N2.x - N2.width / 2), R3 = Math.max(R3, N2.x + N2.width / 2), j = Math.min(j, N2.y - N2.height / 2), I2 = Math.max(I2, N2.y + N2.height / 2));
-      }), (!isFinite(O2) || !isFinite(j) || !isFinite(R3) || !isFinite(I2)) && (O2 = j = 0, R3 = I2 = 0);
-      let v2 = R3 - O2, x = I2 - j;
-      o[b] = { minX: O2, minY: j, maxX: R3, maxY: I2, width: v2, height: x, offsetX: O2, offsetY: j }, p._dagreClusterSubgraph = E;
+        let N2 = E2.node(G2);
+        N2 && typeof N2.x == "number" && typeof N2.y == "number" && typeof N2.width == "number" && typeof N2.height == "number" && (O2 = Math.min(O2, N2.x - N2.width / 2), R3 = Math.max(R3, N2.x + N2.width / 2), j2 = Math.min(j2, N2.y - N2.height / 2), I2 = Math.max(I2, N2.y + N2.height / 2));
+      }), (!isFinite(O2) || !isFinite(j2) || !isFinite(R3) || !isFinite(I2)) && (O2 = j2 = 0, R3 = I2 = 0);
+      let v = R3 - O2, x2 = I2 - j2;
+      o[b] = { minX: O2, minY: j2, maxX: R3, maxY: I2, width: v, height: x2, offsetX: O2, offsetY: j2 }, p._dagreClusterSubgraph = E2;
     }
   });
   let i = [], s = (b) => {
-    let p = [], E = (e.children(b) || []).filter((w2) => w2 !== b);
-    for (; E.length > 0; ) {
-      let w2 = E.shift();
-      p.push(w2), (e.children(w2) || []).filter((k) => k !== w2).forEach((k) => E.push(k));
+    let p = [], E2 = (e.children(b) || []).filter((w2) => w2 !== b);
+    for (; E2.length > 0; ) {
+      let w2 = E2.shift();
+      p.push(w2), (e.children(w2) || []).filter((k) => k !== w2).forEach((k) => E2.push(k));
     }
     return p;
   }, a3 = /* @__PURE__ */ new Map();
   r.forEach((b) => {
     let p = e.node(b);
-    p && p.rankdir && o[b] && a3.set(b, (e.children(b) || []).filter((E) => E !== b));
+    p && p.rankdir && o[b] && a3.set(b, (e.children(b) || []).filter((E2) => E2 !== b));
   });
   let l = new Set([...a3.values()].flat()), u = /* @__PURE__ */ new Map();
   a3.forEach((b, p) => {
     l.has(p) || u.set(p, s(p));
   });
   let d = new Set([...u.values()].flat()), c2 = (b) => {
-    for (let [p, E] of u) if (E.includes(b)) return p;
+    for (let [p, E2] of u) if (E2.includes(b)) return p;
     return b;
   }, f2 = [];
   e.edges().forEach((b) => {
@@ -6961,69 +7032,69 @@ function In(e, n, t) {
     let p = e.parent(b);
     h.set(b, typeof p == "string" ? p : void 0);
   }), u.forEach((b, p) => {
-    let E = e.node(p), w2 = [];
+    let E2 = e.node(p), w2 = [];
     b.forEach((O2) => {
-      let j = e.node(O2);
-      j && (w2.push({ id: O2, node: j, parent: h.get(O2) }), e.removeNode(O2));
+      let j2 = e.node(O2);
+      j2 && (w2.push({ id: O2, node: j2, parent: h.get(O2) }), e.removeNode(O2));
     });
     let k = f2.filter(({ edge: O2 }) => b.includes(O2.v) || b.includes(O2.w)), _2 = o[p];
-    E && (i.push({ clusterId: p, subgraph: E._dagreClusterSubgraph, bounds: _2, children: b, removedNodes: w2, removedEdges: k }), E.width = _2.width, E.height = _2.height);
+    E2 && (i.push({ clusterId: p, subgraph: E2._dagreClusterSubgraph, bounds: _2, children: b, removedNodes: w2, removedEdges: k }), E2.width = _2.width, E2.height = _2.height);
   });
   let g = /* @__PURE__ */ new Set();
   f2.forEach(({ edge: b, label: p }) => {
-    let E = c2(b.v), w2 = c2(b.w);
-    if (E !== w2 && e.hasNode(E) && e.hasNode(w2)) {
-      let k = `${E}\0${w2}`;
-      g.has(k) || (g.add(k), e.setEdge(E, w2, { ...p, width: 0, height: 0 }));
+    let E2 = c2(b.v), w2 = c2(b.w);
+    if (E2 !== w2 && e.hasNode(E2) && e.hasNode(w2)) {
+      let k = `${E2}\0${w2}`;
+      g.has(k) || (g.add(k), e.setEdge(E2, w2, { ...p, width: 0, height: 0 }));
     }
   });
-  let m2 = Rn(e), L2 = Cn(m2, n, t, (y2 = xn.get(e)) != null ? y2 : null);
-  xn.set(e, L2), Tn2(e, m2), g.forEach((b) => {
-    let p = b.indexOf("\0"), E = b.slice(0, p), w2 = b.slice(p + 1);
-    e.hasEdge(E, w2) && e.removeEdge(E, w2);
-  }), i.forEach(({ clusterId: b, subgraph: p, bounds: E, removedNodes: w2, removedEdges: k }) => {
-    var v2, x;
-    let _2 = e.node(b), O2 = (v2 = _2 == null ? void 0 : _2.x) != null ? v2 : 0, j = (x = _2 == null ? void 0 : _2.y) != null ? x : 0, R3 = (E.minX + E.maxX) / 2, I2 = (E.minY + E.maxY) / 2;
-    w2.forEach(({ id: G2, node: N2, parent: C }) => {
-      e.setNode(G2, N2), C !== void 0 && e.setParent(G2, C);
+  let m = Rn(e), L2 = Cn2(m, n, t, (y = xn.get(e)) != null ? y : null);
+  xn.set(e, L2), Tn(e, m), g.forEach((b) => {
+    let p = b.indexOf("\0"), E2 = b.slice(0, p), w2 = b.slice(p + 1);
+    e.hasEdge(E2, w2) && e.removeEdge(E2, w2);
+  }), i.forEach(({ clusterId: b, subgraph: p, bounds: E2, removedNodes: w2, removedEdges: k }) => {
+    var v, x2;
+    let _2 = e.node(b), O2 = (v = _2 == null ? void 0 : _2.x) != null ? v : 0, j2 = (x2 = _2 == null ? void 0 : _2.y) != null ? x2 : 0, R3 = (E2.minX + E2.maxX) / 2, I2 = (E2.minY + E2.maxY) / 2;
+    w2.forEach(({ id: G2, node: N2, parent: C2 }) => {
+      e.setNode(G2, N2), C2 !== void 0 && e.setParent(G2, C2);
     }), k.forEach(({ edge: G2, label: N2 }) => {
       e.setEdge(G2, N2);
     }), p.nodes().forEach((G2) => {
       if (G2 === b) return;
-      let N2 = p.node(G2), C = e.node(G2);
-      C && N2 && typeof N2.x == "number" && typeof N2.y == "number" && (C.x = O2 + (N2.x - R3), C.y = j + (N2.y - I2));
-    }), On2(e, p, O2 - R3, j - I2), delete _2._dagreClusterSubgraph;
+      let N2 = p.node(G2), C2 = e.node(G2);
+      C2 && N2 && typeof N2.x == "number" && typeof N2.y == "number" && (C2.x = O2 + (N2.x - R3), C2.y = j2 + (N2.y - I2));
+    }), On(e, p, O2 - R3, j2 - I2), delete _2._dagreClusterSubgraph;
   }), r.forEach((b) => {
     var w2, k;
-    let p = e.node(b), E = o[b];
-    if (p && p.rankdir && p._dagreClusterSubgraph && E) {
-      let _2 = p._dagreClusterSubgraph, O2 = (w2 = p.x) != null ? w2 : 0, j = (k = p.y) != null ? k : 0, R3 = (E.minX + E.maxX) / 2, I2 = (E.minY + E.maxY) / 2;
-      _2.nodes().forEach((v2) => {
-        if (v2 === b) return;
-        let x = _2.node(v2), G2 = e.node(v2);
-        if (G2 && x && typeof x.x == "number" && typeof x.y == "number") {
-          let N2 = x.x - R3, C = x.y - I2;
-          G2.x = O2 + N2, G2.y = j + C;
+    let p = e.node(b), E2 = o[b];
+    if (p && p.rankdir && p._dagreClusterSubgraph && E2) {
+      let _2 = p._dagreClusterSubgraph, O2 = (w2 = p.x) != null ? w2 : 0, j2 = (k = p.y) != null ? k : 0, R3 = (E2.minX + E2.maxX) / 2, I2 = (E2.minY + E2.maxY) / 2;
+      _2.nodes().forEach((v) => {
+        if (v === b) return;
+        let x2 = _2.node(v), G2 = e.node(v);
+        if (G2 && x2 && typeof x2.x == "number" && typeof x2.y == "number") {
+          let N2 = x2.x - R3, C2 = x2.y - I2;
+          G2.x = O2 + N2, G2.y = j2 + C2;
         }
-      }), On2(e, _2, O2 - R3, j - I2), delete p._dagreClusterSubgraph;
+      }), On(e, _2, O2 - R3, j2 - I2), delete p._dagreClusterSubgraph;
     }
   });
 }
-function On2(e, n, t, r) {
+function On(e, n, t, r) {
   n.edges().forEach((o) => {
     if (!e.hasEdge(o)) return;
     let i = n.edge(o), s = e.edge(o);
     s.points = i.points.map((a3) => ({ x: a3.x + t, y: a3.y + r })), Object.hasOwn(i, "x") && (s.x = i.x + t, s.y = i.y + r);
   });
 }
-function Cn(e, n, t, r = null) {
+function Cn2(e, n, t, r = null) {
   var l, u;
   let o = (t == null ? void 0 : t.useDynamic) !== false, i = o && (l = r == null ? void 0 : r.graph) != null ? l : null, s = o && (u = r == null ? void 0 : r.rawNodes) != null ? u : null;
   n("    makeSpaceForEdgeLabels", () => br(e)), n("    removeSelfEdges", () => Gr(e)), n("    acyclic", () => Ue2(e, i)), n("    nestingGraph.run", () => un(e)), n("    rank", () => dn(Z(e))), n("    injectEdgeLabelProxies", () => gr(e)), n("    removeEmptyRanks", () => We2(e)), n("    nestingGraph.cleanup", () => fn(e)), n("    normalizeRanks", () => Be2(e)), n("    assignRankMinMax", () => pr(e)), n("    removeEdgeLabelProxies", () => mr(e)), n("    normalize.run", () => Ke2(e)), n("    parentDummyChains", () => ln(e)), n("    addBorderSegments", () => bn(e)), n("    order", () => re2(e, t, s)), n("    insertSelfEdges", () => vr(e)), n("    adjustCoordinateSystem", () => pn(e)), n("    position", () => kn(e, t.corePath)), n("    positionSelfEdges", () => kr(e));
   let a3 = JSON.parse(JSON.stringify(e._nodes));
   return n("    removeBorderNodes", () => Nr(e)), n("    normalize.undo", () => Qe2(e)), n("    fixupEdgeLabelCoords", () => yr(e)), n("    undoCoordinateSystem", () => mn(e)), n("    translateGraph", () => Er(e)), n("    assignNodeIntersects", () => Lr(e)), n("    reversePoints", () => wr(e)), n("    acyclic.undo", () => Je2(e)), { graph: e, rawNodes: a3 };
 }
-function Tn2(e, n) {
+function Tn(e, n) {
   e.nodes().forEach((t) => {
     let r = e.node(t), o = n.node(t);
     r && (r.x = o.x, r.y = o.y, r.order = o.order, r.rank = o.rank, n.children(t).length && (r.width = o.width, r.height = o.height));
@@ -7067,7 +7138,7 @@ function gr(e) {
     let t = e.edge(n);
     if (t.width && t.height) {
       let r = e.node(n.v), i = { rank: (e.node(n.w).rank - r.rank) / 2 + r.rank, e: n };
-      M2(e, "edge-proxy", i, "_ep");
+      M(e, "edge-proxy", i, "_ep");
     }
   });
 }
@@ -7156,7 +7227,7 @@ function vr(e) {
     t.forEach((o, i) => {
       let s = e.node(o);
       typeof s.rank != "number" && (s.rank = 0), s.order = i + r, (s.selfEdges || []).forEach((a3) => {
-        M2(e, "selfedge", { width: a3.label.width, height: a3.label.height, rank: s.rank, order: i + ++r, e: a3.e, edgeLabel: a3.label }, "_se"), (!Array.isArray(a3.label.points) || a3.label.points.length !== 7) && (a3.label.points = [{ x: 0, y: -10 }, { x: 0, y: -10 }, { x: 0, y: 0 }, { x: 0, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }, { x: 0, y: 0 }]);
+        M(e, "selfedge", { width: a3.label.width, height: a3.label.height, rank: s.rank, order: i + ++r, e: a3.e, edgeLabel: a3.label }, "_se"), (!Array.isArray(a3.label.points) || a3.label.points.length !== 7) && (a3.label.points = [{ x: 0, y: -10 }, { x: 0, y: -10 }, { x: 0, y: 0 }, { x: 0, y: 10 }, { x: 0, y: 10 }, { x: 0, y: 0 }, { x: 0, y: 0 }]);
       }), delete s.selfEdges;
     });
   });
@@ -7240,7 +7311,7 @@ function curvePoints(points, tolerance = 0.25) {
 var NODE_INSET = 2;
 var LABEL_INSET = 1;
 var OTHER = { LR: "TB", RL: "TB", TB: "LR", BT: "LR" };
-var around = ({ x, y: y2 }, { width, height }) => [x - width / 2, y2 - height / 2, x + width / 2, y2 + height / 2];
+var around = ({ x: x2, y }, { width, height }) => [x2 - width / 2, y - height / 2, x2 + width / 2, y + height / 2];
 var inset = ([x0, y0, x1, y1], d) => [x0 + d, y0 + d, x1 - d, y1 - d];
 var runsThrough = (curve, box) => curve.slice(1).some((p, k) => segmentHits(curve[k], p, box));
 var name = (e) => `${e.from} -> ${e.to}`;
@@ -7251,7 +7322,7 @@ function crossings({ g, key, sizes, labels }, { nodes, edges }) {
   return edges.flatMap((edge, i) => {
     const curve = curvePoints(drawn[i].points);
     const node = nodeBoxes.find(([id, box]) => id !== edge.from && id !== edge.to && runsThrough(curve, box));
-    const label = labelBoxes.findIndex((box, j) => j !== i && box && runsThrough(curve, box));
+    const label = labelBoxes.findIndex((box, j2) => j2 !== i && box && runsThrough(curve, box));
     return [
       ...node ? [{ edge, kind: "node", other: node[0] }] : [],
       ...label >= 0 ? [{ edge, kind: "label", other: edges[label] }] : []
@@ -7336,7 +7407,7 @@ Client -> Gateway
     model.warnings.forEach((w2) => warn?.(w2));
     const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
     const html = `<figure class="am-diagram am-flow">${layout2(model, DIRS.has(flowDir) ? flowDir : "TB", uid(), ui, pageDir, video ? void 0 : warn)}</figure>`;
-    return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
+    return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x2) => x2.state ?? null), { ui, video });
   }
 };
 function parseFlow(text2) {
@@ -7380,7 +7451,7 @@ function parseFlow(text2) {
   if (!nodes.size) throw new ComponentError("flow needs at least one node", 1);
   checkMermaidIds(nodes);
   for (const grp of groups) {
-    const missing = grp.members.filter((m2) => !nodes.has(m2));
+    const missing = grp.members.filter((m) => !nodes.has(m));
     if (missing.length) throw new ComponentError(`group ${grp.name} refers to nodes that do not exist: ${missing.join(", ")}`, grp.line);
   }
   checkLinks(edges);
@@ -7392,12 +7463,12 @@ function parseFlow(text2) {
 }
 function checkMermaidIds(nodes) {
   for (const n of nodes.values()) {
-    const m2 = n.explicit ? null : n.label.match(MERMAID_ID);
-    if (!m2) continue;
-    const id = nodes.get(m2[1]);
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
+    const id = nodes.get(m[1]);
     if (!id || !(n.before && id.before || n.after && id.after)) continue;
     throw new ComponentError(
-      `"${m2[1]}" is a node on its own and also the ID of "${n.label}"; this block has no node IDs, so write the text alone${rewriteOf(m2[2])}`,
+      `"${m[1]}" is a node on its own and also the ID of "${n.label}"; this block has no node IDs, so write the text alone${rewriteOf(m[2])}`,
       n.line
     );
   }
@@ -7405,11 +7476,11 @@ function checkMermaidIds(nodes) {
 function mermaidIdWarnings(nodes) {
   const notes = [];
   for (const n of nodes.values()) {
-    const m2 = n.explicit ? null : n.label.match(MERMAID_ID);
-    if (!m2) continue;
+    const m = n.explicit ? null : n.label.match(MERMAID_ID);
+    if (!m) continue;
     notes.push({
       line: n.line,
-      message: `"${n.label}" looks like a Mermaid node ID with its text; this block has no node IDs, so the box shows "${n.label}". If you meant the text, write it alone${rewriteOf(m2[2])}`
+      message: `"${n.label}" looks like a Mermaid node ID with its text; this block has no node IDs, so the box shows "${n.label}". If you meant the text, write it alone${rewriteOf(m[2])}`
     });
   }
   return notes;
@@ -7427,13 +7498,13 @@ function nodeState({ before, after, tilde }) {
 }
 function checkLinks(edges) {
   const key = (e) => `${e.from}\0${e.to}`;
-  for (const e of edges.filter((x) => x.state)) {
-    const plain = edges.find((x) => !x.state && key(x) === key(e));
+  for (const e of edges.filter((x2) => x2.state)) {
+    const plain = edges.find((x2) => !x2.state && key(x2) === key(e));
     if (plain) throw new ComponentError(`flow: the link ${e.from} -> ${e.to} is written unmarked on line ${plain.line} and as ${e.state === "added" ? "+" : "-"} here. Mark every line of that link, or none`, e.line);
   }
 }
 function groupWarnings(groups, nodes) {
-  return groups.filter((g) => g.state !== "removed" && g.members.every((m2) => nodes.get(m2).state === "removed")).map((g) => ({ line: g.line, message: `group ${g.name} holds only removed nodes and would be an empty box after the change. Mark it with "- group ${g.name}: ${g.members.join(", ")}"` }));
+  return groups.filter((g) => g.state !== "removed" && g.members.every((m) => nodes.get(m).state === "removed")).map((g) => ({ line: g.line, message: `group ${g.name} holds only removed nodes and would be an empty box after the change. Mark it with "- group ${g.name}: ${g.members.join(", ")}"` }));
 }
 function parseChain(t, line) {
   const chain = [];
@@ -7474,9 +7545,9 @@ function parseNode(t, start, line) {
     label = t.slice(pos + bracket.open.length, close).trim();
     end = close + bracket.close.length;
   } else {
-    const m2 = t.slice(pos).match(/^(.*?)(?=\s*(?:-->|->|&|[:：]|$))/);
-    label = m2[1].trim();
-    end = pos + m2[0].length;
+    const m = t.slice(pos).match(/^(.*?)(?=\s*(?:-->|->|&|[:：]|$))/);
+    label = m[1].trim();
+    end = pos + m[0].length;
   }
   if (!label) throw new ComponentError(`flow has an empty node: "${t}"`, line);
   return { node: { id: label, label, shape: bracket?.shape ?? "rect", explicit: Boolean(bracket), hi }, end };
@@ -7525,18 +7596,18 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
   const vertical = rankdir === "TB" || rankdir === "BT";
   groups.forEach((grp, i) => {
     g.setNode(gkey(i), { label: grp.name });
-    grp.members.forEach((m2) => g.setParent(key.get(m2), gkey(i)));
+    grp.members.forEach((m) => g.setParent(key.get(m), gkey(i)));
     if (!reserve.has(i) || !vertical) return;
     g.setNode(reserveKey(i), { width: widths[i] + 4, height: CLUSTER_LABEL_H });
     g.setParent(reserveKey(i), gkey(i));
     const down = edges.map((e) => rankdir === "TB" ? [e.from, e.to] : [e.to, e.from]);
     const link = (a3, b, name2) => rankdir === "TB" ? g.setEdge(a3, b, {}, name2) : g.setEdge(b, a3, {}, name2);
     const inside = new Set(grp.members);
-    const first = grp.members.filter((m2) => !down.some(([a3, b]) => b === m2 && a3 !== m2 && inside.has(a3)));
-    (first.length ? first : grp.members.slice(0, 1)).forEach((m2, k) => {
-      link(reserveKey(i), key.get(m2), `r${i}-${k}`);
-      down.forEach(([a3, b], j) => {
-        if (b === m2 && !inside.has(a3)) link(key.get(a3), reserveKey(i), `r${i}-${k}-${j}`);
+    const first = grp.members.filter((m) => !down.some(([a3, b]) => b === m && a3 !== m && inside.has(a3)));
+    (first.length ? first : grp.members.slice(0, 1)).forEach((m, k) => {
+      link(reserveKey(i), key.get(m), `r${i}-${k}`);
+      down.forEach(([a3, b], j2) => {
+        if (b === m && !inside.has(a3)) link(key.get(a3), reserveKey(i), `r${i}-${k}-${j2}`);
       });
     });
   });
@@ -7571,7 +7642,7 @@ function fitEdges(g) {
   graph.height = Math.max(graph.height, Math.max(...ys) + Math.max(up, 0) + graph.marginy);
 }
 function shiftRight(g, d) {
-  for (const v2 of g.nodes()) g.node(v2).x += d;
+  for (const v of g.nodes()) g.node(v).x += d;
   for (const e of g.edges()) {
     const edge = g.edge(e);
     edge.points = edge.points.map((p) => ({ ...p, x: p.x + d }));
@@ -7579,18 +7650,18 @@ function shiftRight(g, d) {
   }
   g.graph().width += d;
 }
-function insertStrip(g, y2, d) {
-  for (const v2 of g.nodes()) {
-    const n = g.node(v2);
-    if (v2.startsWith("g") && top(n) < y2 && top(n) + n.height > y2) {
+function insertStrip(g, y, d) {
+  for (const v of g.nodes()) {
+    const n = g.node(v);
+    if (v.startsWith("g") && top(n) < y && top(n) + n.height > y) {
       n.height += d;
       n.y += d / 2;
-    } else if (n.y > y2) n.y += d;
+    } else if (n.y > y) n.y += d;
   }
   for (const e of g.edges()) {
     const edge = g.edge(e);
-    edge.points = edge.points.map((p) => p.y > y2 ? { ...p, y: p.y + d } : p);
-    if (edge.y !== void 0 && edge.y > y2) edge.y += d;
+    edge.points = edge.points.map((p) => p.y > y ? { ...p, y: p.y + d } : p);
+    if (edge.y !== void 0 && edge.y > y) edge.y += d;
   }
   g.graph().height += d;
 }
@@ -7598,9 +7669,9 @@ var top = (n) => n.y - n.height / 2;
 function placeLabels({ g, key, sizes }, { nodes, edges, groups }, widths, rtl, reserve) {
   const boxes = [];
   for (const n of nodes.values()) {
-    const { x, y: y2 } = g.node(key.get(n.id));
+    const { x: x2, y } = g.node(key.get(n.id));
     const { width: w2, height: h } = sizes.get(n.id);
-    boxes.push([x - w2 / 2, y2 - h / 2, x + w2 / 2, y2 + h / 2]);
+    boxes.push([x2 - w2 / 2, y - h / 2, x2 + w2 / 2, y + h / 2]);
   }
   const segments = [];
   edges.forEach((e, i) => {
@@ -7665,12 +7736,12 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
   if (warn) crossingWarnings(model, rankdir, run2, (alt) => reservedLayout(model, alt, rtl, widths).run).forEach(warn);
   const clusters = groups.map((grp, i) => {
     const c2 = g.node(gkey(i));
-    const x = c2.x - c2.width / 2;
-    const y2 = c2.y - c2.height / 2;
+    const x2 = c2.x - c2.width / 2;
+    const y = c2.y - c2.height / 2;
     const mark = deltaAttr(grp.state);
-    const badgeX = rtl ? x : x + c2.width;
-    const [labelX, labelY] = spots[i] ?? [rtl ? x + c2.width - 8 : x + 8, y2 + 14];
-    return `<rect class="am-cluster"${mark} x="${f(x)}" y="${f(y2)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y2)}`;
+    const badgeX = rtl ? x2 : x2 + c2.width;
+    const [labelX, labelY] = spots[i] ?? [rtl ? x2 + c2.width - 8 : x2 + 8, y + 14];
+    return `<rect class="am-cluster"${mark} x="${f(x2)}" y="${f(y)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="4"/><text class="am-cluster-label"${mark} x="${f(labelX)}" y="${f(labelY)}">${esc(svgLine(grp.name, pageDir))}</text>${badgeSvg(grp.state, badgeX, y)}`;
   });
   const stepOf = new Map([.../* @__PURE__ */ new Set([...[...nodes.values()].map((n) => n.line), ...edges.map((e) => e.line)])].sort((a3, b) => a3 - b).map((l, k) => [l, k]));
   const edgeSvg = edges.map((e, i) => {
@@ -7684,32 +7755,32 @@ function layout2(model, rankdir, id, ui, pageDir = "ltr", warn) {
     return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w2 / 2)}" y="${f(data.y - h / 2)}" width="${f(w2)}" height="${f(h)}" rx="3"/>${textLines(lines, data.x, data.y, LH2, "", pageDir)}</g></g>`;
   });
   const nodeSvg = [...nodes.values()].map((n) => {
-    const { x, y: y2 } = g.node(key.get(n.id));
+    const { x: x2, y } = g.node(key.get(n.id));
     const { width: w2, height: h, lines } = sizes.get(n.id);
-    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y2, w2, h, rtl));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y2, w2, h)}${textLines(lines, x, y2 + (n.shape === "db" ? 4 : 0), LH2, ' class="am-node-text"', pageDir)}${badge}</g>`;
+    const badge = badgeSvg(n.state, ...badgePoint(n.shape, x2, y, w2, h, rtl));
+    return `<g class="am-node am-node--${n.shape}${n.hi ? " am-node--hi" : ""}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x2, y, w2, h)}${textLines(lines, x2, y + (n.shape === "db" ? 4 : 0), LH2, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
   const { width, height } = g.graph();
   const label = diagramLabel(ui, "flow", [...nodes.keys()].slice(0, 8));
   const heads = ["added", "removed"].filter((state) => edges.some((e) => e.state === state));
   return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g>${clusters.join("")}</g><g>${edgeSvg.join("")}</g><g>${nodeSvg.join("")}</g></svg>`;
 }
-function badgeSvg(state, x, y2, step) {
+function badgeSvg(state, x2, y, step) {
   if (!state) return "";
   const at3 = step === void 0 ? "" : ` data-step="${step}"`;
-  return `<g class="am-delta-badge am-delta-badge--${state}"${at3}${deltaAttr(state)} transform="translate(${f(x)},${f(y2)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at3}${deltaAttr(state)} transform="translate(${f(x2)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
-function badgePoint(shape, x, y2, w2, h, rtl = false) {
+function badgePoint(shape, x2, y, w2, h, rtl = false) {
   const s = rtl ? -1 : 1;
-  if (shape === "diamond") return [x + s * (w2 / 4), y2 - h / 4];
-  if (shape === "round") return [x + s * (w2 / 2 - h * 0.15), y2 - h / 2 + h * 0.15];
-  return [x + s * (w2 / 2), y2 - h / 2];
+  if (shape === "diamond") return [x2 + s * (w2 / 4), y - h / 4];
+  if (shape === "round") return [x2 + s * (w2 / 2 - h * 0.15), y - h / 2 + h * 0.15];
+  return [x2 + s * (w2 / 2), y - h / 2];
 }
-function shapeSvg(shape, x, y2, w2, h) {
-  const l = x - w2 / 2;
-  const t = y2 - h / 2;
+function shapeSvg(shape, x2, y, w2, h) {
+  const l = x2 - w2 / 2;
+  const t = y - h / 2;
   if (shape === "diamond") {
-    return `<polygon class="am-node-shape" points="${f(x)},${f(t)} ${f(x + w2 / 2)},${f(y2)} ${f(x)},${f(t + h)} ${f(l)},${f(y2)}"/>`;
+    return `<polygon class="am-node-shape" points="${f(x2)},${f(t)} ${f(x2 + w2 / 2)},${f(y)} ${f(x2)},${f(t + h)} ${f(l)},${f(y)}"/>`;
   }
   if (shape === "db") {
     const ry = 7;
@@ -7738,31 +7809,31 @@ var LOOP_STEP = 20;
 var LOOP_END = 18;
 var LOOP_LABEL = 24;
 var LOOP_GAP = 6;
-function loopBeside({ x, y: y2, width, labelWidth: labelWidth3 = 0, nth = 0, offset = nth * LOOP_STEP, side = 1 }) {
-  const edge = x + side * width / 2;
+function loopBeside({ x: x2, y, width, labelWidth: labelWidth3 = 0, nth = 0, offset = nth * LOOP_STEP, side = 1 }) {
+  const edge = x2 + side * width / 2;
   const out = edge + side * LOOP_OUT + side * offset;
-  const [ay, by] = [y2 - LOOP_END / 2, y2 + LOOP_END / 2];
+  const [ay, by] = [y - LOOP_END / 2, y + LOOP_END / 2];
   return {
     a: { x: edge, y: ay },
     b: { x: edge, y: by },
     c: [{ x: out, y: ay }, { x: out, y: by }],
     away: { x: side, y: 0 },
-    label: labelWidth3 ? { x: out + side * 6 + side * labelWidth3 / 2, y: y2 } : null,
+    label: labelWidth3 ? { x: out + side * 6 + side * labelWidth3 / 2, y } : null,
     corners: [[out + side * 6 + side * labelWidth3, by], [out, ay]]
   };
 }
-function loopBelow({ x, y: y2, height, labelWidth: labelWidth3 = 0, labelHeight = 18, depth = 0, side = 1 }) {
-  const bottom = y2 + height / 2;
+function loopBelow({ x: x2, y, height, labelWidth: labelWidth3 = 0, labelHeight = 18, depth = 0, side = 1 }) {
+  const bottom = y + height / 2;
   const out = bottom + LOOP_OUT + depth;
-  const [ax, bx] = [x - side * LOOP_END / 2, x + side * LOOP_END / 2];
+  const [ax, bx] = [x2 - side * LOOP_END / 2, x2 + side * LOOP_END / 2];
   const half = Math.max(LOOP_END / 2, labelWidth3 / 2);
   return {
     a: { x: ax, y: bottom },
     b: { x: bx, y: bottom },
     c: [{ x: ax, y: out }, { x: bx, y: out }],
     away: { x: 0, y: 1 },
-    label: labelWidth3 ? { x, y: out + 6 + labelHeight / 2 } : null,
-    corners: [[x - half, bottom], [x + half, out + (labelWidth3 ? 6 + labelHeight : 0)]]
+    label: labelWidth3 ? { x: x2, y: out + 6 + labelHeight / 2 } : null,
+    corners: [[x2 - half, bottom], [x2 + half, out + (labelWidth3 ? 6 + labelHeight : 0)]]
   };
 }
 var labelRoom = (width, height) => width ? Math.max(LOOP_LABEL, 6 + (height ?? 18)) : 0;
@@ -7822,7 +7893,7 @@ Polling -> Open: reply
     const model = parseState(text2);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
     const html = `<figure class="am-diagram am-state">${layout3(model, DIRS2.has(dir) ? dir : "TB", uid(), ui, pageDir, video)}</figure>`;
-    return withDelta(html, [...model.nodes.values(), ...model.edges].map((x) => x.state ?? null), { ui, video });
+    return withDelta(html, [...model.nodes.values(), ...model.edges].map((x2) => x2.state ?? null), { ui, video });
   }
 };
 function parseState(text2) {
@@ -7892,8 +7963,8 @@ function checkMermaid(t, raw, mark, line) {
 function checkTransitions(edges, nodes) {
   const keyOf = (e) => `${e.from}\0${e.to}\0${e.label}`;
   const text2 = (e) => `${nodes.get(e.from).label} -> ${nodes.get(e.to).label}${e.label ? `: ${e.label}` : ""}`;
-  for (const e of edges.filter((x) => x.state)) {
-    const plain = edges.find((x) => !x.state && keyOf(x) === keyOf(e));
+  for (const e of edges.filter((x2) => x2.state)) {
+    const plain = edges.find((x2) => !x2.state && keyOf(x2) === keyOf(e));
     if (plain) {
       throw new ComponentError(`state: the transition ${text2(e)} is written unmarked on line ${plain.line} and as ${e.state === "added" ? "+" : "-"} here. Mark every line of that transition, or none`, e.line);
     }
@@ -7935,9 +8006,9 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
   }));
   const { g, key } = runLayout({ nodes: layoutNodes, edges: straight, groups: [] }, rankdir, rtl, [], /* @__PURE__ */ new Map());
   const centre = (nodeId) => {
-    const { x, y: y2 } = g.node(key.get(nodeId));
+    const { x: x2, y } = g.node(key.get(nodeId));
     const extra = room.get(nodeId) ?? {};
-    return { x: x - side * (extra.x ?? 0) / 2, y: y2 - (extra.y ?? 0) / 2 };
+    return { x: x2 - side * (extra.x ?? 0) / 2, y: y - (extra.y ?? 0) / 2 };
   };
   const stepOf = new Map(lines.map((line, i) => [line, i]));
   const drawn = straight.map((e, i) => {
@@ -7952,16 +8023,16 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
   });
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((e) => {
-    const { x, y: y2 } = centre(e.from);
+    const { x: x2, y } = centre(e.from);
     const box = boxes.get(e.from);
     if (below) {
       const size = measured.get(e);
       const { depth } = seen.get(e.from) ?? { depth: 0 };
       seen.set(e.from, { depth: depth + LOOP_STEP + (e.label ? Math.max(LOOP_LABEL, 6 + size.height) : 0) });
-      return { e, ...loopBelow({ x, y: y2, height: box.height, depth, side, labelWidth: size.width, labelHeight: size.height }) };
+      return { e, ...loopBelow({ x: x2, y, height: box.height, depth, side, labelWidth: size.width, labelHeight: size.height }) };
     }
-    const spec = beside.get(e.from).find((x2) => x2.edge === e);
-    return { e, ...loopBeside({ x, y: y2, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
+    const spec = beside.get(e.from).find((x3) => x3.edge === e);
+    return { e, ...loopBeside({ x: x2, y, width: box.width, side, offset: spec.offset, labelWidth: spec.labelWidth }) };
   });
   const loopsSvg = loopSpecs.map(({ e, ...spec }) => {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
@@ -7970,27 +8041,27 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
     return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text2}</g>`;
   });
   const nodeSvg = [...nodes.values()].map((n) => {
-    const { x, y: y2 } = centre(n.id);
+    const { x: x2, y } = centre(n.id);
     const box = boxes.get(n.id);
     const badgeStep = n.state === "changed" ? stepOf.get(n.tildeLine ?? n.line) : void 0;
-    const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y2 - box.height / 2, badgeStep);
+    const badge = badgeSvg(n.state, rtl ? x2 - box.width / 2 : x2 + box.width / 2, y - box.height / 2, badgeStep);
     const keyAttr = n.kind === "state" ? ` data-key="${esc(n.label)}"` : "";
     const open = `<g class="am-node am-node--state${n.kind === "state" ? "" : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
-    if (n.kind === "initial") return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y2)}" r="${DOT_R}"/>${badge}</g>`;
-    if (n.kind === "final") return `${open}<circle class="am-state-ring" cx="${f(x)}" cy="${f(y2)}" r="${DOT_R}"/><circle class="am-state-core" cx="${f(x)}" cy="${f(y2)}" r="2.8"/>${badge}</g>`;
-    return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y2 - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y2, LH3, ' class="am-node-text"', pageDir)}${badge}</g>`;
+    if (n.kind === "initial") return `${open}<circle class="am-state-dot" cx="${f(x2)}" cy="${f(y)}" r="${DOT_R}"/>${badge}</g>`;
+    if (n.kind === "final") return `${open}<circle class="am-state-ring" cx="${f(x2)}" cy="${f(y)}" r="${DOT_R}"/><circle class="am-state-core" cx="${f(x2)}" cy="${f(y)}" r="2.8"/>${badge}</g>`;
+    return `${open}<rect class="am-node-shape" x="${f(x2 - box.width / 2)}" y="${f(y - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x2, y, LH3, ' class="am-node-text"', pageDir)}${badge}</g>`;
   });
   const xs = [];
   const ys = [];
-  const at3 = (x, y2) => {
-    xs.push(x);
-    ys.push(y2);
+  const at3 = (x2, y) => {
+    xs.push(x2);
+    ys.push(y);
   };
   for (const n of nodes.values()) {
-    const { x, y: y2 } = centre(n.id);
+    const { x: x2, y } = centre(n.id);
     const box = boxes.get(n.id);
-    at3(x - box.width / 2, y2 - box.height / 2);
-    at3(x + box.width / 2, y2 + box.height / 2);
+    at3(x2 - box.width / 2, y - box.height / 2);
+    at3(x2 + box.width / 2, y + box.height / 2);
   }
   for (const { e, data, points } of drawn) {
     for (const p of points) at3(p.x, p.y);
@@ -8001,7 +8072,7 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
     }
   }
   for (const { e, corners, label: label2 } of loopSpecs) {
-    corners.forEach(([x, y2]) => at3(x, y2));
+    corners.forEach(([x2, y]) => at3(x2, y));
     if (label2) {
       const { width: w2, height: h } = edgeText(e.label);
       at3(label2.x - w2 / 2, label2.y - h / 2);
@@ -8026,9 +8097,9 @@ function layout3(model, rankdir, id, ui, pageDir = "ltr", video = false) {
   const empty = video ? lines.map((line) => used.has(stepOf.get(line)) ? "" : `<g data-step="${stepOf.get(line)}"></g>`).join("") : "";
   return `${svgOpen(width, height, label, pageDir)}${arrowDefs(id, heads)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g>${empty}</g></svg>`;
 }
-function edgeLabelSvg(label, x, y2, pageDir) {
+function edgeLabelSvg(label, x2, y, pageDir) {
   const { lines, width: w2, height: h } = edgeText(label);
-  return `<g class="am-edge-label"><rect x="${f(x - w2 / 2)}" y="${f(y2 - h / 2)}" width="${f(w2)}" height="${f(h)}" rx="3"/>${textLines(lines, x, y2, LH3, "", pageDir)}</g>`;
+  return `<g class="am-edge-label"><rect x="${f(x2 - w2 / 2)}" y="${f(y - h / 2)}" width="${f(w2)}" height="${f(h)}" rx="3"/>${textLines(lines, x2, y, LH3, "", pageDir)}</g>`;
 }
 function clipEnds2(points, edge, centre, boxes, room, nodes) {
   const pts = points.map((p) => ({ ...p }));
@@ -8105,7 +8176,7 @@ Order
     const model = parseEr(text2);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? "TB").toUpperCase();
     const html = `<figure class="am-diagram am-er">${layout4(model, DIRS3.has(dir) ? dir : "TB", ui, pageDir)}</figure>`;
-    const states = [...model.entities.values()].flatMap((e) => [e.state, ...e.fields.map((x) => x.state)]).concat(model.written.map((rel) => rel.state));
+    const states = [...model.entities.values()].flatMap((e) => [e.state, ...e.fields.map((x2) => x2.state)]).concat(model.written.map((rel) => rel.state));
     return withDelta(html, states.map((state) => state ?? null), { ui, video });
   }
 };
@@ -8221,14 +8292,14 @@ function relationships({ entities, written }) {
     }
   }
   const replaced = new Set(written.map((rel) => pairKey(rel.from, rel.to)));
-  const lines = written.map((rel) => withState(rel, rel.state ?? ends(rel.from, rel.to) ?? implied.find((x) => pairKey(x.from, x.to) === pairKey(rel.from, rel.to) && x.state)?.state));
+  const lines = written.map((rel) => withState(rel, rel.state ?? ends(rel.from, rel.to) ?? implied.find((x2) => pairKey(x2.from, x2.to) === pairKey(rel.from, rel.to) && x2.state)?.state));
   return [...implied.filter((rel) => !replaced.has(pairKey(rel.from, rel.to))), ...lines];
 }
 var pairKey = (a3, b) => [a3, b].sort().join("\0");
 var fieldText = (field) => field.type ? `${field.name} ${field.type}` : field.name;
 var nameWidth = (entity) => measure(entity.name, FS3, { bold: true });
 var rowWidth = (entity, field) => measure(fieldText(field), FIELD_FS, { bold: entity.hi }) + keyWidth(entity, field) + signWidth(entity) + 2 * PAD;
-var signWidth = (entity) => entity.fields.some((x) => x.state) ? SIGN_W : 0;
+var signWidth = (entity) => entity.fields.some((x2) => x2.state) ? SIGN_W : 0;
 var keyWidth = (entity, field) => field.marker ? measure(field.marker, KEY_FS, { mono: true, bold: entity.hi }) + KEY_GAP : 0;
 function nodeSize2(entity) {
   const rows = entity.fields.map((field) => rowWidth(entity, field));
@@ -8257,8 +8328,8 @@ function layout4(model, rankdir, ui, pageDir = "ltr") {
     g.setNode(key.get(entity.name), { width: size.width, height: size.height + (room.get(entity.name) ?? 0) });
   }
   const centre = (name2) => {
-    const { x, y: y2 } = g.node(key.get(name2));
-    return { x, y: y2 - (room.get(name2) ?? 0) / 2 };
+    const { x: x2, y } = g.node(key.get(name2));
+    return { x: x2, y: y - (room.get(name2) ?? 0) / 2 };
   };
   rels.filter((rel) => rel.from !== rel.to).forEach((rel, i) => {
     const label2 = rel.label ? { label: rel.label, width: measure(rel.label, EDGE_FS2) + 10, height: 18, labelpos: "c" } : {};
@@ -8281,33 +8352,33 @@ function layout4(model, rankdir, ui, pageDir = "ltr") {
     return `<g data-step="${stepOf.get(rel.line)}"${deltaAttr(rel.state)}><path class="am-edge" d="${smoothPath(points)}"/>${endsSvg(points, rel)}${label2}</g>`;
   });
   const nodeSvg = [...entities.values()].map((entity) => {
-    const { x, y: y2 } = centre(entity.name);
+    const { x: x2, y } = centre(entity.name);
     const size = sizes.get(entity.name);
-    return nodeSvgOf(entity, x, y2, size, stepOf.get(entity.line), pageDir);
+    return nodeSvgOf(entity, x2, y, size, stepOf.get(entity.line), pageDir);
   });
   const s = rtl ? -1 : 1;
   const seen = /* @__PURE__ */ new Map();
   const loopSpecs = loops.map((rel) => {
     const { nth, depth } = seen.get(rel.from) ?? { nth: 0, depth: 0 };
     seen.set(rel.from, { nth: nth + 1, depth: depth + LOOP_STEP + (rel.label ? LOOP_LABEL : 0) });
-    const { x, y: y2 } = centre(rel.from);
+    const { x: x2, y } = centre(rel.from);
     const size = sizes.get(rel.from);
     const lw = rel.label ? labelWidth2(rel.label) : 0;
-    const spec = below ? loopBelow({ x, y: y2, height: size.height, depth, side: s, labelWidth: lw }) : loopBeside({ x, y: y2, width: size.width, nth, side: s, labelWidth: lw });
+    const spec = below ? loopBelow({ x: x2, y, height: size.height, depth, side: s, labelWidth: lw }) : loopBeside({ x: x2, y, width: size.width, nth, side: s, labelWidth: lw });
     return { rel, ...spec };
   });
   const loopsSvg = loopSpecs.map((spec) => loopSvg(spec, stepOf.get(spec.rel.line), pageDir));
   const xs = [];
   const ys = [];
-  const at3 = (x, y2) => {
-    xs.push(x);
-    ys.push(y2);
+  const at3 = (x2, y) => {
+    xs.push(x2);
+    ys.push(y);
   };
   for (const entity of entities.values()) {
-    const { x, y: y2 } = centre(entity.name);
+    const { x: x2, y } = centre(entity.name);
     const size = sizes.get(entity.name);
-    at3(x - size.width / 2, y2 - size.height / 2);
-    at3(x + size.width / 2, y2 + size.height / 2);
+    at3(x2 - size.width / 2, y - size.height / 2);
+    at3(x2 + size.width / 2, y + size.height / 2);
   }
   straight.forEach(({ rel, data, points }) => {
     for (const p of points) at3(p.x, p.y);
@@ -8317,7 +8388,7 @@ function layout4(model, rankdir, ui, pageDir = "ltr") {
       at3(data.x + w2 / 2, data.y + 9);
     }
   });
-  for (const { corners } of loopSpecs) corners.forEach(([x, y2]) => at3(x, y2));
+  for (const { corners } of loopSpecs) corners.forEach(([x2, y]) => at3(x2, y));
   const margin = 14;
   const shiftX = margin - Math.min(...xs);
   const shiftY = margin - Math.min(...ys);
@@ -8327,9 +8398,9 @@ function layout4(model, rankdir, ui, pageDir = "ltr") {
   const label = diagramLabel(ui, "er", [...entities.keys()].slice(0, 8));
   return `${svgOpen(width, height, label, pageDir)}<g${shift}><g>${edgeSvg.join("")}</g><g>${loopsSvg.join("")}</g><g>${nodeSvg.join("")}</g></g></svg>`;
 }
-function nodeSvgOf(entity, x, y2, size, step, pageDir) {
-  const left = x - size.width / 2;
-  const top2 = y2 - size.height / 2;
+function nodeSvgOf(entity, x2, y, size, step, pageDir) {
+  const left = x2 - size.width / 2;
+  const top2 = y - size.height / 2;
   const [nameX, keyX] = pageDir === "rtl" ? [left + size.width - PAD, left + PAD] : [left + PAD, left + size.width - PAD];
   const head = `<text class="am-er-head am-node-text" font-weight="600" x="${f(nameX)}" y="${f(top2 + PAD + HEAD_LH / 2)}" dominant-baseline="central">${esc(svgLine(entity.name, pageDir))}</text>`;
   const rule = `<line class="am-er-rule am-edge" opacity="0.45" x1="${f(left)}" y1="${f(top2 + PAD + HEAD_LH)}" x2="${f(left + size.width)}" y2="${f(top2 + PAD + HEAD_LH)}"/>`;
@@ -8354,9 +8425,9 @@ function loopSvg({ rel, a: a3, b, c: c2, away, label }, step, pageDir) {
 function labelWidth2(text2) {
   return measure(text2, EDGE_FS2) + 10;
 }
-function labelSvg(text2, x, y2, pageDir) {
+function labelSvg(text2, x2, y, pageDir) {
   const w2 = labelWidth2(text2);
-  return `<g class="am-edge-label"><rect x="${f(x - w2 / 2)}" y="${f(y2 - 9)}" width="${f(w2)}" height="18" rx="3"/>${textLines([text2], x, y2, LH4, "", pageDir)}</g>`;
+  return `<g class="am-edge-label"><rect x="${f(x2 - w2 / 2)}" y="${f(y - 9)}" width="${f(w2)}" height="18" rx="3"/>${textLines([text2], x2, y, LH4, "", pageDir)}</g>`;
 }
 function endsSvg(points, rel) {
   if (points.length < 2) return "";
@@ -8460,8 +8531,8 @@ User ..|> Store: implements
     const keys = new Map([...classes.keys()].map((name2, i) => [name2, `n${i}`]));
     for (const c2 of classes.values()) {
       const stereotype = c2.kind === "class" ? [] : [c2.kind];
-      const attributes = c2.members.filter((m2) => !METHOD.test(m2));
-      const methods = c2.members.filter((m2) => METHOD.test(m2));
+      const attributes = c2.members.filter((m) => !METHOD.test(m));
+      const methods = c2.members.filter((m) => METHOD.test(m));
       const groups = [[...stereotype, c2.name], attributes, methods].filter((rows) => rows.length);
       const widths = groups.flatMap((rows, i) => rows.map((row, n) => measure(row, i || stereotype.length && !n ? DRAWING.field : DRAWING.node, { bold: c2.hi })));
       g.setNode(keys.get(c2.name), { ...c2, groups, width: Math.ceil(Math.max(100, ...widths.map((w2) => w2 + 2 * PAD2))), height: groups.reduce((n, rows) => n + rows.length * ROW + PAD2, 0) });
@@ -8486,19 +8557,19 @@ User ..|> Store: implements
     });
     const nodes = g.nodes().map((key) => {
       const c2 = g.node(key);
-      const x = c2.x - c2.width / 2;
-      const y2 = c2.y - c2.height / 2;
-      let top2 = y2;
+      const x2 = c2.x - c2.width / 2;
+      const y = c2.y - c2.height / 2;
+      let top2 = y;
       const rows = c2.groups.map((group, k) => {
-        const separator = k ? `<path class="am-edge" d="M${f(x)},${f(top2)} h${f(c2.width)}"/>` : "";
+        const separator = k ? `<path class="am-edge" d="M${f(x2)},${f(top2)} h${f(c2.width)}"/>` : "";
         const text3 = group.map((member, n) => {
           const kind2 = !k && !n && c2.kind !== "class";
-          return `<text class="am-node-text" x="${f(k ? dir === "rtl" ? x + c2.width - PAD2 : x + PAD2 : c2.x)}" y="${f(top2 + PAD2 / 2 + ROW * (n + 0.5))}" text-anchor="${k ? "start" : "middle"}" dominant-baseline="central"${k || kind2 ? ` style="font-size:${DRAWING.field}px${kind2 ? ";font-style:italic;opacity:0.65" : ""}"` : ""}>${esc(svgLine(member, dir))}</text>`;
+          return `<text class="am-node-text" x="${f(k ? dir === "rtl" ? x2 + c2.width - PAD2 : x2 + PAD2 : c2.x)}" y="${f(top2 + PAD2 / 2 + ROW * (n + 0.5))}" text-anchor="${k ? "start" : "middle"}" dominant-baseline="central"${k || kind2 ? ` style="font-size:${DRAWING.field}px${kind2 ? ";font-style:italic;opacity:0.65" : ""}"` : ""}>${esc(svgLine(member, dir))}</text>`;
         }).join("");
         top2 += group.length * ROW + PAD2;
         return separator + text3;
       }).join("");
-      return `<g class="am-node am-node--rect${c2.hi ? " am-node--hi" : ""}" data-key="${esc(c2.name)}" data-step="${c2.line - 1}"><rect class="am-node-shape" x="${f(x)}" y="${f(y2)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="3"/>${rows}</g>`;
+      return `<g class="am-node am-node--rect${c2.hi ? " am-node--hi" : ""}" data-key="${esc(c2.name)}" data-step="${c2.line - 1}"><rect class="am-node-shape" x="${f(x2)}" y="${f(y)}" width="${f(c2.width)}" height="${f(c2.height)}" rx="3"/>${rows}</g>`;
     });
     const defs = `<defs>${[["triangle", "M0,0 L10,5 L0,10 Z"], ["diamond", "M0,5 L6,0 L12,5 L6,10 Z"], ["filled", "M0,5 L6,0 L12,5 L6,10 Z"], ["open", "M1,1 L9,5 L1,9"]].map(([kind2, path]) => `<marker id="${id}-${kind2}" viewBox="-1 -1 14 12" refX="${kind2 === "diamond" || kind2 === "filled" ? 12 : 10}" refY="5" markerWidth="12" markerHeight="10" orient="auto-start-reverse"><path class="${kind2 === "filled" ? "am-arrow" : kind2 === "open" ? "am-edge" : "am-class-hollow"}" d="${path}"/></marker>`).join("")}</defs>`;
     return `<figure class="am-diagram am-class">${svgOpen(g.graph().width, g.graph().height, diagramLabel(ui, "class", [...classes.keys()]), dir)}${defs}${edges.join("")}${nodes.join("")}</svg></figure>`;
@@ -8581,40 +8652,121 @@ response 400 Error
 
 // src/components/ask.js
 var OPTION = /^([*-])\s+(.+)$/;
+var PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
+var PREVIEW_CLOSE = /^(\s*):::\s*$/;
+var FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+var RAW_PREVIEW = /* @__PURE__ */ new Set(["html", "svg"]);
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+function previewEnd(lines, openIdx) {
+  const open = lines[openIdx]?.match(PREVIEW_OPEN);
+  if (!open) return -1;
+  const indent = open[1].length;
+  const raw = RAW_PREVIEW.has(open[2].toLowerCase());
+  const body = lines.map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
+  for (let j2 = openIdx + 1; j2 < lines.length; j2++) {
+    const end = lines[j2].match(PREVIEW_CLOSE);
+    if (end && end[1].length === indent) return j2;
+    const mark = raw ? null : body[j2].match(FENCE_MARK)?.[1];
+    const close = mark ? fenceClose(body, j2, mark) : -1;
+    if (close !== -1) j2 = close;
+  }
+  return -1;
+}
+function read(text2) {
+  const lines = String(text2).split("\n");
+  let question = null;
+  const options = [];
+  let current = null;
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("//")) continue;
+    if (question === null) {
+      if (OPTION.test(trimmed)) throw new ComponentError("ask: the first line is the question", i + 1);
+      question = { text: trimmed, line: i + 1 };
+      continue;
+    }
+    const open = raw.match(PREVIEW_OPEN);
+    if (open) {
+      if (!current) throw new ComponentError("ask: put a preview under an option", i + 1);
+      if (current.preview) throw new ComponentError("ask: one preview per option", i + 1);
+      const indent = open[1].length;
+      const close = previewEnd(lines, i);
+      if (close === -1) throw new ComponentError("ask: the preview block is not closed", i + 1);
+      const content = lines.slice(i + 1, close).map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
+      current.preview = { lang: open[2].toLowerCase(), args: (open[3] ?? "").trim(), text: content.join("\n"), line: i + 1 };
+      i = close;
+      continue;
+    }
+    const option = trimmed.match(OPTION);
+    if (option) {
+      const [label, note2 = ""] = fields(option[2]);
+      if (!label) throw new ComponentError("ask: an option needs a label before |", i + 1);
+      current = { label, note: note2, suggested: option[1] === "*", line: i + 1, preview: null };
+      options.push(current);
+      continue;
+    }
+    throw new ComponentError(`ask: "${trimmed}" is not an option; start it with * (suggested) or -`, i + 1);
+  }
+  if (!question) throw new ComponentError("ask: write the question on the first line", 1);
+  return { question, options };
+}
 var ask_default = {
   name: "ask",
   summary: "A decision the reader makes on the page (collected by Reply)",
   pageOnly: true,
   panelOnly: true,
-  syntax: `\`\`\`ask [multi]
+  // Preview blocks are rendered with the page's scale, so the ask output must not take the factor again.
+  scalesOwnSvg: true,
+  syntax: `\`\`\`ask [multi] [cards]
 The question, one sentence
-* The option you suggest | optional note   \u2190 * marks the suggestion with a tag; nothing starts selected
+* The option you suggest | optional note
 - Another option | optional note
+  :::flow
+  A -> B: its preview, drawn in an indented block
+  :::
 \`\`\`
 - The first line is the question. Each option starts with * or -. Write 2 to 6 options.
 - One choice: exactly one * option. multi lets the reader pick several; * marks the ones you suggest.
+- An option may carry one preview: indent a ::: block under it. Any component works, plus html and svg. Leave it out when a picture does not help.
+- cards lays the options out in a grid, for a landing-page choice. Each preview becomes the card's canvas.
 - Place the ask in the panel whose content the answer changes. The Reply button turns the answers into one reply.`,
   example: "```ask\nWhich cache do we use?\n* Redis | keeps data after a restart\n- Memcached | simpler, no disk\n```",
-  // The text the STE check reads: options are list items; the note reads as a second clause of the item.
+  // The text the STE check reads: options are list items; the note reads as a second clause of the item. A preview is a picture, not prose.
   lint(text2) {
-    return text2.split("\n").map((l) => l.replace(OPTION, (_2, mark, body) => `- ${fields(body).filter(Boolean).join(": ")}`)).join("\n");
+    const out = [];
+    const lines = String(text2).split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const close = line.match(PREVIEW_OPEN) ? previewEnd(lines, i) : -1;
+      if (close !== -1) {
+        out.push(...Array(close - i + 1).fill(""));
+        i = close;
+        continue;
+      }
+      const option = line.trim().match(OPTION);
+      out.push(option ? `- ${fields(option[2]).filter(Boolean).join(": ")}` : line);
+    }
+    return out.join("\n");
   },
-  render(text2, { args, uid, ui = {} }) {
+  /**
+   * Render the ask fieldset. A preview is passed to the caller's nested block renderer,
+   * so it can use any component, html or svg.
+   */
+  render(text2, { args, uid, ui = {}, line = 0, render }) {
     const multi = /(^|\s)multi(\s|$)/.test(args);
-    const lines = contentLines(text2);
-    const [first, ...rest] = lines;
-    if (!first || OPTION.test(first.text)) throw new ComponentError("ask: the first line is the question", first?.line ?? 1);
-    const options = rest.map(({ text: t, line }) => {
-      const m2 = t.match(OPTION);
-      if (!m2) throw new ComponentError(`ask: "${t}" is not an option; start it with * (suggested) or -`, line);
-      const [label, note2 = ""] = fields(m2[2]);
-      if (!label) throw new ComponentError("ask: an option needs a label before |", line);
-      return { label, note: note2, suggested: m2[1] === "*", line };
-    });
-    if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, first.line);
+    const cards = /(^|\s)cards(\s|$)/.test(args);
+    const { question, options } = read(text2);
+    if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, question.line);
     const suggested = options.filter((o) => o.suggested).length;
     if (!multi && suggested !== 1) {
-      throw new ComponentError(`ask: mark exactly one option with * as your suggestion (found ${suggested}); add multi to let the reader pick several`, first.line);
+      throw new ComponentError(`ask: mark exactly one option with * as your suggestion (found ${suggested}); add multi to let the reader pick several`, question.line);
     }
     const seen = /* @__PURE__ */ new Set();
     for (const o of options) {
@@ -8623,8 +8775,18 @@ The question, one sentence
     }
     const id = uid();
     const type = multi ? "checkbox" : "radio";
-    const items = options.map((o) => `<label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? " data-suggested" : ""}><span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? "suggested")}</span>` : ""}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ""}</span></label>`);
-    return `<fieldset class="am-ask" data-ask="${id}"${multi ? " data-multi" : ""}><legend class="am-ask-q">${mdInline(first.text)}</legend>${items.join("")}</fieldset>`;
+    const items = options.map((o) => {
+      let preview2 = "";
+      if (o.preview) {
+        if (!render) throw new ComponentError("ask: a preview needs a page, not a video", o.preview.line);
+        const at3 = line + o.preview.line;
+        const block2 = { type: "fence", lang: o.preview.lang, args: o.preview.args, text: o.preview.text, line: at3 };
+        preview2 = `<div class="am-ask-preview">${render([block2])}</div>`;
+      }
+      const body = `<span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? "suggested")}</span>` : ""}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ""}</span>`;
+      return `<div class="am-ask-card"><label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? " data-suggested" : ""}>${body}</label>${preview2}</div>`;
+    });
+    return `<fieldset class="am-ask${cards ? " am-ask--cards" : ""}" data-ask="${id}"${multi ? " data-multi" : ""}><legend class="am-ask-q">${mdInline(question.text)}</legend><div class="am-ask-opts">${items.join("")}</div></fieldset>`;
   }
 };
 
@@ -8635,8 +8797,8 @@ var MAX_STEPS = 7;
 var fmt = (n) => String(round2(n));
 function* steps(peak, whole) {
   for (let power = Math.floor(Math.log10(peak)) - 2; ; power++) {
-    for (const m2 of MANTISSAS) {
-      const step = round2(m2 * 10 ** power);
+    for (const m of MANTISSAS) {
+      const step = round2(m * 10 ** power);
       if (!whole || Number.isInteger(step)) yield step;
     }
   }
@@ -8708,38 +8870,38 @@ function fitLines(label, maxWidth, maxLines, size) {
   return kept.map((l) => shorten(l, maxWidth, size));
 }
 var NUMBERS = /* @__PURE__ */ new Set(["am-ch-tick", "am-ch-val", "am-ch-num", "am-ch-total"]);
-var text = (cls, x, y2, str, dir, attrs = "") => `<text class="${cls}" x="${f(x)}" y="${f(y2)}"${attrs}>${esc(NUMBERS.has(cls.split(" ")[0]) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
+var text = (cls, x2, y, str, dir, attrs = "") => `<text class="${cls}" x="${f(x2)}" y="${f(y)}"${attrs}>${esc(NUMBERS.has(cls.split(" ")[0]) ? svgNumber(str, dir) : svgLine(str, dir))}</text>`;
 function legendLayout(names2, maxWidth) {
   if (names2.length < 2) return { items: [], height: 0 };
   const items = [];
-  let [x, y2] = [0, 0];
+  let [x2, y] = [0, 0];
   for (const [k, name2] of names2.entries()) {
     const w2 = 16 + measure(name2, FS4.legend);
-    if (x > 0 && x + w2 > maxWidth) [x, y2] = [0, y2 + LEGEND_LH];
-    items.push({ k, name: name2, x, y: y2, w: w2 });
-    x += w2 + 18;
+    if (x2 > 0 && x2 + w2 > maxWidth) [x2, y] = [0, y + LEGEND_LH];
+    items.push({ k, name: name2, x: x2, y, w: w2 });
+    x2 += w2 + 18;
   }
-  return { items, height: y2 + LEGEND_LH + 6, width: Math.max(...items.map((i) => i.x + i.w)) };
+  return { items, height: y + LEGEND_LH + 6, width: Math.max(...items.map((i) => i.x + i.w)) };
 }
 function legendSvg({ items }, left, top2, { rtl, dir }, W3) {
-  return items.map(({ k, name: name2, x, y: y2, w: w2 }) => {
-    const sw = rtl ? W3 - (left + x) - 10 : left + x;
-    return `<rect class="am-ch-sw am-ch-s${k + 1}" x="${f(sw)}" y="${f(top2 + y2 + 2)}" width="10" height="10" rx="2"/>${text("am-ch-leg", rtl ? W3 - (left + x + 16) : left + x + 16, top2 + y2 + 7, name2, dir, ' dominant-baseline="central"')}`;
+  return items.map(({ k, name: name2, x: x2, y, w: w2 }) => {
+    const sw = rtl ? W3 - (left + x2) - 10 : left + x2;
+    return `<rect class="am-ch-sw am-ch-s${k + 1}" x="${f(sw)}" y="${f(top2 + y + 2)}" width="10" height="10" rx="2"/>${text("am-ch-leg", rtl ? W3 - (left + x2 + 16) : left + x2 + 16, top2 + y + 7, name2, dir, ' dominant-baseline="central"')}`;
   }).join("");
 }
 var stepGroup = (i, cls, title, inner) => `<g data-step="${i}" class="${cls}">${title}${inner}</g>`;
 var squash = (s) => s.replace(/\s/g, "");
 var tooltip = (label, shown2) => squash(label) === squash(shown2) ? "" : `<title>${esc(label)}</title>`;
-function valueAxis(m2, { axisX, width, y: y2, W: W3, X: X3 }) {
-  const left = m2.rtl ? W3 - axisX - width : axisX;
-  return m2.range.ticks.flatMap((t) => [
-    `<line class="${t === 0 ? "am-ch-zero" : "am-ch-grid"}" x1="${f(left)}" y1="${f(y2(t))}" x2="${f(left + width)}" y2="${f(y2(t))}"/>`,
-    text("am-ch-tick", X3(axisX - 6), y2(t), m2.tick(t), m2.dir, ' text-anchor="end" dominant-baseline="central"')
+function valueAxis(m, { axisX, width, y, W: W3, X: X3 }) {
+  const left = m.rtl ? W3 - axisX - width : axisX;
+  return m.range.ticks.flatMap((t) => [
+    `<line class="${t === 0 ? "am-ch-zero" : "am-ch-grid"}" x1="${f(left)}" y1="${f(y(t))}" x2="${f(left + width)}" y2="${f(y(t))}"/>`,
+    text("am-ch-tick", X3(axisX - 6), y(t), m.tick(t), m.dir, ' text-anchor="end" dominant-baseline="central"')
   ]);
 }
 function categoryLabel(plan, i, label, cx, catTop, { X: X3, rtl, dir }) {
   if (plan.lines) {
-    return { svg: plan.lines[i].map((l, j) => text("am-ch-cat", X3(cx), catTop + 11 + j * LH5, l, dir, ' text-anchor="middle"')).join(""), tip: "" };
+    return { svg: plan.lines[i].map((l, j2) => text("am-ch-cat", X3(cx), catTop + 11 + j2 * LH5, l, dir, ' text-anchor="middle"')).join(""), tip: "" };
   }
   const shown2 = plan.shown[i];
   const [ax, ay] = [X3(cx + 3), catTop + 4];
@@ -8758,7 +8920,7 @@ var CAT_WIDTH = 180;
 function drawBars(data, { horizontal = false, unit = "", dir = "ltr", label }) {
   const { rows } = data;
   const count2 = rows[0].values.length;
-  const m2 = {
+  const m = {
     rows,
     count: count2,
     names: data.series ?? [],
@@ -8769,13 +8931,13 @@ function drawBars(data, { horizontal = false, unit = "", dir = "ltr", label }) {
     dir,
     anyHi: rows.some((r) => r.hi)
   };
-  m2.tick = (v2) => `${fmt(v2)}${unit}`;
-  const box = horizontal ? horizontalBars(m2) : verticalBars(m2);
+  m.tick = (v) => `${fmt(v)}${unit}`;
+  const box = horizontal ? horizontalBars(m) : verticalBars(m);
   return `${svgOpen(box.width, box.height, label, dir)}${box.body.join("")}</svg>`;
 }
-var barClass = (m2, row, k) => `am-ch-bar ${row.hi && m2.count === 1 ? "am-ch-hi" : `am-ch-s${k + 1}`}`;
-var rowClass = (m2, row) => `am-ch-row${m2.anyHi ? row.hi ? " is-hi" : " is-dim" : ""}`;
-var rowGroup = (m2, row, i, title, inner) => stepGroup(i, rowClass(m2, row), title, inner);
+var barClass = (m, row, k) => `am-ch-bar ${row.hi && m.count === 1 ? "am-ch-hi" : `am-ch-s${k + 1}`}`;
+var rowClass = (m, row) => `am-ch-row${m.anyHi ? row.hi ? " is-hi" : " is-dim" : ""}`;
+var rowGroup = (m, row, i, title, inner) => stepGroup(i, rowClass(m, row), title, inner);
 function planCategories(labels, from, to) {
   for (let slot = from; slot <= to; slot += 6) {
     const lines = labels.map((l) => wrap(l, slot - 8, FS4.cat));
@@ -8783,20 +8945,20 @@ function planCategories(labels, from, to) {
   }
   return { slot: from, lines: null, shown: labels.map((l) => shorten(l, SLANT_MAX, FS4.cat)) };
 }
-function verticalBars(m2) {
-  const { rows, count: count2, range, labels, rtl, dir } = m2;
+function verticalBars(m) {
+  const { rows, count: count2, range, labels, rtl, dir } = m;
   const n = rows.length;
-  const valueW = labels ? Math.max(...rows.flatMap((r) => r.values.map((v2) => measure(m2.tick(v2), FS4.val)))) : 0;
+  const valueW = labels ? Math.max(...rows.flatMap((r) => r.values.map((v) => measure(m.tick(v), FS4.val)))) : 0;
   const barMax = Math.min(64, Math.max(BAR_W[count2], labels ? Math.ceil(valueW) + 4 : 0));
   const budget = Math.floor(MAX_WIDTH / n);
   const natural = Math.min(budget, count2 * barMax + (count2 - 1) * GAP + GUTTER);
   const plan = planCategories(rows.map((r) => r.label), natural, Math.max(natural, Math.min(budget, SLOT_MAX)));
   const slot = plan.slot;
   const bw = Math.max(6, Math.min(barMax, Math.floor((slot - Math.min(GUTTER, slot * 0.3) - (count2 - 1) * GAP) / count2)));
-  const tickW = Math.max(...range.ticks.map((t) => measure(m2.tick(t), FS4.tick)));
+  const tickW = Math.max(...range.ticks.map((t) => measure(m.tick(t), FS4.tick)));
   const reach = plan.lines ? 0 : Math.max(...plan.shown.map((l, i) => measure(l, FS4.cat) * COS + FS4.cat * SIN - ((i + 0.5) * slot + PAD3 + tickW + 9)));
   const axisX = PAD3 + Math.max(0, reach) + tickW + 6;
-  const legend = legendLayout(m2.names, Math.max(n * slot + tickW, 240));
+  const legend = legendLayout(m.names, Math.max(n * slot + tickW, 240));
   const W3 = Math.ceil(Math.max(axisX + n * slot + PAD3, (legend.width ?? 0) + 2 * PAD3));
   const plotTop = PAD3 + legend.height + (labels ? 16 : 6);
   const plotBottom = plotTop + PLOT_H;
@@ -8805,72 +8967,72 @@ function verticalBars(m2) {
   const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls.length)) * LH5 + 4 : Math.max(...plan.shown.map((l) => measure(l, FS4.cat))) * SIN + 12;
   const height = catTop + catH + PAD3;
   const X3 = mirror(W3, rtl);
-  const rectX = (x, w2) => rtl ? W3 - x - w2 : x;
-  const y2 = (v2) => plotTop + (range.max - v2) / (range.max - range.min) * PLOT_H;
-  const y0 = y2(0);
-  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
-  body.push(...valueAxis(m2, { axisX, width: n * slot, y: y2, W: W3, X: X3 }));
+  const rectX = (x2, w2) => rtl ? W3 - x2 - w2 : x2;
+  const y = (v) => plotTop + (range.max - v) / (range.max - range.min) * PLOT_H;
+  const y0 = y(0);
+  const body = [legendSvg(legend, PAD3, PAD3, m, W3)];
+  body.push(...valueAxis(m, { axisX, width: n * slot, y, W: W3, X: X3 }));
   for (const [i, row] of rows.entries()) {
     const x0 = axisX + i * slot;
     const cx = x0 + slot / 2;
     const gx = x0 + (slot - (count2 * bw + (count2 - 1) * GAP)) / 2;
-    const parts = row.values.map((v2, k) => {
-      const x = gx + k * (bw + GAP);
-      const h = Math.max(Math.abs(y2(v2) - y0), v2 === 0 ? 0 : 1);
-      const top2 = v2 >= 0 ? y0 - h : y0;
-      const bar = `<rect class="${barClass(m2, row, k)}" x="${f(rectX(x, bw))}" y="${f(top2)}" width="${bw}" height="${f(h)}" rx="2"/>`;
+    const parts = row.values.map((v, k) => {
+      const x2 = gx + k * (bw + GAP);
+      const h = Math.max(Math.abs(y(v) - y0), v === 0 ? 0 : 1);
+      const top2 = v >= 0 ? y0 - h : y0;
+      const bar = `<rect class="${barClass(m, row, k)}" x="${f(rectX(x2, bw))}" y="${f(top2)}" width="${bw}" height="${f(h)}" rx="2"/>`;
       if (!labels) return bar;
-      const at3 = v2 >= 0 ? top2 - 4 : top2 + h + FS4.val + 1;
-      return bar + text("am-ch-val", X3(x + bw / 2), at3, m2.tick(v2), dir, ' text-anchor="middle"');
+      const at3 = v >= 0 ? top2 - 4 : top2 + h + FS4.val + 1;
+      return bar + text("am-ch-val", X3(x2 + bw / 2), at3, m.tick(v), dir, ' text-anchor="middle"');
     });
     const cat = categoryLabel(plan, i, row.label, cx, catTop, { X: X3, rtl, dir });
-    body.push(rowGroup(m2, row, i, cat.tip, parts.join("") + cat.svg));
+    body.push(rowGroup(m, row, i, cat.tip, parts.join("") + cat.svg));
   }
   return { width: W3, height, body };
 }
-function horizontalBars(m2) {
-  const { rows, count: count2, range, labels, rtl, dir } = m2;
+function horizontalBars(m) {
+  const { rows, count: count2, range, labels, rtl, dir } = m;
   const n = rows.length;
   const lines = rows.map((r) => fitLines(r.label, CAT_WIDTH, 3, FS4.cat));
   const catW = Math.max(...lines.flat().map((l) => measure(l, FS4.cat)));
   const bh = BAR_H[count2];
   const rowH = Math.max(count2 * bh + (count2 - 1) * GAP + 12, Math.max(...lines.map((ls) => ls.length)) * LH5 + 6);
-  const rel = (v2) => (v2 - range.min) / (range.max - range.min) * PLOT_W;
-  const widths = rows.map((r) => r.values.map((v2) => labels ? measure(m2.tick(v2), FS4.val) : 0));
-  const after = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v2, k) => v2 >= 0 ? rel(v2) + 4 + widths[i][k] - PLOT_W : 0))) : 0;
-  const before = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v2, k) => v2 < 0 ? widths[i][k] + 4 - rel(v2) : 0))) : 0;
-  const tickHalf = Math.max(...range.ticks.map((t) => measure(m2.tick(t), FS4.tick))) / 2;
+  const rel = (v) => (v - range.min) / (range.max - range.min) * PLOT_W;
+  const widths = rows.map((r) => r.values.map((v) => labels ? measure(m.tick(v), FS4.val) : 0));
+  const after = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v, k) => v >= 0 ? rel(v) + 4 + widths[i][k] - PLOT_W : 0))) : 0;
+  const before = labels ? Math.max(0, ...rows.flatMap((r, i) => r.values.map((v, k) => v < 0 ? widths[i][k] + 4 - rel(v) : 0))) : 0;
+  const tickHalf = Math.max(...range.ticks.map((t) => measure(m.tick(t), FS4.tick))) / 2;
   const catX = PAD3 + catW;
   const axisX = Math.max(catX + 8 + before, PAD3 + tickHalf);
-  const legend = legendLayout(m2.names, Math.max(catW + PLOT_W, 240));
+  const legend = legendLayout(m.names, Math.max(catW + PLOT_W, 240));
   const W3 = Math.ceil(Math.max(axisX + PLOT_W + Math.max(after, tickHalf) + PAD3, (legend.width ?? 0) + 2 * PAD3));
   const plotTop = PAD3 + legend.height + 4;
   const plotBottom = plotTop + n * rowH;
   const height = plotBottom + 22 + PAD3;
   const X3 = mirror(W3, rtl);
-  const x = (v2) => axisX + rel(v2);
-  const x0 = x(0);
-  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
+  const x2 = (v) => axisX + rel(v);
+  const x0 = x2(0);
+  const body = [legendSvg(legend, PAD3, PAD3, m, W3)];
   for (const t of range.ticks) {
     const line = t === 0 ? "am-ch-zero" : "am-ch-grid";
-    body.push(`<line class="${line}" x1="${f(X3(x(t)))}" y1="${f(plotTop)}" x2="${f(X3(x(t)))}" y2="${f(plotBottom)}"/>`);
-    body.push(text("am-ch-tick", X3(x(t)), plotBottom + 14, m2.tick(t), dir, ' text-anchor="middle"'));
+    body.push(`<line class="${line}" x1="${f(X3(x2(t)))}" y1="${f(plotTop)}" x2="${f(X3(x2(t)))}" y2="${f(plotBottom)}"/>`);
+    body.push(text("am-ch-tick", X3(x2(t)), plotBottom + 14, m.tick(t), dir, ' text-anchor="middle"'));
   }
   for (const [i, row] of rows.entries()) {
     const top2 = plotTop + i * rowH;
     const gy = top2 + (rowH - (count2 * bh + (count2 - 1) * GAP)) / 2;
-    const parts = row.values.map((v2, k) => {
+    const parts = row.values.map((v, k) => {
       const by = gy + k * (bh + GAP);
-      const [from, to] = [Math.min(x0, x(v2)), Math.max(x0, x(v2))];
-      const w2 = Math.max(to - from, v2 === 0 ? 0 : 1);
-      const bar = `<rect class="${barClass(m2, row, k)}" x="${f(rtl ? W3 - from - w2 : from)}" y="${f(by)}" width="${f(w2)}" height="${bh}" rx="2"/>`;
+      const [from, to] = [Math.min(x0, x2(v)), Math.max(x0, x2(v))];
+      const w2 = Math.max(to - from, v === 0 ? 0 : 1);
+      const bar = `<rect class="${barClass(m, row, k)}" x="${f(rtl ? W3 - from - w2 : from)}" y="${f(by)}" width="${f(w2)}" height="${bh}" rx="2"/>`;
       if (!labels) return bar;
-      const end = v2 >= 0 ? x(v2) + 4 : x(v2) - 4;
-      return bar + text("am-ch-val", X3(end), by + bh / 2, m2.tick(v2), dir, ` text-anchor="${v2 >= 0 ? "start" : "end"}" dominant-baseline="central"`);
+      const end = v >= 0 ? x2(v) + 4 : x2(v) - 4;
+      return bar + text("am-ch-val", X3(end), by + bh / 2, m.tick(v), dir, ` text-anchor="${v >= 0 ? "start" : "end"}" dominant-baseline="central"`);
     });
     const first = top2 + rowH / 2 - (lines[i].length - 1) * LH5 / 2;
-    const name2 = lines[i].map((l, j) => text("am-ch-cat", X3(catX), first + j * LH5, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
-    body.push(rowGroup(m2, row, i, tooltip(row.label, lines[i].join(" ")), parts.join("") + name2));
+    const name2 = lines[i].map((l, j2) => text("am-ch-cat", X3(catX), first + j2 * LH5, l, dir, ' text-anchor="end" dominant-baseline="central"')).join("");
+    body.push(rowGroup(m, row, i, tooltip(row.label, lines[i].join(" ")), parts.join("") + name2));
   }
   return { width: W3, height, body };
 }
@@ -8886,7 +9048,7 @@ var COLUMN_END = 0.8;
 function drawLines(data, { unit = "", dir = "ltr", label }) {
   const { rows } = data;
   const count2 = rows[0].values.length;
-  const m2 = {
+  const m = {
     rows,
     count: count2,
     names: data.series ?? [],
@@ -8896,9 +9058,9 @@ function drawLines(data, { unit = "", dir = "ltr", label }) {
     dir,
     anyHi: rows.some((r) => r.hi)
   };
-  m2.tick = (v2) => `${fmt(v2)}${unit}`;
-  m2.carries = (row) => row.hi || count2 === 1 && rows.length <= MAX_VALUE_LABELS2;
-  const box = lineChart(m2);
+  m.tick = (v) => `${fmt(v)}${unit}`;
+  m.carries = (row) => row.hi || count2 === 1 && rows.length <= MAX_VALUE_LABELS2;
+  const box = lineChart(m);
   return `${svgOpen(box.width, box.height, label, dir)}${box.body.join("")}</svg>`;
 }
 function shownRows(rows, step) {
@@ -8918,19 +9080,19 @@ function planAxis(rows, slot) {
   const shown2 = labels.map((l) => shorten(l, SLANT_MAX, FS4.cat));
   return { show, lines: null, shown: shown2, widths: shown2.map((l) => measure(l, FS4.cat)) };
 }
-function valueLabels(m2, X3, x, values, ys, { valleys, end, bottom }) {
-  const label = (k, px2, py, extra) => text(`am-ch-val am-ch-s${k + 1}`, X3(px2), py, m2.tick(values[k]), m2.dir, extra);
-  if (ys.length === 1) return text("am-ch-val", X3(x), valleys[0] ? ys[0] + LABEL_GAP + FS4.val : ys[0] - LABEL_GAP, m2.tick(values[0]), m2.dir, ' text-anchor="middle"');
-  const order = ys.map((y2, k) => k).sort((a3, b) => ys[a3] - ys[b]);
+function valueLabels(m, X3, x2, values, ys, { valleys, end, bottom }) {
+  const label = (k, px2, py, extra) => text(`am-ch-val am-ch-s${k + 1}`, X3(px2), py, m.tick(values[k]), m.dir, extra);
+  if (ys.length === 1) return text("am-ch-val", X3(x2), valleys[0] ? ys[0] + LABEL_GAP + FS4.val : ys[0] - LABEL_GAP, m.tick(values[0]), m.dir, ' text-anchor="middle"');
+  const order = ys.map((y, k) => k).sort((a3, b) => ys[a3] - ys[b]);
   const at3 = order.map((k) => ys[k]);
-  for (let j = 1; j < at3.length; j++) at3[j] = Math.max(at3[j], at3[j - 1] + MIN_APART);
+  for (let j2 = 1; j2 < at3.length; j2++) at3[j2] = Math.max(at3[j2], at3[j2 - 1] + MIN_APART);
   let limit = bottom;
-  for (let j = at3.length - 1; j >= 0; j--) {
-    at3[j] = Math.min(at3[j], limit);
-    limit = at3[j] - MIN_APART;
+  for (let j2 = at3.length - 1; j2 >= 0; j2--) {
+    at3[j2] = Math.min(at3[j2], limit);
+    limit = at3[j2] - MIN_APART;
   }
-  const [px, anchor] = end === "end" ? [x + DOT_HI + LABEL_SIDE, "start"] : [x - DOT_HI - LABEL_SIDE, "end"];
-  return order.map((k, j) => label(k, px, at3[j], ` text-anchor="${anchor}" dominant-baseline="central"`)).join("");
+  const [px, anchor] = end === "end" ? [x2 + DOT_HI + LABEL_SIDE, "start"] : [x2 - DOT_HI - LABEL_SIDE, "end"];
+  return order.map((k, j2) => label(k, px, at3[j2], ` text-anchor="${anchor}" dominant-baseline="central"`)).join("");
 }
 function segment(X3, [x0, y0], [x1, y1], [hi0, hi1], k) {
   const len = Math.hypot(x1 - x0, y1 - y0);
@@ -8938,26 +9100,26 @@ function segment(X3, [x0, y0], [x1, y1], [hi0, hi1], k) {
   const [r0, r1] = [hi0 ? DOT_HI : DOT2, hi1 ? DOT_HI : DOT2];
   return `<path class="am-ch-line am-ch-s${k + 1}" d="M${f(X3(x0 + dx * r0))},${f(y0 + dy * r0)} L${f(X3(x1 - dx * r1))},${f(y1 - dy * r1)}"/>`;
 }
-function lineChart(m2) {
-  const { rows, range, rtl, dir } = m2;
+function lineChart(m) {
+  const { rows, range, rtl, dir } = m;
   const n = rows.length;
   const slot = Math.min(Math.floor(MAX_WIDTH / n), SLOT_MAX);
   const plan = planAxis(rows, slot);
-  const labelled = rows.map((r) => m2.carries(r));
+  const labelled = rows.map((r) => m.carries(r));
   const anyLabels = labelled.some(Boolean);
-  const valueW = rows.map((r, i) => labelled[i] ? Math.max(...r.values.map((v2) => measure(m2.tick(v2), FS4.val, { bold: m2.count > 1 }))) : 0);
-  const tickW = Math.max(...range.ticks.map((t) => measure(m2.tick(t), FS4.tick)));
+  const valueW = rows.map((r, i) => labelled[i] ? Math.max(...r.values.map((v) => measure(m.tick(v), FS4.val, { bold: m.count > 1 }))) : 0);
+  const tickW = Math.max(...range.ticks.map((t) => measure(m.tick(t), FS4.tick)));
   const columnEnd = (i) => (i + 0.5) / n > COLUMN_END ? "start" : "end";
   const over2 = rows.map((r, i) => {
     const half = Math.max(plan.show[i] ? plan.lines ? plan.widths[i] / 2 : 0 : 0, valueW[i] / 2);
     const slanted = plan.show[i] && !plan.lines ? plan.widths[i] * COS + FS4.cat * SIN - 3 : 0;
-    const column = valueW[i] && m2.count > 1 ? valueW[i] + DOT_HI + LABEL_SIDE : 0;
+    const column = valueW[i] && m.count > 1 ? valueW[i] + DOT_HI + LABEL_SIDE : 0;
     const [left, right] = columnEnd(i) === "end" ? [0, column] : [column, 0];
     return { left: Math.max(half, slanted, left) - (i + 0.5) * slot, right: Math.max(half, right) - (n - i - 0.5) * slot };
   });
   const axisX = Math.max(PAD3 + tickW + 6, PAD3 + Math.max(...over2.map((o) => o.left)));
   const plotW = n * slot;
-  const legend = legendLayout(m2.names, Math.max(plotW + tickW, 240));
+  const legend = legendLayout(m.names, Math.max(plotW + tickW, 240));
   const W3 = Math.ceil(Math.max(axisX + plotW + Math.max(PAD3, 2 + Math.max(...over2.map((o) => o.right))), (legend.width ?? 0) + 2 * PAD3));
   const plotTop = PAD3 + legend.height + (anyLabels ? 18 : 6);
   const plotBottom = plotTop + PLOT_H;
@@ -8965,19 +9127,19 @@ function lineChart(m2) {
   const catH = plan.lines ? Math.max(...plan.lines.map((ls) => ls ? ls.length : 0)) * LH5 + 4 : Math.max(...plan.shown.map((l, i) => plan.show[i] ? measure(l, FS4.cat) : 0)) * SIN + 12;
   const height = catTop + catH + PAD3;
   const X3 = mirror(W3, rtl);
-  const y2 = (v2) => plotTop + (range.max - v2) / (range.max - range.min) * PLOT_H;
+  const y = (v) => plotTop + (range.max - v) / (range.max - range.min) * PLOT_H;
   const cx = (i) => axisX + (i + 0.5) * slot;
-  const body = [legendSvg(legend, PAD3, PAD3, m2, W3)];
-  body.push(...valueAxis(m2, { axisX, width: plotW, y: y2, W: W3, X: X3 }));
+  const body = [legendSvg(legend, PAD3, PAD3, m, W3)];
+  body.push(...valueAxis(m, { axisX, width: plotW, y, W: W3, X: X3 }));
   for (const [i, row] of rows.entries()) {
     const parts = [];
     if (row.hi) parts.push(`<line class="am-ch-guide" x1="${f(X3(cx(i)))}" y1="${f(plotTop)}" x2="${f(X3(cx(i)))}" y2="${f(plotBottom)}"/>`);
-    if (i > 0) parts.push(...row.values.map((v2, k) => segment(X3, [cx(i - 1), y2(rows[i - 1].values[k])], [cx(i), y2(v2)], [rows[i - 1].hi, row.hi], k)));
-    parts.push(...row.values.map((v2, k) => `<circle class="am-ch-dot am-ch-s${k + 1}" cx="${f(X3(cx(i)))}" cy="${f(y2(v2))}" r="${row.hi ? DOT_HI : DOT2}"/>`));
+    if (i > 0) parts.push(...row.values.map((v, k) => segment(X3, [cx(i - 1), y(rows[i - 1].values[k])], [cx(i), y(v)], [rows[i - 1].hi, row.hi], k)));
+    parts.push(...row.values.map((v, k) => `<circle class="am-ch-dot am-ch-s${k + 1}" cx="${f(X3(cx(i)))}" cy="${f(y(v))}" r="${row.hi ? DOT_HI : DOT2}"/>`));
     if (labelled[i]) {
-      const around2 = (j, k) => rows[j]?.values[k];
-      const valleys = row.values.map((v2, k) => i > 0 && i < n - 1 && around2(i - 1, k) > v2 && around2(i + 1, k) > v2);
-      parts.push(valueLabels(m2, X3, cx(i), row.values, row.values.map(y2), { valleys, end: columnEnd(i), bottom: plotBottom }));
+      const around2 = (j2, k) => rows[j2]?.values[k];
+      const valleys = row.values.map((v, k) => i > 0 && i < n - 1 && around2(i - 1, k) > v && around2(i + 1, k) > v);
+      parts.push(valueLabels(m, X3, cx(i), row.values, row.values.map(y), { valleys, end: columnEnd(i), bottom: plotBottom }));
     }
     let tip = "";
     if (plan.show[i]) {
@@ -9007,9 +9169,9 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
   const anyHi = rows.some((r) => r.hi);
   const lines = rows.map((r) => fitLines(r.label, LABEL_MAX2, 2, FS4.legend));
   const labelW = Math.max(...lines.flat().map((l) => measure(l, FS4.legend)));
-  const shown2 = values.map((v2) => `${fmt(v2)}${unit}`);
+  const shown2 = values.map((v) => `${fmt(v)}${unit}`);
   const asShares = unit === "%";
-  const shares = asShares ? [] : values.map((v2) => percent(v2, total));
+  const shares = asShares ? [] : values.map((v) => percent(v, total));
   const valueW = Math.max(...shown2.map((s) => measure(s, FS4.legend)));
   const shareW = asShares ? 0 : Math.max(...shares.map((s) => measure(s, FS4.legend)));
   const heights = lines.map((ls) => Math.max(ls.length * LH5 + ROW_PAD, 24));
@@ -9034,7 +9196,7 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
     const parts = [];
     if (span > 0) parts.push(`<path class="am-ch-slice am-ch-s${i + 1}" d="${slice(turn, turn + span)}"/>`);
     parts.push(`<rect class="am-ch-sw am-ch-s${i + 1}" x="${f(rtl ? W3 - lx - 10 : lx)}" y="${f(mid2 - 5)}" width="10" height="10" rx="2"/>`);
-    parts.push(...lines[i].map((l, j) => text("am-ch-leg", X3(lx + SW), first + j * LH5, l, dir, ' dominant-baseline="central"')));
+    parts.push(...lines[i].map((l, j2) => text("am-ch-leg", X3(lx + SW), first + j2 * LH5, l, dir, ' dominant-baseline="central"')));
     parts.push(text("am-ch-num", X3(valueX), mid2, shown2[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     if (!asShares) parts.push(text("am-ch-num", X3(shareX), mid2, shares[i], dir, ' text-anchor="end" dominant-baseline="central"'));
     body.push(stepGroup(i, `am-ch-row${anyHi ? row.hi ? " is-hi" : " is-dim" : ""}`, tooltip(row.label, lines[i].join(" ")), parts.join("")));
@@ -9044,12 +9206,12 @@ function drawPie(data, { unit = "", dir = "ltr", label }) {
   if (!asShares) body.push(totalText(fmt(total), unit, X3(cx), cy, dir));
   return `${svgOpen(W3, H3, label, dir)}${body.join("")}</svg>`;
 }
-function totalText(total, unit, x, y2, dir) {
+function totalText(total, unit, x2, y, dir) {
   const room = 1.6 * R_IN;
   const size = (str, max) => Math.max(DRAWING.totalMin, Math.min(max, Math.floor(room / measure(str, 1))));
-  const one = (str, at3, max) => text("am-ch-total", x, at3, str, dir, ` text-anchor="middle" dominant-baseline="central" style="font-size:${size(str, max)}px"`);
-  if (!unit || measure(`${total}${unit}`, DRAWING.totalFit) <= room) return one(`${total}${unit}`, y2, DRAWING.totalMax);
-  return one(total, y2 - 8, DRAWING.totalMax) + one(shorten(unit.trim(), room, DRAWING.totalUnit), y2 + 12, DRAWING.totalUnit);
+  const one = (str, at3, max) => text("am-ch-total", x2, at3, str, dir, ` text-anchor="middle" dominant-baseline="central" style="font-size:${size(str, max)}px"`);
+  if (!unit || measure(`${total}${unit}`, DRAWING.totalFit) <= room) return one(`${total}${unit}`, y, DRAWING.totalMax);
+  return one(total, y - 8, DRAWING.totalMax) + one(shorten(unit.trim(), room, DRAWING.totalUnit), y + 12, DRAWING.totalUnit);
 }
 
 // src/components/chart.js
@@ -9158,7 +9320,7 @@ function dataTable({ series, rows }, { type, unit }, words3) {
   const shares = pie && unit !== "%";
   const names2 = pie ? [series?.[0] ?? words3.value, ...shares ? [words3.share] : []] : series;
   const head = names2 ? `<thead><tr><td></td>${names2.map((s) => `<th scope="col">${esc(s)}</th>`).join("")}</tr></thead>` : "";
-  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v2) => cell(fmt(v2) + unit)).join("")}${shares ? cell(percent(r.values[0], total)) : ""}</tr>`);
+  const body = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th>${r.values.map((v) => cell(fmt(v) + unit)).join("")}${shares ? cell(percent(r.values[0], total)) : ""}</tr>`);
   return `<details class="am-ch-data${pie ? " am-ch-data--pie" : ""}"><summary>${esc(words3.data)}</summary><div class="am-table-wrap"><table>${head}<tbody>${body.join("")}</tbody></table></div></details>`;
 }
 
@@ -9195,7 +9357,7 @@ var CHOICES = Object.freeze({
   outline: ["left", "right"]
 });
 function applyOverrides(meta, overrides, choices = CHOICES) {
-  const set = Object.entries(overrides).filter(([, v2]) => v2 !== void 0);
+  const set = Object.entries(overrides).filter(([, v]) => v !== void 0);
   for (const [key, value] of set) {
     if (choices[key] && !choices[key].includes(String(value))) {
       throw new ParseError(`Invalid ${key} value "${value}". Choose one of: ${choices[key].join(" | ")}`, 0);
@@ -9243,8 +9405,8 @@ function frontmatterValue(source, key) {
   if (end === -1) return void 0;
   let value;
   for (const line of lines.slice(1, end)) {
-    const m2 = stripLineComment(line).trim().match(FRONT_ENTRY);
-    if (m2?.[1] === key) value = unquote(m2[2]);
+    const m = stripLineComment(line).trim().match(FRONT_ENTRY);
+    if (m?.[1] === key) value = unquote(m[2]);
   }
   return value;
 }
@@ -9256,9 +9418,9 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith("#")) continue;
-    const m2 = raw.match(FRONT_ENTRY);
-    if (!m2) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
-    entries[m2[1]] = { value: coerce(m2[1], unquote(m2[2])), line: i + 1 };
+    const m = raw.match(FRONT_ENTRY);
+    if (!m) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
+    entries[m[1]] = { value: coerce(m[1], unquote(m[2])), line: i + 1 };
   }
   const meta = { ...base };
   for (const [key, { value, line }] of Object.entries(entries)) {
@@ -9296,7 +9458,7 @@ function splitSections(lines, start, errors) {
     const colonName = colon?.[2].toLowerCase();
     if (colon && COMPONENTS.has(colonName)) {
       flushMd();
-      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      const close = findColonClose(lines, i, colon[1], colonName);
       if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
       current.blocks.push({ type: "fence", lang: colonName, args: (colon[3] ?? "").trim(), text: lines.slice(i + 1, close).join("\n"), line: i + 1 });
       i = close;
@@ -9384,10 +9546,48 @@ function checkTables(lines, first) {
     return [];
   });
 }
+var FENCE_MARK2 = /^ {0,3}(`{3,}|~{3,})/;
+function fenceClose2(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK2)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+function findColonClose(lines, openIdx, marker, name2) {
+  const stack = [marker.length];
+  for (let j2 = openIdx + 1; j2 < lines.length; j2++) {
+    if (name2 === "ask") {
+      const end = previewEnd(lines, j2);
+      if (end !== -1) {
+        j2 = end;
+        continue;
+      }
+    }
+    const line = lines[j2];
+    const mark = line.match(FENCE_MARK2)?.[1];
+    if (mark) {
+      const close2 = fenceClose2(lines, j2, mark);
+      if (close2 === -1) continue;
+      j2 = close2;
+      continue;
+    }
+    const open = line.match(COLON_OPEN);
+    if (open) {
+      stack.push(open[1].length);
+      continue;
+    }
+    const close = line.match(COLON_CLOSE);
+    if (!close || close[1].length < stack[stack.length - 1]) continue;
+    stack.pop();
+    if (!stack.length) return j2;
+  }
+  return -1;
+}
 function findFenceClose(lines, openIdx, marker) {
   const closeRe = new RegExp(`^${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
-  for (let j = openIdx + 1; j < lines.length; j++) {
-    if (closeRe.test(lines[j])) return j;
+  for (let j2 = openIdx + 1; j2 < lines.length; j2++) {
+    if (closeRe.test(lines[j2])) return j2;
   }
   return -1;
 }
@@ -9407,9 +9607,9 @@ function extractTitle(intro, meta) {
   const [first, ...rest] = intro;
   const lines = first.text.split("\n");
   const idx = lines.findIndex((l) => l.trim());
-  const m2 = lines[idx]?.match(/^#\s+(.+)$/);
-  if (!m2) return intro;
-  meta.title = m2[1].trim();
+  const m = lines[idx]?.match(/^#\s+(.+)$/);
+  if (!m) return intro;
+  meta.title = m[1].trim();
   const remaining = lines.slice(idx + 1);
   if (!remaining.some((l) => l.trim())) return rest;
   return [{ ...first, text: remaining.join("\n"), line: first.line + idx + 1 }, ...rest];
@@ -9486,10 +9686,10 @@ ${head}<div class="am-panel-body">${panel.html}</div>
 }
 var RESERVED = /* @__PURE__ */ new Set(["template", "theme", "style", "mode", "cols", "title", "subtitle", "lang", "outline", "file"]);
 function headHtml(meta, introHtml, language = {}) {
-  const extras = Object.entries(meta).filter(([k, v2]) => !RESERVED.has(k) && v2 !== "");
+  const extras = Object.entries(meta).filter(([k, v]) => !RESERVED.has(k) && v !== "");
   const names2 = language.metaKeys ?? {};
-  const value = (v2) => language.dir === "rtl" ? `<bdi${hasRtl(v2) ? ' dir="rtl"' : ""}>${esc(v2)}</bdi>` : esc(v2);
-  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k, v2]) => `<span><b>${esc(names2[k.toLowerCase()] ?? k)}</b>${value(v2)}</span>`).join("")}</div>` : "";
+  const value = (v) => language.dir === "rtl" ? `<bdi${hasRtl(v) ? ' dir="rtl"' : ""}>${esc(v)}</bdi>` : esc(v);
+  const metaRow = extras.length ? `<div class="am-head-meta">${extras.map(([k, v]) => `<span><b>${esc(names2[k.toLowerCase()] ?? k)}</b>${value(v)}</span>`).join("")}</div>` : "";
   const sub = meta.subtitle ? `<p class="am-sub">${esc(meta.subtitle)}</p>` : "";
   const intro = introHtml ? `<div class="am-intro am-md">${introHtml}</div>` : "";
   return `<header class="am-head"><h1>${esc(meta.title || "Untitled")}</h1>${sub}${metaRow}${intro}</header>`;
@@ -9522,7 +9722,7 @@ function tableColumns(blocks) {
   });
   return Math.max(0, ...counts);
 }
-var svgWidth = (html) => Math.max(0, ...[...html.matchAll(/<svg\b[^>]*?\swidth="(\d+(?:\.\d+)?)"/g)].map((m2) => Number(m2[1])));
+var svgWidth = (html) => Math.max(0, ...[...html.matchAll(/<svg\b[^>]*?\swidth="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1])));
 function minSpan(panel) {
   const tableCols = tableColumns(panel.blocks ?? []);
   const byTable = tableCols >= WIDE_TABLE_COLS ? Math.ceil(tableCols / TABLE_COLS_PER_SPAN) : 1;
@@ -9574,7 +9774,7 @@ var TEMPLATES = { sheet, doc };
 
 // src/themes/index.js
 var block = (selector, vars) => `${selector} {
-${Object.entries(vars).map(([k, v2]) => `  ${k}: ${v2};`).join("\n")}
+${Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join("\n")}
 }`;
 function tokenCss(sel, { common = {}, light = {}, dark = {} }, fixedMode) {
   const baseScheme = fixedMode === "dark" ? "dark" : "light";
@@ -9714,7 +9914,7 @@ var ABBR = /\b(e\.g|i\.e|etc|vs|cf|approx|Fig|No)\./gi;
 var PASSIVE = /\b(?:am|is|are|was|were|be|been|being)\s+(?:\w+ly\s+)?(\w+ed|known|done|made|given|taken|seen|written|built|shown|sent|kept|held|found|set|put|run|begun|chosen|driven|broken)\b/i;
 var EN_RE = Object.entries(EN_WORDS3).sort((a3, b) => b[0].length - a3[0].length).map(([word, suggestion]) => ({ re: new RegExp(`\\b${word.replace(/ /g, "\\s+")}\\b`, "gi"), word, suggestion }));
 function splitSentences(text2) {
-  const masked = text2.replace(ABBR, (m2) => m2.replace(/\./g, "\0"));
+  const masked = text2.replace(ABBR, (m) => m.replace(/\./g, "\0"));
   const parts = masked.match(/[^。！？；!?;]+?(?:[。！？；!?;]+|\.(?=\s|$)|$)|[^.]+?\.(?=\s|$)/g) ?? [];
   return parts.map((s) => s.replace(/\u0000/g, ".").trim()).filter(Boolean);
 }
@@ -9822,9 +10022,9 @@ function checkUnit(text2, line, kind2, out, family) {
     }
   }
   const lexical = [
-    ...(englishRules ? EN_RE : []).flatMap(({ re: re3, suggestion }) => [...text2.matchAll(re3)].map((m2) => ({ index: m2.index, rule: "word", message: `not recommended: "${m2[0]}"`, suggestion }))),
-    ...(chineseRules ? ZH_LIGHT_VERBS : []).flatMap(({ re: re3, label }) => [...text2.matchAll(re3)].map((m2) => ({ index: m2.index, rule: "word", message: `light verb "${m2[0]}" (${label})`, suggestion: `use "${m2[1]}"` }))),
-    ...(chineseRules ? ZH_WORDS : []).flatMap(({ re: re3, suggestion }) => [...text2.matchAll(re3)].map((m2) => ({ index: m2.index, rule: "word", message: `not recommended: "${m2[0]}"`, suggestion })))
+    ...(englishRules ? EN_RE : []).flatMap(({ re: re3, suggestion }) => [...text2.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion }))),
+    ...(chineseRules ? ZH_LIGHT_VERBS : []).flatMap(({ re: re3, label }) => [...text2.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `light verb "${m[0]}" (${label})`, suggestion: `use "${m[1]}"` }))),
+    ...(chineseRules ? ZH_WORDS : []).flatMap(({ re: re3, suggestion }) => [...text2.matchAll(re3)].map((m) => ({ index: m.index, rule: "word", message: `not recommended: "${m[0]}"`, suggestion })))
   ];
   out.push(...lexical.sort((a3, b) => a3.index - b.index).map(({ index, ...w2 }) => ({ line, ...w2 })));
   for (const s of sentences) {
@@ -9860,10 +10060,10 @@ function readPage(html) {
   const attr = (name2) => root.match(new RegExp(`\\s${name2}="([^"]+)"`))?.[1];
   const video = /\sdata-video\b/.test(root);
   const open = s.lastIndexOf(SOURCE_OPEN);
-  const m2 = open === -1 ? null : s.slice(open).match(SOURCE_RE);
+  const m = open === -1 ? null : s.slice(open).match(SOURCE_RE);
   const before = open === -1 ? "" : s.slice(0, open).trimEnd();
   return {
-    source: m2 ? unescapeHtml(m2[1]) : null,
+    source: m ? unescapeHtml(m[1]) : null,
     video,
     // A <main class="am-doc"> in the body does not count; the template's <main> always comes before the body.
     template: video ? "video" : s.match(/<main class="am-(doc|sheet)\b/)?.[1],
@@ -10043,12 +10243,12 @@ function parseDiff(text2, start) {
       title ||= headPath(line) || from;
       return meta();
     }
-    const m2 = line.match(HUNK);
-    if (m2) {
+    const m = line.match(HUNK);
+    if (m) {
       closeHunk();
-      o = Number(m2[1]);
-      n = Number(m2[3]);
-      hunk = { header: m2[0], want: { o: m2[2] === void 0 ? 1 : Number(m2[2]), n: m2[4] === void 0 ? 1 : Number(m2[4]) }, got: { o: 0, n: 0 } };
+      o = Number(m[1]);
+      n = Number(m[3]);
+      hunk = { header: m[0], want: { o: m[2] === void 0 ? 1 : Number(m[2]), n: m[4] === void 0 ? 1 : Number(m[4]) }, got: { o: 0, n: 0 } };
       return rows.push({ kind: "hunk", text: line });
     }
     if (line.startsWith("@@")) fail(`line ${i + 1} is not a hunk header; write it as @@ -60,4 +60,5 @@ (old start and count, new start and count)`);
@@ -10105,10 +10305,10 @@ var CodeError = class extends Error {
   }
 };
 function parseRange(value, name2) {
-  const m2 = String(value).match(/^(\d+)(?:-(\d+))?$/);
-  if (!m2) throw new CodeError(`${name2}="${value}" is not a line range; write ${name2}=18-30 or ${name2}=18`);
-  const from = Number(m2[1]);
-  const to = m2[2] === void 0 ? from : Number(m2[2]);
+  const m = String(value).match(/^(\d+)(?:-(\d+))?$/);
+  if (!m) throw new CodeError(`${name2}="${value}" is not a line range; write ${name2}=18-30 or ${name2}=18`);
+  const from = Number(m[1]);
+  const to = m[2] === void 0 ? from : Number(m[2]);
   if (from < 1 || to < from) throw new CodeError(`${name2}="${value}": the first line must be 1 or more and not after the last line`);
   return { from, to };
 }
@@ -10177,7 +10377,7 @@ var LINE_SPAN = /<span class="am-ln[^"]*"[^>]*>([\s\S]*?)<\/span>/g;
 function readEmbeddedCode(html) {
   return new Map([...String(html).matchAll(EMBEDDED_BLOCK)].map(([, src, lines = "", inner]) => [
     `${unescapeHtml(src)}#${lines}`,
-    [...inner.matchAll(LINE_SPAN)].map((m2) => unescapeHtml(m2[1]))
+    [...inner.matchAll(LINE_SPAN)].map((m) => unescapeHtml(m[1]))
   ]));
 }
 function renderCode({ lang, args, text: text2 }, { baseDir = process.cwd(), known = /* @__PURE__ */ new Map(), ui = {}, copy = true } = {}) {
@@ -10334,7 +10534,7 @@ function inlineImages(html, { baseDir = process.cwd(), known = /* @__PURE__ */ n
   });
 }
 function remoteImages(html) {
-  return [...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m2) => decodeRef(m2[1] ?? m2[2] ?? m2[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
+  return [...html.matchAll(/<img\b[^>]*?\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)].map((m) => decodeRef(m[1] ?? m[2] ?? m[3])).filter((ref) => /^(?:https?:)?\/\//i.test(ref));
 }
 function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
@@ -10350,7 +10550,7 @@ var K3 = Uint32Array.from({ length: 64 }, (_2, i) => {
   }
   return Math.floor(Math.cbrt(n) % 1 * 2 ** 32);
 });
-var rotr = (x, n) => x >>> n | x << 32 - n;
+var rotr = (x2, n) => x2 >>> n | x2 << 32 - n;
 function sha256Base64(text2) {
   const data = new TextEncoder().encode(text2);
   const blocks = Math.ceil((data.length + 9) / 64);
@@ -10382,12 +10582,12 @@ function sha256Base64(text2) {
       b = a3;
       a3 = t1 + t2 >>> 0;
     }
-    [a3, b, c2, d, e, f2, g, hh].forEach((v2, i) => {
-      h[i] = h[i] + v2 >>> 0;
+    [a3, b, c2, d, e, f2, g, hh].forEach((v, i) => {
+      h[i] = h[i] + v >>> 0;
     });
   }
   const out = new Uint8Array(32);
-  h.forEach((v2, i) => new DataView(out.buffer).setUint32(i * 4, v2));
+  h.forEach((v, i) => new DataView(out.buffer).setUint32(i * 4, v));
   return btoa(String.fromCharCode(...out));
 }
 
@@ -10545,8 +10745,17 @@ function renderFence(block2, ctx) {
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at3 = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at3, component: lang, message });
-    const html = comp.render(text2, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? "ltr", video: ctx.video, warn });
-    return ctx.video ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
+    const html = comp.render(text2, {
+      args,
+      uid: () => `am${++ctx.seq}`,
+      ui: ctx.ui,
+      dir: ctx.dir ?? "ltr",
+      video: ctx.video,
+      warn,
+      line,
+      render: (blocks) => renderBlocks(blocks, ctx)
+    });
+    return ctx.video || comp.scalesOwnSvg ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -10757,9 +10966,9 @@ function coerce2(key, raw, themes2) {
   if (!spec) throw new ConfigError(`No setting named "${key}". Available: ${Object.keys(CONFIG_KEYS).join(" | ")}`);
   if (spec.type === "bool") {
     if (typeof raw === "boolean") return raw;
-    const v3 = String(raw).trim().toLowerCase();
-    if (TRUE.has(v3)) return true;
-    if (FALSE.has(v3)) return false;
+    const v2 = String(raw).trim().toLowerCase();
+    if (TRUE.has(v2)) return true;
+    if (FALSE.has(v2)) return false;
     throw new ConfigError(`${key} accepts only on / off`);
   }
   if (spec.type === "number") {
@@ -10770,10 +10979,10 @@ function coerce2(key, raw, themes2) {
     }
     return n;
   }
-  const v2 = String(raw).trim();
+  const v = String(raw).trim();
   const choices = configChoices(key, themes2);
-  if (!choices.includes(v2)) throw new ConfigError(`Invalid ${key} value "${v2}". Choose one of: ${choices.join(" | ")}`);
-  return v2;
+  if (!choices.includes(v)) throw new ConfigError(`Invalid ${key} value "${v}". Choose one of: ${choices.join(" | ")}`);
+  return v;
 }
 function readStored(env) {
   const file = configPath(env);
@@ -10789,12 +10998,12 @@ function readConfig(env = process.env, themes2 = loadThemes(amHome(env))) {
   const { stored, warning } = readStored(env);
   const values = defaults();
   const warnings = [warning];
-  for (const [k, v2] of Object.entries(stored)) {
+  for (const [k, v] of Object.entries(stored)) {
     if (!CONFIG_KEYS[k]) continue;
     try {
-      values[k] = coerce2(k, v2, themes2);
+      values[k] = coerce2(k, v, themes2);
     } catch {
-      if (k === "theme") warnings.push(`The default theme "${v2}" cannot be used (${themes2.problem(String(v2), "page")}); using ${values.theme}`);
+      if (k === "theme") warnings.push(`The default theme "${v}" cannot be used (${themes2.problem(String(v), "page")}); using ${values.theme}`);
     }
   }
   return { values, stored, warning: warnings.filter(Boolean).join("; ") || void 0, path: configPath(env) };
@@ -11279,9 +11488,9 @@ function splitNarration(blocks) {
     }
     const rest = [];
     b.text.split("\n").forEach((raw, i) => {
-      const m2 = raw.match(NARRATION);
-      if (m2 && m2[1].trim()) beats.push(beat(m2[1].trim(), b.line + i));
-      else if (!m2) rest.push(raw);
+      const m = raw.match(NARRATION);
+      if (m && m[1].trim()) beats.push(beat(m[1].trim(), b.line + i));
+      else if (!m) rest.push(raw);
     });
     if (rest.some((l) => l.trim())) out.push({ ...b, text: rest.join("\n") });
   }
@@ -11294,7 +11503,7 @@ function normalizeNarrationText(raw) {
   return raw.replace(FOCUS, "$1").replace(/\s+/g, " ").trim();
 }
 function beat(raw, line) {
-  const focus = [...raw.matchAll(FOCUS)].map((m2) => m2[1].trim());
+  const focus = [...raw.matchAll(FOCUS)].map((m) => m[1].trim());
   return { raw, text: normalizeNarrationText(raw), focus: focus[0] ?? null, line };
 }
 function estimateSeconds(text2) {
@@ -11341,7 +11550,7 @@ function buildTimeline(video, durations) {
   return { duration: round3(t), title, scenes };
 }
 var allBeats = (video) => [...video.introBeats, ...video.scenes.flatMap((s) => s.beats)];
-var round3 = (x) => Math.round(x * 1e3) / 1e3;
+var round3 = (x2) => Math.round(x2 * 1e3) / 1e3;
 
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
@@ -11489,7 +11698,7 @@ function localSpeech(env) {
       let best = null;
       for (let i = 0; i < attempts; i++) {
         const samples = trimSilence(await request(text2));
-        if (!samples.some((x) => Math.abs(x) >= SILENCE)) continue;
+        if (!samples.some((x2) => Math.abs(x2) >= SILENCE)) continue;
         const ratio = samples.length / SAMPLE_RATE / expected;
         if (!best || Math.abs(Math.log(ratio)) < Math.abs(Math.log(best.ratio))) best = { samples, ratio };
         if (ratio >= LOCAL_RATIO[0] && ratio <= LOCAL_RATIO[1]) break;
@@ -11559,7 +11768,7 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
       }
       const samples = await mappedSamples(buf, entry.file, { which, runCommand });
       const trimmed = trimSilence(samples);
-      if (!trimmed.some((x) => Math.abs(x) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
+      if (!trimmed.some((x2) => Math.abs(x2) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
       return trimmed;
     }
   };
@@ -11664,10 +11873,10 @@ function espeakVoices() {
   return parseEspeakVoices(spawnSync2("espeak-ng", ["--voices"], { encoding: "utf8" }).stdout || "");
 }
 function parseMacVoices(out) {
-  return out.split("\n").map((l) => l.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9]{2,4})\s+#/)).filter(Boolean).map((m2) => ({ name: m2[1].trim(), locale: m2[2] }));
+  return out.split("\n").map((l) => l.match(/^(.+?)\s+([a-z]{2,3}[_-][A-Za-z0-9]{2,4})\s+#/)).filter(Boolean).map((m) => ({ name: m[1].trim(), locale: m[2] }));
 }
 function parseEspeakVoices(out) {
-  return out.split("\n").map((l) => l.match(/^\s*\d+\s+(\S+)\s/)).filter(Boolean).map((m2) => m2[1]);
+  return out.split("\n").map((l) => l.match(/^\s*\d+\s+(\S+)\s/)).filter(Boolean).map((m) => m[1]);
 }
 var PREFERRED_VOICES = {
   zh: ["Tingting", "Ting-Ting", "Meijia", "Sinji"],
@@ -11682,26 +11891,26 @@ function macVoiceFor(voices, language) {
   const named = voiceHints(language)?.say;
   const wanted = [language, implied.region && `${implied.language}-${implied.region}`, named].filter(Boolean).map(localeKey);
   for (const locale of new Set(wanted)) {
-    const voice = bestVoice(voices.filter((v2) => localeKey(v2.locale) === locale), base);
+    const voice = bestVoice(voices.filter((v) => localeKey(v.locale) === locale), base);
     if (voice) return voice;
   }
-  return bestVoice(voices.filter((v2) => localeKey(v2.locale).split("_")[0] === base), base);
+  return bestVoice(voices.filter((v) => localeKey(v.locale).split("_")[0] === base), base);
 }
 function espeakVoiceFor(voices, language) {
   const base = baseLanguage(language);
   const name2 = voiceHints(language)?.espeak ?? base;
   if (!voices.length) return name2;
-  const installed = voices.includes(name2) || voices.includes(base) || voices.some((v2) => v2.startsWith(`${base}-`));
+  const installed = voices.includes(name2) || voices.includes(base) || voices.some((v) => v.startsWith(`${base}-`));
   return installed ? name2 : null;
 }
 var localeKey = (locale) => String(locale).toLowerCase().replace(/-/g, "_");
 function bestVoice(candidates, base) {
   if (!candidates.length) return null;
   for (const name2 of PREFERRED_VOICES[base] ?? []) {
-    const hit = candidates.find((v2) => stripName(v2.name) === name2);
+    const hit = candidates.find((v) => stripName(v.name) === name2);
     if (hit) return hit.name;
   }
-  const own = candidates.filter((v2) => !SHARED_VOICES.has(stripName(v2.name)));
+  const own = candidates.filter((v) => !SHARED_VOICES.has(stripName(v.name)));
   return (own[0] ?? candidates[0]).name;
 }
 var stripName = (name2) => name2.replace(/\s*[(（].*$/, "");
@@ -11763,10 +11972,10 @@ function resample(input) {
   const n = Math.floor(samples.length * SAMPLE_RATE / rate);
   const out = new Int16Array(n);
   for (let i = 0; i < n; i++) {
-    const x = i * rate / SAMPLE_RATE;
-    const a3 = Math.floor(x);
+    const x2 = i * rate / SAMPLE_RATE;
+    const a3 = Math.floor(x2);
     const b = Math.min(a3 + 1, samples.length - 1);
-    out[i] = Math.round(samples[a3] + (samples[b] - samples[a3]) * (x - a3));
+    out[i] = Math.round(samples[a3] + (samples[b] - samples[a3]) * (x2 - a3));
   }
   return out;
 }
@@ -11848,7 +12057,7 @@ function mixTrack(clips, starts, duration) {
   clips.forEach((clip, i) => {
     if (!clip) return;
     const s0 = Math.round(starts[i] * SAMPLE_RATE);
-    for (let j = 0; j < clip.length && s0 + j < total; j++) track[s0 + j] = clip[j];
+    for (let j2 = 0; j2 < clip.length && s0 + j2 < total; j2++) track[s0 + j2] = clip[j2];
   });
   return wav(track);
 }
@@ -11935,8 +12144,8 @@ function renderScenes(video, meta, timeline, ctx, ui) {
 var beatsOf = (video, i) => i === 0 ? video.introBeats : video.scenes[i - 1].beats;
 function captionHtml(raw) {
   return raw.split(/(\[[^\]\n]+\])/).map((part) => {
-    const m2 = part.match(/^\[([^\]]+)\]$/);
-    return m2 ? `<b>${esc(m2[1])}</b>` : esc(part);
+    const m = part.match(/^\[([^\]]+)\]$/);
+    return m ? `<b>${esc(m[1])}</b>` : esc(part);
   }).join("");
 }
 function formatClock(seconds) {
@@ -11946,7 +12155,7 @@ function formatClock(seconds) {
 function titleScene(meta, introHtml, { scenes, duration }, ui) {
   const mmss = formatClock(duration);
   const cells = [[ui.drawn, "Answer me with HTML"], [ui.date, timestamp().slice(0, 10)], [ui.scenes, String(scenes)], [ui.duration, mmss]];
-  const block2 = `<div class="amv-titleblock">${cells.map(([k, v2]) => `<div><b>${esc(k)}</b><span>${esc(v2)}</span></div>`).join("")}</div>`;
+  const block2 = `<div class="amv-titleblock">${cells.map(([k, v]) => `<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join("")}</div>`;
   return `<section class="amv-scene amv-scene--title" data-i="0">
 <div class="amv-title-wrap"><h1 class="amv-title">${esc(meta.title || "Answer me with HTML")}</h1>${meta.subtitle ? `<p class="amv-subtitle">${esc(meta.subtitle)}</p>` : ""}${introHtml ? `<div class="amv-intro">${introHtml}</div>` : ""}${block2}</div>
 </section>`;
@@ -12146,10 +12355,10 @@ ${tail}` : msg));
     chrome.on("close", (code, signal) => fail(`Chrome exited (${code ?? signal}) before it started`));
     chrome.stderr.on("data", (d) => {
       buf += d;
-      const m2 = buf.match(/DevTools listening on (ws:\/\/\S+)/);
-      if (m2) {
+      const m = buf.match(/DevTools listening on (ws:\/\/\S+)/);
+      if (m) {
         clearTimeout(timer);
-        resolve7(m2[1]);
+        resolve7(m[1]);
       }
     });
   });
@@ -12181,9 +12390,9 @@ function connect(url) {
             pending.delete(msgId);
             fail(new ExportError(`Chrome is not responding (${method} took more than ${CDP_TIMEOUT_MS / 1e3} seconds)`));
           }, CDP_TIMEOUT_MS);
-          pending.set(msgId, { ok: (v2) => {
+          pending.set(msgId, { ok: (v) => {
             clearTimeout(timer);
-            ok(v2);
+            ok(v);
           }, fail: (e) => {
             clearTimeout(timer);
             fail(e);
@@ -12357,12 +12566,12 @@ function slicePoints(pageHeight, boxes = [], maxHeight = MAX_SLICE) {
   return cuts;
 }
 function gapCut(start, target, boxes) {
-  let y2 = target;
+  let y = target;
   for (; ; ) {
-    const box = boxes.find((b) => y2 > b.top && y2 < b.bottom);
-    if (!box) return y2 > start ? y2 : null;
+    const box = boxes.find((b) => y > b.top && y < b.bottom);
+    if (!box) return y > start ? y : null;
     if (!(box.top > start)) return null;
-    y2 = box.top;
+    y = box.top;
   }
 }
 async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
@@ -12579,9 +12788,9 @@ var sameDirectory = (a3, b) => {
   if (resolve4(a3) === resolve4(b)) return true;
   try {
     if (realOrAncestor(a3) === realOrAncestor(b)) return true;
-    const x = statSync5(a3);
-    const y2 = statSync5(b);
-    return x.dev === y2.dev && x.ino === y2.ino;
+    const x2 = statSync5(a3);
+    const y = statSync5(b);
+    return x2.dev === y.dev && x2.ino === y.ino;
   } catch {
     return false;
   }
@@ -12628,10 +12837,10 @@ var DSH_PATH = /[\\/]\.dsh[\\/]profiles[\\/]([^\\/]+)[\\/]node_modules[\\/]((?:@
 var PROFILE_NAME = /^[\w.-]+$/;
 var PACKAGE_NAME = /^(@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*$/i;
 function dshUpdateCommand(scriptPath = "") {
-  const m2 = scriptPath.match(DSH_PATH);
-  if (!m2) return UPDATE_COMMANDS.dsh;
-  const pkg = m2[2].replace(/\\/g, "/");
-  return `dsh plugin --profile ${PROFILE_NAME.test(m2[1]) ? m2[1] : "<profile>"} up ${PACKAGE_NAME.test(pkg) ? pkg : "<package>"}`;
+  const m = scriptPath.match(DSH_PATH);
+  if (!m) return UPDATE_COMMANDS.dsh;
+  const pkg = m[2].replace(/\\/g, "/");
+  return `dsh plugin --profile ${PROFILE_NAME.test(m[1]) ? m[1] : "<profile>"} up ${PACKAGE_NAME.test(pkg) ? pkg : "<package>"}`;
 }
 function updateCommand(scriptPath = "") {
   const method = installMethod(scriptPath);
@@ -12867,13 +13076,13 @@ function lanRank(address) {
   if (a3 === 172 && b >= 16 && b <= 31) return 2;
   return 3;
 }
-var compareOctets = (x, y2) => {
-  const [p, q3] = [x, y2].map((address) => address.split(".").map(Number));
+var compareOctets = (x2, y) => {
+  const [p, q3] = [x2, y].map((address) => address.split(".").map(Number));
   const i = p.findIndex((n, k) => n !== q3[k]);
   return i === -1 ? 0 : p[i] - q3[i];
 };
 function lanIPv4Addresses(interfaces = networkInterfaces()) {
-  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("127.") && !address.startsWith("169.254.")).map(({ address }) => address))].sort((x, y2) => lanRank(x) - lanRank(y2) || compareOctets(x, y2));
+  return [...new Set(Object.values(interfaces).flatMap((entries) => entries ?? []).filter(({ address, family, internal }) => (family === "IPv4" || family === 4) && !internal && isIP(address) === 4 && address !== LAN_BIND && !address.startsWith("127.") && !address.startsWith("169.254.")).map(({ address }) => address))].sort((x2, y) => lanRank(x2) - lanRank(y) || compareOctets(x2, y));
 }
 function publicUrlOrigin(input) {
   const error = () => new ServeError("--public-url must be an http:// or https:// origin without a path, credentials, query or fragment");
@@ -13656,7 +13865,7 @@ ${USAGE}`);
     case "lint":
       return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case "config":
-      return cmdConfig([arg, ...rest].filter((x) => x !== void 0), ctx);
+      return cmdConfig([arg, ...rest].filter((x2) => x2 !== void 0), ctx);
     case "theme":
       return cmdTheme(arg, rest[0], opts, ctx);
     case "clean":
@@ -13742,8 +13951,8 @@ var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERS
 var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
 var draftsDir = (home) => join13(resolve6(home), "drafts");
 function draftTitle(src) {
-  const m2 = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
-  return m2?.[1] ?? "";
+  const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
+  return m?.[1] ?? "";
 }
 function nameSource({ file, title }) {
   return /[A-Za-z0-9]/.test(String(file ?? "")) ? file : title;
@@ -14217,7 +14426,7 @@ function summaryLine(result) {
   if (result.beats !== void 0) {
     return `video \xB7 ${meta.theme} \xB7 ${count(stats.panels, "scene")} \xB7 ${count(result.beats, "beat")} \xB7 ${result.duration.toFixed(1)}s \xB7 voice: ${result.voiceName}`;
   }
-  const comps = Object.entries(stats.components).map(([k, v2]) => `${k}\xD7${v2}`).join(" ");
+  const comps = Object.entries(stats.components).map(([k, v]) => `${k}\xD7${v}`).join(" ");
   return `${meta.template} \xB7 ${meta.theme} \xB7 ${count(stats.panels, "panel")}${comps ? ` \xB7 ${comps}` : ""}`;
 }
 var count = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
@@ -14334,7 +14543,7 @@ function reportError(e, fail) {
   }
   throw e;
 }
-var showValue = (v2) => typeof v2 === "boolean" ? v2 ? "on" : "off" : String(v2);
+var showValue = (v) => typeof v === "boolean" ? v ? "on" : "off" : String(v);
 function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   const [action, key, value] = args;
   try {
