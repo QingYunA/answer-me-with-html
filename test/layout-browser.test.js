@@ -876,6 +876,24 @@ test('e2e: the data table of a chart breaks a long label when it is short of roo
   assert.ok(state.scrolls <= 1, `the chart data table fits its panel, it scrolls ${state.scrolls}px`);
 });
 
+// Shorter ids fit in a sum of longest words, but the number columns hold their share above their own longest word, so at 840 to
+// 900 px the table came out wider than its panel unless the ids broke.
+test('e2e: the data table of a chart with shorter ids fits its panel at the widths where its number columns hold their share', { skip: SKIP, timeout: 120000 }, async () => {
+  if (!cdp) await launch();
+  const rows = ['job_1051223399_log_ends_at_plugin_install_and_keeps_going', 'key_field_missing_in_check_27030090071_of_the_nightly_run', 'async_tier_1051211796_web_command_1051211795_only_in_job_5']
+    .map((id, i) => `${id} | ${10 + i} | ${20 + i} | ${30 + i} | ${40 + i} | ${50 + i}`).join('\n');
+  const html = renderDoc(`---\ntitle: Chart ids\nlang: en\ncols: 3\n---\n## A Chart {span=2}\n\`\`\`chart bar\n | p50 | p75 | p90 | p95 | p99\n${rows}\n\`\`\`\n\n## B Neighbour\nShort text.\n`).html
+    .replace('<details class="am-ch-data"', '<details open class="am-ch-data"');
+  const file = join(tmp, 'chart-short-ids.html');
+  writeFileSync(file, html);
+  for (const width of [840, 860, 880, 900]) {
+    await open(file, width);
+    await waitFor(SETTLED, `the chart page to lay out at ${width}px`);
+    const scrolls = await evaluate(`(() => { const w = document.querySelector('.am-ch-data .am-table-wrap'); return w.scrollWidth - w.clientWidth; })()`);
+    assert.ok(scrolls <= 1, `@${width}px: the chart data table fits its panel, it scrolls ${scrolls}px`);
+  }
+});
+
 test('e2e: the expand button does not cover a node at the right edge of the drawing', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const { html } = renderDoc('---\ntitle: Expand overlap\nlang: en\ntheme: blueprint\n---\n## A Flow plan {span=2}\n```flow LR\nClient -> Gateway\nGateway -> [(Cache)]: lookup\nCache -> Service: miss\nGateway -> Service\n*Service\n```\n');
