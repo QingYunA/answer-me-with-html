@@ -24,5 +24,10 @@
     "am export הופך עמוד ל-PDF בגודל A4 או לפרוסות PNG לאפליקציות צ'אט",
     "כתבו {table sort filter} אחרי טבלה כדי למיין ולסנן אותה",
     "am video --audio-map משתמש בקובצי השמע שלכם כקריינות"
+  ],
+  "tr": [
+    "am export sayfayı A4 PDF ya da sohbet için PNG dilimlerine dönüştürür",
+    "Tablodan sonra {table sort filter} yazın, tablo sıralanıp filtrelensin",
+    "am video --audio-map videoyu kendi ses dosyalarınızla seslendirir"
   ]
 }
