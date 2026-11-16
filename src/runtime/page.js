@@ -250,6 +250,8 @@
       const vb = svg.viewBox?.baseVal;
       curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);
       curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);
+      // The panel's svg carries the reading floor as min-width (layout-dom.js floorDiagrams); the viewer sizes the clone itself.
+      clone.style.minWidth = '';
       clone.style.width = `${curVw}px`;
       clone.style.height = `${curVh}px`;
       canvas.innerHTML = '';

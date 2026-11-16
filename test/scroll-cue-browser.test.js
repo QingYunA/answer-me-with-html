@@ -137,6 +137,27 @@ test('scroll cue: the floor follows the reader text size, and a box that fits ha
   assert.deepEqual(state, { floor: true, short: 0 });
 });
 
+test('scroll cue: at the largest reader text size the diagram viewer still centers the drawing inside its stage', { skip: SKIP }, async () => {
+  await load(page('fan', FAN), 1440);
+  const state = await evaluate(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const up = document.querySelector('[data-am="scale-up"]');
+    for (let i = 0; i < 12 && !up.disabled; i += 1) { up.click(); await wait(60); }
+    await wait(400);
+    document.querySelector('#panel-A .am-diagram-expand').click();
+    await wait(600);
+    const lb = document.querySelector('.am-lightbox:not([hidden])');
+    const stage = lb.querySelector('.am-lightbox-canvas').parentElement.getBoundingClientRect();
+    const box = lb.querySelector('.am-lightbox-canvas > svg').getBoundingClientRect();
+    const left = box.left - stage.left;
+    const right = stage.right - box.right;
+    lb.querySelector('[data-am="lb-close"], .am-lightbox-close')?.click();
+    try { localStorage.removeItem('am-scale'); } catch {}
+    return { inside: left >= -1 && right >= -1, centered: Math.abs(left - right) <= 2, left: Math.round(left), right: Math.round(right) };
+  })()`);
+  assert.equal(state.inside && state.centered, true, `the drawing sits inside the stage and centered: ${JSON.stringify(state)}`);
+});
+
 test('scroll cue: a wide diagram on a right-to-left page starts at the right and fades its left edge', { skip: SKIP }, async () => {
   await load(page('rtl', RTL_FAN), 1000);
   const state = await evaluate(`(async () => {
