@@ -2,7 +2,7 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync, existsSync, readFileSync, symlinkSync, lstatSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { usage, clean, cleanHint, afterRender, CLEAN, mb } from '../src/housekeeping.js';
 import { updateHint, newer, updateCommand, shouldCheckUpdate, runUpdateCheck, parseVersion, pageUpdate } from '../src/update.js';
@@ -90,6 +90,36 @@ test('clean: a pages_dir inside drafts/ is counted once and keeps the page-name 
   clean(home, { now: NOW, pages: custom });
   assert.ok(!existsSync(page));
   assert.ok(existsSync(keep), 'a file the user put in the pages folder stays, even inside drafts/');
+});
+
+test('pages_dir overlapping the data folders: each file counted once, user files kept, other folders still cleaned', () => {
+  const put = (path, ageDays = 40) => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, 'x');
+    const t = (NOW - ageDays * DAY) / 1000;
+    utimesSync(path, t, t);
+    return path;
+  };
+  // Inside videos/: usage counts a page once.
+  put(join(home, 'videos', 'pages', 'note-20260101-000000.html'));
+  assert.equal(usage(home, join(home, 'videos', 'pages')).total, 1);
+  rmSync(join(home, 'videos'), { recursive: true, force: true });
+  // Inside drafts/: a child whose name starts with two dots is inside, so it keeps the page-name filter.
+  const dotted = put(join(home, 'drafts', 'pages', '..notes', 'keep.txt'));
+  clean(home, { now: NOW, pages: join(home, 'drafts', 'pages') });
+  assert.ok(existsSync(dotted), 'a user file under ..notes/ stays');
+  rmSync(join(home, 'drafts'), { recursive: true, force: true });
+  // Inside cache/: the cache scan leaves the user's files and fresh pages alone.
+  const keep = put(join(home, 'cache', 'pages', 'keep.txt'));
+  const fresh = put(join(home, 'cache', 'pages', 'fresh-20260102-000000.html'), 1);
+  clean(home, { now: NOW, pages: join(home, 'cache', 'pages') });
+  assert.ok(existsSync(keep) && existsSync(fresh), 'the cache scan does not reach the pages folder');
+  rmSync(join(home, 'cache'), { recursive: true, force: true });
+  // pages_dir is the data folder itself: --all still removes videos and drafts.
+  const video = put(join(home, 'videos', 'clip.mp4'), 1);
+  const draft = put(join(home, 'drafts', 'old.md'), 1);
+  clean(home, { now: NOW, all: true, pages: home });
+  assert.ok(!existsSync(video) && !existsSync(draft), 'videos and drafts are cleaned when pages_dir contains them');
 });
 
 test('clean: --dry-run deletes nothing; --all deletes every page and video', () => {

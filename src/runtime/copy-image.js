@@ -22,8 +22,16 @@
   btn.hidden = false;
 
   const idle = btn.textContent;
+  // The button's aria-label stays "Copy as image", so a screen reader hears each result through a hidden live region beside it.
+  // aria-live, not role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
+  const status = document.createElement('span');
+  status.setAttribute('aria-live', 'polite');
+  status.dataset.am = 'copy-image-status';
+  status.className = 'am-visually-hidden';
+  btn.after(status);
   const say = (text, restore) => {
     btn.textContent = text;
+    status.textContent = text;
     clearTimeout(say.timer);
     if (restore) say.timer = setTimeout(() => { btn.textContent = idle; }, 1800);
   };

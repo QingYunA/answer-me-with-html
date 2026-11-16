@@ -111,7 +111,7 @@ const CLICK_FALLBACK = `(async () => {
   for (let i = 0; i < 200 && !clicked; i++) await sleep(50);
   HTMLAnchorElement.prototype.click = orig;
   await sleep(30);
-  return { revealed, wrote, clicked, label: btn.textContent };
+  return { revealed, wrote, clicked, label: btn.textContent, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
 })()`;
 
 test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
@@ -121,6 +121,7 @@ test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied
   assert.equal(r.wrote, true, 'the clipboard write was attempted');
   assert.ok(r.clicked >= 1, 'a download was triggered');
   assert.equal(r.label, 'Downloaded', `the fallback reports a download, not a copy (${JSON.stringify(r)})`);
+  assert.equal(r.status, 'Downloaded', 'a screen reader hears the result through the status region');
 });
 
 // A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which

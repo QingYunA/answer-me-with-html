@@ -1,7 +1,7 @@
 // Data-directory maintenance: usage stats, am clean, cleanup notice; after a render, collects the cleanup and update notices.
 // Notices are printed only for the Agent (one line starting with "! "), which asks the user whether to act; the CLI never deletes automatically.
 import { readdirSync, lstatSync, rmSync, readFileSync } from 'node:fs';
-import { join, basename, resolve, relative, isAbsolute } from 'node:path';
+import { join, basename, resolve, relative, isAbsolute, sep } from 'node:path';
 import { DAY, readState, writeState } from './state.js';
 import { updateEnabled, updateHint, shouldCheckUpdate, spawnUpdateCheck } from './update.js';
 
@@ -42,41 +42,48 @@ function walk(dir) {
 
 const sum = (files) => files.reduce((n, f) => n + f.bytes, 0);
 
+// True when path is inside dir: not dir itself, not above it, not a sibling that only shares a prefix. A child named "..notes" is inside.
+const insideDir = (dir, path) => {
+  const rel = relative(resolve(dir), resolve(path));
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+};
+// pages_dir may overlap the data folders. Each file belongs to one of them: a walk of a data folder leaves out a pages_dir nested in it,
+// and a walk of the pages folder leaves out the data folders nested in it (pages_dir set to the data directory itself).
+const DATA_DIRS = ['videos', 'drafts', 'cache', 'serve-state', 'themes'];
+const outsidePages = (root, pages) => (insideDir(root, pages) ? (f) => !insideDir(pages, f.path) : () => true);
+const pageFiles = (home, pages) => {
+  const nested = DATA_DIRS.map((d) => join(home, d)).filter((root) => insideDir(pages, root));
+  return walk(pages).filter((f) => !nested.some((root) => insideDir(root, f.path)));
+};
+
 export function usage(home, pages = join(home, 'pages')) {
   const roots = { pages, videos: join(home, 'videos'), cache: join(home, 'cache') };
   const parts = Object.fromEntries(DIRS.map((d) => {
-    const files = walk(roots[d]);
+    const files = d === 'pages' ? pageFiles(home, pages) : walk(roots[d]).filter(outsidePages(roots[d], pages));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 
 // Files in the pages folder that cleanup may delete: only names am render writes when pages is a custom folder.
-const pageVictims = (pages, cutoff, all, custom) =>
-  walk(pages).filter((f) => (all || f.mtime < cutoff) && (!custom || PAGE_FILE.test(basename(f.path))));
+const pageVictims = (home, pages, cutoff, all, custom) =>
+  pageFiles(home, pages).filter((f) => (all || f.mtime < cutoff) && (!custom || PAGE_FILE.test(basename(f.path))));
 
 // Delete pages, videos and kept drafts (src/cli.js keepDraft) older than days, plus the whole voice cache (it can be regenerated). all: delete everything (config is kept).
 // temp: the private folder in the system temporary folder (src/home.js); its pages, videos and drafts follow the same rules.
 // The reply state of a served page (src/serve.js, serve-state/) goes with its page: a state whose page is gone cannot be restored.
-// True when path is inside dir (not dir itself, and not a sibling that only shares a prefix).
-const insideDir = (dir, path) => {
-  const rel = relative(resolve(dir), resolve(path));
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
-};
-
 export function clean(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join(home, 'pages') } = {}) {
   const cutoff = now - days * DAY;
   const custom = resolve(pages) !== resolve(join(home, 'pages'));
-  // A pages_dir inside videos/ or drafts/ is cleaned only as pages (with the page-name filter), and each file is counted once.
-  const notPages = (f) => !insideDir(pages, f.path);
+  // A pages_dir nested in a data folder is cleaned only as pages (with the page-name filter), and each file is counted once.
   const victims = [
-    ...pageVictims(pages, cutoff, all, custom),
-    ...['videos', 'drafts'].flatMap((d) => walk(join(home, d)).filter((f) => notPages(f) && (all || f.mtime < cutoff))),
+    ...pageVictims(home, pages, cutoff, all, custom),
+    ...['videos', 'drafts'].flatMap((d) => walk(join(home, d)).filter((f) => outsidePages(join(home, d), pages)(f) && (all || f.mtime < cutoff))),
     ...[temp].filter(Boolean).flatMap((dir) => ['pages', 'videos', 'drafts'].flatMap((d) => walk(join(dir, d)).filter((f) => all || f.mtime < cutoff))),
-    ...walk(join(home, 'cache')),
+    ...walk(join(home, 'cache')).filter(outsidePages(join(home, 'cache'), pages)),
   ];
   // A state goes with its page even when the state itself was saved recently: it names a page file, so the page victims decide too.
-  const gone = new Set(pageVictims(pages, cutoff, all, custom).map((f) => f.path));
+  const gone = new Set(pageVictims(home, pages, cutoff, all, custom).map((f) => f.path));
   const states = walk(join(home, 'serve-state')).filter((f) => {
     // A record being written is a .tmp file (src/serve.js writeState); deleting it before its rename fails the save. One that is an
     // hour old was left by a process that stopped mid-write, and nothing will rename it.
