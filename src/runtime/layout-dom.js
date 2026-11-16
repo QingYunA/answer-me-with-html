@@ -187,20 +187,24 @@ if (panels.length > 1) {
     if (printing || printQuery.matches) return;
     try {
       // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.
+      // A later pass plans for the width the previous layout left, not the grid's: restoring the grid first would bring back the
+      // grid's scrollbar, so a page whose grid scrolls and whose rows do not (or the reverse) would never settle.
       let planned = -1;
-      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {
+      let laidOut = NaN;
+      for (let pass = 0; pass < 3 && planned !== laidOut; pass++) {
         restore();
         if (matchMedia(SINGLE_COLUMN).matches) return;
-        planned = containerWidth();
+        planned = pass === 0 ? containerWidth() : laidOut;
         const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
         const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);
         const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });
         apply(plan, gap);
         capDiagrams(plan.maxScale);
         fitTables();
+        laidOut = containerWidth();
       }
       // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.
-      if (planned !== containerWidth()) restore();
+      if (planned !== laidOut) restore();
     } catch {
       restore();
     }
