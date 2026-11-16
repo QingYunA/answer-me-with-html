@@ -21,6 +21,12 @@ if (opt('--log')) appendFileSync(opt('--log'), JSON.stringify({ args, stdin, fil
 if (mode === 'fail') { process.stderr.write('Traceback (most recent call last):\n' + '  File "tts.py", line 1\n'.repeat(40) + 'ValueError: voice zz-ZZ-Nobody not found\n'); process.exit(3); }
 if (mode === 'none') process.exit(0);
 if (mode === 'sleep') setTimeout(() => {}, 60000);
+// Ignores SIGTERM and leaves a grandchild that holds stderr open, so the child's 'close' never comes in time.
+if (mode === 'stubborn') {
+  process.on('SIGTERM', () => {});
+  (await import('node:child_process')).spawn(process.execPath, ['-e', 'setTimeout(() => {}, 3000)'], { stdio: ['ignore', 'ignore', 'inherit'] });
+  setTimeout(() => {}, 60000);
+}
 if (mode === 'mp3') { writeFileSync(opt('--out'), Buffer.from('ID3\x03\x00\x00\x00fake mp3')); process.exit(0); }
 const n = Math.round(text.length * 0.05 * 22050);
 const buf = Buffer.alloc(44 + n * 2);
@@ -28,7 +34,7 @@ buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write('WAVE', 8); bu
 buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(22050, 24);
 buf.writeUInt32LE(44100, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 2, 40);
 if (mode !== 'silent') for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round(8000 * Math.sin(i / 8)), 44 + i * 2);
-if (mode !== 'sleep') writeFileSync(opt('--out'), buf);
+if (mode !== 'sleep' && mode !== 'stubborn') writeFileSync(opt('--out'), buf);
 `;
 
 let dir;
@@ -112,6 +118,9 @@ test('cmd voice: a missing program, a failed run, no audio, silent audio and a h
   await fails(`${node()} --mode silent --out {out}`, /only silence/);
   await fails(`${node()} --mode mp3 --out {out}`, /ffmpeg/, { which: () => false });
   await fails(`${node()} --mode sleep --out {out}`, /did not finish within 0\.5 seconds/, { timeoutMs: 500 });
+  const started = Date.now();
+  await fails(`${node()} --mode stubborn --out {out}`, /did not finish within 0\.5 seconds/, { timeoutMs: 500 });
+  assert.ok(Date.now() - started < 2500, 'the timeout does not wait for the command or its children to close their pipes');
 });
 
 function sink() {

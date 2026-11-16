@@ -11785,10 +11785,19 @@ function runCommandTts(program, args, text2, timeoutMs) {
   return new Promise((resolve7, reject) => {
     const p = spawn(program, args, { stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
     let err = "";
-    let timedOut = false;
+    let settled = false;
+    const settle3 = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve7();
+    };
     const timer = setTimeout(() => {
-      timedOut = true;
-      p.kill();
+      p.kill("SIGKILL");
+      p.stdin.destroy();
+      p.stderr.destroy();
+      settle3(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1e3} seconds`));
     }, timeoutMs);
     p.stderr.on("data", (d) => {
       err = (err + d).slice(-4e3);
@@ -11796,16 +11805,8 @@ function runCommandTts(program, args, text2, timeoutMs) {
     p.stdin.on("error", () => {
     });
     p.stdin.end(text2);
-    p.on("error", (e) => {
-      clearTimeout(timer);
-      reject(new TtsError(e.code === "ENOENT" ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD` : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`));
-    });
-    p.on("close", (code) => {
-      clearTimeout(timer);
-      if (timedOut) reject(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1e3} seconds`));
-      else if (code !== 0) reject(new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(" | ").slice(-300)}`));
-      else resolve7();
-    });
+    p.on("error", (e) => settle3(new TtsError(e.code === "ENOENT" ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD` : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`)));
+    p.on("close", (code) => settle3(code === 0 ? null : new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(" | ").slice(-300)}`)));
   });
 }
 function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}) {

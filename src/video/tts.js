@@ -215,30 +215,34 @@ export function commandArgs(template, values) {
   return words.map((w) => w.replace(/\{(text|text_file|out|lang)\}/g, (_, key) => values[key] ?? `{${key}}`));
 }
 
+// The timeout rejects at the deadline on its own: a command may ignore SIGTERM, and a child it started may keep stderr open, so
+// 'close' may come late or never. SIGKILL ends the command itself; its pipes are closed so nothing waits on them.
 function runCommandTts(program, args, text, timeoutMs) {
   return new Promise((resolve, reject) => {
     const p = spawn(program, args, { stdio: ['pipe', 'ignore', 'pipe'], windowsHide: true });
     let err = '';
-    let timedOut = false;
+    let settled = false;
+    const settle = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    };
     const timer = setTimeout(() => {
-      timedOut = true;
-      p.kill();
+      p.kill('SIGKILL');
+      p.stdin.destroy();
+      p.stderr.destroy();
+      settle(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1000} seconds`));
     }, timeoutMs);
     p.stderr.on('data', (d) => { err = (err + d).slice(-4000); }); // the end: a Python traceback names the error last
     p.stdin.on('error', () => {}); // a command that does not read stdin may exit before taking the text
     p.stdin.end(text);
-    p.on('error', (e) => {
-      clearTimeout(timer);
-      reject(new TtsError(e.code === 'ENOENT'
-        ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD`
-        : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`));
-    });
-    p.on('close', (code) => {
-      clearTimeout(timer);
-      if (timedOut) reject(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1000} seconds`));
-      else if (code !== 0) reject(new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(' | ').slice(-300)}`));
-      else resolve();
-    });
+    p.on('error', (e) => settle(new TtsError(e.code === 'ENOENT'
+      ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD`
+      : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`)));
+    p.on('close', (code) => settle(code === 0 ? null
+      : new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(' | ').slice(-300)}`)));
   });
 }
 
