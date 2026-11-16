@@ -17,7 +17,7 @@ const SETTLE_MS = 400;              // web fonts and the sheet planner need a be
 // The chrome that makes no sense in a picture. The page's print CSS hides the same controls for the PDF; this is the
 // screen-media list, plus the remark popover, new-version notice and table controls / sort indicators, which only @media print hides.
 const CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comment-btn, .am-remark-pop,
-.am-update, .am-btn--update, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
+.am-update, .am-btn--update, .am-btn--copy-image, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
   display: none !important;
 }
 .am-table-sort::after { content: none !important; }`;
