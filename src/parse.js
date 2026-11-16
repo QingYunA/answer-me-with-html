@@ -53,7 +53,7 @@ export function applyOverrides(meta, overrides, choices = CHOICES) {
 }
 
 // Allowed voice-over values for video narration (shared by config voice and am video --voice).
-export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'off']);
+export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'cmd', 'system', 'off']);
 
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
