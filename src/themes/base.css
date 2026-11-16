@@ -86,6 +86,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md li + li { margin-top: 3px; }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
+/* A link inside a component (kv, timeline, tree, ask) sits outside .am-md: give it the same colour, not the browser default (#405). */
+.am-panel a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
 .am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
@@ -100,6 +102,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
 .am-md tbody tr:nth-child(even) td { background: var(--fill); }
 .am-table-wrap { overflow-x: auto; }
+/* A table short of room (src/runtime/layout-dom.js fitTables) breaks a long word inside its cell rather than hold its column at full width. */
+.am-table-wrap > table.am-table-fit th, .am-table-wrap > table.am-table-fit td, .am-table-wrap > table.am-table-fit :not(pre) > code { overflow-wrap: anywhere; }
 /* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
 .am-md img { max-width: 100%; max-height: 70vh; height: auto; }
 .am-figure { margin: 0; text-align: center; }
@@ -118,6 +122,28 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
 .am-ask-tag { display: inline-block; font-size: var(--am-fs-label); line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 .am-ask-note { display: block; color: var(--ink-2); }
+/* Options with a preview: the block under an option is the card's canvas. A dot grid reads as a drawing surface in every theme. */
+.am-ask-opts { clear: both; }
+.am-ask-card { min-width: 0; }
+.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); align-items: stretch; }
+.am-ask--cards .am-ask-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-ask--cards .am-ask-opt { padding: 9px 11px; }
+.am-ask-preview {
+  padding: 10px; overflow: hidden; border-top: 1px solid var(--line-2);
+  background-color: var(--fill);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-3) 38%, transparent) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.am-ask--cards .am-ask-preview { flex: 1; cursor: pointer; }
+.am-ask-preview > :first-child { margin-top: 0; }
+.am-ask-preview > :last-child { margin-bottom: 0; }
+/* A diagram keeps the card width, also on a phone, where a panel diagram may scroll instead. */
+.am-ask-preview .am-diagram { overflow: visible; }
+.am-ask-preview .am-diagram > svg { max-width: 100%; height: auto; }
+.am-ask-preview > svg { display: block; max-width: 100%; height: auto; }
 /* Comment box under each panel, and the Reply sheet */
 .am-comment-btn {
   display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
@@ -355,6 +381,18 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 
 /* ── Diagrams (flow / sequence) ───────────────── */
 .am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+/* A box that hides content past its left or right edge fades that edge (src/runtime/page.js sets the classes). A diagram keeps its
+   top row out of the fade: the expand button sits there at the end edge. */
+.am-more-left, .am-more-right {
+  --am-fade-l: #000; --am-fade-r: #000;
+  mask-image: linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+}
+.am-more-left { --am-fade-l: transparent; }
+.am-more-right { --am-fade-r: transparent; }
+.am-diagram.am-more-left, .am-diagram.am-more-right {
+  mask-image: linear-gradient(#000, #000), linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+  mask-size: 100% 32px, 100% 100%; mask-repeat: no-repeat;
+}
 /* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
 .am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
 .am-diagram text { fill: var(--ink, #16181d); font-size: var(--am-fs-d-node); }
@@ -584,6 +622,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
+  /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */
+  .am-diagram > svg { min-width: 0 !important; max-width: 100% !important; }
+  .am-more-left, .am-more-right { mask-image: none !important; }
 }
 /* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
    (a wide table, a wide diagram): one panel per row instead. */
