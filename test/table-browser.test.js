@@ -388,10 +388,16 @@ test('e2e api: field names and types wrap only between their words', { skip: SKI
     range.selectNodeContents(n);
     return [n.textContent, new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size];
   }))`);
+  // The load waiter is registered before the reload: Page.reload answers before the new document loads.
+  const reload = async () => {
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.reload', {});
+    await loaded;
+    await evaluate('new Promise((resolve) => requestAnimationFrame(() => resolve()))');
+  };
   const reloadAt = async (width) => {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    await send('Page.reload', {});
-    await evaluate('new Promise((resolve) => (document.readyState === "complete" ? requestAnimationFrame(() => resolve()) : addEventListener("load", () => requestAnimationFrame(() => resolve()))))');
+    await reload();
   };
   try {
     await reloadAt(480);
@@ -401,6 +407,6 @@ test('e2e api: field names and types wrap only between their words', { skip: SKI
     assert.equal(await evaluate(`(() => { const wrap = document.querySelector('#panel-J .am-table-wrap'); return wrap.scrollWidth - wrap.clientWidth; })()`), 0);
   } finally {
     await send('Emulation.clearDeviceMetricsOverride', {});
-    await send('Page.reload', {});
+    await reload();
   }
 });
