@@ -2,7 +2,7 @@
 // with a following {table ...} line; status words in cells render as badges; an image on its own line becomes a captioned figure;
 // raw HTML is filtered (see raw-html.js): a placeholder such as <host> shows as text, tags that break the page are escaped, event handlers and javascript: links are removed.
 
-import { Marked } from 'marked';
+import { Marked, Lexer } from 'marked';
 import { filterBlocks, filterInline } from './raw-html.js';
 import { mathExtension } from './math.js';
 import { parseAttrs } from './attrs.js';
@@ -74,8 +74,11 @@ function tableOptions(tokens) {
   return tokens;
 }
 
-marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note }) } });
-inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+// The token passes of md() and mdInline(). codeSpans() runs them too, so it sees the tokens the page renders.
+const blockPass = (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note });
+const inlinePass = (tokens) => filterInline(tokens, note);
+marked.use({ hooks: { processAllTokens: blockPass } });
+inline.use({ hooks: { processAllTokens: inlinePass } });
 marked.use({ extensions: [{
   name: 'table',
   renderer(token) {
@@ -148,8 +151,9 @@ export function md(text, { ui, interactive = true } = {}) {
 }
 
 // Every inline code span of a Markdown text, in source order: [{ text, raw }]. Code blocks hold no spans, so their text is never returned.
-// The lexer is the one md() uses, so a span here is a span on the page.
-export function codeSpans(text) {
+// The lexer and token passes are those of md(), or of mdInline() with inline: true, so a span here is a span on the page. The notes
+// those passes make are dropped: they belong to the render, not to this read.
+export function codeSpans(text, { inline: inlineField = false } = {}) {
   const spans = [];
   const walk = (tokens) => {
     if (!Array.isArray(tokens)) return;
@@ -161,7 +165,14 @@ export function codeSpans(text) {
       (token.rows ?? []).forEach((row) => walk(row));
     }
   };
-  walk(marked.lexer(String(text ?? '')));
+  const source = wrapSpacedImages(String(text ?? ''));
+  const outer = sink;
+  sink = null;
+  try {
+    walk(inlineField ? inlinePass(Lexer.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)));
+  } finally {
+    sink = outer;
+  }
   return spans;
 }
 

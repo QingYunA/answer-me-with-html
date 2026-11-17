@@ -1491,7 +1491,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join14, resolve as resolve8, relative as relative4, isAbsolute as isAbsolute6, dirname as dirname5, basename as basename6, extname as extname3, sep as sep5 } from "node:path";
+import { join as join14, resolve as resolve8, relative as relative4, isAbsolute as isAbsolute6, dirname as dirname5, basename as basename6, extname as extname3, sep as sep6 } from "node:path";
 import { spawn as spawn5 } from "node:child_process";
 import { randomBytes as randomBytes2 } from "node:crypto";
 
@@ -4690,8 +4690,10 @@ function tableOptions(tokens) {
   }
   return tokens;
 }
-marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note }) } });
-inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+var blockPass = (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note });
+var inlinePass = (tokens) => filterInline(tokens, note);
+marked.use({ hooks: { processAllTokens: blockPass } });
+inline.use({ hooks: { processAllTokens: inlinePass } });
 marked.use({ extensions: [{
   name: "table",
   renderer(token) {
@@ -4744,7 +4746,7 @@ function md(text2, { ui, interactive = true } = {}) {
     tableInteractive = outerInteractive;
   }
 }
-function codeSpans(text2) {
+function codeSpans(text2, { inline: inlineField = false } = {}) {
   const spans = [];
   const walk2 = (tokens) => {
     if (!Array.isArray(tokens)) return;
@@ -4756,7 +4758,14 @@ function codeSpans(text2) {
       (token.rows ?? []).forEach((row) => walk2(row));
     }
   };
-  walk2(marked.lexer(String(text2 ?? "")));
+  const source = wrapSpacedImages(String(text2 ?? ""));
+  const outer = sink;
+  sink = null;
+  try {
+    walk2(inlineField ? inlinePass(O.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)));
+  } finally {
+    sink = outer;
+  }
   return spans;
 }
 function mdInline(text2) {
@@ -10752,7 +10761,7 @@ function readEmbeddedImages(html) {
 
 // src/refs.js
 import { lstatSync, readFileSync as readFileSync4, realpathSync as realpathSync3, statSync as statSync3 } from "node:fs";
-import { isAbsolute as isAbsolute3, join as join2, relative as relative2 } from "node:path";
+import { isAbsolute as isAbsolute3, join as join2, relative as relative2, sep as sep3 } from "node:path";
 var REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
 var FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
 var INLINE_PARTS = {
@@ -10764,12 +10773,12 @@ var INLINE_PARTS = {
   // the value; the key is plain text
 };
 function inlineTexts(block2) {
-  if (block2.type === "md") return [{ text: block2.text, line: block2.line }];
-  if (block2.lang === "callout") return [{ text: block2.text, line: block2.line + 1 }];
+  if (block2.type === "md") return [{ text: block2.text, line: block2.line, inline: false }];
+  if (block2.lang === "callout") return [{ text: block2.text, line: block2.line + 1, inline: false }];
   if (block2.lang === "ask") return askTexts(block2);
   const parts = INLINE_PARTS[block2.lang];
   if (!parts) return [];
-  return contentLines(block2.text).flatMap(({ text: text2, line }) => parts(text2).map((part) => ({ text: part, line: block2.line + line })));
+  return contentLines(block2.text).flatMap(({ text: text2, line }) => parts(text2).map((part) => ({ text: part, line: block2.line + line, inline: true })));
 }
 function askTexts(block2) {
   let ask;
@@ -10779,10 +10788,10 @@ function askTexts(block2) {
     return [];
   }
   return [
-    { text: ask.question.text, line: block2.line + ask.question.line },
+    { text: ask.question.text, line: block2.line + ask.question.line, inline: true },
     ...ask.options.flatMap((o) => [
-      { text: o.label, line: block2.line + o.line },
-      { text: o.note, line: block2.line + o.line },
+      { text: o.label, line: block2.line + o.line, inline: true },
+      { text: o.note, line: block2.line + o.line, inline: true },
       ...o.preview ? inlineTexts({ type: "fence", lang: o.preview.lang, text: o.preview.text, line: block2.line + o.preview.line }) : []
     ])
   ];
@@ -10790,9 +10799,9 @@ function askTexts(block2) {
 function checkRefs(blocks, { baseDir }) {
   const files = /* @__PURE__ */ new Map();
   const warnings = [];
-  for (const { text: text2, line } of blocks.flatMap(inlineTexts)) {
+  for (const { text: text2, line, inline: inline2 } of blocks.flatMap(inlineTexts)) {
     let cursor = 0;
-    for (const span of codeSpans(text2)) {
+    for (const span of codeSpans(text2, { inline: inline2 })) {
       const found = text2.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
       const problem = checkRef(span.text.trim(), baseDir, files);
@@ -10807,11 +10816,11 @@ function checkRef(text2, baseDir, files) {
   const [, path, a3, b = a3] = m;
   const from = Number(a3);
   const to = Number(b);
-  if (from < 1) return `\`${text2}\`: lines start at 1`;
-  if (to < from) return `\`${text2}\`: the first line comes after the last; write ${path}:${to}-${from}`;
   if (!files.has(path)) files.set(path, inspect(path, baseDir));
   const file = files.get(path);
   if (!file) return null;
+  if (from < 1) return `\`${text2}\`: lines start at 1`;
+  if (to < from) return `\`${text2}\`: the first line comes after the last; write ${path}:${to}-${from}`;
   if (file.missing) return `\`${text2}\`: no such file in ${baseDir}`;
   if (file.folder) return `\`${text2}\`: ${path} is a folder, not a file`;
   if (to > file.lines) return `\`${text2}\`: the file has ${file.lines} line${file.lines === 1 ? "" : "s"}`;
@@ -10819,10 +10828,11 @@ function checkRef(text2, baseDir, files) {
 }
 function inspect(path, baseDir) {
   const written = localPath(path, baseDir);
-  if (!written || isSecretPath(relative2(baseDir, written))) return null;
+  const rel = written && relative2(baseDir, written);
+  if (!rel || isSecretPath(rel)) return null;
   if (!exists(written)) {
-    const top2 = path.split("/")[0];
-    return path.includes("/") && exists(join2(baseDir, top2)) ? { missing: true } : null;
+    const parts = rel.split(sep3);
+    return parts.length > 1 && exists(join2(baseDir, parts[0])) ? { missing: true } : null;
   }
   try {
     const real = realpathSync3(written);
@@ -13207,7 +13217,7 @@ var isPath = (value) => value.includes("/") || value.includes("\\");
 
 // src/housekeeping.js
 import { readdirSync as readdirSync3, lstatSync as lstatSync4, rmSync as rmSync5, readFileSync as readFileSync9 } from "node:fs";
-import { join as join12, basename as basename4, resolve as resolve6, relative as relative3, isAbsolute as isAbsolute5, sep as sep3 } from "node:path";
+import { join as join12, basename as basename4, resolve as resolve6, relative as relative3, isAbsolute as isAbsolute5, sep as sep4 } from "node:path";
 
 // src/update.js
 import { spawn as spawn4 } from "node:child_process";
@@ -13339,7 +13349,7 @@ function walk(dir) {
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 var insideDir = (dir, path) => {
   const rel = relative3(resolve6(dir), resolve6(path));
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep3}`) && !isAbsolute5(rel);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep4}`) && !isAbsolute5(rel);
 };
 var DATA_DIRS = ["videos", "drafts", "cache", "serve-state", "themes"];
 var samePath = (a3, b) => relative3(resolve6(a3), resolve6(b)) === "";
@@ -13483,7 +13493,7 @@ import { networkInterfaces, uptime } from "node:os";
 import { createHmac, createHash as createHash3, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync as readFileSync10, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync5, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join13, resolve as resolve7, dirname as dirname4, basename as basename5, sep as sep4 } from "node:path";
+import { join as join13, resolve as resolve7, dirname as dirname4, basename as basename5, sep as sep5 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -13794,7 +13804,7 @@ async function resolvePage(home, dir, file, pages = resolve7(home, "pages")) {
     const path = join13(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
-    return real.startsWith(root + sep4) ? real : null;
+    return real.startsWith(root + sep5) ? real : null;
   } catch {
     return null;
   }
@@ -14770,7 +14780,7 @@ function unusedPagePath(file) {
 }
 var inside = (dir, target) => {
   const rel = relative4(resolve8(dir), resolve8(target));
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep5}`) && !isAbsolute6(rel);
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep6}`) && !isAbsolute6(rel);
 };
 function writePage(file, html, env, pages = join14(amHome(env), "pages")) {
   const home = resolve8(amHome(env));

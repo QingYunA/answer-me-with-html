@@ -3,7 +3,7 @@
 // A warning, not an error: the page is still written, because a page may cite another project's files.
 
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { isAbsolute, join, relative } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { codeSpans } from './markdown.js';
 import { localPath, isSecretPath, MAX_FILE_BYTES } from './code.js';
 import { contentLines, fields } from './components/error.js';
@@ -25,12 +25,12 @@ const INLINE_PARTS = {
 // The texts of one block that may hold code spans, each with the draft line its text starts on. A fence's text starts on the line
 // after the fence, so its line n is block.line + n.
 function inlineTexts(block) {
-  if (block.type === 'md') return [{ text: block.text, line: block.line }];
-  if (block.lang === 'callout') return [{ text: block.text, line: block.line + 1 }];
+  if (block.type === 'md') return [{ text: block.text, line: block.line, inline: false }];
+  if (block.lang === 'callout') return [{ text: block.text, line: block.line + 1, inline: false }];
   if (block.lang === 'ask') return askTexts(block);
   const parts = INLINE_PARTS[block.lang];
   if (!parts) return [];
-  return contentLines(block.text).flatMap(({ text, line }) => parts(text).map((part) => ({ text: part, line: block.line + line })));
+  return contentLines(block.text).flatMap(({ text, line }) => parts(text).map((part) => ({ text: part, line: block.line + line, inline: true })));
 }
 
 // The question, each option's label and note, and each preview, which is a block of its own. A block the component cannot read is
@@ -43,10 +43,10 @@ function askTexts(block) {
     return [];
   }
   return [
-    { text: ask.question.text, line: block.line + ask.question.line },
+    { text: ask.question.text, line: block.line + ask.question.line, inline: true },
     ...ask.options.flatMap((o) => [
-      { text: o.label, line: block.line + o.line },
-      { text: o.note, line: block.line + o.line },
+      { text: o.label, line: block.line + o.line, inline: true },
+      { text: o.note, line: block.line + o.line, inline: true },
       ...(o.preview ? inlineTexts({ type: 'fence', lang: o.preview.lang, text: o.preview.text, line: block.line + o.preview.line }) : []),
     ]),
   ];
@@ -57,9 +57,9 @@ function askTexts(block) {
 export function checkRefs(blocks, { baseDir }) {
   const files = new Map();
   const warnings = [];
-  for (const { text, line } of blocks.flatMap(inlineTexts)) {
+  for (const { text, line, inline } of blocks.flatMap(inlineTexts)) {
     let cursor = 0;
-    for (const span of codeSpans(text)) {
+    for (const span of codeSpans(text, { inline })) {
       const found = text.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
       const problem = checkRef(span.text.trim(), baseDir, files);
@@ -76,11 +76,12 @@ function checkRef(text, baseDir, files) {
   const [, path, a, b = a] = m;
   const from = Number(a);
   const to = Number(b);
-  if (from < 1) return `\`${text}\`: lines start at 1`;
-  if (to < from) return `\`${text}\`: the first line comes after the last; write ${path}:${to}-${from}`;
   if (!files.has(path)) files.set(path, inspect(path, baseDir));
   const file = files.get(path);
+  // A path that is not checked (another project's, outside the folder, a secret file) gets no warning at all.
   if (!file) return null;
+  if (from < 1) return `\`${text}\`: lines start at 1`;
+  if (to < from) return `\`${text}\`: the first line comes after the last; write ${path}:${to}-${from}`;
   if (file.missing) return `\`${text}\`: no such file in ${baseDir}`;
   if (file.folder) return `\`${text}\`: ${path} is a folder, not a file`;
   if (to > file.lines) return `\`${text}\`: the file has ${file.lines} line${file.lines === 1 ? '' : 's'}`;
@@ -92,10 +93,12 @@ function checkRef(text, baseDir, files) {
 // A missing path is a warning only when its first folder is in baseDir: then it claims to be a file of this project.
 function inspect(path, baseDir) {
   const written = localPath(path, baseDir);
-  if (!written || isSecretPath(relative(baseDir, written))) return null;
+  const rel = written && relative(baseDir, written);
+  if (!rel || isSecretPath(rel)) return null;
   if (!exists(written)) {
-    const top = path.split('/')[0];
-    return path.includes('/') && exists(join(baseDir, top)) ? { missing: true } : null;
+    // The first folder of the normalized path, so ./a/x.py and src/../a/x.py count as a/x.py.
+    const parts = rel.split(sep);
+    return parts.length > 1 && exists(join(baseDir, parts[0])) ? { missing: true } : null;
   }
   try {
     const real = realpathSync(written);

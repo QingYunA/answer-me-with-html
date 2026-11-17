@@ -147,6 +147,26 @@ test('refs: diagram text shows backticks as text, so flow, sequence, state, limi
   ].join('\n')), []);
 });
 
+test('refs: inline fields are read as inline Markdown, so a field that looks like a fence still has its span checked', () => {
+  const warnings = refs('```ask\n~~~ `src/app.ts:99`\n* Yes\n- No\n```');
+  assert.deepEqual(warnings.map((w) => w.line), [6]);
+});
+
+test('refs: a span the page shows after the raw-HTML filter relexes a block is checked', () => {
+  const warnings = refs('<host>\nSee `src/app.ts:99`.');
+  assert.deepEqual(warnings.map((w) => w.line), [6]);
+});
+
+test('refs: a path that is not checked gets no line-range warning either', () => {
+  assert.deepEqual(refs('`../outside.ts:0`, `.env:9-2`, `other-repo/x.py:0`'), []);
+  assert.deepEqual(refs('`src/nope.ts:0`').map((w) => w.message), ['`src/nope.ts:0`: lines start at 1']);
+});
+
+test('refs: equivalent spellings of a path are classified the same way', () => {
+  assert.deepEqual(refs('`./other-repo/x.py:3`, `src/../other-repo/x.py:3`'), []);
+  assert.equal(refs('`./src/nope.ts:3`').length, 1);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });
