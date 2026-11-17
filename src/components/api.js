@@ -14,6 +14,10 @@ function apiState(mark, parent, line) {
   return state ? { state } : {};
 }
 
+// identifier escapes a field name or type and lets it wrap only between its words: after _ . / , : < > | - and before a capital that
+// follows a lowercase letter or digit (refund_|amount, Order|Status). <wbr> adds no character, so copied text stays the same.
+const identifier = (text) => text.split(/(?<=[_./,:<>|-])(?=.)|(?<=[a-z0-9])(?=[A-Z])/).map(esc).join('<wbr>');
+
 // parseApi reads HTTP/RPC contracts in source order; markers apply to endpoints, sections or fields, and fields stay under their current section.
 export function parseApi(text) {
   const endpoints = [];
@@ -110,7 +114,7 @@ response 400 Error
         const specified = fields.some((field) => field.requirement);
         const req = specified ? column(fields, 'requirement') : '';
         const desc = described ? column(fields, 'description') : '';
-        const rows = fields.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words[field.requirement]) : '—'}</td>` : ''}${described ? `<td${desc}>${esc(field.description)}</td>` : ''}</tr>`).join('');
+        const rows = fields.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${identifier(field.name)}</code></th><td><code>${identifier(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words[field.requirement]) : '—'}</td>` : ''}${described ? `<td${desc}>${esc(field.description)}</td>` : ''}</tr>`).join('');
         const table = fields.length ? `<div class="am-table-wrap"${hideIn((visible) => fields.some((field) => visible(field.state)))}><table><thead><tr><th scope="col">${esc(words.field)}</th><th scope="col">${esc(words.type)}</th>${specified ? `<th scope="col"${req}>${esc(words.requirement)}</th>` : ''}${described ? `<th scope="col"${desc}>${esc(words.description)}</th>` : ''}</tr></thead><tbody>${rows}</tbody></table></div>` : '';
         return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words[kind])}${detail ? ` <code>${esc(detail)}</code>` : ''}</h4>${table}</section>`;
       }).join('');

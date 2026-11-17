@@ -141,10 +141,19 @@ test('api: renders RPC messages, optional fields, empty responses and semantic t
 test('api: escapes markup in targets, types, section names and descriptions', () => {
   const html = render('api', 'GET /<img>\nresponse 200 <script>\n  data Array<User> optional | <img src=x onerror=alert(1)> **literal**');
   assert.match(html, /\/&lt;img&gt;/);
-  assert.match(html, /Array&lt;User&gt;/);
+  assert.match(html, /Array&lt;<wbr>User&gt;/);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; \*\*literal\*\*/);
   assert.doesNotMatch(html, /<img|<script/);
+});
+
+// Field names and types wrap only between their words, so a narrow column never splits OrderStatus into OrderStatu and s.
+test('api: field names and types offer line breaks only between their words', () => {
+  const html = render('api', 'GET /orders\nresponse 200 Order\n  refund_amount OrderStatus required\n  items map<string, v1.Item> optional\n  id ID required');
+  assert.match(html, /<code>refund_<wbr>amount<\/code>/);
+  assert.match(html, /<code>Order<wbr>Status<\/code>/);
+  assert.match(html, /<code>map&lt;<wbr>string,<wbr> v1.<wbr>Item&gt;<\/code>/);
+  assert.match(html, /<code>ID<\/code>/);
 });
 
 // Invalid endpoint and section syntax must preserve the draft line in the error.
