@@ -10765,19 +10765,19 @@ import { lstatSync, readFileSync as readFileSync4, realpathSync as realpathSync3
 import { isAbsolute as isAbsolute3, join as join2, relative as relative2, sep as sep3 } from "node:path";
 var REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
 var FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
-var INLINE_PARTS = {
-  tree: { lines: (text2) => String(text2).split("\n").map((raw, i) => ({ text: raw.trim(), line: i + 1 })).filter((l) => l.text), parts: (t) => fields(t) },
-  // label and note
+var INLINE_PARTS = new Map(Object.entries({
+  tree: { lines: (text2) => String(text2).split("\n").map((raw, i) => ({ text: raw.trim(), line: i + 1 })).filter((l) => l.text), parts: (t) => fields(t).slice(0, 2) },
+  // label and note; tree ignores a third field
   timeline: { lines: contentLines, parts: (t) => fields(t).slice(1, 3) },
   // title and note; the time is plain text
   kv: { lines: contentLines, parts: (t) => [(t.startsWith("*") ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ""] }
   // the value; the key is plain text
-};
+}));
 function inlineTexts(block2) {
   if (block2.type === "md") return [{ text: block2.text, line: block2.line, inline: false }];
   if (block2.lang === "callout") return [{ text: block2.text, line: block2.line + 1, inline: false }];
   if (block2.lang === "ask") return askTexts(block2);
-  const component = INLINE_PARTS[block2.lang];
+  const component = INLINE_PARTS.get(block2.lang);
   if (!component) return [];
   return component.lines(block2.text).flatMap(({ text: text2, line }) => component.parts(text2).map((part) => ({ text: part, line: block2.line + line, inline: true })));
 }

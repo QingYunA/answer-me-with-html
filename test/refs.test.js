@@ -175,6 +175,14 @@ test('refs: image alt text shows backticks as text, so a span there is not check
   assert.deepEqual(refs('![see `src/app.ts:99`](data:image/png;base64,iVBORw0KGgo=)'), []);
 });
 
+test('refs: a third tree field is not shown, so a span there is not checked', () => {
+  assert.deepEqual(refs('```tree\nRoot | Note | `src/app.ts:99`\n```'), []);
+});
+
+test('refs: a code block named like an Object property does not break the check', () => {
+  assert.deepEqual(refs('```constructor\n`src/app.ts:99`\n```\n\n```toString\nx\n```'), []);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });
