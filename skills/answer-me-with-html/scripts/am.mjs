@@ -4748,15 +4748,18 @@ function md(text2, { ui, interactive = true } = {}) {
 }
 function codeSpans(text2, { inline: inlineField = false } = {}) {
   const spans = [];
-  const walk2 = (tokens, shown2 = true) => {
+  const walk2 = (tokens) => {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
-      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw, shown: shown2 });
-      const inner = shown2 && token.type !== "image";
-      walk2(token.tokens, inner);
-      walk2(token.items, inner);
-      walk2(token.header, inner);
-      (token.rows ?? []).forEach((row) => walk2(row, inner));
+      if (token.type === "image") {
+        spans.push({ text: "", raw: token.raw, shown: false });
+        continue;
+      }
+      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw, shown: true });
+      walk2(token.tokens);
+      walk2(token.items);
+      walk2(token.header);
+      (token.rows ?? []).forEach((row) => walk2(row));
     }
   };
   const source = wrapSpacedImages(String(text2 ?? ""));

@@ -188,6 +188,11 @@ test('refs: a span after the same text in image alt is reported at its own line'
   assert.deepEqual(warnings.map((w) => w.line), [6]);
 });
 
+test('refs: escaped brackets in image alt do not make the image take a later span\'s place', () => {
+  const warnings = refs('![see `src/\\[app\\].ts:99`](data:image/png;base64,iVBORw0KGgo=)\nSee `src/[app].ts:99`.');
+  assert.deepEqual(warnings.map((w) => w.line), [6]);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });
