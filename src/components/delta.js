@@ -18,6 +18,28 @@ export function splitMarker(text) {
 
 export const markState = (mark) => STATE_OF[mark] ?? null;
 
+// A marker starts the line and applies to all of it. Written before a name inside the line ("A -> + B"), it would stay part of
+// that name and draw a second box beside the real one, so the caller reports the message this returns (null when there is none).
+// names are the line's endpoint names as written, after the line's own marker; quoted names, such as flow's [- Gateway], are left out.
+// link: whether the line draws a link (a bracketed endpoint is left out of names, so names alone cannot tell).
+export function innerMarkMessage(component, names, mark, text, escape = '', link = names.length > 1) {
+  const inner = names.map((name) => ({ name, m: splitMarker(name) })).filter(({ m }) => m.mark);
+  if (!inner.length) return null;
+  const first = inner[0].name;
+  const marks = new Set([mark, ...inner.map(({ m }) => m.mark)].filter(Boolean));
+  const head = `${component}: "${first}" has a change marker inside the line, so "${inner[0].m.mark} " would become part of the name and draw a second box.`;
+  if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
+  // ~ marks a node, not a link, so a ~ on a line with a link cannot move to the start: the node goes on a line of its own.
+  if ([...marks][0] === '~' && link) return `${head} ~ marks a node, not a link: write it on a line of its own: "~ ${inner[0].m.text}"`;
+  // Rewrite only the detected endpoints: a bracketed name that starts with a marker, such as [+ B], stays as written.
+  const quote = (name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let fixed = text;
+  for (const { name, m } of inner) fixed = fixed.replace(new RegExp(`(?<!\\[)${quote(name)}(?!\\])`), m.text);
+  // The bracket escape fits a plain name only: a name with * emphasis or shape brackets after the marker means a marked link.
+  const plain = !/^[*[({]/.test(inner[0].m.text);
+  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed}".${escape && plain ? ` ${escape.replace('NAME', first)}` : ''}`;
+}
+
 export const deltaAttr = (state) => (state ? ` data-delta="${state}"` : '');
 
 // The small +, − or ~ badge on a tree node; flow draws its own in SVG next to the node shape.

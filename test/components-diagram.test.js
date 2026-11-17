@@ -61,6 +61,14 @@ test('sequence: the num argument adds step numbers', () => {
   assert.match(render('sequence', 'A -> B: x', 'num'), /class="am-step"[^>]*>1<\/text>/);
 });
 
+test('sequence: a two-digit step number gets more room than a one-digit one, so it does not run into a centred label', () => {
+  const msgs = (k) => Array.from({ length: k }, () => 'A -> B: x').join('\n');
+  // Nine messages need no more room than one; the tenth widens the gap by the extra digit on both sides of the label.
+  assert.equal(viewBox(render('sequence', msgs(9), 'num'))[0], viewBox(render('sequence', msgs(1), 'num'))[0]);
+  const long = `A -> B: ${'x'.repeat(30)}`;
+  assert.ok(viewBox(render('sequence', `${msgs(8)}\n${long}\nA -> B: x`, 'num'))[0] < viewBox(render('sequence', `${msgs(9)}\n${long}`, 'num'))[0]);
+});
+
 test('sequence: an unparseable line reports its line number', () => {
   throwsAt(() => render('sequence', 'A -> B: ok\nA => B'), 2);
 });
@@ -138,6 +146,13 @@ test('flow: edges inside a group keep the order of the nodes they end at too', (
   // The order of these lines matters: dagre then leaves a crossing that one swap removes. Other orders can need two moves at once.
   const src = 'P -> X\nP -> M\nQ -> M\nQ -> Y\nY -> Z\nX -> Z\ngroup G: P, Q, M, X, Y, Z';
   for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
+});
+
+test('flow: a node at the end of a long edge changes places together with the points of that edge', () => {
+  // B and E point at each other, so the edges from B to its other ends are two ranks long. The edge from F to E crossed the one
+  // from B to G: no single swap removes that crossing, G and the middle point of its edge must both move.
+  const src = 'A -> B\nB -> C\nC -> B\nB -> D\nB -> E\nF -> E\nE -> B\nB -> G';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 8), 0, dir);
 });
 
 test('flow: diamond nodes draw as a polygon, databases as a cylinder', () => {

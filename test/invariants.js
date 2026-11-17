@@ -1,6 +1,8 @@
 // Invariant: patching a page with a panel's own source must leave the page unchanged (except timestamps).
 // Covers render and video pages, every theme × mode × template combination, with and without a config file, and "patch with a different config".
 // The invariant also verifies that the page stores all settings, patch reads them back, and those settings win over the config file.
+// Each pair of render and patch configs is its own test file (test/invariants-*.test.js), so Node runs them in parallel;
+// in one file the 2160 renders ran one after another.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
@@ -22,7 +24,7 @@ const NOTES = {
 };
 
 let dir;
-before(() => {
+function setUp() {
   dir = mkdtempSync(join(tmpdir(), 'am-inv-'));
   for (const [name, config] of Object.entries(HOMES)) {
     mkdirSync(join(dir, name));
@@ -30,8 +32,7 @@ before(() => {
   }
   mkdirSync(join(dir, 'user', 'themes'));
   writeFileSync(join(dir, 'user', 'themes', 'notes.json'), JSON.stringify(NOTES));
-});
-after(() => rmSync(dir, { recursive: true, force: true }));
+}
 
 const sink = () => new Writable({ write(_c, _e, cb) { cb(); } });
 
@@ -81,7 +82,10 @@ function cases() {
   return out;
 }
 
-for (const [renderHome, patchHome] of [['none', 'none'], ['cfg', 'cfg'], ['none', 'cfg'], ['cfg', 'none'], ['user', 'user']]) {
+// Registers the invariant test for one pair of configs: the page is rendered with renderHome and patched with patchHome.
+export function patchInvariant(renderHome, patchHome) {
+  before(setUp);
+  after(() => rmSync(dir, { recursive: true, force: true }));
   test(`invariant: patching with the source leaves the page unchanged (render config ${renderHome}, patch config ${patchHome})`, async () => {
     const failures = [];
     for (const [i, c] of cases().entries()) {

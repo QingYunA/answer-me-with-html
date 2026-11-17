@@ -849,14 +849,12 @@ const HEBREW = '---\ntitle: לחיצת יד\nlang: he\n---\n## א שלום\n```f
 const hebrewChapters = (n) => `---\nlang: he\n---\n${Array.from({ length: n }, (_, i) => `## פרק מספר ${i + 1} עם כותרת ארוכה\n- נקודה\n> משפט בפרק ${i + 1}.\n`).join('\n')}`;
 const englishChapters = (n) => `---\nlang: en\n---\n${Array.from({ length: n }, (_, i) => `## Chapter number ${i + 1} with a long title\n- point\n> A sentence in chapter ${i + 1}.\n`).join('\n')}`;
 
-test('e2e: a Hebrew video exports to MP4 and WebM at 1080p', { skip: !E2E, timeout: 180000 }, async () => {
+// One format is enough here: the MP4 and WebM tests above cover each encoder, and this one covers right-to-left text.
+test('e2e: a Hebrew video exports to MP4 at 1080p', { skip: !E2E, timeout: 180000 }, async () => {
   const mp4 = await run(['video', '-', '-o', 'e2e-he.html', '--mp4'], { stdin: HEBREW, ttsProvider: fakeProvider() });
   assert.equal(mp4.code, 0, mp4.err);
   const { execFileSync } = await import('node:child_process');
   assert.match(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height', '-of', 'csv=p=0', join(dir, 'e2e-he.mp4')], { encoding: 'utf8' }), /video,1920,1080/);
-  const webm = await run(['video', '-', '-o', 'e2e-he-webm.html', '--webm'], { stdin: HEBREW, ttsProvider: fakeProvider() });
-  assert.equal(webm.code, 0, webm.err);
-  assert.match(readFileSync(join(dir, 'e2e-he-webm.webm')).subarray(0, 64).toString('latin1'), /webm/);
 });
 
 for (const [name, draft] of [['Hebrew', hebrewChapters], ['English', englishChapters]]) {

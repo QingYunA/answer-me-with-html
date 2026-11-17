@@ -187,10 +187,14 @@ function renderFence(block, ctx) {
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
-    const html = comp.render(text, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn });
+    const html = comp.render(text, {
+      args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn, line,
+      render: (blocks) => renderBlocks(blocks, ctx),
+    });
     // A component's own svg is measured in viewBox units at fixed text sizes, so the whole box takes the factor. Raw svg / html blocks
-    // bypass this function, and a video never scales.
-    return ctx.video ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
+    // bypass this function, and a video never scales. A component that renders nested blocks scales each one itself, so its output
+    // must not take the factor again; otherwise a raw preview would be rewritten while the same block at the top level is not.
+    return ctx.video || comp.scalesOwnSvg ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -343,6 +347,7 @@ ${scaleButtons(ui)}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
+<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="${esc(ui.image.working)}" data-done="${esc(ui.image.done)}" data-downloaded="${esc(ui.image.downloaded)}" data-failed="${esc(ui.image.failed)}" aria-label="${esc(ui.image.button)}" title="${esc(ui.image.button)}" hidden>${esc(ui.image.button)}</button>
 </div>
 ${notice.popover}${colophon ? withColophon(body, language) : body}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}

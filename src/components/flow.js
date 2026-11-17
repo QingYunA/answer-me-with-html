@@ -6,7 +6,7 @@ import { svgLine } from '../bidi.js';
 import { overlaps, segmentHits } from '../svg/geometry.js';
 import { crossingWarnings } from './flow-check.js';
 import { ComponentError, contentLines } from './error.js';
-import { splitMarker, markState, deltaAttr, withDelta, SIGN } from './delta.js';
+import { splitMarker, markState, deltaAttr, withDelta, SIGN, innerMarkMessage } from './delta.js';
 import { DRAWING } from '../themes/type-scale.js';
 
 const FS = DRAWING.node;
@@ -75,7 +75,7 @@ Client -> Gateway
   - ~ on a line with an arrow is an error: remove the old link with - and add the new one with +. That is also how a link's label changes. The same link both unmarked and marked is an error too.
   - + group Name: A, B and - group Name: A, B mark a group box. A group that is not removed and holds only removed nodes is a warning. Markers combine with * and every shape bracket.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
-  - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a node ("A -> + B"), is an error: write it at the start, "+ A -> B". To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
   render(text, { args, uid, ui, warn, video, dir: pageDir = 'ltr' }) {
     const model = parseFlow(text);
@@ -112,6 +112,8 @@ export function parseFlow(text) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
+    const inner = innerMarkMessage('flow', chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, 'To keep a name that starts with a marker, use brackets: [NAME]', chain.length > 1);
+    if (inner) throw new ComponentError(inner, line);
     if (mark === '~' && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);
     }
@@ -181,7 +183,7 @@ function rewriteOf(rest) {
 }
 
 // Removed when the node exists only before, added when only after; on both sides it is unchanged unless a "~ Node" line marked it.
-function nodeState({ before, after, tilde }) {
+export function nodeState({ before, after, tilde }) {
   if (before && !after) return 'removed';
   if (after && !before) return 'added';
   return tilde ? 'changed' : null;
@@ -258,7 +260,7 @@ function labelLines(label, maxWidth, size) {
 }
 
 // Edge labels are not wrapped unless they carry a forced break: that keeps a long label as it was drawn before.
-function edgeText(label) {
+export function edgeText(label) {
   const parts = String(label).split(FORCED_BREAK);
   const lines = parts.length > 1 ? parts.flatMap((part) => wrap(part, EDGE_MAX, EDGE_FS)) : [String(label)];
   return {
@@ -268,7 +270,9 @@ function edgeText(label) {
   };
 }
 
-function nodeSize(node) {
+export function nodeSize(node) {
+  // A component can give a node its own box (the pseudo-states of `state`), which is drawn as it is.
+  if (node.size) return { lines: [], width: node.size[0], height: node.size[1] };
   const lines = labelLines(node.label, TEXT_MAX, FS);
   const tw = Math.max(...lines.map((l) => measure(l, FS)));
   const th = lines.length * LH;
@@ -512,9 +516,10 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
 }
 
 // The +, − or ~ badge of a marked item: a small disc on the corner of its shape. It carries data-delta itself because a group box's badge sits beside it, not inside.
-export function badgeSvg(state, x, y) {
+export function badgeSvg(state, x, y, step) {
   if (!state) return '';
-  return `<g class="am-delta-badge am-delta-badge--${state}"${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
+  const at = step === undefined ? '' : ` data-step="${step}"`;
+  return `<g class="am-delta-badge am-delta-badge--${state}"${at}${deltaAttr(state)} transform="translate(${f(x)},${f(y)})"><circle r="7"/><text text-anchor="middle" dominant-baseline="central">${SIGN[state]}</text></g>`;
 }
 
 // Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.

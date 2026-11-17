@@ -1,10 +1,11 @@
 // am CLI: render / patch / video / export / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync, chmodSync, openSync, closeSync } from 'node:fs';
 import { VERSION } from './assets.js';
-import { join, resolve, dirname, basename, extname, sep } from 'node:path';
+import { join, resolve, relative, isAbsolute, dirname, basename, extname, sep } from 'node:path';
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { renderDoc, RenderError, LintError } from './render.js';
 import { parseDoc, ParseError, DraftErrors, CHOICES, VOICES, frontmatterValue } from './parse.js';
 import { lintDoc, formatWarning } from './lint/ste.js';
@@ -22,7 +23,7 @@ import { exportMp4, exportWebm, ExportError } from './video/export.js';
 import { exportPage, isHtmlPage } from './export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck, pageUpdate } from './update.js';
-import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
+import { amHome, pagesDir, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
 import { ensureHome, tempHome, checkedTempHome, UnsafeTempHome } from './home.js';
 import { hasCommand, renameOver, isDenied } from './sys.js';
 import { loadMath } from './math-load.js';
@@ -43,7 +44,7 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme …] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off | --audio-map <file.json>]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|cmd|system|off | --audio-map <file.json>]
                       [--mp4] [--webm] [--no-open] [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am export <page.html> [--pdf <file.pdf>] [--png <dir>]
@@ -186,12 +187,12 @@ Client -> Server: ACK
 > The client sends ACK, and the connection is open.
 
 - "## " starts a scene; a scene holds components or Markdown (the picture), and lines that start with > are narration (one beat per line).
-- When narration line N plays, step N of the picture appears: in flow / er / sequence / tree each source line is one step;
+- When narration line N plays, step N of the picture appears: in flow / state / er / sequence / tree each source line is one step;
   timeline, limits, chart rows, table rows, list items and paragraphs step item by item. With more steps than narration lines, the steps are spread across the lines;
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
-- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | cmd | system | off.
   The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
   the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
   A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
@@ -203,6 +204,11 @@ Client -> Server: ACK
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit \
       AM_TTS_VOICE=vivian am video draft.md --voice local
+  cmd runs a command-line TTS once per line, with no server: AM_TTS_CMD is the command, split into words by am and run
+  without a shell. In each word {text} is the line, {text_file} a file holding it, {out} the file the command writes its audio to
+  (required) and {lang} the line's language tag; the line is also written to its stdin. Audio that is not 16-bit PCM WAV needs ffmpeg.
+  Example (edge-tts reads with Microsoft's online voices, so it needs the network; pip install edge-tts):
+      AM_TTS_CMD='edge-tts --voice zh-CN-XiaoxiaoNeural --file {text_file} --write-media {out}' am video draft.md --voice cmd
   --audio-map lines.json reads ready-made audio from a JSON object of narration line to audio file, for example
   {"First the client sends SYN.":"audio/01.mp3"}. Relative audio paths start at the map file's folder. Keys ignore > and [ ]
   markers and extra whitespace. Non-WAV audio needs ffmpeg; every line needs an entry and every audio file must exist.
@@ -335,12 +341,13 @@ export function shouldOpen(opts, env, config) {
 
 async function cmdRender(src, opts, ctx, baseDir, from) {
   const { fail, print } = ctx;
-  const replaced = opts.replace === undefined ? null : pagePath(opts.replace, ctx);
+  const config = loadConfig(ctx);
+  const pages = pagesDir(ctx.env, config);
+  const replaced = opts.replace === undefined ? null : pagePath(opts.replace, ctx, pages);
   if (replaced === false) {
-    fail(`✗ --replace takes a page that am render wrote (a .html file in ${join(amHome(ctx.env), 'pages')} or ${join(tempHome(), 'pages')})`);
+    fail(`✗ --replace takes a page that am render wrote (a .html file in ${pages} or ${join(tempHome(), 'pages')})`);
     return 2;
   }
-  const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   await loadMath(src);
   let result;
@@ -349,9 +356,9 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }
-  const file = outputPath('pages', nameSource(result.meta), opts, ctx);
+  const file = outputPath('pages', nameSource(result.meta), opts, ctx, pages);
   if (!file) return 2;
-  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages' });
+  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages', pages });
   if (!written) return 1;
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   // Delete the earlier attempt only now: a render that fails above keeps it.
@@ -456,9 +463,9 @@ const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats
 
 // The absolute path of a page, or false when arg does not name a .html file directly inside pages/ of the data directory or of the
 // temporary folder (where a page goes when the data directory is not writable). The file may be gone.
-function pagePath(arg, { env, io }) {
+function pagePath(arg, { env, io }, pages = join(amHome(env), 'pages')) {
   const path = resolve(io.cwd ?? process.cwd(), arg);
-  const folders = [resolve(amHome(env), 'pages'), resolve(tempHome(), 'pages')];
+  const folders = [resolve(pages), resolve(tempHome(), 'pages')];
   return folders.includes(dirname(path)) && basename(path).endsWith('.html') ? path : false;
 }
 
@@ -535,7 +542,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   Keep the file self-contained: no url() or image-set() to http(s) or //, no @import, no @font-face, no backslash escapes. A link would send a request each time a page opens.
   am theme check warns about them; the catalog and am theme add reject them.
 - Diagram tokens (optional): node-fill node-stroke node-width node-radius node-shadow node-text, hi-fill hi-stroke hi-text, edge-color edge-width edge-label, actor-fill actor-stroke actor-text, note-fill note-stroke note-width note-radius, cluster-fill cluster-stroke, lifeline-color, series-1 series-2 series-3 series-4 series-5 series-6 (each with a -- prefix).
-  They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
+  They restyle what is inside flow, state, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
   --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
 - A page carries the built-in themes plus every installed user theme, so the toolbar can switch to any of them and the page opens anywhere; readers without your fonts see the fallback.
@@ -595,6 +602,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     return 1;
   }
   const config = loadConfig(ctx);
+  const pages = pagesDir(ctx.env, config);
   const { theme, mode, style } = config.values;
   // Keep the original page's template, theme, mode and STE strictness (it may have been made with --theme / --style etc.); this command's arguments win.
   // Video pages must go through renderVideo, not renderDoc.
@@ -629,7 +637,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '', inPlace: true })) return 1;
+  if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '', inPlace: true, pages })) return 1;
   return finish(file, opts, config, ctx);
 }
 
@@ -786,8 +794,8 @@ function themeWarnings({ fail, themes }) {
   themes.warnings.forEach((w) => fail(`! ${w}`));
 }
 
-// Output path: the -o path when given, otherwise pages/ or videos/ in the data directory. io.now can inject a clock.
-function outputPath(dir, title, opts, { env, io, fail }) {
+// Output path: the -o path when given, otherwise a file in folder (pages/ or videos/ by default). io.now can inject a clock.
+function outputPath(dir, title, opts, { env, io, fail }, folder = join(amHome(env), dir)) {
   if (opts.out) {
     const file = resolve(io.cwd ?? process.cwd(), opts.out);
     if (statSync(file, { throwIfNoEntry: false })?.isDirectory()) {
@@ -796,7 +804,7 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  const file = join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join(folder, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
   return opts.replace === undefined ? unusedPagePath(file) : file;
 }
 
@@ -808,21 +816,43 @@ function unusedPagePath(file) {
   }
 }
 
+// True when target resolves to a path strictly inside dir. A plain prefix test on a filesystem root would build "//" and never
+// match; path.relative copes with the root and with a path that merely shares a prefix (a sibling folder).
+const inside = (dir, target) => {
+  const rel = relative(resolve(dir), resolve(target));
+  return rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+};
+
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
-// A page in pages/ is written to a temp file and renamed over the old one, so am serve (src/serve.js) never reloads a half-written
-// page. Elsewhere it is written in place: a rename would replace a symlink with a plain file and drop the file's mode and hard links.
-function writePage(file, html, env) {
+// A page in the managed pages folder (pages/ or pages_dir) is written to a temp file and renamed over the old one, so am serve
+// (src/serve.js) never reloads a half-written page. Elsewhere it is written in place: a rename would replace a symlink with a
+// plain file and drop the file's mode and hard links.
+function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   const home = resolve(amHome(env));
   const path = resolve(file);
-  if (path.startsWith(home + sep)) ensureHome(home);
+  if (inside(home, path)) ensureHome(home);
   mkdirSync(dirname(file), { recursive: true });
-  if (!path.startsWith(join(home, 'pages') + sep)) return writeFileSync(file, html);
-  const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.tmp`);
+  if (!inside(pages, path)) return writeFileSync(file, html);
+  // pages_dir may be a shared folder another user can write to. The temp file has a random name and is created exclusively ('wx'
+  // refuses an existing path, a planted symlink too), and only a temp file this call created is removed.
+  const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
+  // A page being replaced keeps its mode: the temp file starts private (0600) and takes the old page's mode before the rename,
+  // instead of the default 0644 that would open a private page to other users.
+  const mode = statSync(file, { throwIfNoEntry: false })?.mode;
+  // Open first, so the temp file counts as ours before any byte is written: a write that fails half way (ENOSPC) still removes it.
+  let fd = null;
+  let created = false;
   try {
-    writeFileSync(tmp, html);
+    fd = openSync(tmp, 'wx', mode === undefined ? 0o666 : 0o600);
+    created = true;
+    writeFileSync(fd, html);
+    closeSync(fd);
+    fd = null;
+    if (mode !== undefined) chmodSync(tmp, mode & 0o777);
     renameOver(tmp, file);
   } finally {
-    rmSync(tmp, { force: true });
+    if (fd !== null) closeSync(fd);
+    if (created) rmSync(tmp, { force: true });
   }
 }
 
@@ -831,9 +861,10 @@ function writePage(file, html, env) {
 // 'videos') names the default location's folder: a page the user named with -o, or one patched in place, never moves. Returns
 // { file, notice } with the path actually written, or null after one line that says what to run instead.
 // inPlace: am patch, which takes no -o, so its hint does not name -o.
-function savePage(html, file, { fallback, inPlace }, { fail, env }) {
+function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   const home = amHome(env);
-  const inHome = resolve(file).startsWith(resolve(home) + sep);
+  const pageRoot = pages ?? join(home, 'pages');
+  const inHome = inside(home, file);
   const hint = (path) => {
     if (inPlace) return 'Copy the page to a folder this session can write to and patch the copy';
     return inHome
@@ -842,7 +873,7 @@ function savePage(html, file, { fallback, inPlace }, { fail, env }) {
   };
   const refuse = (path, e) => fail(`✗ Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
-    writePage(file, html, env);
+    writePage(file, html, env, pageRoot);
     return { file };
   } catch (e) {
     if (!isDenied(e)) throw e;
@@ -850,7 +881,7 @@ function savePage(html, file, { fallback, inPlace }, { fail, env }) {
     const spare = join(tempHome(), fallback, basename(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env);
+      writePage(spare, html, env, join(tempHome(), 'pages'));
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`✗ Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -873,14 +904,14 @@ function removeEarlier(file, { fail }) {
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
 // Returns the path written, or null when the page could not be written (see savePage).
-function emit(result, file, ctx, { note = '', fallback, inPlace } = {}) {
+function emit(result, file, ctx, { note = '', fallback, inPlace, pages } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, { fallback, inPlace }, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace, pages }, ctx);
   if (!saved) return null;
   print(`✓ ${saved.file}`);
   if (saved.notice) print(saved.notice);
   // With am serve running, a page inside the data directory also gets an http link.
-  const link = serveLink(amHome(env), saved.file);
+  const link = serveLink(amHome(env), saved.file, pages);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note}`);
   // The code the page now holds, so the user can check it before sharing the page.
@@ -945,7 +976,7 @@ function finish(file, opts, config, ctx) {
 function printHints(config, { env, io, print }) {
   try {
     const hints = afterRender({
-      home: amHome(env), env, config: config.values, current: VERSION,
+      home: amHome(env), env, config: config.values, current: VERSION, pages: pagesDir(env, config),
       scriptPath: io.scriptPath, background: Boolean(io.background),
     });
     hints.forEach((h) => print(h));
@@ -961,12 +992,13 @@ function cmdClean(opts, { print, fail, env }) {
   }
   const days = opts.days === undefined ? CLEAN.days : Number(opts.days);
   const home = amHome(env);
-  const before = usage(home);
+  const pages = pagesDir(env, readConfig(env));
+  const before = usage(home, pages);
   // The temporary folder holds pages written while the data directory was not writable. Only a folder that exists and is private.
   const temp = existingTempHome();
   const tempBefore = temp && usage(temp);
   const dry = Boolean(opts['dry-run']);
-  const r = clean(home, { days, all: Boolean(opts.all), dryRun: dry, temp });
+  const r = clean(home, { days, all: Boolean(opts.all), dryRun: dry, temp, pages });
   const scope = opts.all ? 'all pages, videos and drafts' : `pages, videos and drafts older than ${count(days, 'day')}`;
   print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, 'page')}, ${count(before.videos.count, 'video')}, ${mb(before.cache.bytes)} voice-over cache)`);
   if (temp) print(`Temporary folder: ${temp} (${mb(tempBefore.total)} in total: ${count(tempBefore.pages.count, 'page')}, ${count(tempBefore.videos.count, 'video')})`);
@@ -997,7 +1029,8 @@ function cmdServe(opts, { print, fail, env, io }) {
   }
   const port = opts.port === undefined ? DEFAULT_PORT : Number(opts.port);
   const secretFile = opts['secret-file'] === undefined ? undefined : resolve(io?.cwd ?? process.cwd(), opts['secret-file']);
-  return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts['public-url'], secretFile, print, fail });
+  const pages = pagesDir(env, readConfig(env));
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts['public-url'], secretFile, pagesDir: pages, print, fail });
 }
 
 function cmdLint(src, opts, { print, fail }) {
@@ -1094,8 +1127,10 @@ function cmdConfig(args, { print, fail, env, themes }) {
     const mark = k in stored ? '*' : ' ';
     const options = spec.type === 'bool' ? 'on | off'
       : spec.type === 'number' ? `${spec.min}–${spec.max}, step ${spec.step}`
-        : configChoices(k, themes).join(' | ');
-    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
+        : spec.type === 'path' ? 'a folder path'
+          : configChoices(k, themes).join(' | ');
+    const shown = showValue(values[k]);
+    print(`${mark} ${k.padEnd(19)}${shown.length >= 10 ? `${shown} ` : shown.padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== '0') print('Note: the AM_NO_OPEN environment variable is set and overrides the open setting.');
   print('* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]');
@@ -1157,10 +1192,11 @@ function cmdTheme(action, target, opts, ctx) {
 
   const themes = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
   const config = readConfig(env, themes);
+  const pages = pagesDir(env, config);
   const files = ['light', 'dark'].map((mode) => {
     const result = renderDoc(specimenDraft(name, mode), { theme: name, mode, style: 'off' }, {}, { themes, colophon: config.values.colophon });
-    const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx);
-    writePage(file, result.html, env);
+    const file = outputPath('pages', `theme-${name}-${mode}`, {}, ctx, pages);
+    writePage(file, result.html, env, pages);
     print(`✓ ${file}`);
     return file;
   });

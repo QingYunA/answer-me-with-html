@@ -10,10 +10,17 @@ import { typeScaleCss } from './type-scale.js';
 const block = (selector, vars) =>
   `${selector} {\n${Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join('\n')}\n}`;
 
-function tokenCss(sel, { common = {}, light = {}, dark = {} }) {
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { ...common, ...light })];
+function tokenCss(sel, { common = {}, light = {}, dark = {} }, fixedMode) {
+  // Each mode block also sets color-scheme (#395): it tells the browser which native UI (scrollbar, form controls) to draw.
+  // auto says "light dark" outside the media query, so the browser follows the system the way the tokens below follow the query.
+  const baseScheme = fixedMode === 'dark' ? 'dark' : 'light';
+  const parts = [
+    block(`${sel}, ${sel}[data-mode="light"]`, { 'color-scheme': baseScheme, ...common, ...light }),
+    block(`${sel}[data-mode="dark"]`, { 'color-scheme': 'dark', ...dark }),
+    block(`${sel}[data-mode="auto"]`, { 'color-scheme': 'light dark' }),
+  ];
   if (Object.keys(dark).length) {
-    parts.push(block(`${sel}[data-mode="dark"]`, dark), `@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`);
+    parts.push(`@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`);
   }
   return parts.join('\n');
 }
@@ -42,7 +49,7 @@ export function pageCss(list = themes('page'), { diff = false, delta = false, rt
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const fontFaces = fonts ? [...new Set(list.map((t) => t.font).filter((f) => f && FONT_CSS[f]))].map((f) => FONT_CSS[f]) : [];
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(table ? [TABLE_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...fontFaces, ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens, t.mode)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(table ? [TABLE_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...fontFaces, ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page
@@ -50,7 +57,7 @@ export function pageCss(list = themes('page'), { diff = false, delta = false, rt
 // The player has no theme picker, so its page styles carry no font face (pageCss fonts: false).
 export function videoCss(list = themes('video'), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list.filter((t) => t.video).flatMap((t) => [
-    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : '',
+    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens, t.mode) : '',
     t.video.css ? scoped(t.video.css, videoSel(t)) : '',
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : '',
   ]).filter(Boolean);

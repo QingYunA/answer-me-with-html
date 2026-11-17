@@ -1,6 +1,6 @@
 {
   "name": "answer-me-with-html",
-  "version": "0.5.11",
+  "version": "0.6.1",
   "description": "Answer hard questions with a one-page HTML: the model writes a short Markdown draft; the bundled CLI handles templates, SVG auto-layout and an STE controlled-writing check.",
   "icon": "./docs/logo.svg",
   "type": "module",
@@ -17,6 +17,8 @@
     "examples",
     "cordis.patch.yml",
     "docs/logo.svg",
+    "apply-faster-banner.png",
+    "get-started-button.png",
     "locale"
   ],
   "dsh": {
@@ -49,7 +51,7 @@
   "dependencies": {
     "@dagrejs/dagre": "^3.1.3",
     "@fontsource/bangers": "^5.3.0",
-    "marked": "^18.1.2",
+    "marked": "^18.1.3",
     "temml": "^0.14.0"
   },
   "repository": {
