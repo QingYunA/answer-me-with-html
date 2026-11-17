@@ -272,7 +272,7 @@ The agent picks a component by the shape of the information:
 | `state` | A state machine: states and the events that move between them, with an initial state, a final state and self-transitions |
 | `er` | A data model: entities with their columns (PK / FK / UK) and crow's-foot relationships |
 | `class` | UML classes, attributes, methods, interfaces and relationships |
-| `api` | HTTP / RPC contracts: parameters, request and response fields, status codes |
+| `api` | HTTP / RPC contracts and multi-endpoint diffs: parameters, requests, responses and status codes |
 | `sequence` | Messages going back and forth between several parties over time |
 | `tree` | Folders, modules, taxonomies |
 | `timeline` | History, releases, phases |
