@@ -9,11 +9,11 @@ The page is worth its evidence. Explore the code first, record each claim with t
 Work from the repository root, in this order. Each step ends on its own bar.
 
 1. **Entry points.** Find every way into the program: `bin` and `main` in `package.json`, `[project.scripts]` in `pyproject.toml`, `cmd/` in Go, `[[bin]]` in `Cargo.toml`, the CLI command table, the route table, the exported index. Done when each entry point has a `path:line`.
-2. **Module boundaries.** List the tracked files (`git ls-files`), then read the imports of each top-level folder. A module is a folder or file whose imports stay mostly inside it. Scope the map to the question: the whole repository for "how is this organized", the modules the main path reaches for "how does X work". Done when every source file in scope belongs to one module and each module's dependencies are known.
+2. **Module boundaries.** List the tracked files (`git ls-files`), then read the imports of each top-level folder. A module is a folder or file whose imports stay mostly inside it. Scope the map to the question: the whole repository for "how is this organized"; for "how does X work", name the top-level modules now and read each one's imports when step 3 reaches it. Done when every source file in scope belongs to one module and each module's dependencies are known.
 3. **Main path.** Take the request the question is about, or the most common one (the default command, the main route). Trace it from its entry point to its output, one call at a time. Done when every hop has a `path:line`.
 4. **Data and config.** Read the types, schemas or tables on the main path, and where settings load from, with their defaults and precedence. Done when each type and setting the main path reads has a `path:line`.
 
-On a repository too large to read in this context: after step 2, give each module in scope to a subagent, one per module. Brief it with the question, the module's files, its place in the boundaries, and the evidence rule below. Ask for the module's job in one sentence, its entry functions, its part of the main path, and every claim with its span. Merge the reports, then trace the hand-offs between modules yourself.
+On a repository too large to read in this context: once the modules in scope are known, give each one to a subagent, one per module. Brief it with the question, the module's files, its place in the boundaries, and the evidence rule below. Ask for the module's job in one sentence, its entry functions, its part of the main path, and every claim with its span. Merge the reports, then trace the hand-offs between modules yourself.
 
 ## Evidence
 
