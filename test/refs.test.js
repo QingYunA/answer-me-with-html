@@ -93,6 +93,60 @@ test('refs: spans in table cells, list items, quotes and callouts are checked at
   assert.deepEqual(warnings.map((w) => [w.line, w.message.slice(0, 16)]), [[7, '`src/app.ts:99`:'], [9, '`src/app.ts:98`:'], [12, '`src/app.ts:97`:']]);
 });
 
+// Component text that renders inline Markdown: a span there is <code> on the page, so it is checked at its own draft line.
+test('refs: spans in tree labels and notes are checked at their lines', () => {
+  const warnings = refs([
+    '```tree',
+    'src | the source',
+    '  refs.js | checks `src/refs.js:900`',
+    '  `src/app.ts:99` app | entry',
+    '  ok.ts | `src/app.ts:30`',
+    '```',
+  ].join('\n'));
+  assert.deepEqual(warnings.map((w) => [w.line, w.message.slice(0, 17)]), [[7, '`src/refs.js:900`'], [8, '`src/app.ts:99`: ']]);
+});
+
+test('refs: spans in timeline titles and notes and in kv values are checked; the time and the key are plain text', () => {
+  const warnings = refs([
+    '```timeline',
+    '`src/app.ts:91` | starts at `src/app.ts:92` | then `src/app.ts:93`',
+    '```',
+    '```kv',
+    'Entry: `src/app.ts:94`',
+    '* Wide: `src/app.ts:95`',
+    '```',
+  ].join('\n'));
+  assert.deepEqual(warnings.map((w) => [w.line, w.message.slice(0, 16)]), [
+    [6, '`src/app.ts:92`:'], [6, '`src/app.ts:93`:'], [9, '`src/app.ts:94`:'], [10, '`src/app.ts:95`:'],
+  ]);
+});
+
+test('refs: spans in an ask question, its options and their previews are checked', () => {
+  const warnings = refs([
+    '```ask',
+    'Keep `src/app.ts:81`?',
+    '* Yes `src/app.ts:82` | see `src/app.ts:83`',
+    '  :::tree',
+    '  root | `src/app.ts:84`',
+    '  :::',
+    '- No',
+    '```',
+  ].join('\n'));
+  assert.deepEqual(warnings.map((w) => [w.line, w.message.slice(0, 16)]), [
+    [6, '`src/app.ts:81`:'], [7, '`src/app.ts:82`:'], [7, '`src/app.ts:83`:'], [9, '`src/app.ts:84`:'],
+  ]);
+});
+
+test('refs: diagram text shows backticks as text, so flow, sequence, state, limits and annot are not checked', () => {
+  assert.deepEqual(refs([
+    '```flow', 'A -> B: see `src/app.ts:99`', '```',
+    '```sequence', 'A -> B: call `src/app.ts:99`', 'note A: `src/app.ts:99`', '```',
+    '```state', '[*] -> Idle: `src/app.ts:99`', '```',
+    '```limits', '`src/app.ts:99` | 13 / 20 | ms', '```',
+    '```annot', '# head | `src/app.ts:99`', '[span]{`src/app.ts:99`}', '```',
+  ].join('\n')), []);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });

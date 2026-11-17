@@ -8887,7 +8887,7 @@ function previewEnd(lines, openIdx) {
   }
   return -1;
 }
-function read(text2) {
+function readAsk(text2) {
   const lines = String(text2).split("\n");
   let question = null;
   const options = [];
@@ -8971,7 +8971,7 @@ The question, one sentence
   render(text2, { args, uid, ui = {}, line = 0, render }) {
     const multi = /(^|\s)multi(\s|$)/.test(args);
     const cards = /(^|\s)cards(\s|$)/.test(args);
-    const { question, options } = read(text2);
+    const { question, options } = readAsk(text2);
     if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, question.line);
     const suggested = options.filter((o) => o.suggested).length;
     if (!multi && suggested !== 1) {
@@ -10755,21 +10755,51 @@ import { lstatSync, readFileSync as readFileSync4, realpathSync as realpathSync3
 import { isAbsolute as isAbsolute3, join as join2, relative as relative2 } from "node:path";
 var REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
 var FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
+var INLINE_PARTS = {
+  tree: (t) => fields(t),
+  // label and note
+  timeline: (t) => fields(t).slice(1, 3),
+  // title and note; the time is plain text
+  kv: (t) => [(t.startsWith("*") ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ""]
+  // the value; the key is plain text
+};
+function inlineTexts(block2) {
+  if (block2.type === "md") return [{ text: block2.text, line: block2.line }];
+  if (block2.lang === "callout") return [{ text: block2.text, line: block2.line + 1 }];
+  if (block2.lang === "ask") return askTexts(block2);
+  const parts = INLINE_PARTS[block2.lang];
+  if (!parts) return [];
+  return contentLines(block2.text).flatMap(({ text: text2, line }) => parts(text2).map((part) => ({ text: part, line: block2.line + line })));
+}
+function askTexts(block2) {
+  let ask;
+  try {
+    ask = readAsk(block2.text);
+  } catch {
+    return [];
+  }
+  return [
+    { text: ask.question.text, line: block2.line + ask.question.line },
+    ...ask.options.flatMap((o) => [
+      { text: o.label, line: block2.line + o.line },
+      { text: o.note, line: block2.line + o.line },
+      ...o.preview ? inlineTexts({ type: "fence", lang: o.preview.lang, text: o.preview.text, line: block2.line + o.preview.line }) : []
+    ])
+  ];
+}
 function checkRefs(blocks, { baseDir }) {
   const files = /* @__PURE__ */ new Map();
   const warnings = [];
-  for (const block2 of blocks) {
-    const first = block2.type === "md" ? block2.line : block2.lang === "callout" ? block2.line + 1 : null;
-    if (first === null) continue;
+  for (const { text: text2, line } of blocks.flatMap(inlineTexts)) {
     let cursor = 0;
-    for (const span of codeSpans(block2.text)) {
-      const found = block2.text.indexOf(span.raw, cursor);
+    for (const span of codeSpans(text2)) {
+      const found = text2.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
       const problem = checkRef(span.text.trim(), baseDir, files);
-      if (problem) warnings.push({ line: first + (found < 0 ? 0 : block2.text.slice(0, found).split("\n").length - 1), rule: "ref", message: problem });
+      if (problem) warnings.push({ line: line + (found < 0 ? 0 : text2.slice(0, found).split("\n").length - 1), rule: "ref", message: problem });
     }
   }
-  return warnings;
+  return warnings.sort((a3, b) => a3.line - b.line);
 }
 function checkRef(text2, baseDir, files) {
   const m = text2.match(REF);
@@ -14114,7 +14144,8 @@ export const LIMIT = 50
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ \u2026) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
-- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file. The render checks it against the same
+- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file (also in tree, timeline, kv and ask text;
+  diagram text is not checked). The render checks it against the same
   folder and prints a refs warning when the file is missing, the lines go past its end, or the range runs backwards; the page then does not open.
   A missing path is a warning only when its first folder exists here, so a path of another project is not checked.
 

@@ -6,28 +6,67 @@ import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import { codeSpans } from './markdown.js';
 import { localPath, isSecretPath, MAX_FILE_BYTES } from './code.js';
+import { contentLines, fields } from './components/error.js';
+import { readAsk } from './components/ask.js';
 
 // The whole span: a path without spaces or colons, a colon, a line or a range. A path looks like a file: it has a / or an extension
 // with a letter in it, so localhost:3000 and 127.0.0.1:8080 are not references.
 const REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
 const FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
 
-// blocks: the draft's blocks; Markdown blocks and callouts are read. Returns [{ line, rule: 'ref', message }] in draft order.
+// The parts of a component line that render inline Markdown, so a code span there is <code> on the page. Diagram components
+// (flow, sequence, state, limits, annot …) draw their text as is, backticks included, so they have no spans to check.
+const INLINE_PARTS = {
+  tree: (t) => fields(t), // label and note
+  timeline: (t) => fields(t).slice(1, 3), // title and note; the time is plain text
+  kv: (t) => [(t.startsWith('*') ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ''], // the value; the key is plain text
+};
+
+// The texts of one block that may hold code spans, each with the draft line its text starts on. A fence's text starts on the line
+// after the fence, so its line n is block.line + n.
+function inlineTexts(block) {
+  if (block.type === 'md') return [{ text: block.text, line: block.line }];
+  if (block.lang === 'callout') return [{ text: block.text, line: block.line + 1 }];
+  if (block.lang === 'ask') return askTexts(block);
+  const parts = INLINE_PARTS[block.lang];
+  if (!parts) return [];
+  return contentLines(block.text).flatMap(({ text, line }) => parts(text).map((part) => ({ text: part, line: block.line + line })));
+}
+
+// The question, each option's label and note, and each preview, which is a block of its own. A block the component cannot read is
+// a render error anyway, so it has nothing to check.
+function askTexts(block) {
+  let ask;
+  try {
+    ask = readAsk(block.text);
+  } catch {
+    return [];
+  }
+  return [
+    { text: ask.question.text, line: block.line + ask.question.line },
+    ...ask.options.flatMap((o) => [
+      { text: o.label, line: block.line + o.line },
+      { text: o.note, line: block.line + o.line },
+      ...(o.preview ? inlineTexts({ type: 'fence', lang: o.preview.lang, text: o.preview.text, line: block.line + o.preview.line }) : []),
+    ]),
+  ];
+}
+
+// blocks: the draft's blocks; Markdown blocks, callouts and the inline text of components are read.
+// Returns [{ line, rule: 'ref', message }] in draft order.
 export function checkRefs(blocks, { baseDir }) {
   const files = new Map();
   const warnings = [];
-  for (const block of blocks) {
-    const first = block.type === 'md' ? block.line : block.lang === 'callout' ? block.line + 1 : null;
-    if (first === null) continue;
+  for (const { text, line } of blocks.flatMap(inlineTexts)) {
     let cursor = 0;
-    for (const span of codeSpans(block.text)) {
-      const found = block.text.indexOf(span.raw, cursor);
+    for (const span of codeSpans(text)) {
+      const found = text.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
       const problem = checkRef(span.text.trim(), baseDir, files);
-      if (problem) warnings.push({ line: first + (found < 0 ? 0 : block.text.slice(0, found).split('\n').length - 1), rule: 'ref', message: problem });
+      if (problem) warnings.push({ line: line + (found < 0 ? 0 : text.slice(0, found).split('\n').length - 1), rule: 'ref', message: problem });
     }
   }
-  return warnings;
+  return warnings.sort((a, b) => a.line - b.line);
 }
 
 // What is wrong with one span, or null when it is not a reference, it is fine, or it cannot be checked here.
