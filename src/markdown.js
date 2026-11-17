@@ -147,6 +147,24 @@ export function md(text, { ui, interactive = true } = {}) {
   }
 }
 
+// Every inline code span of a Markdown text, in source order: [{ text, raw }]. Code blocks hold no spans, so their text is never returned.
+// The lexer is the one md() uses, so a span here is a span on the page.
+export function codeSpans(text) {
+  const spans = [];
+  const walk = (tokens) => {
+    if (!Array.isArray(tokens)) return;
+    for (const token of tokens) {
+      if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw });
+      walk(token.tokens);
+      walk(token.items);
+      walk(token.header);
+      (token.rows ?? []).forEach((row) => walk(row));
+    }
+  };
+  walk(marked.lexer(String(text ?? '')));
+  return spans;
+}
+
 export function mdInline(text) {
   return inline.parseInline(wrapSpacedImages(String(text ?? '')));
 }

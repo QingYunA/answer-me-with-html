@@ -30,7 +30,7 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync6, chmodSync as chmodSync2, openSync as openSync2, closeSync as closeSync2 } from "node:fs";
+import { readFileSync as readFileSync11, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync7, chmodSync as chmodSync2, openSync as openSync2, closeSync as closeSync2 } from "node:fs";
 
 // src/assets.js
 var VERSION = "0.6.1";
@@ -1491,7 +1491,7 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join13, resolve as resolve8, relative as relative3, isAbsolute as isAbsolute5, dirname as dirname5, basename as basename6, extname as extname3, sep as sep5 } from "node:path";
+import { join as join14, resolve as resolve8, relative as relative4, isAbsolute as isAbsolute6, dirname as dirname5, basename as basename6, extname as extname3, sep as sep5 } from "node:path";
 import { spawn as spawn5 } from "node:child_process";
 import { randomBytes as randomBytes2 } from "node:crypto";
 
@@ -4743,6 +4743,21 @@ function md(text2, { ui, interactive = true } = {}) {
     tableUi = outerUi;
     tableInteractive = outerInteractive;
   }
+}
+function codeSpans(text2) {
+  const spans = [];
+  const walk2 = (tokens) => {
+    if (!Array.isArray(tokens)) return;
+    for (const token of tokens) {
+      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw });
+      walk2(token.tokens);
+      walk2(token.items);
+      walk2(token.header);
+      (token.rows ?? []).forEach((row) => walk2(row));
+    }
+  };
+  walk2(marked.lexer(String(text2 ?? "")));
+  return spans;
 }
 function mdInline(text2) {
   return inline.parseInline(wrapSpacedImages(String(text2 ?? "")));
@@ -10528,8 +10543,9 @@ function localPath(ref, baseDir) {
   const rel = relative(baseDir, path);
   return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
 }
+var isSecretPath = (rel) => SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part));
 function assertNotSecret(ref, rel, via) {
-  if (SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+  if (isSecretPath(rel)) {
     throw new CodeError(`"${ref}" ${via ? "points to" : "is"} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
   }
 }
@@ -10734,6 +10750,74 @@ function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
 }
 
+// src/refs.js
+import { lstatSync, readFileSync as readFileSync4, realpathSync as realpathSync3, statSync as statSync3 } from "node:fs";
+import { isAbsolute as isAbsolute3, join as join2, relative as relative2 } from "node:path";
+var REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
+var FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
+function checkRefs(blocks, { baseDir }) {
+  const files = /* @__PURE__ */ new Map();
+  const warnings = [];
+  for (const block2 of blocks) {
+    const first = block2.type === "md" ? block2.line : block2.lang === "callout" ? block2.line + 1 : null;
+    if (first === null) continue;
+    let cursor = 0;
+    for (const span of codeSpans(block2.text)) {
+      const found = block2.text.indexOf(span.raw, cursor);
+      if (found >= 0) cursor = found + span.raw.length;
+      const problem = checkRef(span.text.trim(), baseDir, files);
+      if (problem) warnings.push({ line: first + (found < 0 ? 0 : block2.text.slice(0, found).split("\n").length - 1), rule: "ref", message: problem });
+    }
+  }
+  return warnings;
+}
+function checkRef(text2, baseDir, files) {
+  const m = text2.match(REF);
+  if (!m || !FILE_LIKE.test(m[1]) || isAbsolute3(m[1]) || /^[~\\]/.test(m[1]) || m[1].includes("\\")) return null;
+  const [, path, a3, b = a3] = m;
+  const from = Number(a3);
+  const to = Number(b);
+  if (from < 1) return `\`${text2}\`: lines start at 1`;
+  if (to < from) return `\`${text2}\`: the first line comes after the last; write ${path}:${to}-${from}`;
+  if (!files.has(path)) files.set(path, inspect(path, baseDir));
+  const file = files.get(path);
+  if (!file) return null;
+  if (file.missing) return `\`${text2}\`: no such file in ${baseDir}`;
+  if (file.folder) return `\`${text2}\`: ${path} is a folder, not a file`;
+  if (to > file.lines) return `\`${text2}\`: the file has ${file.lines} line${file.lines === 1 ? "" : "s"}`;
+  return null;
+}
+function inspect(path, baseDir) {
+  const written = localPath(path, baseDir);
+  if (!written || isSecretPath(relative2(baseDir, written))) return null;
+  if (!exists(written)) {
+    const top2 = path.split("/")[0];
+    return path.includes("/") && exists(join2(baseDir, top2)) ? { missing: true } : null;
+  }
+  try {
+    const real = realpathSync3(written);
+    const root = realpathSync3(baseDir);
+    if (!localPath(real, root) || isSecretPath(relative2(root, real))) return null;
+    const stat2 = statSync3(real);
+    if (stat2.isDirectory()) return { folder: true };
+    if (!stat2.isFile() || stat2.size > MAX_FILE_BYTES) return null;
+    const buf = readFileSync4(real);
+    if (buf.includes(0)) return null;
+    const text2 = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "");
+    return { lines: text2 ? text2.split("\n").length : 0 };
+  } catch {
+    return null;
+  }
+}
+function exists(path) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // src/sha256.js
 var K3 = Uint32Array.from({ length: 64 }, (_2, i) => {
   let n = 2;
@@ -10836,7 +10920,8 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
     raiseAll(errors);
     throw new LintError(warnings);
   }
-  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
+  const refWarnings = codeDir ? checkRefs([...doc2.intro, ...doc2.panels.flatMap((p) => p.blocks)], { baseDir: codeDir }) : [];
+  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], refWarnings, componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc2.intro.filter((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
@@ -11080,25 +11165,25 @@ ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 }
 
 // src/theme-market.js
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 
 // src/config.js
-import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
-import { join as join3, dirname, isAbsolute as isAbsolute3, resolve as resolve3 } from "node:path";
+import { readFileSync as readFileSync5, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
+import { join as join4, dirname, isAbsolute as isAbsolute4, resolve as resolve3 } from "node:path";
 import { homedir as homedir3 } from "node:os";
 
 // src/home.js
-import { mkdirSync, existsSync as existsSync2, statSync as statSync3, lstatSync, chmodSync } from "node:fs";
+import { mkdirSync, existsSync as existsSync2, statSync as statSync4, lstatSync as lstatSync2, chmodSync } from "node:fs";
 import { homedir as homedir2, tmpdir } from "node:os";
-import { join as join2 } from "node:path";
-var defaultHome = () => join2(homedir2(), ".answer-me-with-html");
+import { join as join3 } from "node:path";
+var defaultHome = () => join3(homedir2(), ".answer-me-with-html");
 function ensureHome(home) {
   const fresh = !existsSync2(home);
   mkdirSync(home, { recursive: true, mode: 448 });
   if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
-  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+  if ((statSync4(home).mode & 511) !== 448) chmodSync(home, 448);
 }
-var tempHome = () => join2(tmpdir(), process.getuid ? `answer-me-with-html-${process.getuid()}` : "answer-me-with-html");
+var tempHome = () => join3(tmpdir(), process.getuid ? `answer-me-with-html-${process.getuid()}` : "answer-me-with-html");
 var UnsafeTempHome = class extends Error {
   constructor(dir) {
     super(`${dir} is not a private folder of this user`);
@@ -11117,7 +11202,7 @@ function checkedTempHome({ create = false } = {}) {
   }
   let info;
   try {
-    info = lstatSync(dir);
+    info = lstatSync2(dir);
   } catch (e) {
     if (e.code === "ENOENT" && !create) return null;
     throw e;
@@ -11155,12 +11240,12 @@ function pagesDir(env = process.env, config = {}) {
   const values = config && typeof config === "object" && config.values ? config.values : config;
   const raw = typeof values === "string" ? values : values?.pages_dir ?? "";
   const text2 = String(raw).trim();
-  if (!text2) return join3(amHome(env), "pages");
+  if (!text2) return join4(amHome(env), "pages");
   const expanded = text2.replace(/^~(?=$|[\\/])/, () => homedir3());
-  return isAbsolute3(expanded) ? resolve3(expanded) : resolve3(amHome(env), expanded);
+  return isAbsolute4(expanded) ? resolve3(expanded) : resolve3(amHome(env), expanded);
 }
 function configPath(env = process.env) {
-  return join3(amHome(env), "config.json");
+  return join4(amHome(env), "config.json");
 }
 var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k, s]) => [k, s.default]));
 function configChoices(key, themes2) {
@@ -11199,7 +11284,7 @@ function readStored(env) {
   const file = configPath(env);
   if (!existsSync3(file)) return { stored: {} };
   try {
-    const data = JSON.parse(readFileSync4(file, "utf8"));
+    const data = JSON.parse(readFileSync5(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
   } catch (e) {
     return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
@@ -11244,17 +11329,17 @@ function resetConfig(key, env = process.env) {
 
 // src/themes/catalog.js
 import { createHash } from "node:crypto";
-import { mkdirSync as mkdirSync2, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join5 } from "node:path";
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync7, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join6 } from "node:path";
 
 // src/state.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, renameSync } from "node:fs";
-import { join as join4 } from "node:path";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync2, renameSync } from "node:fs";
+import { join as join5 } from "node:path";
 var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join4(home, "state.json");
+var statePath = (home) => join5(home, "state.json");
 function readState(home) {
   try {
-    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
+    const data = JSON.parse(readFileSync6(statePath(home), "utf8"));
     return data && typeof data === "object" && !Array.isArray(data) ? data : {};
   } catch {
     return {};
@@ -11291,8 +11376,8 @@ var CatalogError = class extends Error {
   }
 };
 var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-var themesDir = (home) => join5(home, "themes");
-var themeFile = (home, name2) => join5(themesDir(home), `${name2}.json`);
+var themesDir = (home) => join6(home, "themes");
+var themeFile = (home, name2) => join6(themesDir(home), `${name2}.json`);
 function catalogUrl(env = process.env) {
   const url = env.AM_CATALOG_URL || CATALOG.url;
   let parsed;
@@ -11422,7 +11507,7 @@ function forget(home, name2) {
 }
 function readInstalledFile(home, name2) {
   try {
-    return readFileSync6(themeFile(home, name2));
+    return readFileSync7(themeFile(home, name2));
   } catch {
     return null;
   }
@@ -11634,7 +11719,7 @@ function removeTheme(name2, { print, fail, env }) {
   }
   const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name2;
   remove(home, name2);
-  print(`\u2713 Removed ${join6(themesDir(home), `${name2}.json`)}`);
+  print(`\u2713 Removed ${join7(themesDir(home), `${name2}.json`)}`);
   if (wasDefault) {
     resetConfig("theme", env);
     print(`! ${name2} was the default theme; the default is auto again`);
@@ -11766,9 +11851,9 @@ var round3 = (x2) => Math.round(x2 * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4, statSync as statSync4 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync8, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4, statSync as statSync5 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { dirname as dirname2, join as join7, resolve as resolve4 } from "node:path";
+import { dirname as dirname2, join as join8, resolve as resolve4 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -11940,7 +12025,7 @@ function commandVoice(env, { which, timeoutMs }) {
       await runCommandTts(program, args, text2, timeoutMs);
       let buf;
       try {
-        buf = readFileSync7(out);
+        buf = readFileSync8(out);
       } catch {
         buf = Buffer.alloc(0);
       }
@@ -12006,8 +12091,8 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
   let source;
   let mapStat;
   try {
-    source = readFileSync7(mapFile, "utf8").replace(/^\uFEFF/, "");
-    mapStat = statSync4(mapFile);
+    source = readFileSync8(mapFile, "utf8").replace(/^\uFEFF/, "");
+    mapStat = statSync5(mapFile);
   } catch (e) {
     throw new TtsError(`Cannot read audio map ${mapFile}: ${e.message}`);
   }
@@ -12031,9 +12116,9 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
     let stat2;
     let audio;
     try {
-      stat2 = statSync4(audioFile);
+      stat2 = statSync5(audioFile);
       if (!stat2.isFile()) throw new TtsError(`Audio file for narration line "${text2}" is not a file: ${audioFile}`);
-      audio = readFileSync7(audioFile);
+      audio = readFileSync8(audioFile);
     } catch (e) {
       if (e instanceof TtsError) throw e;
       throw new TtsError(`Cannot read audio file for narration line "${text2}": ${audioFile}: ${e.message}`);
@@ -12055,7 +12140,7 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
       if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
       let buf;
       try {
-        buf = readFileSync7(entry.file);
+        buf = readFileSync8(entry.file);
       } catch (e) {
         throw new TtsError(`Cannot read audio file for narration line "${key}": ${entry.file}: ${e.message}`);
       }
@@ -12079,7 +12164,7 @@ async function mappedSamples(buf, file, label, { which, runCommand }) {
   return withTemp(async (out) => {
     try {
       await runCommand("ffmpeg", ["-v", "error", "-y", "-i", file, "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", out]);
-      return readWav(readFileSync7(out));
+      return readWav(readFileSync8(out));
     } catch (e) {
       throw new TtsError(`Cannot convert ${label} with ffmpeg: ${e.message}`);
     }
@@ -12137,7 +12222,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
       synth: (text2, { voice } = {}) => withTemp(async (file) => {
         await run("say", [...voice ? ["-v", voice] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text2)]);
-        return readWav(readFileSync7(file));
+        return readWav(readFileSync8(file));
       })
     };
   }
@@ -12153,7 +12238,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
       synth: (text2, { voice } = {}) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", voice ?? "en-us", "-w", file, "-f", textFile(file, text2)]);
-        return readWav(readFileSync7(file));
+        return readWav(readFileSync8(file));
       })
     };
   }
@@ -12224,9 +12309,9 @@ function textFile(wavFile, text2) {
   return p;
 }
 async function withTemp(fn2) {
-  const dir = mkdtempSync(join7(tmpdir2(), "am-tts-"));
+  const dir = mkdtempSync(join8(tmpdir2(), "am-tts-"));
   try {
-    return await fn2(join7(dir, "out.wav"));
+    return await fn2(join8(dir, "out.wav"));
   } finally {
     rmSync3(dir, { recursive: true, force: true });
   }
@@ -12288,7 +12373,7 @@ async function synthAll(texts, provider, { cacheDir: wanted, languageOf } = {}) 
       const key = `${provider.id}${voice ? `:${voice}` : ""}${language ? `
 ${language}` : ""}
 ${texts[i]}`;
-      const file = cacheDir && join7(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
+      const file = cacheDir && join8(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
@@ -12314,7 +12399,7 @@ function readCache(file) {
   if (!existsSync4(file)) return null;
   let buf;
   try {
-    buf = readFileSync7(file);
+    buf = readFileSync8(file);
   } catch (e) {
     if (!isDenied(e)) throw e;
     return null;
@@ -12522,14 +12607,14 @@ ${sourceTag(source)}
 // src/video/export.js
 import { spawn as spawn3 } from "node:child_process";
 import { writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // src/chrome.js
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 var ExportError = class extends Error {
 };
 var CDP_TIMEOUT_MS = 3e4;
@@ -12570,11 +12655,11 @@ async function openPage(url, {
   scriptError = "Page script error"
 } = {}) {
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join8(tmpdir3(), "am-chrome-"));
+  const tmp = mkdtempSync2(join9(tmpdir3(), "am-chrome-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
-    `--user-data-dir=${join8(tmp, "profile")}`,
+    `--user-data-dir=${join9(tmp, "profile")}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--hide-scrollbars",
@@ -12733,7 +12818,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
     const { info, evaluate, screenshot, tmp } = player;
-    const wavFile = wav2 ? join9(tmp, "voice.wav") : null;
+    const wavFile = wav2 ? join10(tmp, "voice.wav") : null;
     if (wav2) writeFileSync5(wavFile, wav2);
     const ffmpeg = spawn3("ffmpeg", [
       "-y",
@@ -12832,8 +12917,8 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readlinkSync, realpathSync as realpathSync3, statSync as statSync5, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
-import { basename as basename3, dirname as dirname3, join as join10, resolve as resolve5 } from "node:path";
+import { existsSync as existsSync6, lstatSync as lstatSync3, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readlinkSync, realpathSync as realpathSync4, statSync as statSync6, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
+import { basename as basename3, dirname as dirname3, join as join11, resolve as resolve5 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
 var DEVICE_SCALE = 2;
@@ -12877,7 +12962,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   if (pdf && png && sameDirectory(dirname3(pdf), png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
-  if (pdf && png && lstatSync2(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
+  if (pdf && png && lstatSync3(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
     const target = resolve5(dirname3(pdf), readlinkSync(pdf));
     if (sameDirectory(dirname3(target), png) && isSliceOf(basename3(target), sliceName(file))) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
@@ -12892,7 +12977,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   }
   let inputStat;
   try {
-    inputStat = statSync5(file);
+    inputStat = statSync6(file);
   } catch (e) {
     throw new ExportError(`Cannot read the page ${file}: ${e.message}`);
   }
@@ -12925,7 +13010,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
 function checkPdfCollision(file, pdf, png) {
   let entries;
   try {
-    entries = statSync5(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync2(png) : [];
+    entries = statSync6(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync2(png) : [];
   } catch (e) {
     throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
   }
@@ -12934,7 +13019,7 @@ function checkPdfCollision(file, pdf, png) {
     const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
     if (!index || checked.has(index)) continue;
     checked.add(index);
-    const slice = join10(png, `${sliceName(file)}-${index}.png`);
+    const slice = join11(png, `${sliceName(file)}-${index}.png`);
     if (existsSync6(slice) && sameFile(slice, pdf)) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
     }
@@ -12962,7 +13047,7 @@ async function writePdf(page, file) {
   return file;
 }
 async function writePngSlices(page, htmlFile, folder, onWarn = () => {
-}, inputStat = statSync5(htmlFile)) {
+}, inputStat = statSync6(htmlFile)) {
   await page.page("Emulation.setEmulatedMedia", { media: "screen" });
   await settle2(page);
   const layout5 = await page.evaluate(`(async () => {
@@ -12987,7 +13072,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
   if (layout5.empty) throw new ExportError("The page is empty: there is nothing to export");
   try {
     mkdirSync4(folder, { recursive: true });
-    if (!statSync5(folder).isDirectory()) throw new Error("not a folder");
+    if (!statSync6(folder).isDirectory()) throw new Error("not a folder");
   } catch (e) {
     throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
   }
@@ -13005,7 +13090,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
       captureBeyondViewport: true,
       clip: { x: 0, y: top2, width: VIEWPORT, height, scale: 1 }
     });
-    const file = join10(folder, `${name2}-${i}.png`);
+    const file = join11(folder, `${name2}-${i}.png`);
     if (isInputFile(file, htmlFile, inputStat)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync6(file, Buffer.from(data, "base64"));
@@ -13018,7 +13103,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
   return written;
 }
 function removeStaleSlices(folder, name2, kept, htmlFile, onWarn = () => {
-}, inputStat = statSync5(htmlFile, { throwIfNoEntry: false })) {
+}, inputStat = statSync6(htmlFile, { throwIfNoEntry: false })) {
   let entries;
   try {
     entries = readdirSync2(folder);
@@ -13028,9 +13113,9 @@ function removeStaleSlices(folder, name2, kept, htmlFile, onWarn = () => {
   }
   for (const entry of entries) {
     if (!isSliceOf(entry, name2) || kept.has(entry)) continue;
-    const file = join10(folder, entry);
+    const file = join11(folder, entry);
     try {
-      const st3 = lstatSync2(file);
+      const st3 = lstatSync3(file);
       if (!st3.isFile() && !st3.isSymbolicLink()) {
         onWarn(`Left ${file} in place: it is not a PNG file`);
         continue;
@@ -13052,7 +13137,7 @@ var settle2 = (page) => page.evaluate(`(async () => {
   return true;
 })()`);
 function isHtmlPage(file) {
-  return /\.html?$/i.test(file) && statSync5(file, { throwIfNoEntry: false })?.isFile() === true;
+  return /\.html?$/i.test(file) && statSync6(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 var sliceName = (htmlFile) => basename3(htmlFile).replace(/\.html?$/i, "") || "page";
 var isSliceOf = (fileName, name2) => {
@@ -13060,13 +13145,13 @@ var isSliceOf = (fileName, name2) => {
   return /^[1-9]\d*$/.test(fileName.slice(name2.length + 1, -".png".length));
 };
 var sameFile = (a3, b) => {
-  return sameIdentity(statSync5(a3), statSync5(b));
+  return sameIdentity(statSync6(a3), statSync6(b));
 };
 var sameIdentity = (a3, b) => a3.dev === b.dev && a3.ino === b.ino;
 var isInputFile = (file, htmlFile, inputStat) => {
   if (!existsSync6(file)) return false;
-  const st3 = statSync5(file);
-  return inputStat && sameIdentity(st3, inputStat) || existsSync6(htmlFile) && sameIdentity(st3, statSync5(htmlFile));
+  const st3 = statSync6(file);
+  return inputStat && sameIdentity(st3, inputStat) || existsSync6(htmlFile) && sameIdentity(st3, statSync6(htmlFile));
 };
 var realOrAncestor = (path) => {
   const missing = [];
@@ -13075,14 +13160,14 @@ var realOrAncestor = (path) => {
     missing.unshift(basename3(current));
     current = dirname3(current);
   }
-  return join10(realpathSync3(current), ...missing);
+  return join11(realpathSync4(current), ...missing);
 };
 var sameDirectory = (a3, b) => {
   if (resolve5(a3) === resolve5(b)) return true;
   try {
     if (realOrAncestor(a3) === realOrAncestor(b)) return true;
-    const x2 = statSync5(a3);
-    const y = statSync5(b);
+    const x2 = statSync6(a3);
+    const y = statSync6(b);
     return x2.dev === y.dev && x2.ino === y.ino;
   } catch {
     return false;
@@ -13091,8 +13176,8 @@ var sameDirectory = (a3, b) => {
 var isPath = (value) => value.includes("/") || value.includes("\\");
 
 // src/housekeeping.js
-import { readdirSync as readdirSync3, lstatSync as lstatSync3, rmSync as rmSync5, readFileSync as readFileSync8 } from "node:fs";
-import { join as join11, basename as basename4, resolve as resolve6, relative as relative2, isAbsolute as isAbsolute4, sep as sep3 } from "node:path";
+import { readdirSync as readdirSync3, lstatSync as lstatSync4, rmSync as rmSync5, readFileSync as readFileSync9 } from "node:fs";
+import { join as join12, basename as basename4, resolve as resolve6, relative as relative3, isAbsolute as isAbsolute5, sep as sep3 } from "node:path";
 
 // src/update.js
 import { spawn as spawn4 } from "node:child_process";
@@ -13205,16 +13290,16 @@ var PAGE_FILE = /^[a-z0-9-]+-\d{8}-\d{6}(-\d+)?\.html$/;
 function walk(dir) {
   let entries;
   try {
-    if (!lstatSync3(dir).isDirectory()) return [];
+    if (!lstatSync4(dir).isDirectory()) return [];
     entries = readdirSync3(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join11(dir, e.name);
+    const p = join12(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
-      const s = lstatSync3(p);
+      const s = lstatSync4(p);
       return s.isFile() ? [{ path: p, bytes: s.size, mtime: s.mtimeMs }] : [];
     } catch {
       return [];
@@ -13223,18 +13308,18 @@ function walk(dir) {
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
 var insideDir = (dir, path) => {
-  const rel = relative2(resolve6(dir), resolve6(path));
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep3}`) && !isAbsolute4(rel);
+  const rel = relative3(resolve6(dir), resolve6(path));
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep3}`) && !isAbsolute5(rel);
 };
 var DATA_DIRS = ["videos", "drafts", "cache", "serve-state", "themes"];
-var samePath = (a3, b) => relative2(resolve6(a3), resolve6(b)) === "";
+var samePath = (a3, b) => relative3(resolve6(a3), resolve6(b)) === "";
 var outsidePages = (root, pages) => insideDir(root, pages) || samePath(root, pages) ? (f2) => !insideDir(pages, f2.path) : () => true;
 var pageFiles = (home, pages) => {
-  const nested = DATA_DIRS.map((d) => join11(home, d)).filter((root) => insideDir(pages, root));
+  const nested = DATA_DIRS.map((d) => join12(home, d)).filter((root) => insideDir(pages, root));
   return walk(pages).filter((f2) => !nested.some((root) => insideDir(root, f2.path)));
 };
-function usage2(home, pages = join11(home, "pages")) {
-  const roots = { pages, videos: join11(home, "videos"), cache: join11(home, "cache") };
+function usage2(home, pages = join12(home, "pages")) {
+  const roots = { pages, videos: join12(home, "videos"), cache: join12(home, "cache") };
   const parts = Object.fromEntries(DIRS4.map((d) => {
     const files = d === "pages" ? pageFiles(home, pages) : walk(roots[d]).filter(outsidePages(roots[d], pages));
     return [d, { count: files.length, bytes: sum(files) }];
@@ -13242,22 +13327,22 @@ function usage2(home, pages = join11(home, "pages")) {
   return { ...parts, total: DIRS4.reduce((n, d) => n + parts[d].bytes, 0) };
 }
 var pageVictims = (home, pages, cutoff, all, custom) => pageFiles(home, pages).filter((f2) => (all || f2.mtime < cutoff) && (!custom || PAGE_FILE.test(basename4(f2.path))));
-function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join11(home, "pages") } = {}) {
+function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join12(home, "pages") } = {}) {
   const cutoff = now - days * DAY;
-  const custom = resolve6(pages) !== resolve6(join11(home, "pages"));
+  const custom = resolve6(pages) !== resolve6(join12(home, "pages"));
   const victims = [
     ...pageVictims(home, pages, cutoff, all, custom),
-    ...["videos", "drafts"].flatMap((d) => walk(join11(home, d)).filter((f2) => outsidePages(join11(home, d), pages)(f2) && (all || f2.mtime < cutoff))),
-    ...[temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join11(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
-    ...walk(join11(home, "cache")).filter(outsidePages(join11(home, "cache"), pages))
+    ...["videos", "drafts"].flatMap((d) => walk(join12(home, d)).filter((f2) => outsidePages(join12(home, d), pages)(f2) && (all || f2.mtime < cutoff))),
+    ...[temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join12(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
+    ...walk(join12(home, "cache")).filter(outsidePages(join12(home, "cache"), pages))
   ];
   const gone = new Set(pageVictims(home, pages, cutoff, all, custom).map((f2) => f2.path));
-  const states = walk(join11(home, "serve-state")).filter(outsidePages(join11(home, "serve-state"), pages)).filter((f2) => {
+  const states = walk(join12(home, "serve-state")).filter(outsidePages(join12(home, "serve-state"), pages)).filter((f2) => {
     if (!f2.path.endsWith(".json")) return f2.mtime < now - HOUR;
     if (all || f2.mtime < cutoff) return true;
     try {
-      const file = JSON.parse(readFileSync8(f2.path, "utf8"))?.file;
-      return typeof file !== "string" || gone.has(join11(pages, file)) || !lstatSync3(join11(pages, file)).isFile();
+      const file = JSON.parse(readFileSync9(f2.path, "utf8"))?.file;
+      return typeof file !== "string" || gone.has(join12(pages, file)) || !lstatSync4(join12(pages, file)).isFile();
     } catch {
       return true;
     }
@@ -13281,7 +13366,7 @@ function cleanHint(state, use, now = Date.now()) {
   const when = state.lastClean ? `last cleaned ${days} days ago` : "never cleaned";
   return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages, videos and drafts older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
 }
-function afterRender({ home, env, config, current, scriptPath, background, now = Date.now(), pages = join11(home, "pages") }) {
+function afterRender({ home, env, config, current, scriptPath, background, now = Date.now(), pages = join12(home, "pages") }) {
   let state = readState(home);
   if (!state.firstSeen) state = writeState(home, { firstSeen: now });
   const hints = [];
@@ -13366,9 +13451,9 @@ import { connect as connect2, isIP } from "node:net";
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, createHash as createHash3, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync4, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync10, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync5, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join12, resolve as resolve7, dirname as dirname4, basename as basename5, sep as sep4 } from "node:path";
+import { join as join13, resolve as resolve7, dirname as dirname4, basename as basename5, sep as sep4 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -13463,7 +13548,7 @@ var SECRET_PATTERN = /^[0-9a-f]{64}$/;
 function loadSecret(secretFile) {
   if (secretFile === void 0) return randomBytes(32).toString("hex");
   try {
-    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync4(secretFile).isSymbolicLink()) {
+    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync5(secretFile).isSymbolicLink()) {
       throw new ServeError("--secret-file must not be a symbolic link");
     }
     const flags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
@@ -13472,7 +13557,7 @@ function loadSecret(secretFile) {
       const mode = fstatSync(fd);
       if (!mode.isFile()) throw new ServeError("--secret-file must be a regular file");
       if (process.platform !== "win32" && mode.mode & 36) throw new ServeError("--secret-file must not be readable by group or others");
-      const secret = readFileSync9(fd, "utf8");
+      const secret = readFileSync10(fd, "utf8");
       if (!SECRET_PATTERN.test(secret)) throw new ServeError("--secret-file must contain exactly 64 lowercase hex characters");
       return secret;
     } finally {
@@ -13500,7 +13585,7 @@ function loadSecret(secretFile) {
     }
   }
 }
-var infoPath = (home) => join12(home, "serve.json");
+var infoPath = (home) => join13(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -13532,7 +13617,7 @@ var BOOT_SLACK_MS = 5e3;
 var bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1e3 - BOOT_SLACK_MS;
 function readServeInfo(home) {
   try {
-    const info = JSON.parse(readFileSync9(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync10(infoPath(home), "utf8"));
     const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
     const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
     const host = isIP(info.host) ? info.host : void 0;
@@ -13567,7 +13652,7 @@ function writeInfo(home, info) {
 }
 function removeInfo(home, secret, port) {
   try {
-    const info = JSON.parse(readFileSync9(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync10(infoPath(home), "utf8"));
     if (info.secret === secret && info.port === port) rmSync6(infoPath(home), { force: true });
   } catch {
   }
@@ -13588,17 +13673,17 @@ async function pageVersion(home, file, pages = resolve7(home, "pages")) {
     return null;
   }
 }
-var stateFile = (home, token) => join12(home, STATE_DIR, `${createHash3("sha256").update(token).digest("hex")}.json`);
+var stateFile = (home, token) => join13(home, STATE_DIR, `${createHash3("sha256").update(token).digest("hex")}.json`);
 function readState2(home, token) {
   try {
-    const record2 = JSON.parse(readFileSync9(stateFile(home, token), "utf8"));
+    const record2 = JSON.parse(readFileSync10(stateFile(home, token), "utf8"));
     return record2 && typeof record2 === "object" ? record2 : null;
   } catch {
     return null;
   }
 }
 function writeState2(home, token, record2) {
-  const dir = join12(home, STATE_DIR);
+  const dir = join13(home, STATE_DIR);
   mkdirSync5(dir, { recursive: true, mode: 448 });
   const path = stateFile(home, token);
   const tmp = `${path}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
@@ -13675,8 +13760,8 @@ async function saveState(req, res, home, secret, file, token, version) {
 }
 async function resolvePage(home, dir, file, pages = resolve7(home, "pages")) {
   try {
-    const root = await realpath(dir === "pages" ? pages : join12(home, dir));
-    const path = join12(root, file);
+    const root = await realpath(dir === "pages" ? pages : join13(home, dir));
+    const path = join13(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
     return real.startsWith(root + sep4) ? real : null;
@@ -13871,7 +13956,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   if (tail && !secretFile) ensureHome(home);
-  const secret = loadSecret(secretFile ?? (tail ? join12(home, "serve-secret") : void 0));
+  const secret = loadSecret(secretFile ?? (tail ? join13(home, "serve-secret") : void 0));
   const live = liveStreams(home, pagesDir2);
   const server = createServer(handler(home, secret, allowedHosts, live, pagesDir2));
   await new Promise((done, fail) => {
@@ -13898,7 +13983,7 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
     });
     return closed;
   };
-  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join12(home, "serve-secret") : secretFile };
+  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join13(home, "serve-secret") : secretFile };
 }
 async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, pagesDir: pagesDir2, print, fail }) {
   let srv;
@@ -13960,7 +14045,7 @@ Usage:
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
-- A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
+- A page with STE, code or ref warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 var FORMAT = `Draft format (extended Markdown)
@@ -14029,6 +14114,9 @@ export const LIMIT = 50
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ \u2026) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
+- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file. The render checks it against the same
+  folder and prints a refs warning when the file is missing, the lines go past its end, or the range runs backwards; the page then does not open.
+  A missing path is a warning only when its first folder exists here, so a path of another project is not checked.
 
 Diff blocks: show a change
 
@@ -14208,7 +14296,7 @@ async function withSource(arg, io, fail, fn2) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve8(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync11(resolve8(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -14241,7 +14329,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   const pages = pagesDir(ctx.env, config);
   const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx, pages);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${pages} or ${join13(tempHome(), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${pages} or ${join14(tempHome(), "pages")})`);
     return 2;
   }
   const { theme, mode, style } = config.values;
@@ -14265,7 +14353,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
-var draftsDir = (home) => join13(resolve8(home), "drafts");
+var draftsDir = (home) => join14(resolve8(home), "drafts");
 function draftTitle(src) {
   const m = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
   return m?.[1] ?? "";
@@ -14295,7 +14383,7 @@ function saveDraft(src, { env, io }) {
 }
 function writeNew(dir, name2, text2) {
   for (let n = 1; ; n++) {
-    const file = join13(dir, n === 1 ? name2 : name2.replace(/\.md$/, `-${n}.md`));
+    const file = join14(dir, n === 1 ? name2 : name2.replace(/\.md$/, `-${n}.md`));
     try {
       writeFileSync8(file, text2, { flag: "wx" });
       return file;
@@ -14329,8 +14417,8 @@ function reportDraftError(e, src, from, ctx) {
   }
   return code;
 }
-var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
-function pagePath(arg, { env, io }, pages = join13(amHome(env), "pages")) {
+var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.refWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
+function pagePath(arg, { env, io }, pages = join14(amHome(env), "pages")) {
   const path = resolve8(io.cwd ?? process.cwd(), arg);
   const folders = [resolve8(pages), resolve8(tempHome(), "pages")];
   return folders.includes(dirname5(path)) && basename6(path).endsWith(".html") ? path : false;
@@ -14431,7 +14519,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const file = resolve8(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync10(file, "utf8");
+    html = readFileSync11(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -14445,7 +14533,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve8(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync11(resolve8(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -14600,7 +14688,7 @@ function narrationCache(home) {
     if (!isDenied(e)) throw e;
     return void 0;
   }
-  return join13(home, "cache", "tts");
+  return join14(home, "cache", "tts");
 }
 function voiceSummary(provider, captionsOnly = []) {
   if (!provider) return "none (captions only)";
@@ -14631,16 +14719,16 @@ function loadConfig({ fail, env, themes: themes2 }) {
 function themeWarnings({ fail, themes: themes2 }) {
   themes2.warnings.forEach((w2) => fail(`! ${w2}`));
 }
-function outputPath(dir, title, opts, { env, io, fail }, folder = join13(amHome(env), dir)) {
+function outputPath(dir, title, opts, { env, io, fail }, folder = join14(amHome(env), dir)) {
   if (opts.out) {
     const file2 = resolve8(io.cwd ?? process.cwd(), opts.out);
-    if (statSync6(file2, { throwIfNoEntry: false })?.isDirectory()) {
+    if (statSync7(file2, { throwIfNoEntry: false })?.isDirectory()) {
       fail("\u2717 -o names a folder; give a file path, for example -o page.html");
       return null;
     }
     return file2;
   }
-  const file = join13(folder, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join14(folder, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
   return opts.replace === void 0 ? unusedPagePath(file) : file;
 }
 function unusedPagePath(file) {
@@ -14650,17 +14738,17 @@ function unusedPagePath(file) {
   }
 }
 var inside = (dir, target) => {
-  const rel = relative3(resolve8(dir), resolve8(target));
-  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep5}`) && !isAbsolute5(rel);
+  const rel = relative4(resolve8(dir), resolve8(target));
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep5}`) && !isAbsolute6(rel);
 };
-function writePage(file, html, env, pages = join13(amHome(env), "pages")) {
+function writePage(file, html, env, pages = join14(amHome(env), "pages")) {
   const home = resolve8(amHome(env));
   const path = resolve8(file);
   if (inside(home, path)) ensureHome(home);
   mkdirSync6(dirname5(file), { recursive: true });
   if (!inside(pages, path)) return writeFileSync8(file, html);
-  const tmp = join13(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
-  const mode = statSync6(file, { throwIfNoEntry: false })?.mode;
+  const tmp = join14(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
+  const mode = statSync7(file, { throwIfNoEntry: false })?.mode;
   let fd = null;
   let created = false;
   try {
@@ -14678,7 +14766,7 @@ function writePage(file, html, env, pages = join13(amHome(env), "pages")) {
 }
 function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   const home = amHome(env);
-  const pageRoot = pages ?? join13(home, "pages");
+  const pageRoot = pages ?? join14(home, "pages");
   const inHome = inside(home, file);
   const hint = (path) => {
     if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
@@ -14691,10 +14779,10 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   } catch (e) {
     if (!isDenied(e)) throw e;
     if (!(fallback && inHome)) return refuse(file, e), null;
-    const spare = join13(tempHome(), fallback, basename6(file));
+    const spare = join14(tempHome(), fallback, basename6(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env, join13(tempHome(), "pages"));
+      writePage(spare, html, env, join14(tempHome(), "pages"));
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`\u2717 Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -14727,11 +14815,18 @@ function emit(result, file, ctx, { note: note2 = "", fallback, inPlace, pages } 
     print(`  code ${count(long.length, "warning")} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w2) => print(`  L${w2.line} [${w2.rule}] ${w2.message}`));
   }
+  printRefWarnings(result.stats.refWarnings, print);
   printComponentWarnings(result.stats.componentWarnings, print);
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printMathWarnings(result.stats.mathWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
   return saved.file;
+}
+function printRefWarnings(notes = [], print) {
+  if (!notes.length) return;
+  print(`  refs ${count(notes.length, "warning")} (fix the path or the lines and run again; keep it if the path is from another project):`);
+  notes.slice(0, MAX_LISTED_WARNINGS).forEach((w2) => print(`  L${w2.line} [${w2.rule}] ${w2.message}`));
+  if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
@@ -14950,7 +15045,7 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve8(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
+  const path = isFile ? resolve8(io.cwd ?? process.cwd(), target) : join14(amHome(env), "themes", `${target}.json`);
   const name2 = isFile ? basename6(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];

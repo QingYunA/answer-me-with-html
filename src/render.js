@@ -15,6 +15,7 @@ import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 import { renderCode, CodeError } from './code.js';
+import { checkRefs } from './refs.js';
 import { isolateLtrRuns } from './bidi.js';
 import { hasMath } from './math.js';
 import { cspMeta } from './csp.js';
@@ -63,7 +64,9 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
     throw new LintError(warnings);
   }
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
+  // path:line spans in prose are checked against the folder code blocks read from, when the caller names one (am render, am patch).
+  const refWarnings = codeDir ? checkRefs([...doc.intro, ...doc.panels.flatMap((p) => p.blocks)], { baseDir: codeDir }) : [];
+  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], refWarnings, componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   // A panel-only component in the intro is an error of its own, and the block renders nothing.

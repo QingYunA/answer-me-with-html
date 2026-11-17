@@ -62,7 +62,7 @@ Usage:
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
-- A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
+- A page with STE, code or ref warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 
@@ -134,6 +134,9 @@ export const LIMIT = 50
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ …) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
+- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file. The render checks it against the same
+  folder and prints a refs warning when the file is missing, the lines go past its end, or the range runs backwards; the page then does not open.
+  A missing path is a warning only when its first folder exists here, so a path of another project is not checked.
 
 Diff blocks: show a change
 
@@ -364,7 +367,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   // Delete the earlier attempt only now: a render that fails above keeps it.
   if (replaced && replaced !== resolve(written)) removeEarlier(replaced, ctx);
   keepDraft(result, src, from, ctx);
-  // A page with STE, code or math warnings is likely to be rendered again, so it opens only when --open asks for it.
+  // A page with STE, code, ref or math warnings is likely to be rendered again, so it opens only when --open asks for it.
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
   return finish(written, held ? { ...opts, 'no-open': true } : opts, config, ctx);
@@ -459,7 +462,7 @@ function reportDraftError(e, src, from, ctx) {
   return code;
 }
 
-const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
+const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.refWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 
 // The absolute path of a page, or false when arg does not name a .html file directly inside pages/ of the data directory or of the
 // temporary folder (where a page goes when the data directory is not writable). The file may be gone.
@@ -921,11 +924,20 @@ function emit(result, file, ctx, { note = '', fallback, inPlace, pages } = {}) {
     print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
   }
+  printRefWarnings(result.stats.refWarnings, print);
   printComponentWarnings(result.stats.componentWarnings, print);
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printMathWarnings(result.stats.mathWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
   return saved.file;
+}
+
+// A path:line span in the prose whose file or lines are not in the current folder (src/refs.js). The page is still written.
+function printRefWarnings(notes = [], print) {
+  if (!notes.length) return;
+  print(`  refs ${count(notes.length, 'warning')} (fix the path or the lines and run again; keep it if the path is from another project):`);
+  notes.slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
+  if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 
 // What a component noticed in its own block (a group box that would be empty after a change). The page is still written.
