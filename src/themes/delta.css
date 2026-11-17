@@ -62,6 +62,9 @@
 }
 .am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
 .am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
+/* A view hides the columns and tables none of its fields need, and the first contract it shows drops the separator above it. */
+.am-api.am-view-before [data-api-hide~="before"], .am-api.am-view-after [data-api-hide~="after"] { display: none; }
+.am-api.am-view-before .am-api-contract[data-api-lead~="before"], .am-api.am-view-after .am-api-contract[data-api-lead~="after"] { margin-block-start: 0; padding-block-start: 0; border-block-start: 0; }
 .am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }
 .am-view-changes .am-api-contract[data-delta="added"], .am-view-changes .am-api-contract [data-delta="added"] { --api-change: var(--ok); --api-change-bg: var(--ok-bg); }
 .am-view-changes .am-api-contract[data-delta="removed"], .am-view-changes .am-api-contract [data-delta="removed"] { --api-change: var(--err); --api-change-bg: var(--err-bg); }

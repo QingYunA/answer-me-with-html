@@ -803,6 +803,9 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 }
 .am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
 .am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
+/* A view hides the columns and tables none of its fields need, and the first contract it shows drops the separator above it. */
+.am-api.am-view-before [data-api-hide~="before"], .am-api.am-view-after [data-api-hide~="after"] { display: none; }
+.am-api.am-view-before .am-api-contract[data-api-lead~="before"], .am-api.am-view-after .am-api-contract[data-api-lead~="after"] { margin-block-start: 0; padding-block-start: 0; border-block-start: 0; }
 .am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }
 .am-view-changes .am-api-contract[data-delta="added"], .am-view-changes .am-api-contract [data-delta="added"] { --api-change: var(--ok); --api-change-bg: var(--ok-bg); }
 .am-view-changes .am-api-contract[data-delta="removed"], .am-view-changes .am-api-contract [data-delta="removed"] { --api-change: var(--err); --api-change-bg: var(--err-bg); }
@@ -8813,14 +8816,28 @@ response 400 Error
   render(text2, { ui, video } = {}) {
     const { endpoints } = parseApi(text2);
     const words3 = ui?.api ?? FALLBACK.ui.api;
-    const contracts = endpoints.map(({ method, target, sections, state }) => {
+    const VISIBLE = { before: (state) => state !== "added", after: (state) => state !== "removed" };
+    const hideIn = (needed) => {
+      const views = Object.keys(VISIBLE).filter((view) => !needed(VISIBLE[view]));
+      return views.length ? ` data-api-hide="${views.join(" ")}"` : "";
+    };
+    const column = (fields2, key) => hideIn((visible) => fields2.some((field) => visible(field.state) && field[key]));
+    const leadIn = (index) => {
+      if (!index) return "";
+      const views = Object.keys(VISIBLE).filter((view) => VISIBLE[view](endpoints[index].state) && !endpoints.slice(0, index).some((item) => VISIBLE[view](item.state)));
+      return views.length ? ` data-api-lead="${views.join(" ")}"` : "";
+    };
+    const contracts = endpoints.map(({ method, target, sections, state }, index) => {
       const body = sections.map(({ kind: kind2, detail, fields: fields2, state: sectionState }) => {
         const described = fields2.some((field) => field.description);
         const specified = fields2.some((field) => field.requirement);
-        const table = fields2.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col">${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col">${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td>${esc(field.description)}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : "";
+        const req = specified ? column(fields2, "requirement") : "";
+        const desc = described ? column(fields2, "description") : "";
+        const rows = fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td${desc}>${esc(field.description)}</td>` : ""}</tr>`).join("");
+        const table = fields2.length ? `<div class="am-table-wrap"${hideIn((visible) => fields2.some((field) => visible(field.state)))}><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col"${req}>${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col"${desc}>${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${rows}</tbody></table></div>` : "";
         return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
       }).join("");
-      return `<article class="am-api-contract"${deltaAttr(state)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
+      return `<article class="am-api-contract"${deltaAttr(state)}${leadIn(index)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
     }).join("");
     const states = endpoints.flatMap((endpoint) => [endpoint.state, ...endpoint.sections.flatMap((section) => [section.state, ...section.fields.map((field) => field.state)])]);
     return withDelta(`<div class="am-api am-md">${contracts}</div>`, states, { ui, video });

@@ -90,6 +90,21 @@ response OK User
 -old
 +new
 \`\`\`
+
+## I API views drop hidden space
+\`\`\`api
++ POST /orders
+request Order
+  id string
+- GET /legacy
+response 200 Legacy
+  id string
+GET /health
+response 200 Health
+  ok string
+  + detail string optional
+  - trace string | removed note
+\`\`\`
 `;
 
 let tmp;
@@ -255,6 +270,40 @@ test('e2e api: one switch changes multiple HTTP/RPC contracts and their exact fi
   assert.deepEqual(after[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Required' }]);
   assert.equal(await evaluate(`document.querySelector('#panel-G [data-view="after"]').getAttribute('aria-pressed')`), 'true');
   assert.deepEqual(await snapshot('changes'), changes);
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// A view must not keep the separator of a hidden first contract, nor a column that only hidden fields need.
+test('e2e api: Before and After collapse hidden contracts and columns', { skip: SKIP }, async () => {
+  const view = (name) => evaluate(`(() => {
+    const host = document.querySelector('#panel-I .am-api');
+    host.querySelector('button[data-view="${name}"]').click();
+    const shown = (el) => el.getClientRects().length > 0;
+    return [...host.querySelectorAll('.am-api-contract')].filter(shown).map((contract) => {
+      const style = getComputedStyle(contract);
+      return {
+        target: contract.querySelector('.am-api-endpoint code').textContent,
+        separator: [style.borderBlockStartWidth, style.marginBlockStart, style.paddingBlockStart].join(' '),
+        columns: [...contract.querySelectorAll('thead th')].filter(shown).map((th) => th.textContent),
+        cells: [...contract.querySelectorAll('tbody tr')].filter(shown).map((row) => [...row.cells].filter(shown).length),
+      };
+    });
+  })()`);
+  const before = await view('before');
+  assert.deepEqual(before.map((contract) => contract.target), ['/legacy', '/health']);
+  assert.equal(before[0].separator, '0px 0px 0px');
+  assert.notEqual(before[1].separator, '0px 0px 0px');
+  assert.deepEqual(before[1].columns, ['Field', 'Type', 'Description']);
+  assert.deepEqual(before[1].cells, [3, 3]);
+  const after = await view('after');
+  assert.deepEqual(after.map((contract) => contract.target), ['/orders', '/health']);
+  assert.equal(after[0].separator, '0px 0px 0px');
+  assert.notEqual(after[1].separator, '0px 0px 0px');
+  assert.deepEqual(after[1].columns, ['Field', 'Type', 'Requirement']);
+  assert.deepEqual(after[1].cells, [3, 3]);
+  const changes = await view('changes');
+  assert.deepEqual(changes.map((contract) => contract.target), ['/orders', '/legacy', '/health']);
+  assert.deepEqual(changes[2].columns, ['Field', 'Type', 'Requirement', 'Description']);
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 

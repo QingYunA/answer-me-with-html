@@ -89,14 +89,32 @@ response 400 Error
   render(text, { ui, video } = {}) {
     const { endpoints } = parseApi(text);
     const words = ui?.api ?? FALLBACK.ui.api;
-    const contracts = endpoints.map(({ method, target, sections, state }) => {
+    // A field shows in Before unless it is added, and in After unless it is removed; Changes shows every field.
+    const VISIBLE = { before: (state) => state !== 'added', after: (state) => state !== 'removed' };
+    // hideIn lists the views (before, after) where an element is hidden although its own marker would leave it visible.
+    const hideIn = (needed) => {
+      const views = Object.keys(VISIBLE).filter((view) => !needed(VISIBLE[view]));
+      return views.length ? ` data-api-hide="${views.join(' ')}"` : '';
+    };
+    // A column is drawn when any field needs it, and hidden in a view where no field visible in that view needs it.
+    const column = (fields, key) => hideIn((visible) => fields.some((field) => visible(field.state) && field[key]));
+    // lead: the views in which a later contract is the first one shown, so it drops the separator above it.
+    const leadIn = (index) => {
+      if (!index) return '';
+      const views = Object.keys(VISIBLE).filter((view) => VISIBLE[view](endpoints[index].state) && !endpoints.slice(0, index).some((item) => VISIBLE[view](item.state)));
+      return views.length ? ` data-api-lead="${views.join(' ')}"` : '';
+    };
+    const contracts = endpoints.map(({ method, target, sections, state }, index) => {
       const body = sections.map(({ kind, detail, fields, state: sectionState }) => {
         const described = fields.some((field) => field.description);
         const specified = fields.some((field) => field.requirement);
-        const table = fields.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words.field)}</th><th scope="col">${esc(words.type)}</th>${specified ? `<th scope="col">${esc(words.requirement)}</th>` : ''}${described ? `<th scope="col">${esc(words.description)}</th>` : ''}</tr></thead><tbody>${fields.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td>${field.requirement ? esc(words[field.requirement]) : '—'}</td>` : ''}${described ? `<td>${esc(field.description)}</td>` : ''}</tr>`).join('')}</tbody></table></div>` : '';
+        const req = specified ? column(fields, 'requirement') : '';
+        const desc = described ? column(fields, 'description') : '';
+        const rows = fields.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words[field.requirement]) : '—'}</td>` : ''}${described ? `<td${desc}>${esc(field.description)}</td>` : ''}</tr>`).join('');
+        const table = fields.length ? `<div class="am-table-wrap"${hideIn((visible) => fields.some((field) => visible(field.state)))}><table><thead><tr><th scope="col">${esc(words.field)}</th><th scope="col">${esc(words.type)}</th>${specified ? `<th scope="col"${req}>${esc(words.requirement)}</th>` : ''}${described ? `<th scope="col"${desc}>${esc(words.description)}</th>` : ''}</tr></thead><tbody>${rows}</tbody></table></div>` : '';
         return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words[kind])}${detail ? ` <code>${esc(detail)}</code>` : ''}</h4>${table}</section>`;
       }).join('');
-      return `<article class="am-api-contract"${deltaAttr(state)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
+      return `<article class="am-api-contract"${deltaAttr(state)}${leadIn(index)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
     }).join('');
     const states = endpoints.flatMap((endpoint) => [endpoint.state, ...endpoint.sections.flatMap((section) => [section.state, ...section.fields.map((field) => field.state)])]);
     return withDelta(`<div class="am-api am-md">${contracts}</div>`, states, { ui, video });
