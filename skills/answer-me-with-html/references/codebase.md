@@ -9,7 +9,7 @@ The page is worth its evidence. Explore the code first, record each claim with t
 Work from the repository root, in this order. Each step ends on its own bar.
 
 1. **Entry points.** Find every way into the program: `bin` and `main` in `package.json`, `[project.scripts]` in `pyproject.toml`, `cmd/` in Go, `[[bin]]` in `Cargo.toml`, the CLI command table, the route table, the exported index. Done when each entry point has a `path:line`.
-2. **Module boundaries.** List the tracked files (`git ls-files`). A module is a folder or file whose imports stay mostly inside it. Scope the map to the question. For "how is this organized", read the imports of each top-level folder; done when every source file belongs to one module and each module's dependencies are known. For "how does X work", the map is provisional; done when the top-level modules are named, and step 3 reads each module's imports when the trace reaches it.
+2. **Module boundaries.** List the files (`git ls-files --cached --others --exclude-standard`, which adds new files git does not track yet). A module is a folder or file whose imports stay mostly inside it. Scope the map to the question. For "how is this organized", read the imports of each top-level folder; done when every source file belongs to one module and each module's dependencies are known. For "how does X work", the map is provisional; done when the top-level modules are named, and step 3 reads each module's imports when the trace reaches it.
 3. **Main path.** Take the request the question is about, or the most common one (the default command, the main route). Trace it from its entry point to its output, one call at a time. Done when every hop has a `path:line`.
 4. **Data and config.** Read the types, schemas or tables on the main path, and where settings load from, with their defaults and precedence. Done when each type and setting the main path reads has a `path:line`.
 
@@ -20,7 +20,8 @@ On a repository too large to read in this context: once the modules in scope are
 - Cite every claim about the code as an inline code span: `` `src/cli.js:42` `` for one line, `` `src/cli.js:42-60` `` for a range, the path relative to the repository root. Write the span when you read the line.
 - Put spans in panel text, table cells and `tree` notes. Diagram labels name parts; the panel text under the diagram cites them.
 - A claim with no line to cite is an inference: mark it as not checked and say how to check it.
-- `am render` checks every span whose path names a file in the current folder: the file exists and the lines are inside it. A failed span prints a `refs n warnings` line with its draft line. Fix it as you fix a code warning: open the file, find the right lines, correct the span, render again.
+- `am render` checks the spans it can place in the current folder: the file exists and the lines are inside it. A failed span prints a `refs n warnings` line with its draft line. Fix it as you fix a code warning: open the file, find the right lines, correct the span, render again.
+- The check skips some spans: a missing file at the root, a root file with no extension (`LICENSE`), a secret or binary file, and diagram text. A clean render is not proof; the proof is that you read each cited line when you wrote its span.
 
 ## Draft
 
