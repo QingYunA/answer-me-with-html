@@ -167,6 +167,14 @@ test('refs: equivalent spellings of a path are classified the same way', () => {
   assert.equal(refs('`./src/nope.ts:3`').length, 1);
 });
 
+test('refs: a tree line that starts with // is a label, not a comment, so its span is checked', () => {
+  assert.deepEqual(refs('```tree\nroot\n  // See `src/app.ts:99`\n```').map((w) => w.line), [7]);
+});
+
+test('refs: image alt text shows backticks as text, so a span there is not checked', () => {
+  assert.deepEqual(refs('![see `src/app.ts:99`](data:image/png;base64,iVBORw0KGgo=)'), []);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });

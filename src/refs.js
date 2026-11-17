@@ -16,10 +16,11 @@ const FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
 
 // The parts of a component line that render inline Markdown, so a code span there is <code> on the page. Diagram components
 // (flow, sequence, state, limits, annot …) draw their text as is, backticks included, so they have no spans to check.
+// lines: the lines the component reads; tree reads every non-empty line, the others skip // comments as contentLines does.
 const INLINE_PARTS = {
-  tree: (t) => fields(t), // label and note
-  timeline: (t) => fields(t).slice(1, 3), // title and note; the time is plain text
-  kv: (t) => [(t.startsWith('*') ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ''], // the value; the key is plain text
+  tree: { lines: (text) => String(text).split('\n').map((raw, i) => ({ text: raw.trim(), line: i + 1 })).filter((l) => l.text), parts: (t) => fields(t) }, // label and note
+  timeline: { lines: contentLines, parts: (t) => fields(t).slice(1, 3) }, // title and note; the time is plain text
+  kv: { lines: contentLines, parts: (t) => [(t.startsWith('*') ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ''] }, // the value; the key is plain text
 };
 
 // The texts of one block that may hold code spans, each with the draft line its text starts on. A fence's text starts on the line
@@ -28,9 +29,9 @@ function inlineTexts(block) {
   if (block.type === 'md') return [{ text: block.text, line: block.line, inline: false }];
   if (block.lang === 'callout') return [{ text: block.text, line: block.line + 1, inline: false }];
   if (block.lang === 'ask') return askTexts(block);
-  const parts = INLINE_PARTS[block.lang];
-  if (!parts) return [];
-  return contentLines(block.text).flatMap(({ text, line }) => parts(text).map((part) => ({ text: part, line: block.line + line, inline: true })));
+  const component = INLINE_PARTS[block.lang];
+  if (!component) return [];
+  return component.lines(block.text).flatMap(({ text, line }) => component.parts(text).map((part) => ({ text: part, line: block.line + line, inline: true })));
 }
 
 // The question, each option's label and note, and each preview, which is a block of its own. A block the component cannot read is

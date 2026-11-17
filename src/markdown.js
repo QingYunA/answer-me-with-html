@@ -159,6 +159,8 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
       if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw });
+      // An image shows its alt text as plain text, so a span there is not code on the page.
+      if (token.type === 'image') continue;
       walk(token.tokens);
       walk(token.items);
       walk(token.header);
