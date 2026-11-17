@@ -150,6 +150,8 @@ cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answe
 
 要不要出页面由 Agent 判断：概念之间关系复杂、有多步流程、要做多维对比，才会出页面。你也可以直接说"用 HTML 讲一下……"。
 
+如果答案依据网页文档，可以参考[可点击来源示例](docs/source-backed-answers.md)（英文），其中包含可选的 MCP 搜索配置，以及可离线渲染的稿件。
+
 页面保存在 `~/.answer-me-with-html/pages/`。页面右上角可以切换主题、切换亮暗、汇总你的回复，也可以复制生成这一页的 Markdown 原稿。
 
 ## 和 Archify、GenUI 插件有什么不同？

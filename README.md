@@ -149,6 +149,8 @@ No setup is needed after install. **We recommend turning on [always-on mode](#al
 
 The agent decides when a page is worth it: related concepts, multi-step flows, multi-way comparisons. You can also just say "explain it in HTML".
 
+For answers based on web documentation, see [the clickable sources example](docs/source-backed-answers.md), with an optional MCP search setup and a draft you can render offline.
+
 Pages are saved in `~/.answer-me-with-html/pages/`. The buttons in the top-right corner switch the theme and light/dark mode, collect your reply, and copy the Markdown that produced the page.
 
 ## How is this different from Archify or GenUI plugins?

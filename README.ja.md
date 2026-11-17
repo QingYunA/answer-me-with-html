@@ -139,6 +139,8 @@ cp -R /tmp/answer-me-with-html/skills/answer-me-with-html ~/.claude/skills/answe
 
 ページにする価値があるかどうかは、エージェントが判断します。関連する概念、複数ステップの流れ、多方面の比較などです。「HTML で説明して」と言うだけでもかまいません。
 
+Web ドキュメントに基づく回答には、[クリックできる出典の例](docs/source-backed-answers.md)（英語）をご覧ください。任意の MCP 検索設定と、オフラインで描画できる下書きが含まれています。
+
 ページは `~/.answer-me-with-html/pages/` に保存されます。右上のボタンで、テーマとライト / ダークモードの切り替え、あなたの返信の取りまとめ、ページの元になった Markdown のコピーができます。
 
 ## Archify や GenUI プラグインとは何が違うのか？
