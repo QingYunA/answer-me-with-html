@@ -151,40 +151,49 @@ export function md(text, { ui, interactive = true } = {}) {
 }
 
 // Every inline code span the page shows, in source order: [{ text, line }], line being the 0-based line of the span in text. Code blocks
-// hold no spans. Image alt text shows as plain text, so its spans are not returned, but the whole image is passed over when the spans are
-// located. Spans are located in the same wrapped text the lexer reads; wrapping adds no line, so line counts in text too.
+// hold no spans, and image alt text shows as plain text, so neither gives one.
 // The lexer and token passes are those of md(), or of mdInline() with inline: true, so a span here is a span on the page. The notes
 // those passes make are dropped: they belong to the render, not to this read.
+// Each token is found by its raw text inside its parent's part of the source, after the sibling before it. So a span's text that
+// also stands in a link title, a link destination or alt text earlier in the source cannot take its place. A token whose raw text
+// is not in the source as written (lines of a quote, without the >) leaves its children to search the rest of its parent's part.
+// Spans are located in the same wrapped text the lexer reads; wrapping adds no line, so the line counts in text too.
 export function codeSpans(text, { inline: inlineField = false } = {}) {
-  const spans = [];
-  const walk = (tokens) => {
-    if (!Array.isArray(tokens)) return;
-    for (const token of tokens) {
-      if (token.type === 'image') {
-        spans.push({ raw: token.raw, shown: false });
-        continue;
-      }
-      if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw, shown: true });
-      walk(token.tokens);
-      walk(token.items);
-      walk(token.header);
-      (token.rows ?? []).forEach((row) => walk(row));
-    }
-  };
   const source = wrapSpacedImages(String(text ?? ''));
+  const spans = [];
+  const lineAt = (index) => source.slice(0, index).split('\n').length - 1;
+  const find = (raw, from, to) => {
+    const at = source.indexOf(raw, from);
+    return at >= 0 && at + raw.length <= to ? at : -1;
+  };
+  // Walks tokens inside source[from, to) and returns where the last one found ends.
+  const walk = (tokens, from, to) => {
+    let cursor = from;
+    for (const token of Array.isArray(tokens) ? tokens : []) {
+      const at = token.raw ? find(token.raw, cursor, to) : -1;
+      const start = at >= 0 ? at : cursor;
+      const end = at >= 0 ? at + token.raw.length : to;
+      let inner = start;
+      if (token.type === 'codespan') spans.push({ text: token.text, line: lineAt(start) });
+      else if (token.type !== 'image') {
+        inner = walk(token.tokens, inner, end);
+        inner = walk(token.items, inner, end);
+        for (const row of [token.header, ...(token.rows ?? [])]) {
+          for (const cell of Array.isArray(row) ? row : []) inner = walk(cell.tokens, inner, end);
+        }
+      }
+      cursor = at >= 0 ? end : Math.max(cursor, inner);
+    }
+    return cursor;
+  };
   const outer = sink;
   sink = null;
   try {
-    walk(inlineField ? inlinePass(Lexer.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)));
+    walk(inlineField ? inlinePass(Lexer.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)), 0, source.length);
   } finally {
     sink = outer;
   }
-  let cursor = 0;
-  return spans.flatMap(({ text: code, raw, shown }) => {
-    const found = source.indexOf(raw, cursor);
-    if (found >= 0) cursor = found + raw.length;
-    return shown ? [{ text: code, line: found < 0 ? 0 : source.slice(0, found).split('\n').length - 1 }] : [];
-  });
+  return spans;
 }
 
 export function mdInline(text) {

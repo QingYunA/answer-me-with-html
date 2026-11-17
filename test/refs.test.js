@@ -200,6 +200,16 @@ test('refs: an image whose path has a space does not take a later span\'s place'
   assert.deepEqual(warnings.map((w) => w.line), [6]);
 });
 
+test('refs: the same text in a link title or destination does not take a later span\'s place', () => {
+  assert.deepEqual(refs('[link](https://example.com "`src/app.ts:99`")\nSee `src/app.ts:99`.').map((w) => w.line), [6]);
+  assert.deepEqual(refs('[`src/app.ts:98`](https://example.com "`src/app.ts:98`")\nSee `src/app.ts:98`.').map((w) => w.line), [5, 6]);
+});
+
+test('refs: spans in lists, tables and multi-line quotes keep their lines', () => {
+  const warnings = refs('- a\n- `src/app.ts:91`\n\n| a | b |\n| - | - |\n| x | `src/app.ts:92` |\n\n> one\n> two `src/app.ts:93`');
+  assert.deepEqual(warnings.map((w) => w.line), [6, 10, 13]);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });

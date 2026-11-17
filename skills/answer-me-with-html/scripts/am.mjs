@@ -4747,35 +4747,40 @@ function md(text2, { ui, interactive = true } = {}) {
   }
 }
 function codeSpans(text2, { inline: inlineField = false } = {}) {
-  const spans = [];
-  const walk2 = (tokens) => {
-    if (!Array.isArray(tokens)) return;
-    for (const token of tokens) {
-      if (token.type === "image") {
-        spans.push({ raw: token.raw, shown: false });
-        continue;
-      }
-      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw, shown: true });
-      walk2(token.tokens);
-      walk2(token.items);
-      walk2(token.header);
-      (token.rows ?? []).forEach((row) => walk2(row));
-    }
-  };
   const source = wrapSpacedImages(String(text2 ?? ""));
+  const spans = [];
+  const lineAt = (index) => source.slice(0, index).split("\n").length - 1;
+  const find = (raw, from, to) => {
+    const at3 = source.indexOf(raw, from);
+    return at3 >= 0 && at3 + raw.length <= to ? at3 : -1;
+  };
+  const walk2 = (tokens, from, to) => {
+    let cursor = from;
+    for (const token of Array.isArray(tokens) ? tokens : []) {
+      const at3 = token.raw ? find(token.raw, cursor, to) : -1;
+      const start = at3 >= 0 ? at3 : cursor;
+      const end = at3 >= 0 ? at3 + token.raw.length : to;
+      let inner = start;
+      if (token.type === "codespan") spans.push({ text: token.text, line: lineAt(start) });
+      else if (token.type !== "image") {
+        inner = walk2(token.tokens, inner, end);
+        inner = walk2(token.items, inner, end);
+        for (const row of [token.header, ...token.rows ?? []]) {
+          for (const cell of Array.isArray(row) ? row : []) inner = walk2(cell.tokens, inner, end);
+        }
+      }
+      cursor = at3 >= 0 ? end : Math.max(cursor, inner);
+    }
+    return cursor;
+  };
   const outer = sink;
   sink = null;
   try {
-    walk2(inlineField ? inlinePass(O.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)));
+    walk2(inlineField ? inlinePass(O.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)), 0, source.length);
   } finally {
     sink = outer;
   }
-  let cursor = 0;
-  return spans.flatMap(({ text: code, raw, shown: shown2 }) => {
-    const found = source.indexOf(raw, cursor);
-    if (found >= 0) cursor = found + raw.length;
-    return shown2 ? [{ text: code, line: found < 0 ? 0 : source.slice(0, found).split("\n").length - 1 }] : [];
-  });
+  return spans;
 }
 function mdInline(text2) {
   return inline.parseInline(wrapSpacedImages(String(text2 ?? "")));
