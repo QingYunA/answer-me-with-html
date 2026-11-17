@@ -64,6 +64,7 @@ export function checkRefs(blocks, { baseDir }) {
     for (const span of codeSpans(text, { inline })) {
       const found = text.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
+      if (!span.shown) continue;
       const problem = checkRef(span.text.trim(), baseDir, files);
       if (problem) warnings.push({ line: line + (found < 0 ? 0 : text.slice(0, found).split('\n').length - 1), rule: 'ref', message: problem });
     }

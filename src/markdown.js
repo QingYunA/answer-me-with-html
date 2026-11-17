@@ -150,21 +150,22 @@ export function md(text, { ui, interactive = true } = {}) {
   }
 }
 
-// Every inline code span of a Markdown text, in source order: [{ text, raw }]. Code blocks hold no spans, so their text is never returned.
+// Every inline code span of a Markdown text, in source order: [{ text, raw, shown }]. Code blocks hold no spans, so their text is never
+// returned. A span in image alt text has shown: false, because the page shows alt text as plain text; it is still listed, so a caller
+// that finds spans in the source by their raw text moves past it.
 // The lexer and token passes are those of md(), or of mdInline() with inline: true, so a span here is a span on the page. The notes
 // those passes make are dropped: they belong to the render, not to this read.
 export function codeSpans(text, { inline: inlineField = false } = {}) {
   const spans = [];
-  const walk = (tokens) => {
+  const walk = (tokens, shown = true) => {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
-      if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw });
-      // An image shows its alt text as plain text, so a span there is not code on the page.
-      if (token.type === 'image') continue;
-      walk(token.tokens);
-      walk(token.items);
-      walk(token.header);
-      (token.rows ?? []).forEach((row) => walk(row));
+      if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw, shown });
+      const inner = shown && token.type !== 'image';
+      walk(token.tokens, inner);
+      walk(token.items, inner);
+      walk(token.header, inner);
+      (token.rows ?? []).forEach((row) => walk(row, inner));
     }
   };
   const source = wrapSpacedImages(String(text ?? ''));

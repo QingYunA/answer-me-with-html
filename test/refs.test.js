@@ -183,6 +183,11 @@ test('refs: a code block named like an Object property does not break the check'
   assert.deepEqual(refs('```constructor\n`src/app.ts:99`\n```\n\n```toString\nx\n```'), []);
 });
 
+test('refs: a span after the same text in image alt is reported at its own line', () => {
+  const warnings = refs('![see `src/app.ts:99`](data:image/png;base64,iVBORw0KGgo=)\nSee `src/app.ts:99`.');
+  assert.deepEqual(warnings.map((w) => w.line), [6]);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });

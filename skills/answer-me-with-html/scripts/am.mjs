@@ -4748,15 +4748,15 @@ function md(text2, { ui, interactive = true } = {}) {
 }
 function codeSpans(text2, { inline: inlineField = false } = {}) {
   const spans = [];
-  const walk2 = (tokens) => {
+  const walk2 = (tokens, shown2 = true) => {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
-      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw });
-      if (token.type === "image") continue;
-      walk2(token.tokens);
-      walk2(token.items);
-      walk2(token.header);
-      (token.rows ?? []).forEach((row) => walk2(row));
+      if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw, shown: shown2 });
+      const inner = shown2 && token.type !== "image";
+      walk2(token.tokens, inner);
+      walk2(token.items, inner);
+      walk2(token.header, inner);
+      (token.rows ?? []).forEach((row) => walk2(row, inner));
     }
   };
   const source = wrapSpacedImages(String(text2 ?? ""));
@@ -10805,6 +10805,7 @@ function checkRefs(blocks, { baseDir }) {
     for (const span of codeSpans(text2, { inline: inline2 })) {
       const found = text2.indexOf(span.raw, cursor);
       if (found >= 0) cursor = found + span.raw.length;
+      if (!span.shown) continue;
       const problem = checkRef(span.text.trim(), baseDir, files);
       if (problem) warnings.push({ line: line + (found < 0 ? 0 : text2.slice(0, found).split("\n").length - 1), rule: "ref", message: problem });
     }
