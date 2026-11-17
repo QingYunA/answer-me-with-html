@@ -210,6 +210,10 @@ test('refs: spans in lists, tables and multi-line quotes keep their lines', () =
   assert.deepEqual(warnings.map((w) => w.line), [6, 10, 13]);
 });
 
+test('refs: a span with an escaped pipe in a table cell keeps its line', () => {
+  assert.deepEqual(refs('| a |\n| - |\n| `src/a\\|b.ts:99` |').map((w) => [w.line, w.message.slice(0, 17)]), [[7, '`src/a|b.ts:99`: ']]);
+});
+
 test('refs: the same span twice is reported at each of its lines', () => {
   assert.deepEqual(refs('`src/app.ts:99`\n\n`src/app.ts:99`').map((w) => w.line), [5, 7]);
 });

@@ -4751,15 +4751,18 @@ function codeSpans(text2, { inline: inlineField = false } = {}) {
   const spans = [];
   const lineAt = (index) => source.slice(0, index).split("\n").length - 1;
   const find = (raw, from, to) => {
-    const at3 = source.indexOf(raw, from);
-    return at3 >= 0 && at3 + raw.length <= to ? at3 : -1;
+    for (const written of raw.includes("|") ? [raw, raw.replaceAll("|", "\\|")] : [raw]) {
+      const at3 = source.indexOf(written, from);
+      if (at3 >= 0 && at3 + written.length <= to) return { at: at3, length: written.length };
+    }
+    return null;
   };
   const walk2 = (tokens, from, to) => {
     let cursor = from;
     for (const token of Array.isArray(tokens) ? tokens : []) {
-      const at3 = token.raw ? find(token.raw, cursor, to) : -1;
-      const start = at3 >= 0 ? at3 : cursor;
-      const end = at3 >= 0 ? at3 + token.raw.length : to;
+      const found = token.raw ? find(token.raw, cursor, to) : null;
+      const start = found ? found.at : cursor;
+      const end = found ? found.at + found.length : to;
       let inner = start;
       if (token.type === "codespan") spans.push({ text: token.text, line: lineAt(start) });
       else if (token.type !== "image") {
@@ -4769,7 +4772,7 @@ function codeSpans(text2, { inline: inlineField = false } = {}) {
           for (const cell of Array.isArray(row) ? row : []) inner = walk2(cell.tokens, inner, end);
         }
       }
-      cursor = at3 >= 0 ? end : Math.max(cursor, inner);
+      cursor = found ? end : Math.max(cursor, inner);
     }
     return cursor;
   };

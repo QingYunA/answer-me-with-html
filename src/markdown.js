@@ -162,17 +162,22 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
   const source = wrapSpacedImages(String(text ?? ''));
   const spans = [];
   const lineAt = (index) => source.slice(0, index).split('\n').length - 1;
+  // { at, length } of raw in source[from, to), or null. A table cell drops the \\ of an escaped pipe before it is lexed, so a raw text
+  // with a | is looked for with the pipes escaped too.
   const find = (raw, from, to) => {
-    const at = source.indexOf(raw, from);
-    return at >= 0 && at + raw.length <= to ? at : -1;
+    for (const written of raw.includes('|') ? [raw, raw.replaceAll('|', '\\|')] : [raw]) {
+      const at = source.indexOf(written, from);
+      if (at >= 0 && at + written.length <= to) return { at, length: written.length };
+    }
+    return null;
   };
   // Walks tokens inside source[from, to) and returns where the last one found ends.
   const walk = (tokens, from, to) => {
     let cursor = from;
     for (const token of Array.isArray(tokens) ? tokens : []) {
-      const at = token.raw ? find(token.raw, cursor, to) : -1;
-      const start = at >= 0 ? at : cursor;
-      const end = at >= 0 ? at + token.raw.length : to;
+      const found = token.raw ? find(token.raw, cursor, to) : null;
+      const start = found ? found.at : cursor;
+      const end = found ? found.at + found.length : to;
       let inner = start;
       if (token.type === 'codespan') spans.push({ text: token.text, line: lineAt(start) });
       else if (token.type !== 'image') {
@@ -182,7 +187,7 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
           for (const cell of Array.isArray(row) ? row : []) inner = walk(cell.tokens, inner, end);
         }
       }
-      cursor = at >= 0 ? end : Math.max(cursor, inner);
+      cursor = found ? end : Math.max(cursor, inner);
     }
     return cursor;
   };
