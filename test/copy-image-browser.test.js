@@ -1,6 +1,7 @@
-// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button is revealed only where the
-// rasterizer and the Clipboard API exist, and a click reaches navigator.clipboard.write with a real PNG blob. It needs a
-// Chromium-family browser, so it runs only with AM_E2E=1 (and AM_CHROME when the binary is not auto-detected, e.g. Edge).
+// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button is revealed in Chromium wherever
+// the page can be rasterized (without the Clipboard API a click downloads the PNG), and a click reaches navigator.clipboard.write
+// with a real PNG blob. It needs a Chromium-family browser, so it runs only with AM_E2E=1 (and AM_CHROME when the binary is not
+// auto-detected, e.g. Edge).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -114,17 +115,68 @@ const CLICK_FALLBACK = `(async () => {
   return { revealed, wrote, clicked, label: btn.textContent, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
 })()`;
 
-test('copy-image: a browser that is not Chromium keeps the button hidden, even with the async Clipboard API', { skip: SKIP }, async () => {
-  // Safari and Firefox expose ClipboardItem and clipboard.write but no navigator.userAgentData; hide it before the page script runs.
-  const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source: "Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true });" });
+// Run the page with these overrides in place before its scripts, then remove them.
+const withOverrides = async (source, fn) => {
+  const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source });
   try {
     await load(pathToFileURL(file).href);
-    assert.equal(await evaluate('typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function"'), true, 'the Clipboard API is there');
-    assert.equal(await evaluate('document.querySelector(\'[data-am="copy-image"]\').hidden'), true, 'the button stays hidden');
+    return await fn();
   } finally {
     await send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
   }
+};
+const NO_UA_DATA = "Object.defineProperty(Navigator.prototype, 'userAgentData', { get: () => undefined, configurable: true });";
+const userAgent = (ua) => `Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => ${JSON.stringify(ua)}, configurable: true });`;
+const HIDDEN = 'document.querySelector(\'[data-am="copy-image"]\').hidden';
+
+test('copy-image: a browser that is not Chromium keeps the button hidden, even with the async Clipboard API', { skip: SKIP }, async () => {
+  // Safari and Firefox expose ClipboardItem and clipboard.write but no navigator.userAgentData, and no Chrome/ in their user agent.
+  const safari = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
+  await withOverrides(NO_UA_DATA + userAgent(safari), async () => {
+    assert.equal(await evaluate('typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function"'), true, 'the Clipboard API is there');
+    assert.equal(await evaluate(HIDDEN), true, 'the button stays hidden');
+  });
 });
+
+test('copy-image: a Chromium host without navigator.userAgentData (Electron, WebView2) shows the button', { skip: SKIP }, async () => {
+  const electron = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) SomeApp/1.2.3 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36';
+  await withOverrides(NO_UA_DATA + userAgent(electron), async () => {
+    assert.equal(await evaluate(HIDDEN), false, 'the button is shown');
+  });
+});
+
+// Count clipboard writes and download clicks after a click on the button.
+const CLICK_COUNT = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  let wrote = 0;
+  if (navigator.clipboard) {
+    try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote += 1; } }); } catch {}
+  }
+  let clicked = 0;
+  const orig = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
+  btn.click();
+  for (let i = 0; i < 200 && !clicked && !wrote; i++) await sleep(50);
+  HTMLAnchorElement.prototype.click = orig;
+  await sleep(30);
+  return { wrote, clicked, label: btn.textContent };
+})()`;
+
+for (const [what, source] of [
+  ['no ClipboardItem', 'delete window.ClipboardItem;'],
+  ['a page that is not a secure context', "Object.defineProperty(window, 'isSecureContext', { get: () => false, configurable: true });"],
+]) {
+  test(`copy-image: with ${what}, the button still shows and a click downloads the PNG`, { skip: SKIP }, async () => {
+    await withOverrides(source, async () => {
+      assert.equal(await evaluate(HIDDEN), false, 'the button is shown');
+      const r = await evaluate(CLICK_COUNT);
+      assert.equal(r.wrote, 0, 'no clipboard write is tried');
+      assert.equal(r.clicked, 1, `the PNG is downloaded (${JSON.stringify(r)})`);
+      assert.equal(r.label, 'Downloaded', 'the button reports the download');
+    });
+  });
+}
 
 test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
   await load(pathToFileURL(file).href);
