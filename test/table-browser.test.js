@@ -105,6 +105,15 @@ response 200 Health
   + detail string optional
   - trace string | removed note
 \`\`\`
+
+## J API type names
+\`\`\`api
+GET /orders/{id}
+response 200 Order
+  id string required | Order id
+  status OrderStatus required | Current state of the order
+  refund_amount number optional
+\`\`\`
 `;
 
 let tmp;
@@ -368,4 +377,30 @@ test('e2e table: without JavaScript every row renders, no sort buttons appear, a
   assert.deepEqual(JSON.parse(result.result.value), { rows: 3, buttons: 0, hidden: true });
   await cdp.send('Target.closeTarget', { targetId });
   assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// A field name or type wraps only between its words (refund_|amount, Order|Status), never at whatever letter a column width falls on,
+// on a 480px window and on a phone alike, and a phone needs no sideways scroll for it.
+test('e2e api: field names and types wrap only between their words', { skip: SKIP }, async () => {
+  // pieces: each run of text between <wbr> breaks, with the number of lines it takes; a piece split inside itself takes two.
+  const pieces = () => evaluate(`[...document.querySelectorAll('#panel-J tbody code')].flatMap((code) => [...code.childNodes].filter((n) => n.nodeType === 3).map((n) => {
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    return [n.textContent, new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size];
+  }))`);
+  const reloadAt = async (width) => {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await send('Page.reload', {});
+    await evaluate('new Promise((resolve) => (document.readyState === "complete" ? requestAnimationFrame(() => resolve()) : addEventListener("load", () => requestAnimationFrame(() => resolve()))))');
+  };
+  try {
+    await reloadAt(480);
+    assert.deepEqual(await pieces(), [['id', 1], ['string', 1], ['status', 1], ['Order', 1], ['Status', 1], ['refund_', 1], ['amount', 1], ['number', 1]]);
+    await reloadAt(390);
+    assert.ok((await pieces()).every(([, lines]) => lines === 1));
+    assert.equal(await evaluate(`(() => { const wrap = document.querySelector('#panel-J .am-table-wrap'); return wrap.scrollWidth - wrap.clientWidth; })()`), 0);
+  } finally {
+    await send('Emulation.clearDeviceMetricsOverride', {});
+    await send('Page.reload', {});
+  }
 });

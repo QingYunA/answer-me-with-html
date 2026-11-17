@@ -8743,6 +8743,7 @@ function apiState(mark, parent, line) {
   const state = inherited ?? own;
   return state ? { state } : {};
 }
+var identifier = (text2) => text2.split(/(?<=[_./,:<>|-])(?=.)|(?<=[a-z0-9])(?=[A-Z])/).map(esc).join("<wbr>");
 function parseApi(text2) {
   const endpoints = [];
   let endpoint;
@@ -8833,7 +8834,7 @@ response 400 Error
         const specified = fields2.some((field) => field.requirement);
         const req = specified ? column(fields2, "requirement") : "";
         const desc = described ? column(fields2, "description") : "";
-        const rows = fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td${desc}>${esc(field.description)}</td>` : ""}</tr>`).join("");
+        const rows = fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${identifier(field.name)}</code></th><td><code>${identifier(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td${desc}>${esc(field.description)}</td>` : ""}</tr>`).join("");
         const table = fields2.length ? `<div class="am-table-wrap"${hideIn((visible) => fields2.some((field) => visible(field.state)))}><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col"${req}>${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col"${desc}>${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${rows}</tbody></table></div>` : "";
         return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
       }).join("");
