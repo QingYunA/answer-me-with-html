@@ -150,9 +150,9 @@ export function md(text, { ui, interactive = true } = {}) {
   }
 }
 
-// Every inline code span of a Markdown text, in source order: [{ text, raw, shown }]. Code blocks hold no spans, so their text is never
-// returned. The page shows image alt text as plain text, so an image is listed as one entry with shown: false and raw set to the image's
-// own source; a caller that finds entries in the source by their raw text moves past the whole image, whatever its alt holds.
+// Every inline code span the page shows, in source order: [{ text, line }], line being the 0-based line of the span in text. Code blocks
+// hold no spans. Image alt text shows as plain text, so its spans are not returned, but the whole image is passed over when the spans are
+// located. Spans are located in the same wrapped text the lexer reads; wrapping adds no line, so line counts in text too.
 // The lexer and token passes are those of md(), or of mdInline() with inline: true, so a span here is a span on the page. The notes
 // those passes make are dropped: they belong to the render, not to this read.
 export function codeSpans(text, { inline: inlineField = false } = {}) {
@@ -161,7 +161,7 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
       if (token.type === 'image') {
-        spans.push({ text: '', raw: token.raw, shown: false });
+        spans.push({ raw: token.raw, shown: false });
         continue;
       }
       if (token.type === 'codespan') spans.push({ text: token.text, raw: token.raw, shown: true });
@@ -179,7 +179,12 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
   } finally {
     sink = outer;
   }
-  return spans;
+  let cursor = 0;
+  return spans.flatMap(({ text: code, raw, shown }) => {
+    const found = source.indexOf(raw, cursor);
+    if (found >= 0) cursor = found + raw.length;
+    return shown ? [{ text: code, line: found < 0 ? 0 : source.slice(0, found).split('\n').length - 1 }] : [];
+  });
 }
 
 export function mdInline(text) {

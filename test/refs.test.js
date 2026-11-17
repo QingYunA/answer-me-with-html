@@ -17,6 +17,8 @@ before(() => {
   writeFileSync(join(dir, 'README.md'), 'one\ntwo\nthree');
   writeFileSync(join(dir, '.env'), 'TOKEN=abc\n');
   writeFileSync(join(root, 'outside.ts'), 'export const outside = 1;\n');
+  // A 1×1 PNG at a path with a space, for an image whose destination Markdown needs wrapped in <…>.
+  writeFileSync(join(root, 'my pic.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
@@ -190,6 +192,11 @@ test('refs: a span after the same text in image alt is reported at its own line'
 
 test('refs: escaped brackets in image alt do not make the image take a later span\'s place', () => {
   const warnings = refs('![see `src/\\[app\\].ts:99`](data:image/png;base64,iVBORw0KGgo=)\nSee `src/[app].ts:99`.');
+  assert.deepEqual(warnings.map((w) => w.line), [6]);
+});
+
+test('refs: an image whose path has a space does not take a later span\'s place', () => {
+  const warnings = refs(`![see \`src/app.ts:99\`](${join(root, 'my pic.png')})\nSee \`src/app.ts:99\`.`);
   assert.deepEqual(warnings.map((w) => w.line), [6]);
 });
 

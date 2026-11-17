@@ -4752,7 +4752,7 @@ function codeSpans(text2, { inline: inlineField = false } = {}) {
     if (!Array.isArray(tokens)) return;
     for (const token of tokens) {
       if (token.type === "image") {
-        spans.push({ text: "", raw: token.raw, shown: false });
+        spans.push({ raw: token.raw, shown: false });
         continue;
       }
       if (token.type === "codespan") spans.push({ text: token.text, raw: token.raw, shown: true });
@@ -4770,7 +4770,12 @@ function codeSpans(text2, { inline: inlineField = false } = {}) {
   } finally {
     sink = outer;
   }
-  return spans;
+  let cursor = 0;
+  return spans.flatMap(({ text: code, raw, shown: shown2 }) => {
+    const found = source.indexOf(raw, cursor);
+    if (found >= 0) cursor = found + raw.length;
+    return shown2 ? [{ text: code, line: found < 0 ? 0 : source.slice(0, found).split("\n").length - 1 }] : [];
+  });
 }
 function mdInline(text2) {
   return inline.parseInline(wrapSpacedImages(String(text2 ?? "")));
@@ -10804,13 +10809,9 @@ function checkRefs(blocks, { baseDir }) {
   const files = /* @__PURE__ */ new Map();
   const warnings = [];
   for (const { text: text2, line, inline: inline2 } of blocks.flatMap(inlineTexts)) {
-    let cursor = 0;
     for (const span of codeSpans(text2, { inline: inline2 })) {
-      const found = text2.indexOf(span.raw, cursor);
-      if (found >= 0) cursor = found + span.raw.length;
-      if (!span.shown) continue;
       const problem = checkRef(span.text.trim(), baseDir, files);
-      if (problem) warnings.push({ line: line + (found < 0 ? 0 : text2.slice(0, found).split("\n").length - 1), rule: "ref", message: problem });
+      if (problem) warnings.push({ line: line + span.line, rule: "ref", message: problem });
     }
   }
   return warnings.sort((a3, b) => a3.line - b.line);
