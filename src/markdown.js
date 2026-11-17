@@ -162,14 +162,13 @@ export function codeSpans(text, { inline: inlineField = false } = {}) {
   const source = wrapSpacedImages(String(text ?? ''));
   const spans = [];
   const lineAt = (index) => source.slice(0, index).split('\n').length - 1;
-  // { at, length } of raw in source[from, to), or null. A table cell drops the \\ of an escaped pipe before it is lexed, so a raw text
-  // with a | is looked for with the pipes escaped too.
+  // { at, length } of the earliest place of raw in source[from, to), or null. A table cell drops the \\ of an escaped pipe before it is
+  // lexed, so a raw text with a | is looked for with the pipes escaped too.
   const find = (raw, from, to) => {
-    for (const written of raw.includes('|') ? [raw, raw.replaceAll('|', '\\|')] : [raw]) {
-      const at = source.indexOf(written, from);
-      if (at >= 0 && at + written.length <= to) return { at, length: written.length };
-    }
-    return null;
+    const places = (raw.includes('|') ? [raw, raw.replaceAll('|', '\\|')] : [raw])
+      .map((written) => ({ at: source.indexOf(written, from), length: written.length }))
+      .filter(({ at, length }) => at >= 0 && at + length <= to);
+    return places.sort((a, b) => a.at - b.at)[0] ?? null;
   };
   // Walks tokens inside source[from, to) and returns where the last one found ends.
   const walk = (tokens, from, to) => {

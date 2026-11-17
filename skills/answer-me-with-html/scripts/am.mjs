@@ -4751,11 +4751,8 @@ function codeSpans(text2, { inline: inlineField = false } = {}) {
   const spans = [];
   const lineAt = (index) => source.slice(0, index).split("\n").length - 1;
   const find = (raw, from, to) => {
-    for (const written of raw.includes("|") ? [raw, raw.replaceAll("|", "\\|")] : [raw]) {
-      const at3 = source.indexOf(written, from);
-      if (at3 >= 0 && at3 + written.length <= to) return { at: at3, length: written.length };
-    }
-    return null;
+    const places = (raw.includes("|") ? [raw, raw.replaceAll("|", "\\|")] : [raw]).map((written) => ({ at: source.indexOf(written, from), length: written.length })).filter(({ at: at3, length }) => at3 >= 0 && at3 + length <= to);
+    return places.sort((a3, b) => a3.at - b.at)[0] ?? null;
   };
   const walk2 = (tokens, from, to) => {
     let cursor = from;
