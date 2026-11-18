@@ -1,11 +1,12 @@
-// Copy the page as a PNG image onto the clipboard. The button starts hidden (src/render.js) and this script reveals it only where the
-// browser can draw the page: a canvas. Chromium and Firefox (160 and later) can rasterize an SVG foreignObject; Safari cannot
-// reliably, and there the button stays hidden rather than failing on every click. Without the async Clipboard API or a secure
-// context (some embedded WebViews), a click downloads the PNG instead.
+// Copy the page as a PNG image onto the clipboard. The button shows on every page with a sheet or doc, and this script explains why
+// it cannot copy where the browser lacks the pieces: no canvas rasterizer, a preview frame whose feature policy forbids clipboard-write,
+// or no async Clipboard API / secure context. Firefox can rasterize the page as of version 160, so the button is enabled there and in
+// Chromium; Safari and unknown browsers keep a usable button but carry a note that the effect is not guaranteed. A failed copy shows
+// the failure and never falls back to downloading the PNG.
 //
 // Pipeline: clone the page body → inline every computed style (CSS variables are resolved there, so a clone keeps theme colours and
 // sizes) and the ::before / ::after decorations → wrap it in an SVG foreignObject → draw that image on a canvas → toBlob('image/png')
-// → navigator.clipboard.write(new ClipboardItem(...)). If the clipboard refuses the image, the PNG is downloaded instead.
+// → navigator.clipboard.write(new ClipboardItem(...)), passing the blob as a promise so the write keeps the user's click activation.
 (() => {
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const SVG = 'http://www.w3.org/2000/svg';
@@ -14,22 +15,22 @@
 
   const btn = document.querySelector('[data-am="copy-image"]');
   if (!btn) return;
+  const main = document.querySelector('main.am-sheet, main.am-doc');
+  if (!main) return;
+
   const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';
   const canCopy = window.isSecureContext && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
-  // Safari also exposes the async Clipboard API, but cannot rasterize the page reliably; Firefox 160 and later can. An embedded
-  // Chromium (Electron, WebView2, CEF) can lack navigator.userAgentData; its user agent still names Chrome/.
+  // Chromium (including an embedded Chromium without navigator.userAgentData, whose UA still names Chrome/) and Firefox can rasterize
+  // the page. Safari and unknown browsers are not rejected outright: their button stays usable but carries a note that the effect is
+  // not guaranteed.
   const brands = navigator.userAgentData?.brands;
   const chromium = brands ? brands.some((b) => /Chromium/.test(b.brand)) : /\bChrome\//.test(navigator.userAgent);
   const gecko = /\bFirefox\//.test(navigator.userAgent);
-  if (!canRasterize || !(chromium || gecko)) return; // the button stays hidden
-
-  const main = document.querySelector('main.am-sheet, main.am-doc');
-  if (!main) return;
   btn.hidden = false;
 
   const idle = btn.textContent;
-  // The button's aria-label stays "Copy as image", so a screen reader hears each result through a hidden live region beside it.
-  // aria-live, not role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
+  // When the button can copy, its aria-label stays "Copy as image", so a screen reader hears each result through a hidden live region
+  // beside it. aria-live, not role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
   const status = document.createElement('span');
   status.setAttribute('aria-live', 'polite');
   status.dataset.am = 'copy-image-status';
@@ -41,6 +42,31 @@
     clearTimeout(say.timer);
     if (restore) say.timer = setTimeout(() => { btn.textContent = idle; }, 1800);
   };
+
+  // A disabled button says why, in the order of the conditions the page can act on: no rasterizer, a preview frame's feature policy
+  // forbidding clipboard-write, then a missing async Clipboard API or secure context. The reason fills the button, its title, its
+  // accessible name, and the hidden live region; no click handler is registered.
+  let unavailable = null;
+  if (!canRasterize) unavailable = btn.dataset.unavailableBrowser;
+  else if (document.featurePolicy && document.featurePolicy.allowsFeature('clipboard-write') === false) unavailable = btn.dataset.unavailablePolicy;
+  else if (!canCopy) unavailable = btn.dataset.unavailableClipboard;
+  if (unavailable) {
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    btn.textContent = unavailable;
+    btn.title = unavailable;
+    btn.setAttribute('aria-label', unavailable);
+    status.textContent = unavailable;
+    return;
+  }
+
+  // Safari and unknown browsers can draw the page often enough to keep the button, but the result is not guaranteed: say so in the
+  // title and the accessible name, and keep the original button text.
+  if (!chromium && !gecko) {
+    const unverified = btn.dataset.unverifiedEffect;
+    btn.title = unverified;
+    btn.setAttribute('aria-label', unverified);
+  }
 
   // A stylesheet of only the local font declarations, so a font a theme embeds still draws inside the SVG.
   const fontFaceCss = () => {
@@ -162,17 +188,6 @@
     return blob;
   }
 
-  const download = (blob) => {
-    const name = `${(document.title || 'page').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'page'}.png`;
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = name;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-  };
-
   let busy = false;
   btn.addEventListener('click', async () => {
     if (busy) return;
@@ -180,21 +195,14 @@
     btn.setAttribute('aria-disabled', 'true');
     say(btn.dataset.working, false);
     try {
-      const blob = await rasterize();
-      if (!canCopy) {
-        download(blob);
-        say(btn.dataset.downloaded, true);
-        return;
-      }
-      try {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        say(btn.dataset.done, true);
-      } catch {
-        // A clipboard the browser refuses (a permission, or a sandbox without clipboard-write) still gets the picture as a file.
-        download(blob);
-        say(btn.dataset.downloaded, true);
-      }
-    } catch {
+      // Start rasterizing, then hand the pending blob to ClipboardItem and write within the same click task so the browser keeps the
+      // user's activation. Awaiting the raster first would spend it, and the write would be rejected.
+      const blobPromise = rasterize();
+      const item = new ClipboardItem({ 'image/png': blobPromise });
+      await navigator.clipboard.write([item]);
+      say(btn.dataset.done, true);
+    } catch (e) {
+      console.error('[am] copy image failed', e);
       say(btn.dataset.failed, true);
     } finally {
       busy = false;
