@@ -1,19 +1,18 @@
-// Copy the page as a PNG image onto the clipboard. The button starts hidden (src/render.js) and this script reveals it only where the
-// browser can draw the page: a canvas, in Chromium. Firefox and Safari cannot reliably rasterize an SVG foreignObject, and there the
-// button stays hidden rather than failing on every click. Without the async Clipboard API or a secure context (some embedded
-// WebViews), a click downloads the PNG instead.
+// Export the page as PNG in browsers that can rasterize an SVG foreignObject. Clipboard
+// access is needed only for Copy as image. Download image also works without it.
 //
 // Pipeline: clone the page body → inline every computed style (CSS variables are resolved there, so a clone keeps theme colours and
 // sizes) and the ::before / ::after decorations → wrap it in an SVG foreignObject → draw that image on a canvas → toBlob('image/png')
-// → navigator.clipboard.write(new ClipboardItem(...)). If the clipboard refuses the image, the PNG is downloaded instead.
+// → copy the PNG to the clipboard or download it, according to the selected action.
 (() => {
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const SVG = 'http://www.w3.org/2000/svg';
   const MAX_DIM = 16384;        // Chrome refuses a canvas wider or taller than this
   const MAX_AREA = 268435456;   // and one with more pixels than this (16384 * 16384)
 
-  const btn = document.querySelector('[data-am="copy-image"]');
-  if (!btn) return;
+  const copyButton = document.querySelector('[data-am="copy-image"]');
+  const downloadButton = document.querySelector('[data-am="download-image"]');
+  if (!copyButton || !downloadButton) return;
   const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';
   const canCopy = window.isSecureContext && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
   // Safari and Firefox also expose the async Clipboard API, but cannot rasterize the page reliably: Chromium only. An embedded
@@ -24,21 +23,19 @@
 
   const main = document.querySelector('main.am-sheet, main.am-doc');
   if (!main) return;
-  btn.hidden = false;
+  copyButton.hidden = !canCopy;
+  downloadButton.hidden = false;
 
-  const idle = btn.textContent;
-  // The button's aria-label stays "Copy as image", so a screen reader hears each result through a hidden live region beside it.
+  // The aria-labels stay fixed. A screen reader hears each result through a live region beside them.
   // aria-live, not role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
   const status = document.createElement('span');
   status.setAttribute('aria-live', 'polite');
   status.dataset.am = 'copy-image-status';
   status.className = 'am-visually-hidden';
-  btn.after(status);
-  const say = (text, restore) => {
+  downloadButton.after(status);
+  const say = (btn, text) => {
     btn.textContent = text;
     status.textContent = text;
-    clearTimeout(say.timer);
-    if (restore) say.timer = setTimeout(() => { btn.textContent = idle; }, 1800);
   };
 
   // A stylesheet of only the local font declarations, so a font a theme embeds still draws inside the SVG.
@@ -173,31 +170,33 @@
   };
 
   let busy = false;
-  btn.addEventListener('click', async () => {
-    if (busy) return;
-    busy = true;
-    btn.setAttribute('aria-disabled', 'true');
-    say(btn.dataset.working, false);
-    try {
-      const blob = await rasterize();
-      if (!canCopy) {
-        download(blob);
-        say(btn.dataset.downloaded, true);
-        return;
-      }
+  function bind(btn, action) {
+    const idle = btn.textContent;
+    let timer;
+    btn.addEventListener('click', async () => {
+      if (busy) return;
+      busy = true;
+      btn.setAttribute('aria-disabled', 'true');
+      clearTimeout(timer);
+      say(btn, btn.dataset.working);
       try {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        say(btn.dataset.done, true);
+        await action();
+        say(btn, btn.dataset.done);
       } catch {
-        // A clipboard the browser refuses (a permission, or a sandbox without clipboard-write) still gets the picture as a file.
-        download(blob);
-        say(btn.dataset.downloaded, true);
+        say(btn, btn.dataset.failed);
+      } finally {
+        timer = setTimeout(() => { btn.textContent = idle; }, 1800);
+        busy = false;
+        btn.removeAttribute('aria-disabled');
       }
-    } catch {
-      say(btn.dataset.failed, true);
-    } finally {
-      busy = false;
-      btn.removeAttribute('aria-disabled');
-    }
+    });
+  }
+
+  if (canCopy) bind(copyButton, async () => {
+    const png = rasterize();
+    // Give Chromium a promised PNG during the click, before rasterization can outlast its activation.
+    await Promise.all([png, Promise.resolve().then(() =>
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]))]);
   });
+  bind(downloadButton, async () => download(await rasterize()));
 })();

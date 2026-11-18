@@ -97,7 +97,7 @@ test('copy-image: the button appears and a click writes a real PNG to the clipbo
   assert.equal(r.label, 'Copied ✓', 'the button reports the copy');
 });
 
-// A refused clipboard downloads the PNG; the button must say so, not "Copied ✓".
+// A refused clipboard is a copy failure. Only the download action creates a file.
 const CLICK_FALLBACK = `(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const btn = document.querySelector('[data-am="copy-image"]');
@@ -109,7 +109,7 @@ const CLICK_FALLBACK = `(async () => {
   const orig = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function () { clicked += 1; };
   btn.click();
-  for (let i = 0; i < 200 && !clicked; i++) await sleep(50);
+  for (let i = 0; i < 200 && btn.getAttribute('aria-disabled') === 'true'; i++) await sleep(50);
   HTMLAnchorElement.prototype.click = orig;
   await sleep(30);
   return { revealed, wrote, clicked, label: btn.textContent, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
@@ -145,47 +145,56 @@ test('copy-image: a Chromium host without navigator.userAgentData (Electron, Web
   });
 });
 
-// Count clipboard writes and download clicks after a click on the button.
-const CLICK_COUNT = `(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const btn = document.querySelector('[data-am="copy-image"]');
-  let wrote = 0;
-  if (navigator.clipboard) {
-    try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote += 1; } }); } catch {}
+// Capture the PNG handed to the browser's download action without writing a file.
+const DOWNLOAD_PNG = `(async () => {
+  const btn = document.querySelector('[data-am="download-image"]');
+  let blob;
+  let name;
+  let writes = 0;
+  const original = HTMLAnchorElement.prototype.click;
+  const createUrl = URL.createObjectURL;
+  URL.createObjectURL = value => { blob = value; return createUrl(value); };
+  HTMLAnchorElement.prototype.click = function () { name = this.download; };
+  if (navigator.clipboard) Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { writes++; } });
+  try {
+    btn.click();
+    for (let i = 0; i < 200 && btn.getAttribute('aria-disabled') === 'true'; i++) await new Promise(r => setTimeout(r, 50));
+    const bytes = blob ? new Uint8Array(await blob.arrayBuffer()) : [];
+    return { hidden: btn.hidden, writes, name, signature: Array.from(bytes.slice(0, 8)), label: btn.textContent };
+  } finally {
+    HTMLAnchorElement.prototype.click = original;
+    URL.createObjectURL = createUrl;
   }
-  let clicked = 0;
-  const orig = HTMLAnchorElement.prototype.click;
-  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
-  btn.click();
-  for (let i = 0; i < 200 && !clicked && !wrote; i++) await sleep(50);
-  HTMLAnchorElement.prototype.click = orig;
-  await sleep(30);
-  return { wrote, clicked, label: btn.textContent };
 })()`;
+
+const EXPECTED_DOWNLOAD = { hidden: false, writes: 0, name: 'answer-me-with-html.png',
+  signature: [137, 80, 78, 71, 13, 10, 26, 10], label: 'Downloaded' };
+
+test('download-image: clicking Download image does not use the clipboard', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  assert.deepEqual(await evaluate(DOWNLOAD_PNG), EXPECTED_DOWNLOAD);
+});
 
 for (const [what, source] of [
   ['no ClipboardItem', 'delete window.ClipboardItem;'],
   ['a page that is not a secure context', "Object.defineProperty(window, 'isSecureContext', { get: () => false, configurable: true });"],
 ]) {
-  test(`copy-image: with ${what}, the button still shows and a click downloads the PNG`, { skip: SKIP }, async () => {
+  test(`download-image: works with ${what} while unavailable copy stays hidden`, { skip: SKIP }, async () => {
     await withOverrides(source, async () => {
-      assert.equal(await evaluate(HIDDEN), false, 'the button is shown');
-      const r = await evaluate(CLICK_COUNT);
-      assert.equal(r.wrote, 0, 'no clipboard write is tried');
-      assert.equal(r.clicked, 1, `the PNG is downloaded (${JSON.stringify(r)})`);
-      assert.equal(r.label, 'Downloaded', 'the button reports the download');
+      assert.equal(await evaluate(HIDDEN), true);
+      assert.deepEqual(await evaluate(DOWNLOAD_PNG), EXPECTED_DOWNLOAD);
     });
   });
 }
 
-test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
+test('copy-image: a refused clipboard leaves downloads untouched and reports failure', { skip: SKIP }, async () => {
   await load(pathToFileURL(file).href);
   const r = await evaluate(CLICK_FALLBACK);
   assert.equal(r.revealed, true, 'the button is revealed');
   assert.equal(r.wrote, true, 'the clipboard write was attempted');
-  assert.ok(r.clicked >= 1, 'a download was triggered');
-  assert.equal(r.label, 'Downloaded', `the fallback reports a download, not a copy (${JSON.stringify(r)})`);
-  assert.equal(r.status, 'Downloaded', 'a screen reader hears the result through the status region');
+  assert.equal(r.clicked, 0, 'copy must not trigger a download');
+  assert.equal(r.label, 'Copy failed');
+  assert.equal(r.status, 'Copy failed', 'a screen reader hears the failure');
 });
 
 // A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which

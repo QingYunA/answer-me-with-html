@@ -34,7 +34,7 @@ export default {
     chart: { name: 'Grafik', data: 'Veri', value: 'Değer', share: 'Pay' },
     api: { path: 'Yol parametreleri', query: 'Sorgu parametreleri', headers: 'Başlıklar', request: 'İstek', response: 'Yanıt', field: 'Alan', type: 'Tür', description: 'Açıklama', requirement: 'Gereklilik', required: 'Zorunlu', optional: 'İsteğe bağlı' },
     table: { filter: 'Tabloyu filtrele' },
-    image: { button: 'Görsel olarak kopyala', working: 'Görsel oluşturuluyor…', done: 'Kopyalandı ✓', downloaded: 'İndirildi', failed: 'Kopyalanamadı' },
+    image: { download: 'Görseli indir', downloadFailed: 'İndirilemedi', button: 'Görsel olarak kopyala', working: 'Görsel oluşturuluyor…', done: 'Kopyalandı ✓', downloaded: 'İndirildi', failed: 'Kopyalanamadı' },
   },
   // Player labels. drawn..duration are the title block cells; sheet is the scene header, with {n} and {total} the zero-padded numbers.
   videoUi: {
