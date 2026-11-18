@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
 import { renderDoc } from '../src/render.js';
+import { loadMath } from '../src/math-load.js';
 
 const CHROME = findChrome();
 const SKIP = process.env.AM_E2E !== '1'
@@ -37,9 +38,10 @@ const evaluate = async (expression) => {
 
 before(async () => {
   if (SKIP) return;
+  await loadMath('$x$');
   tmp = mkdtempSync(join(tmpdir(), 'am-copy-image-'));
   file = join(tmp, 'page.html');
-  const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n`;
+  const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n\n\`\`\`flow\n[A] -> [B]\n\`\`\`\n\n$$\nx = 1\n$$\n`;
   writeFileSync(file, renderDoc(src, {}, {}, {}).html);
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
@@ -216,4 +218,62 @@ test('copy-image: a multi-layer body background stays opaque in the PNG', { skip
   const r = await evaluate(CLICK_MULTI_BG);
   assert.equal(r.error, undefined, `the capture succeeded (${JSON.stringify(r)})`);
   assert.equal(r.alpha, 255, `the corner is opaque, so the background was drawn (${JSON.stringify(r)})`);
+});
+
+const CAPTURE_SVG = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let svgSrc = null;
+  const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+  Object.defineProperty(Image.prototype, 'src', {
+    set(val) {
+      if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
+        svgSrc = decodeURIComponent(val.split(',')[1]);
+      }
+      origSrc.set.call(this, val);
+    },
+    get() { return origSrc.get.call(this); },
+    configurable: true,
+  });
+  const btn = document.querySelector('[data-am="copy-image"]');
+  btn.click();
+  for (let i = 0; i < 200 && !svgSrc; i++) await sleep(50);
+  Object.defineProperty(Image.prototype, 'src', origSrc);
+  if (!svgSrc) return { error: 'svg not captured' };
+  const doc = new DOMParser().parseFromString(svgSrc, 'image/svg+xml');
+  const tableWrap = doc.querySelector('.am-table-wrap');
+  const diagram = doc.querySelector('.am-diagram');
+  const mathBlock = doc.querySelector('.am-math-block');
+  return {
+    found: !!tableWrap && !!diagram && !!mathBlock,
+    tableWrap: {
+      overflow: tableWrap?.style?.overflow ?? null,
+      height: tableWrap?.style?.height ?? null,
+      maxHeight: tableWrap?.style?.maxHeight ?? null,
+    },
+    diagram: {
+      overflow: diagram?.style?.overflow ?? null,
+      height: diagram?.style?.height ?? null,
+      maxHeight: diagram?.style?.maxHeight ?? null,
+    },
+    mathBlock: {
+      overflow: mathBlock?.style?.overflow ?? null,
+      height: mathBlock?.style?.height ?? null,
+      maxHeight: mathBlock?.style?.maxHeight ?? null,
+    },
+  };
+})()`;
+
+test('copy-image: scrolling containers reset overflow to visible, height to auto, and max-height to none in rasterized SVG', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CAPTURE_SVG);
+  assert.equal(r.found, true, 'table wrap, diagram, and math block exist in the rendered SVG');
+  assert.equal(r.tableWrap.overflow, 'visible', 'table wrap overflow is reset to visible');
+  assert.equal(r.tableWrap.height, 'auto', 'table wrap height is reset to auto');
+  assert.equal(r.tableWrap.maxHeight, 'none', 'table wrap max-height is reset to none');
+  assert.equal(r.diagram.overflow, 'visible', 'diagram overflow is reset to visible');
+  assert.equal(r.diagram.height, 'auto', 'diagram height is reset to auto');
+  assert.equal(r.diagram.maxHeight, 'none', 'diagram max-height is reset to none');
+  assert.equal(r.mathBlock.overflow, 'visible', 'math block overflow is reset to visible');
+  assert.equal(r.mathBlock.height, 'auto', 'math block height is reset to auto');
+  assert.equal(r.mathBlock.maxHeight, 'none', 'math block max-height is reset to none');
 });

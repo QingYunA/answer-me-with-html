@@ -102,6 +102,14 @@
       pseudoCss += pseudoRule(srcNodes[i], dstNodes[i], '::after');
     }
     for (const node of clone.querySelectorAll(CHROME)) node.remove();
+    // A rasterized image is a static snapshot, not a scrollable viewport. Inlined computed styles turn auto heights
+    // into fixed fractional heights on scrolling containers (.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre),
+    // and subpixel rounding inside the foreignObject can trigger unwanted scrollbars. Reset them to visible and auto.
+    for (const scroller of clone.querySelectorAll('.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre')) {
+      scroller.style.setProperty('overflow', 'visible', 'important');
+      scroller.style.setProperty('height', 'auto', 'important');
+      scroller.style.setProperty('max-height', 'none', 'important');
+    }
     clone.style.margin = '0';
     clone.style.width = `${width}px`;
     clone.style.maxWidth = 'none';
