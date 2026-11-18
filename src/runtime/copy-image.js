@@ -1,7 +1,7 @@
 // Copy the page as a PNG image onto the clipboard. The button starts hidden (src/render.js) and this script reveals it only where the
-// browser can draw the page: a canvas, in Chromium. Firefox and Safari cannot reliably rasterize an SVG foreignObject, and there the
-// button stays hidden rather than failing on every click. Without the async Clipboard API or a secure context (some embedded
-// WebViews), a click downloads the PNG instead.
+// browser can draw the page: a canvas. Chromium and Firefox (160 and later) can rasterize an SVG foreignObject; Safari cannot
+// reliably, and there the button stays hidden rather than failing on every click. Without the async Clipboard API or a secure
+// context (some embedded WebViews), a click downloads the PNG instead.
 //
 // Pipeline: clone the page body → inline every computed style (CSS variables are resolved there, so a clone keeps theme colours and
 // sizes) and the ::before / ::after decorations → wrap it in an SVG foreignObject → draw that image on a canvas → toBlob('image/png')
@@ -16,11 +16,12 @@
   if (!btn) return;
   const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';
   const canCopy = window.isSecureContext && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
-  // Safari and Firefox also expose the async Clipboard API, but cannot rasterize the page reliably: Chromium only. An embedded
+  // Safari also exposes the async Clipboard API, but cannot rasterize the page reliably; Firefox 160 and later can. An embedded
   // Chromium (Electron, WebView2, CEF) can lack navigator.userAgentData; its user agent still names Chrome/.
   const brands = navigator.userAgentData?.brands;
   const chromium = brands ? brands.some((b) => /Chromium/.test(b.brand)) : /\bChrome\//.test(navigator.userAgent);
-  if (!canRasterize || !chromium) return; // the button stays hidden
+  const gecko = /\bFirefox\//.test(navigator.userAgent);
+  if (!canRasterize || !(chromium || gecko)) return; // the button stays hidden
 
   const main = document.querySelector('main.am-sheet, main.am-doc');
   if (!main) return;
