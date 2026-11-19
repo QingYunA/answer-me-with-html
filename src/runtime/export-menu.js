@@ -43,13 +43,15 @@
   btn.hidden = false;
 
   const idle = btn.textContent;
-  // The button keeps its name ("Export"), so a screen reader hears each result through a hidden live region beside it. aria-live, not
+  // The button keeps its name ("Export") while its text shows progress, so a screen reader hears each result through a hidden live
+  // region beside it. aria-live, not
   // role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
   const status = document.createElement('span');
   status.setAttribute('aria-live', 'polite');
   status.dataset.am = 'export-status';
   status.className = 'am-visually-hidden';
   btn.after(status);
+  btn.setAttribute('aria-label', idle);
   // Short feedback on the button itself, restored after a moment; the live region carries the same words.
   const say = (message, restore) => {
     btn.textContent = message;
@@ -187,10 +189,11 @@
     return new XMLSerializer().serializeToString(svg);
   }
 
-  // A canvas may not exceed the browser's dimension or area limit: shrink the pixels rather than fail on a long page.
+  // A canvas may not exceed the browser's dimension or area limit: shrink the pixels rather than fail on a long page. No lower bound:
+  // one would let a very long page exceed the limits again.
   const pixelScale = (width, height) => {
     const wanted = Math.min(2, window.devicePixelRatio || 1);
-    return Math.max(0.05, Math.min(wanted, MAX_DIM / width, MAX_DIM / height, Math.sqrt(MAX_AREA / (width * height))));
+    return Math.min(wanted, MAX_DIM / width, MAX_DIM / height, Math.sqrt(MAX_AREA / (width * height)));
   };
 
   async function rasterize() {
@@ -266,14 +269,16 @@
   // class, with Esc and a click outside handled here.
   const isOpen = () => (native ? menu.matches(':popover-open') : menu.classList.contains('is-open'));
   // Under the button, aligned to its inline-end edge, and inside the viewport (the toolbar scrolls sideways on a phone, so the button
-  // can sit near an edge).
+  // can sit near an edge). On a short viewport the menu is cut to the space below the button and scrolls, so every item stays reachable.
   const place = () => {
     const r = btn.getBoundingClientRect();
     const width = menu.offsetWidth;
     const rtl = getComputedStyle(btn).direction === 'rtl';
     const left = Math.max(8, Math.min(rtl ? r.left : r.right - width, document.documentElement.clientWidth - 8 - width));
-    menu.style.top = `${r.bottom + 6}px`;
+    const top = r.bottom + 6;
+    menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
+    menu.style.maxHeight = `${Math.max(48, document.documentElement.clientHeight - 8 - top)}px`;
   };
   const firstEnabled = () => items.find((el) => el.getAttribute('aria-disabled') !== 'true');
   const opened = () => {

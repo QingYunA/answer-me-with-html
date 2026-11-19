@@ -624,7 +624,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-export { display: none; }
 .am-export:is(:popover-open, .is-open) {
   display: flex; flex-direction: column; position: fixed; inset: 52px auto auto auto; margin: 0; z-index: 11;
-  width: max-content; min-width: 200px; max-width: calc(100vw - 16px); padding: 4px; overflow: visible;
+  width: max-content; min-width: 200px; max-width: calc(100vw - 16px); padding: 4px; overflow-y: auto;
   color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
 }
 .am-export-item {

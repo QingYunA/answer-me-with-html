@@ -298,6 +298,56 @@ test('export: the menu stays inside the viewport at 390px, and in right-to-left'
   }
 });
 
+test('export: on a short viewport the menu scrolls, so Save as PDF stays reachable', { skip: SKIP }, async () => {
+  await send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 170, deviceScaleFactor: 1, mobile: false });
+  try {
+    await withOverrides(NO_CLIPBOARD_ITEM, async () => {
+      await openMenu();
+      const r = await evaluate(`(() => {
+        ${UI}
+        const vh = document.documentElement.clientHeight;
+        const overflows = menu.scrollHeight > menu.clientHeight;
+        const bottom = menu.getBoundingClientRect().bottom;
+        pdf.scrollIntoView({ block: 'nearest' });
+        const m = menu.getBoundingClientRect(), p = pdf.getBoundingClientRect();
+        return { vh, overflows, bottom, pdfInside: p.top >= m.top && p.bottom <= m.bottom + 0.5 && p.bottom <= vh };
+      })()`);
+      assert.equal(r.overflows, true, `the case is real: the menu is taller than the space below the button (${JSON.stringify(r)})`);
+      assert.ok(r.bottom <= r.vh, `the menu ends inside the viewport (${JSON.stringify(r)})`);
+      assert.equal(r.pdfInside, true, `Save as PDF scrolls into view (${JSON.stringify(r)})`);
+      await key('Escape', 'Escape', 27);
+      await wait(SETTLED, 'Esc to close the menu');
+    });
+  } finally {
+    await send('Emulation.clearDeviceMetricsOverride');
+  }
+});
+
+// A very long page: the canvas is shrunk to stay within the browser's dimension limit, however small the scale gets.
+const CLICK_LONG_PAGE = `(async () => {
+  ${UI}
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  document.querySelector('main').style.minHeight = '1000000px';
+  let size = null;
+  const origDraw = CanvasRenderingContext2D.prototype.drawImage;
+  CanvasRenderingContext2D.prototype.drawImage = function (...args) { size = { width: this.canvas.width, height: this.canvas.height }; return origDraw.apply(this, args); };
+  const orig = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {};
+  download.click();
+  for (let i = 0; i < 400 && !size; i++) await sleep(50);
+  for (let i = 0; i < 200 && toggle.getAttribute('aria-busy') === 'true'; i++) await sleep(50);
+  HTMLAnchorElement.prototype.click = orig;
+  CanvasRenderingContext2D.prototype.drawImage = origDraw;
+  return size;
+})()`;
+
+test('export: a very long page draws to a canvas within the browser limit', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const size = await evaluate(CLICK_LONG_PAGE);
+  assert.ok(size, 'the page was drawn');
+  assert.ok(size.width <= 16384 && size.height <= 16384, `the canvas (${JSON.stringify(size)}) stays within 16384px`);
+});
+
 test('export: a browser without popovers gets the same menu from a class toggle, closed by Esc and an outside click', { skip: SKIP }, async () => {
   await withOverrides('delete HTMLElement.prototype.popover;', async () => {
     assert.equal(await evaluate(`(() => { ${UI} return toggle.hidden; })()`), false, 'the button is still shown');
@@ -415,14 +465,18 @@ const CLICK_REFUSED_EARLY = `(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const isBusy = () => toggle.getAttribute('aria-busy') === 'true';
   let drawings = 0;
+  // The first drawing is held until the test releases it, so the checks below run while it is certainly still in progress.
+  let release = null;
   const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
   Object.defineProperty(Image.prototype, 'src', {
     set(val) {
       if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
         drawings += 1;
-        const image = this;
-        setTimeout(() => origSrc.set.call(image, val), 800); // a slow rasterization
-        return;
+        if (drawings === 1) {
+          const image = this;
+          new Promise((r) => { release = r; }).then(() => origSrc.set.call(image, val));
+          return;
+        }
       }
       origSrc.set.call(this, val);
     },
@@ -430,25 +484,30 @@ const CLICK_REFUSED_EARLY = `(async () => {
     configurable: true,
   });
   Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { throw new DOMException('denied', 'NotAllowedError'); } });
+  const name = toggle.textContent;
   copy.click();
-  await sleep(300); // the write has been refused by now; the drawing has not finished
+  for (let i = 0; i < 200 && !release; i++) await sleep(25); // the drawing has started and is held
+  await sleep(100); // the write has been refused by now
   const busyAfterRefusal = isBusy();
   const labelAfterRefusal = toggle.textContent;
+  const nameWhileBusy = toggle.getAttribute('aria-label');
   const blocked = [copy, download].map((el) => el.getAttribute('aria-disabled') === 'true');
   const pdfFree = pdf.getAttribute('aria-disabled') !== 'true';
   copy.click();
   download.click();
-  await sleep(300);
+  await sleep(100);
   const drawingsAfterSecondClicks = drawings;
+  release?.();
   let settled = false;
   for (let i = 0; i < 200 && !settled; i++) { await sleep(50); settled = !isBusy(); }
   const labelAtEnd = toggle.textContent;
+  const nameAtEnd = toggle.getAttribute('aria-label');
   const freeAgain = [copy, download].map((el) => el.getAttribute('aria-disabled') !== 'true');
   copy.click(); // a retry after everything settled starts a new drawing
   await sleep(300);
   const drawingsAfterRetry = drawings;
   Object.defineProperty(Image.prototype, 'src', origSrc);
-  return { busyAfterRefusal, labelAfterRefusal, working: menu.dataset.working, blocked, pdfFree, drawingsAfterSecondClicks, settled, labelAtEnd, failed: menu.dataset.failed, freeAgain, drawingsAfterRetry };
+  return { name, nameWhileBusy, nameAtEnd, busyAfterRefusal, labelAfterRefusal, working: menu.dataset.working, blocked, pdfFree, drawingsAfterSecondClicks, settled, labelAtEnd, failed: menu.dataset.failed, freeAgain, drawingsAfterRetry };
 })()`;
 
 test('export: a clipboard refusal during a slow rasterization keeps Copy and Download busy until the drawing settles', { skip: SKIP }, async () => {
@@ -456,6 +515,8 @@ test('export: a clipboard refusal during a slow rasterization keeps Copy and Dow
   const r = await evaluate(CLICK_REFUSED_EARLY);
   assert.equal(r.busyAfterRefusal, true, `the export is still busy while the page is being drawn (${JSON.stringify(r)})`);
   assert.equal(r.labelAfterRefusal, r.working, `the button still shows the working state (${JSON.stringify(r)})`);
+  assert.equal(r.nameWhileBusy, r.name, 'the button keeps its name while its text shows progress');
+  assert.equal(r.nameAtEnd, r.name, 'and after the failure');
   assert.deepEqual(r.blocked, [true, true], `Copy and Download are aria-disabled meanwhile (${JSON.stringify(r)})`);
   assert.equal(r.pdfFree, true, 'Save as PDF stays free');
   assert.equal(r.drawingsAfterSecondClicks, 1, `a Copy or Download during the drawing starts no second rasterization (${JSON.stringify(r)})`);
