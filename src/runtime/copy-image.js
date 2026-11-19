@@ -60,12 +60,12 @@
     return;
   }
 
-  // Safari and unknown browsers can draw the page often enough to keep the button, but the result is not guaranteed: say so in the
-  // title and the accessible name, and keep the original button text.
+  // Safari and unknown browsers can draw the page often enough to keep the button, but the result is not guaranteed: add the note to
+  // the title and the accessible name after what the button does, and keep the original button text.
   if (!chromium && !gecko) {
-    const unverified = btn.dataset.unverifiedEffect;
-    btn.title = unverified;
-    btn.setAttribute('aria-label', unverified);
+    const labelled = `${idle}. ${btn.dataset.unverifiedEffect}`;
+    btn.title = labelled;
+    btn.setAttribute('aria-label', labelled);
   }
 
   // A stylesheet of only the local font declarations, so a font a theme embeds still draws inside the SVG.

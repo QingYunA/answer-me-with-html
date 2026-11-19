@@ -143,6 +143,9 @@ test('copy-image: Safari keeps the button enabled but says the effect is not gua
     assert.equal(s.disabled, false, 'the button stays enabled');
     assert.ok(s.unverifiedEffect && s.title.includes(s.unverifiedEffect), `the title carries the unverified-effect note (${JSON.stringify(s)})`);
     assert.ok(s.ariaLabel.includes(s.unverifiedEffect), `the accessible name carries the unverified-effect note (${JSON.stringify(s)})`);
+    // The note adds to what the button does; it must not replace it, or the accessible name no longer says "Copy as image".
+    assert.ok(s.text && s.ariaLabel.includes(s.text), `the accessible name still says what the button does (${JSON.stringify(s)})`);
+    assert.ok(s.title.includes(s.text), `the title still says what the button does (${JSON.stringify(s)})`);
   });
 });
 
