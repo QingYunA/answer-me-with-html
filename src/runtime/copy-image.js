@@ -99,6 +99,20 @@
       pseudoCss += pseudoRule(srcNodes[i], dstNodes[i], '::after');
     }
     for (const node of clone.querySelectorAll(CHROME)) node.remove();
+    // A rasterized image is a static snapshot, not a scrollable viewport. Inlined computed styles turn auto heights
+    // into fixed fractional heights on scrolling containers (.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre),
+    // and subpixel rounding inside the foreignObject can trigger unwanted scrollbars. Reset unconstrained containers to visible and auto.
+    // For containers with an author-specified finite max-height, keep inlined height and max-height, and hide overflow.
+    for (const scroller of clone.querySelectorAll('.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre')) {
+      const maxH = parseFloat(scroller.style.maxHeight || scroller.style.getPropertyValue('max-height'));
+      if (Number.isFinite(maxH) && maxH >= 0) {
+        scroller.style.setProperty('overflow', 'hidden', 'important');
+      } else {
+        scroller.style.setProperty('overflow', 'visible', 'important');
+        scroller.style.setProperty('height', 'auto', 'important');
+        scroller.style.setProperty('max-height', 'none', 'important');
+      }
+    }
     clone.style.margin = '0';
     clone.style.width = `${width}px`;
     clone.style.maxWidth = 'none';

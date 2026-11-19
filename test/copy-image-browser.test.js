@@ -36,7 +36,8 @@ before(async () => {
   if (SKIP) return;
   tmp = mkdtempSync(join(tmpdir(), 'am-copy-image-'));
   file = join(tmp, 'page.html');
-  const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n`;
+  const preLines = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n');
+  const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n\n\`\`\`flow\n[A] -> [B]\n\`\`\`\n\n$$\nx = 1\n$$\n\n## C\n\`\`\`html\n<pre id="constrained-pre" style="max-height: 40px; overflow: auto">${preLines}</pre>\n\`\`\`\n\nA paragraph following constrained pre.\n`;
   const cli = fileURLToPath(new URL('../skills/answer-me-with-html/scripts/am.mjs', import.meta.url));
   execFileSync(process.execPath, [cli, 'render', '-', '-o', file, '--no-open'], {
     input: src, env: { ...process.env, AM_HOME: join(tmp, 'settings'), AM_NO_UPDATE_CHECK: '1' },
@@ -272,4 +273,121 @@ test('copy-image: a multi-layer body background stays opaque in the PNG', { skip
   const r = await evaluate(CLICK_MULTI_BG);
   assert.equal(r.error, undefined, `the capture succeeded (${JSON.stringify(r)})`);
   assert.equal(r.alpha, 255, `the corner is opaque, so the background was drawn (${JSON.stringify(r)})`);
+});
+
+const CAPTURE_SVG = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let svgSrc = null;
+  const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+  Object.defineProperty(Image.prototype, 'src', {
+    set(val) {
+      if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
+        svgSrc = decodeURIComponent(val.split(',')[1]);
+      }
+      origSrc.set.call(this, val);
+    },
+    get() { return origSrc.get.call(this); },
+    configurable: true,
+  });
+  const btn = document.querySelector('[data-am="copy-image"]');
+  btn.click();
+  for (let i = 0; i < 200 && !svgSrc; i++) await sleep(50);
+  Object.defineProperty(Image.prototype, 'src', origSrc);
+  if (!svgSrc) return { error: 'svg not captured' };
+  const doc = new DOMParser().parseFromString(svgSrc, 'image/svg+xml');
+  const tableWrap = doc.querySelector('.am-table-wrap');
+  const diagram = doc.querySelector('.am-diagram');
+  const mathBlock = doc.querySelector('.am-math-block');
+  return {
+    found: !!tableWrap && !!diagram && !!mathBlock,
+    tableWrap: {
+      overflow: tableWrap?.style?.overflow ?? null,
+      height: tableWrap?.style?.height ?? null,
+      maxHeight: tableWrap?.style?.maxHeight ?? null,
+    },
+    diagram: {
+      overflow: diagram?.style?.overflow ?? null,
+      height: diagram?.style?.height ?? null,
+      maxHeight: diagram?.style?.maxHeight ?? null,
+    },
+    mathBlock: {
+      overflow: mathBlock?.style?.overflow ?? null,
+      height: mathBlock?.style?.height ?? null,
+      maxHeight: mathBlock?.style?.maxHeight ?? null,
+    },
+  };
+})()`;
+
+test('copy-image: scrolling containers reset overflow to visible, height to auto, and max-height to none in rasterized SVG', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CAPTURE_SVG);
+  assert.equal(r.found, true, 'table wrap, diagram, and math block exist in the rendered SVG');
+  assert.equal(r.tableWrap.overflow, 'visible', 'table wrap overflow is reset to visible');
+  assert.equal(r.tableWrap.height, 'auto', 'table wrap height is reset to auto');
+  assert.equal(r.tableWrap.maxHeight, 'none', 'table wrap max-height is reset to none');
+  assert.equal(r.diagram.overflow, 'visible', 'diagram overflow is reset to visible');
+  assert.equal(r.diagram.height, 'auto', 'diagram height is reset to auto');
+  assert.equal(r.diagram.maxHeight, 'none', 'diagram max-height is reset to none');
+  assert.equal(r.mathBlock.overflow, 'visible', 'math block overflow is reset to visible');
+  assert.equal(r.mathBlock.height, 'auto', 'math block height is reset to auto');
+  assert.equal(r.mathBlock.maxHeight, 'none', 'math block max-height is reset to none');
+});
+
+const CAPTURE_CONSTRAINED = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let svgSrc = null;
+  const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+  Object.defineProperty(Image.prototype, 'src', {
+    set(val) {
+      if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
+        svgSrc = decodeURIComponent(val.split(',')[1]);
+      }
+      origSrc.set.call(this, val);
+    },
+    get() { return origSrc.get.call(this); },
+    configurable: true,
+  });
+  const btn = document.querySelector('[data-am="copy-image"]');
+  btn.click();
+  for (let i = 0; i < 200 && !svgSrc; i++) await sleep(50);
+  Object.defineProperty(Image.prototype, 'src', origSrc);
+  if (!svgSrc) return { error: 'svg not captured' };
+
+  const container = document.createElement('div');
+  container.style.position = 'absolute';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.innerHTML = svgSrc;
+  document.body.appendChild(container);
+
+  const pre = container.querySelector('#constrained-pre');
+  const panel = pre ? pre.closest('.am-panel') : null;
+  const p = panel ? panel.querySelector('p') : null;
+  const panelRect = panel ? panel.getBoundingClientRect() : null;
+  const pRect = p ? p.getBoundingClientRect() : null;
+  const preStyle = pre ? {
+    overflow: pre.style.overflow,
+    height: pre.style.height,
+    maxHeight: pre.style.maxHeight,
+  } : null;
+
+  const res = {
+    found: !!panel && !!pre && !!p,
+    preStyle,
+    panelRect: panelRect ? { top: panelRect.top, bottom: panelRect.bottom, height: panelRect.height } : null,
+    pRect: pRect ? { top: pRect.top, bottom: pRect.bottom, height: pRect.height } : null,
+    withinBounds: panelRect && pRect ? pRect.bottom <= panelRect.bottom : false,
+  };
+  container.remove();
+  return res;
+})()`;
+
+test('copy-image: constrained code block keeps max-height and hides overflow without clipping following content in panel', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CAPTURE_CONSTRAINED);
+  assert.equal(r.found, true, `panel, constrained pre, and following paragraph exist in the rendered SVG (${JSON.stringify(r)})`);
+  assert.equal(r.preStyle.overflow, 'hidden', 'constrained pre overflow is set to hidden');
+  assert.equal(r.preStyle.maxHeight, '40px', 'constrained pre max-height is preserved');
+  assert.ok(r.preStyle.height && r.preStyle.height !== 'auto', 'constrained pre height is preserved and not reset to auto');
+  assert.equal(r.withinBounds, true, `paragraph bottom (${r.pRect?.bottom}) is within panel bottom (${r.panelRect?.bottom})`);
 });

@@ -813,6 +813,49 @@ test('e2e: diagram expand button opens lightbox and Escape closes it', { skip: S
   assert.equal(await evaluate('document.querySelector(".am-lightbox").hasAttribute("hidden")'), true, 'lightbox closes on Escape');
 });
 
+test('e2e: the lightbox diagram is drawn sharp at the zoom the reader chose (#430)', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const tcp = pages.find((x) => x.name === 'tcp');
+  assert.ok(tcp, 'tcp page with diagram');
+  await open(tcp.file, DESKTOP);
+  await waitFor(SETTLED, 'tcp to lay out');
+  await evaluate('document.querySelector(".am-diagram-expand").click()');
+  // Zoom in to the maximum the way a wheel does, then let the compositor settle.
+  await evaluate(`(async () => {
+    const stage = document.querySelector('.am-lightbox-stage');
+    const r = stage.getBoundingClientRect();
+    for (let i = 0; i < 40; i++) {
+      stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true }));
+      await new Promise((res) => setTimeout(res, 20));
+    }
+    await new Promise((res) => setTimeout(res, 500));
+  })()`);
+  assert.ok(await evaluate('new DOMMatrix(getComputedStyle(document.querySelector(".am-lightbox-canvas")).transform).a') > 4, 'the viewer is zoomed in');
+  const shot = async () => (await page('Page.captureScreenshot', { format: 'png' })).data;
+  const asShown = await shot();
+  // A will-change layer keeps the bitmap it drew at the first scale and stretches it; "auto" makes Chrome draw the SVG again at the current scale.
+  await evaluate(`document.querySelector('.am-lightbox-canvas').style.willChange = 'auto'; new Promise((res) => setTimeout(res, 500))`);
+  const redrawn = await shot();
+  const meanDiff = await evaluate(`(async () => {
+    const pixels = async (b64) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      return ctx.getImageData(0, 0, c.width, c.height).data;
+    };
+    const a = await pixels(${JSON.stringify(asShown)});
+    const b = await pixels(${JSON.stringify(redrawn)});
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+    return sum / a.length;
+  })()`);
+  assert.ok(meanDiff < 0.5, `the zoomed diagram is already as sharp as a fresh drawing (mean pixel difference ${meanDiff.toFixed(2)})`);
+});
+
 test('e2e: the expand button stays in view when a wide diagram scrolls sideways', { skip: SKIP, timeout: 60000 }, async () => {
   if (!cdp) await launch();
   const tcp = pages.find((x) => x.name === 'tcp');
