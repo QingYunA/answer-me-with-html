@@ -34,8 +34,9 @@ export default {
     chart: { name: 'Grafik', data: 'Veri', value: 'Değer', share: 'Pay' },
     api: { path: 'Yol parametreleri', query: 'Sorgu parametreleri', headers: 'Başlıklar', request: 'İstek', response: 'Yanıt', field: 'Alan', type: 'Tür', description: 'Açıklama', requirement: 'Gereklilik', required: 'Zorunlu', optional: 'İsteğe bağlı' },
     table: { filter: 'Tabloyu filtrele' },
-    image: {
-      button: 'Görsel olarak kopyala', working: 'Görsel oluşturuluyor…', done: 'Kopyalandı ✓', failed: 'Kopyalanamadı',
+    export: {
+      button: 'Dışa aktar', copy: 'Görsel olarak kopyala', download: 'PNG indir', pdf: 'PDF olarak kaydet',
+      working: 'Hazırlanıyor…', copied: 'Kopyalandı ✓', saved: 'Kaydedildi ✓', failed: 'Dışa aktarılamadı',
       unavailableBrowser: 'Bu tarayıcı sayfayı görsel olarak dışa aktaramaz.',
       unavailableClipboard: 'Bu tarayıcı görseli panoya yazamaz.',
       unavailablePolicy: 'Bu önizleme kopyalamaya izin vermiyor.',
