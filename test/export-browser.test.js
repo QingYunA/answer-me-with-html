@@ -391,6 +391,8 @@ const CLICK_FAILURE = `(async () => {
   HTMLAnchorElement.prototype.click = function () { clicked += 1; };
   copy.click();
   for (let i = 0; i < 200 && !wrote; i++) await sleep(50);
+  // The failure is reported once the drawing has settled too, which takes longer on a busy machine.
+  for (let i = 0; i < 200 && toggle.textContent === menu.dataset.working; i++) await sleep(50);
   await sleep(100);
   HTMLAnchorElement.prototype.click = orig;
   return { revealed, wrote, clicked, label: toggle.textContent, failed: menu.dataset.failed, status: document.querySelector('[data-am="export-status"]')?.textContent ?? null };
