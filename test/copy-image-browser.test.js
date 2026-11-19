@@ -217,6 +217,55 @@ test('copy-image: a refused clipboard reports the failure and downloads nothing'
   assert.equal(r.status, r.failed, 'a screen reader hears the failure through the status region');
 });
 
+// The clipboard refuses at once (permission denied) while the page is still being drawn. The button must stay busy until the drawing
+// has settled too, so a second click cannot start a second full-page rasterization.
+const CLICK_REFUSED_EARLY = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  let drawings = 0;
+  const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+  Object.defineProperty(Image.prototype, 'src', {
+    set(val) {
+      if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
+        drawings += 1;
+        const image = this;
+        setTimeout(() => origSrc.set.call(image, val), 800); // a slow rasterization
+        return;
+      }
+      origSrc.set.call(this, val);
+    },
+    get() { return origSrc.get.call(this); },
+    configurable: true,
+  });
+  Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { throw new DOMException('denied', 'NotAllowedError'); } });
+  btn.click();
+  await sleep(300); // the write has been refused by now; the drawing has not finished
+  const busyAfterRefusal = btn.getAttribute('aria-disabled') === 'true';
+  const labelAfterRefusal = btn.textContent;
+  btn.click();
+  await sleep(300);
+  const drawingsAfterSecondClick = drawings;
+  let settled = false;
+  for (let i = 0; i < 200 && !settled; i++) { await sleep(50); settled = btn.getAttribute('aria-disabled') !== 'true'; }
+  const labelAtEnd = btn.textContent;
+  btn.click(); // a retry after everything settled starts a new drawing
+  await sleep(300);
+  const drawingsAfterRetry = drawings;
+  Object.defineProperty(Image.prototype, 'src', origSrc);
+  return { busyAfterRefusal, labelAfterRefusal, working: btn.dataset.working, drawingsAfterSecondClick, settled, labelAtEnd, failed: btn.dataset.failed, drawingsAfterRetry };
+})()`;
+
+test('copy-image: a clipboard refusal during a slow rasterization keeps the button busy until the drawing settles', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CLICK_REFUSED_EARLY);
+  assert.equal(r.busyAfterRefusal, true, `the button is still busy while the page is being drawn (${JSON.stringify(r)})`);
+  assert.equal(r.labelAfterRefusal, r.working, `the button still shows the working state (${JSON.stringify(r)})`);
+  assert.equal(r.drawingsAfterSecondClick, 1, `a click during the drawing starts no second rasterization (${JSON.stringify(r)})`);
+  assert.equal(r.settled, true, `the button is free again once the drawing has settled (${JSON.stringify(r)})`);
+  assert.equal(r.labelAtEnd, r.failed, `the refusal is reported when everything has settled (${JSON.stringify(r)})`);
+  assert.equal(r.drawingsAfterRetry, 2, `a retry after everything settled draws again (${JSON.stringify(r)})`);
+});
+
 // A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which
 // breaks if the colour and image are combined in one background shorthand.
 const CLICK_MULTI_BG = `(async () => {

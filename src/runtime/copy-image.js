@@ -212,8 +212,14 @@
       // Start rasterizing, then hand the pending blob to ClipboardItem and write within the same click task so the browser keeps the
       // user's activation. Awaiting the raster first would spend it, and the write would be rejected.
       const blobPromise = rasterize();
-      const item = new ClipboardItem({ 'image/png': blobPromise });
-      await navigator.clipboard.write([item]);
+      const written = (async () => {
+        const item = new ClipboardItem({ 'image/png': blobPromise });
+        await navigator.clipboard.write([item]);
+      })();
+      // The write can be refused at once while the page is still being drawn. Stay busy until both have settled, so a retry cannot
+      // start a second full-page rasterization beside the first.
+      const [write] = await Promise.allSettled([written, blobPromise]);
+      if (write.status === 'rejected') throw write.reason;
       say(btn.dataset.done, true);
     } catch (e) {
       console.error('[am] copy image failed', e);
