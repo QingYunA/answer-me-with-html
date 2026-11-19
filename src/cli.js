@@ -358,7 +358,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   }
   const file = outputPath('pages', nameSource(result.meta), opts, ctx, pages);
   if (!file) return 2;
-  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages', pages });
+  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages', pages, modeFrom: replaced });
   if (!written) return 1;
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   // Delete the earlier attempt only now: a render that fails above keeps it.
@@ -827,7 +827,8 @@ const inside = (dir, target) => {
 // A page in the managed pages folder (pages/ or pages_dir) is written to a temp file and renamed over the old one, so am serve
 // (src/serve.js) never reloads a half-written page. Elsewhere it is written in place: a rename would replace a symlink with a
 // plain file and drop the file's mode and hard links.
-function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
+// modeFrom: the earlier page that --replace names. The new page usually has a new name (a later stamp), so it takes that page's mode.
+function writePage(file, html, env, pages = join(amHome(env), 'pages'), modeFrom = null) {
   const home = resolve(amHome(env));
   const path = resolve(file);
   if (inside(home, path)) ensureHome(home);
@@ -837,8 +838,9 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   // refuses an existing path, a planted symlink too), and only a temp file this call created is removed.
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
   // A page being replaced keeps its mode: the temp file starts private (0600) and takes the old page's mode before the rename,
-  // instead of the default 0644 that would open a private page to other users.
-  const mode = statSync(file, { throwIfNoEntry: false })?.mode;
+  // instead of the default 0644 that would open a private page to other users. The old page is the one --replace names, or the
+  // file already at this path.
+  const mode = (statSync(modeFrom ?? file, { throwIfNoEntry: false }) ?? statSync(file, { throwIfNoEntry: false }))?.mode;
   // Open first, so the temp file counts as ours before any byte is written: a write that fails half way (ENOSPC) still removes it.
   let fd = null;
   let created = false;
@@ -860,8 +862,8 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
 // and the temporary folder) gets the page in a private folder of the temporary folder instead, but only when fallback ('pages' or
 // 'videos') names the default location's folder: a page the user named with -o, or one patched in place, never moves. Returns
 // { file, notice } with the path actually written, or null after one line that says what to run instead.
-// inPlace: am patch, which takes no -o, so its hint does not name -o.
-function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
+// inPlace: am patch, which takes no -o, so its hint does not name -o. modeFrom: the page --replace names (see writePage).
+function savePage(html, file, { fallback, inPlace, pages, modeFrom }, { fail, env }) {
   const home = amHome(env);
   const pageRoot = pages ?? join(home, 'pages');
   const inHome = inside(home, file);
@@ -873,7 +875,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   };
   const refuse = (path, e) => fail(`✗ Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
-    writePage(file, html, env, pageRoot);
+    writePage(file, html, env, pageRoot, modeFrom);
     return { file };
   } catch (e) {
     if (!isDenied(e)) throw e;
@@ -881,7 +883,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
     const spare = join(tempHome(), fallback, basename(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env, join(tempHome(), 'pages'));
+      writePage(spare, html, env, join(tempHome(), 'pages'), modeFrom);
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`✗ Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -904,9 +906,9 @@ function removeEarlier(file, { fail }) {
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
 // Returns the path written, or null when the page could not be written (see savePage).
-function emit(result, file, ctx, { note = '', fallback, inPlace, pages } = {}) {
+function emit(result, file, ctx, { note = '', fallback, inPlace, pages, modeFrom } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, { fallback, inPlace, pages }, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace, pages, modeFrom }, ctx);
   if (!saved) return null;
   print(`✓ ${saved.file}`);
   if (saved.notice) print(saved.notice);
