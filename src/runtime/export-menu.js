@@ -1,72 +1,88 @@
-// Copy the page as a PNG image onto the clipboard. The button shows on every page with a sheet or doc, and this script explains why
-// it cannot copy where the browser lacks the pieces: no canvas rasterizer, a preview frame whose feature policy forbids clipboard-write,
-// or no async Clipboard API / secure context. Firefox can rasterize the page as of version 160, so the button is enabled there and in
-// Chromium; Safari and unknown browsers keep a usable button but carry a note that the effect is not guaranteed. A failed copy shows
-// the failure and never falls back to downloading the PNG.
+// The toolbar's Export menu: Copy as image, Download PNG and Save as PDF. The menu is a native popover that src/render.js writes next to
+// the toolbar (a click on the button, Esc and a click outside open and close it with no script); this script shows the button, moves
+// focus with the arrow keys, says why an item cannot run, and does the work. A browser without popovers gets the same menu from a class
+// toggle instead of losing it.
+//
+// Copy and Download share one rasterizer. An item that cannot run is marked aria-disabled and carries the reason as its muted second
+// line (also its accessible description), never as the toolbar button's text: no rasterizer disables both; a preview frame whose feature
+// policy forbids clipboard-write, or a missing async Clipboard API / secure context, disables only Copy. Chromium and Firefox (as of
+// version 160) can rasterize the page; Safari and unknown browsers keep both items but carry a note that the effect is not guaranteed.
+// A refused copy reports a failure and never falls back to downloading. Save as PDF is the browser's print dialog and always works
+// (the page's print CSS hides the toolbar and the menu).
 //
 // Pipeline: clone the page body → inline every computed style (CSS variables are resolved there, so a clone keeps theme colours and
 // sizes) and the ::before / ::after decorations → wrap it in an SVG foreignObject → draw that image on a canvas → toBlob('image/png')
-// → navigator.clipboard.write(new ClipboardItem(...)), passing the blob as a promise so the write keeps the user's click activation.
+// → navigator.clipboard.write(new ClipboardItem(...)), passing the blob as a promise so the write keeps the user's click activation,
+// or a download through <a download>.
 (() => {
   const XHTML = 'http://www.w3.org/1999/xhtml';
   const SVG = 'http://www.w3.org/2000/svg';
   const MAX_DIM = 16384;        // Chrome refuses a canvas wider or taller than this
   const MAX_AREA = 268435456;   // and one with more pixels than this (16384 * 16384)
 
-  const btn = document.querySelector('[data-am="copy-image"]');
-  if (!btn) return;
+  const btn = document.querySelector('[data-am="export"]');
+  const menu = document.getElementById('am-export');
+  if (!btn || !menu) return;
   const main = document.querySelector('main.am-sheet, main.am-doc');
   if (!main) return;
+  const items = [...menu.querySelectorAll('[data-export]')];
+  const item = (kind) => menu.querySelector(`[data-export="${kind}"]`);
+  const [copyItem, downloadItem, pdfItem] = ['copy', 'download', 'pdf'].map(item);
+  const note = (el) => document.getElementById(el.getAttribute('aria-describedby'));
+  const text = menu.dataset;
 
   const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';
   const canCopy = window.isSecureContext && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';
   // Chromium (including an embedded Chromium without navigator.userAgentData, whose UA still names Chrome/) and Firefox can rasterize
-  // the page. Safari and unknown browsers are not rejected outright: their button stays usable but carries a note that the effect is
-  // not guaranteed.
+  // the page. Safari and unknown browsers are not rejected outright: their items stay usable but carry a note that the effect is not
+  // guaranteed.
   const brands = navigator.userAgentData?.brands;
   const chromium = brands ? brands.some((b) => /Chromium/.test(b.brand)) : /\bChrome\//.test(navigator.userAgent);
   const gecko = /\bFirefox\//.test(navigator.userAgent);
+  const native = Object.hasOwn(HTMLElement.prototype, 'popover') && typeof menu.showPopover === 'function';
   btn.hidden = false;
 
   const idle = btn.textContent;
-  // When the button can copy, its aria-label stays "Copy as image", so a screen reader hears each result through a hidden live region
-  // beside it. aria-live, not role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
+  // The button keeps its name ("Export"), so a screen reader hears each result through a hidden live region beside it. aria-live, not
+  // role="status": the live-update notice owns role="status" (src/runtime/page.js), and the two must stay apart.
   const status = document.createElement('span');
   status.setAttribute('aria-live', 'polite');
-  status.dataset.am = 'copy-image-status';
+  status.dataset.am = 'export-status';
   status.className = 'am-visually-hidden';
   btn.after(status);
-  const say = (text, restore) => {
-    btn.textContent = text;
-    status.textContent = text;
+  // Short feedback on the button itself, restored after a moment; the live region carries the same words.
+  const say = (message, restore) => {
+    btn.textContent = message;
+    status.textContent = message;
     clearTimeout(say.timer);
     if (restore) say.timer = setTimeout(() => { btn.textContent = idle; }, 1800);
   };
 
-  // A disabled button says why, in the order of the conditions the page can act on: no rasterizer, a preview frame's feature policy
-  // forbidding clipboard-write, then a missing async Clipboard API or secure context. The reason fills the button, its title, its
-  // accessible name, and the hidden live region; no click handler is registered.
-  let unavailable = null;
-  if (!canRasterize) unavailable = btn.dataset.unavailableBrowser;
-  else if (document.featurePolicy && document.featurePolicy.allowsFeature('clipboard-write') === false) unavailable = btn.dataset.unavailablePolicy;
-  else if (!canCopy) unavailable = btn.dataset.unavailableClipboard;
-  if (unavailable) {
-    btn.disabled = true;
-    btn.setAttribute('aria-disabled', 'true');
-    btn.textContent = unavailable;
-    btn.title = unavailable;
-    btn.setAttribute('aria-label', unavailable);
-    status.textContent = unavailable;
-    return;
+  // An item that can never run here (aria-disabled, reason as its second line), in the order of the conditions the page can act on.
+  const unavailable = new Map();
+  if (!canRasterize) {
+    unavailable.set(copyItem, text.unavailableBrowser);
+    unavailable.set(downloadItem, text.unavailableBrowser);
+  } else {
+    if (document.featurePolicy && document.featurePolicy.allowsFeature('clipboard-write') === false) unavailable.set(copyItem, text.unavailablePolicy);
+    else if (!canCopy) unavailable.set(copyItem, text.unavailableClipboard);
+    // Safari and unknown browsers can draw the page often enough to keep the items, but the result is not guaranteed.
+    if (!chromium && !gecko) for (const el of [copyItem, downloadItem]) if (!unavailable.has(el)) note(el).textContent = text.unverifiedEffect;
   }
+  for (const [el, reason] of unavailable) note(el).textContent = reason;
 
-  // Safari and unknown browsers can draw the page often enough to keep the button, but the result is not guaranteed: add the note to
-  // the title and the accessible name after what the button does, and keep the original button text.
-  if (!chromium && !gecko) {
-    const labelled = `${idle}. ${btn.dataset.unverifiedEffect}`;
-    btn.title = labelled;
-    btn.setAttribute('aria-label', labelled);
-  }
+  // A running export blocks the next copy or download (a second full-page rasterization beside the first); Save as PDF stays free.
+  let busy = false;
+  const sync = () => {
+    for (const el of items) {
+      const off = unavailable.has(el) || (busy && el !== pdfItem);
+      if (off) el.setAttribute('aria-disabled', 'true');
+      else el.removeAttribute('aria-disabled');
+    }
+    if (busy) btn.setAttribute('aria-busy', 'true');
+    else btn.removeAttribute('aria-busy');
+  };
+  sync();
 
   // A stylesheet of only the local font declarations, so a font a theme embeds still draws inside the SVG.
   const fontFaceCss = () => {
@@ -202,31 +218,117 @@
     return blob;
   }
 
-  let busy = false;
-  btn.addEventListener('click', async () => {
-    if (busy) return;
+  // The PNG is saved under the page title (letters and digits of any script, joined by dashes).
+  const fileName = () => {
+    const slug = (document.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 40).replace(/^-+|-+$/g, '');
+    return `${slug || 'page'}.png`;
+  };
+  const download = (blob) => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName();
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+  };
+
+  // Start rasterizing, then hand the pending blob to ClipboardItem and write within the same click task so the browser keeps the
+  // user's activation. Awaiting the raster first would spend it, and the write would be rejected. The write can be refused at once
+  // while the page is still being drawn; wait for both to settle, so a retry cannot start a second rasterization beside the first.
+  const copy = async () => {
+    const blobPromise = rasterize();
+    const written = (async () => {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    })();
+    const [write] = await Promise.allSettled([written, blobPromise]);
+    if (write.status === 'rejected') throw write.reason;
+  };
+  const save = async () => { download(await rasterize()); };
+
+  async function run(work, done) {
     busy = true;
-    btn.setAttribute('aria-disabled', 'true');
-    say(btn.dataset.working, false);
+    sync();
+    say(text.working, false);
     try {
-      // Start rasterizing, then hand the pending blob to ClipboardItem and write within the same click task so the browser keeps the
-      // user's activation. Awaiting the raster first would spend it, and the write would be rejected.
-      const blobPromise = rasterize();
-      const written = (async () => {
-        const item = new ClipboardItem({ 'image/png': blobPromise });
-        await navigator.clipboard.write([item]);
-      })();
-      // The write can be refused at once while the page is still being drawn. Stay busy until both have settled, so a retry cannot
-      // start a second full-page rasterization beside the first.
-      const [write] = await Promise.allSettled([written, blobPromise]);
-      if (write.status === 'rejected') throw write.reason;
-      say(btn.dataset.done, true);
+      await work();
+      say(done, true);
     } catch (e) {
-      console.error('[am] copy image failed', e);
-      say(btn.dataset.failed, true);
+      console.error('[am] export failed', e);
+      say(text.failed, true);
     } finally {
       busy = false;
-      btn.removeAttribute('aria-disabled');
+      sync();
     }
+  }
+
+  // The menu. Native: the popover opens and closes itself and tells us through toggle events. Fallback: the same menu toggled by a
+  // class, with Esc and a click outside handled here.
+  const isOpen = () => (native ? menu.matches(':popover-open') : menu.classList.contains('is-open'));
+  // Under the button, aligned to its inline-end edge, and inside the viewport (the toolbar scrolls sideways on a phone, so the button
+  // can sit near an edge).
+  const place = () => {
+    const r = btn.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const rtl = getComputedStyle(btn).direction === 'rtl';
+    const left = Math.max(8, Math.min(rtl ? r.left : r.right - width, document.documentElement.clientWidth - 8 - width));
+    menu.style.top = `${r.bottom + 6}px`;
+    menu.style.left = `${left}px`;
+  };
+  const firstEnabled = () => items.find((el) => el.getAttribute('aria-disabled') !== 'true');
+  const opened = () => {
+    btn.setAttribute('aria-expanded', 'true');
+    place();
+    menu.style.visibility = '';
+    firstEnabled()?.focus();
+  };
+  const closed = (restoreFocus) => {
+    btn.setAttribute('aria-expanded', 'false');
+    if (restoreFocus || menu.contains(document.activeElement)) btn.focus();
+  };
+  const close = (restoreFocus = true) => {
+    if (!isOpen()) return;
+    if (native) menu.hidePopover();
+    else { menu.classList.remove('is-open'); closed(restoreFocus); }
+  };
+
+  if (native) {
+    // Place the box before it is first drawn, so it never flashes in the wrong spot.
+    menu.addEventListener('beforetoggle', (e) => {
+      btn.setAttribute('aria-expanded', String(e.newState === 'open'));
+      if (e.newState === 'open') menu.style.visibility = 'hidden';
+    });
+    menu.addEventListener('toggle', (e) => { if (e.newState === 'open') opened(); else closed(false); });
+  } else {
+    // No popover: the browser must not half-handle the attributes, and the button toggles the class itself.
+    menu.removeAttribute('popover');
+    btn.removeAttribute('popovertarget');
+    btn.addEventListener('click', () => {
+      if (isOpen()) close();
+      else { menu.classList.add('is-open'); opened(); }
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) { e.preventDefault(); close(); } });
+    document.addEventListener('pointerdown', (e) => { if (isOpen() && !menu.contains(e.target) && !btn.contains(e.target)) close(false); });
+  }
+  window.addEventListener('resize', () => { if (isOpen()) place(); });
+
+  menu.addEventListener('keydown', (e) => {
+    const at = items.indexOf(document.activeElement);
+    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to !== undefined) {
+      e.preventDefault();
+      items[(to + items.length) % items.length].focus();
+    } else if (e.key === 'Tab') {
+      close(true); // focus goes back to the button and Tab then moves on from there
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-export]');
+    if (!el || el.getAttribute('aria-disabled') === 'true') return;
+    close();
+    if (el === pdfItem) window.print();
+    else if (el === copyItem) run(copy, text.copied);
+    else run(save, text.saved);
   });
 })();

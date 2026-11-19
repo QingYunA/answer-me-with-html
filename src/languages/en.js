@@ -13,8 +13,9 @@ export default {
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     scale: { down: 'Smaller text', up: 'Larger text' },
-    image: {
-      button: 'Copy as image', working: 'Rendering image…', done: 'Copied ✓', failed: 'Copy failed',
+    export: {
+      button: 'Export', copy: 'Copy as image', download: 'Download PNG', pdf: 'Save as PDF',
+      working: 'Rendering…', copied: 'Copied ✓', saved: 'Saved ✓', failed: 'Export failed',
       unavailableBrowser: 'This browser cannot export the page as an image.',
       unavailableClipboard: 'This browser cannot write the image to the clipboard.',
       unavailablePolicy: 'This preview does not allow copying.',

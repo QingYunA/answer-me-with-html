@@ -21,8 +21,9 @@ export default {
     theme: 'テーマ', modeLabel: '表示',
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
     scale: { down: '文字を小さく', up: '文字を大きく' },
-    image: {
-      button: '画像としてコピー', working: '画像を生成中…', done: 'コピーしました ✓', failed: 'コピーできません',
+    export: {
+      button: '書き出し', copy: '画像としてコピー', download: 'PNG をダウンロード', pdf: 'PDF として保存',
+      working: '生成中…', copied: 'コピーしました ✓', saved: '保存しました ✓', failed: '書き出せませんでした',
       unavailableBrowser: 'このブラウザは画像を書き出せません。',
       unavailableClipboard: 'このブラウザはクリップボードに画像を書き込めません。',
       unavailablePolicy: 'このプレビューではクリップボード権限がないためコピーできません。',

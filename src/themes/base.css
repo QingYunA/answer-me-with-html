@@ -617,14 +617,35 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-lightbox-header { top: 8px; left: 12px; right: 12px; }
   .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }
 }
-/* Read by screen readers, not drawn (the Copy as image status, src/runtime/export-menu.js). */
+/* ── Export menu ─────────────────────────────
+   A native popover (src/render.js exportMenu): the top layer keeps it clear of the toolbar's sideways scroll box on a phone. It stays
+   hidden unless open; a browser without popovers gets the .is-open class from src/runtime/export-menu.js instead, and the runtime sets
+   top and left so the menu sits under the button. */
+.am-export { display: none; }
+.am-export:is(:popover-open, .is-open) {
+  display: flex; flex-direction: column; position: fixed; inset: 52px auto auto auto; margin: 0; z-index: 11;
+  width: max-content; min-width: 200px; max-width: calc(100vw - 16px); padding: 4px; overflow: visible;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.am-export-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; text-align: start;
+  font: var(--am-fs-text)/1.3 var(--font-sans); color: var(--ink); background: transparent; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.am-export-item:hover, .am-export-item:focus-visible { background: var(--fill); }
+.am-export-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.am-export-item[aria-disabled="true"] { cursor: default; }
+.am-export-item[aria-disabled="true"] > span { color: var(--ink-3); }
+.am-export-item[aria-disabled="true"]:hover { background: transparent; }
+.am-export-note { font-size: var(--am-fs-small); color: var(--ink-2); white-space: normal; }
+.am-export-note:empty { display: none; }
+/* Read by screen readers, not drawn (the Export status, src/runtime/export-menu.js). */
 .am-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .am-colophon { margin: 0 0 8px; font: var(--am-fs-label) var(--font-mono); color: var(--ink-3); }
 .am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 @media print {
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
-  .am-btn--copy-image { display: none !important; }
+  .am-btn--export, .am-export { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
   /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */

@@ -20,8 +20,9 @@ export default {
     theme: '主題', modeLabel: '明暗',
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
     scale: { down: '縮小文字', up: '放大文字' },
-    image: {
-      button: '複製為圖片', working: '正在產生圖片…', done: '已複製 ✓', failed: '複製失敗',
+    export: {
+      button: '匯出', copy: '複製為圖片', download: '下載 PNG', pdf: '儲存為 PDF',
+      working: '正在產生…', copied: '已複製 ✓', saved: '已儲存 ✓', failed: '匯出失敗',
       unavailableBrowser: '目前瀏覽器不支援匯出圖片。',
       unavailableClipboard: '目前瀏覽器不支援寫入剪貼簿。',
       unavailablePolicy: '目前預覽視窗未開啟剪貼簿權限，不支援複製。',
