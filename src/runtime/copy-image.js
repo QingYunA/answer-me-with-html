@@ -170,13 +170,20 @@
   };
 
   let busy = false;
+  function setBusy(value) {
+    busy = value;
+    for (const button of [copyButton, downloadButton]) {
+      if (value) button.setAttribute('aria-disabled', 'true');
+      else button.removeAttribute('aria-disabled');
+    }
+  }
+
   function bind(btn, action) {
     const idle = btn.textContent;
     let timer;
     btn.addEventListener('click', async () => {
       if (busy) return;
-      busy = true;
-      btn.setAttribute('aria-disabled', 'true');
+      setBusy(true);
       clearTimeout(timer);
       say(btn, btn.dataset.working);
       try {
@@ -186,8 +193,7 @@
         say(btn, btn.dataset.failed);
       } finally {
         timer = setTimeout(() => { btn.textContent = idle; }, 1800);
-        busy = false;
-        btn.removeAttribute('aria-disabled');
+        setBusy(false);
       }
     });
   }
@@ -195,8 +201,11 @@
   if (canCopy) bind(copyButton, async () => {
     const png = rasterize();
     // Give Chromium a promised PNG during the click, before rasterization can outlast its activation.
-    await Promise.all([png, Promise.resolve().then(() =>
+    const results = await Promise.allSettled([png, Promise.resolve().then(() =>
       navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]))]);
+    // A rejected write can arrive before the canvas finishes encoding.
+    const failure = results.find(result => result.status === 'rejected');
+    if (failure) throw failure.reason;
   });
   bind(downloadButton, async () => download(await rasterize()));
 })();

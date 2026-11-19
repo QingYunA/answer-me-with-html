@@ -1,16 +1,13 @@
-// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button is revealed in Chromium wherever
-// the page can be rasterized (without the Clipboard API a click downloads the PNG), and a click reaches navigator.clipboard.write
-// with a real PNG blob. It needs a Chromium-family browser, so it runs only with AM_E2E=1 (and AM_CHROME when the binary is not
-// auto-detected, e.g. Edge).
+// Exercise image actions on a page produced by the bundled CLI in Chromium.
+// Run with AM_E2E=1, and set AM_CHROME if the browser cannot be auto-detected.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
-import { renderDoc } from '../src/render.js';
 
 const CHROME = findChrome();
 const SKIP = process.env.AM_E2E !== '1'
@@ -40,7 +37,10 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'am-copy-image-'));
   file = join(tmp, 'page.html');
   const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n`;
-  writeFileSync(file, renderDoc(src, {}, {}, {}).html);
+  const cli = fileURLToPath(new URL('../skills/answer-me-with-html/scripts/am.mjs', import.meta.url));
+  execFileSync(process.execPath, [cli, 'render', '-', '-o', file, '--no-open'], {
+    input: src, env: { ...process.env, AM_HOME: join(tmp, 'settings'), AM_NO_UPDATE_CHECK: '1' },
+  });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -149,25 +149,32 @@ test('copy-image: a Chromium host without navigator.userAgentData (Electron, Web
 const DOWNLOAD_PNG = `(async () => {
   const btn = document.querySelector('[data-am="download-image"]');
   let blob;
+  let objectUrl;
+  let href;
   let name;
   let writes = 0;
   const original = HTMLAnchorElement.prototype.click;
   const createUrl = URL.createObjectURL;
-  URL.createObjectURL = value => { blob = value; return createUrl(value); };
-  HTMLAnchorElement.prototype.click = function () { name = this.download; };
+  URL.createObjectURL = value => {
+    blob = value;
+    objectUrl = createUrl(value);
+    return objectUrl;
+  };
+  HTMLAnchorElement.prototype.click = function () { name = this.download; href = this.href; };
   if (navigator.clipboard) Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { writes++; } });
   try {
     btn.click();
     for (let i = 0; i < 200 && btn.getAttribute('aria-disabled') === 'true'; i++) await new Promise(r => setTimeout(r, 50));
     const bytes = blob ? new Uint8Array(await blob.arrayBuffer()) : [];
-    return { hidden: btn.hidden, writes, name, signature: Array.from(bytes.slice(0, 8)), label: btn.textContent };
+    return { hidden: btn.hidden, writes, name, targetsPng: !!objectUrl && href === objectUrl,
+      signature: Array.from(bytes.slice(0, 8)), label: btn.textContent };
   } finally {
     HTMLAnchorElement.prototype.click = original;
     URL.createObjectURL = createUrl;
   }
 })()`;
 
-const EXPECTED_DOWNLOAD = { hidden: false, writes: 0, name: 'answer-me-with-html.png',
+const EXPECTED_DOWNLOAD = { hidden: false, writes: 0, name: 'answer-me-with-html.png', targetsPng: true,
   signature: [137, 80, 78, 71, 13, 10, 26, 10], label: 'Downloaded' };
 
 test('download-image: clicking Download image does not use the clipboard', { skip: SKIP }, async () => {
@@ -195,6 +202,46 @@ test('copy-image: a refused clipboard leaves downloads untouched and reports fai
   assert.equal(r.clicked, 0, 'copy must not trigger a download');
   assert.equal(r.label, 'Copy failed');
   assert.equal(r.status, 'Copy failed', 'a screen reader hears the failure');
+});
+
+test('copy-image: early clipboard refusal keeps both actions busy until PNG encoding finishes', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const result = await evaluate(`(async () => {
+    const copy = document.querySelector('[data-am="copy-image"]');
+    const download = document.querySelector('[data-am="download-image"]');
+    const original = HTMLCanvasElement.prototype.toBlob;
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const disabled = () => [copy, download].map(button => button.getAttribute('aria-disabled') === 'true');
+    let encodes = 0;
+    let finishEncoding;
+    HTMLCanvasElement.prototype.toBlob = function (callback, ...args) {
+      encodes++;
+      // Delay the first encode. If a second activation slips through, count it and finish it normally.
+      if (encodes === 1) finishEncoding = () => original.call(this, callback, ...args);
+      else original.call(this, callback, ...args);
+    };
+    Object.defineProperty(navigator.clipboard, 'write', {
+      configurable: true, value: async () => { throw new DOMException('Denied', 'NotAllowedError'); },
+    });
+    try {
+      copy.click();
+      for (let i = 0; i < 200 && !finishEncoding; i++) await sleep(20);
+      if (!finishEncoding) throw new Error('PNG encoding did not start');
+      const whileEncoding = disabled();
+      // A broken lock would let the retry and the other action start their own encodes.
+      copy.click();
+      download.click();
+      finishEncoding();
+      for (let i = 0; i < 200 && disabled().some(Boolean); i++) await sleep(20);
+      // Let any unintended extra rasterization deliver its canvas callback.
+      await sleep(120);
+      return { whileEncoding, encodes, afterEncoding: disabled(), label: copy.textContent };
+    } finally {
+      HTMLCanvasElement.prototype.toBlob = original;
+    }
+  })()`);
+  assert.deepEqual(result, { whileEncoding: [true, true], encodes: 1,
+    afterEncoding: [false, false], label: 'Copy failed' });
 });
 
 // A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which
