@@ -529,9 +529,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-lightbox-canvas {
   position: absolute; left: 0; top: 0;
   transform-origin: 0 0;
-  will-change: transform;
   pointer-events: none;
 }
+/* Only while the reader drags: a will-change layer keeps the bitmap it drew at the first scale and stretches it, so a zoomed-in diagram looks blurry (#430). */
+.am-lightbox-stage.am-panning .am-lightbox-canvas { will-change: transform; }
 .am-lightbox-canvas svg {
   max-width: none !important;
   max-height: none !important;
