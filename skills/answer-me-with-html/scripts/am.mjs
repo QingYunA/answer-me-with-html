@@ -14738,7 +14738,7 @@ function writePage(file, html, env, pages = join13(amHome(env), "pages"), modeFr
   mkdirSync6(dirname5(file), { recursive: true });
   if (!inside(pages, path)) return writeFileSync8(file, html);
   const tmp = join13(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
-  const mode = (statSync6(modeFrom ?? file, { throwIfNoEntry: false }) ?? statSync6(file, { throwIfNoEntry: false }))?.mode;
+  const mode = (modeFrom && modeOf(modeFrom)) ?? statSync6(file, { throwIfNoEntry: false })?.mode;
   let fd = null;
   let created = false;
   try {
@@ -14752,6 +14752,14 @@ function writePage(file, html, env, pages = join13(amHome(env), "pages"), modeFr
   } finally {
     if (fd !== null) closeSync2(fd);
     if (created) rmSync7(tmp, { force: true });
+  }
+}
+function modeOf(path) {
+  try {
+    return statSync6(path, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return 384;
   }
 }
 function savePage(html, file, { fallback, inPlace, pages, modeFrom }, { fail, env }) {

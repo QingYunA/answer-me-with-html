@@ -840,7 +840,7 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages'), modeFrom
   // A page being replaced keeps its mode: the temp file starts private (0600) and takes the old page's mode before the rename,
   // instead of the default 0644 that would open a private page to other users. The old page is the one --replace names, or the
   // file already at this path.
-  const mode = (statSync(modeFrom ?? file, { throwIfNoEntry: false }) ?? statSync(file, { throwIfNoEntry: false }))?.mode;
+  const mode = (modeFrom && modeOf(modeFrom)) ?? statSync(file, { throwIfNoEntry: false })?.mode;
   // Open first, so the temp file counts as ours before any byte is written: a write that fails half way (ENOSPC) still removes it.
   let fd = null;
   let created = false;
@@ -855,6 +855,17 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages'), modeFrom
   } finally {
     if (fd !== null) closeSync(fd);
     if (created) rmSync(tmp, { force: true });
+  }
+}
+
+// The mode of the page --replace names. A page this session cannot reach (a folder it may not enter) counts as private, so the
+// fallback in the temporary folder still saves the new page, as 0600.
+function modeOf(path) {
+  try {
+    return statSync(path, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return 0o600;
   }
 }
 
