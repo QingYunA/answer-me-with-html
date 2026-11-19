@@ -65,12 +65,21 @@ const evaluate = async (expression) => {
   if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
   return r.result.value;
 };
+// While am serve reloads the page, document.body can be null and the execution context can go away, so until counts an error as
+// "not yet" and polls again. An error that lasts to the deadline is thrown, so a broken expression still fails with its message.
 const until = async (expression, ms = 5000) => {
   const end = Date.now() + ms;
+  let error;
   while (Date.now() < end) {
-    if (await evaluate(expression)) return true;
+    try {
+      if (await evaluate(expression)) return true;
+      error = undefined;
+    } catch (e) {
+      error = e;
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
+  if (error) throw error;
   return false;
 };
 const renderTo = (name, version) => {
