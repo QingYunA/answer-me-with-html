@@ -1,4 +1,4 @@
-// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button shows on any page with a sheet or doc,
+// Browser check for the "Copy as image" toolbar button (src/runtime/export-menu.js): the button shows on any page with a sheet or doc,
 // a browser that cannot copy (no rasterizer, a feature policy that forbids clipboard-write, or no async Clipboard API / secure
 // context) disables it with the matching label, and a click writes a real PNG blob to the clipboard. Safari and unknown browsers keep
 // the button but carry an "effect not guaranteed" note, and a refused clipboard reports a failure without downloading anything. It
@@ -16,7 +16,7 @@ import { loadMath } from '../src/math-load.js';
 
 const CHROME = findChrome();
 const SKIP = process.env.AM_E2E !== '1'
-  ? 'set AM_E2E=1 to run the browser copy-image test'
+  ? 'set AM_E2E=1 to run the browser export test'
   : !CHROME ? 'no Chrome found (set AM_CHROME)' : typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : false;
 
 let tmp;
@@ -40,7 +40,7 @@ const evaluate = async (expression) => {
 before(async () => {
   if (SKIP) return;
   await loadMath('$x$');
-  tmp = mkdtempSync(join(tmpdir(), 'am-copy-image-'));
+  tmp = mkdtempSync(join(tmpdir(), 'am-export-'));
   file = join(tmp, 'page.html');
   const preLines = Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n');
   const src = `---\nlang: en\n---\n## A\nThe value is 42.\n\n## B\nA paragraph with **bold** and a table.\n\n| k | v |\n|---|---|\n| a | 1 |\n\n\`\`\`flow\n[A] -> [B]\n\`\`\`\n\n$$\nx = 1\n$$\n\n## C\n\`\`\`html\n<pre id="constrained-pre" style="max-height: 40px; overflow: auto">${preLines}</pre>\n\`\`\`\n\nA paragraph following constrained pre.\n`;
