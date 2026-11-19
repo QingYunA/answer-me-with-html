@@ -202,6 +202,8 @@ const CLICK_FAILURE = `(async () => {
   HTMLAnchorElement.prototype.click = function () { clicked += 1; };
   btn.click();
   for (let i = 0; i < 200 && !wrote; i++) await sleep(50);
+  // The failure is reported once the drawing has settled too, which takes longer on a busy machine.
+  for (let i = 0; i < 200 && btn.textContent === btn.dataset.working; i++) await sleep(50);
   await sleep(100);
   HTMLAnchorElement.prototype.click = orig;
   return { revealed, wrote, clicked, label: btn.textContent, failed: btn.dataset.failed, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
