@@ -1,7 +1,8 @@
-// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button is revealed in Chromium wherever
-// the page can be rasterized (without the Clipboard API a click downloads the PNG), and a click reaches navigator.clipboard.write
-// with a real PNG blob. It needs a Chromium-family browser, so it runs only with AM_E2E=1 (and AM_CHROME when the binary is not
-// auto-detected, e.g. Edge).
+// Browser check for the "Copy as image" toolbar button (src/runtime/copy-image.js): the button shows on any page with a sheet or doc,
+// a browser that cannot copy (no rasterizer, a feature policy that forbids clipboard-write, or no async Clipboard API / secure
+// context) disables it with the matching label, and a click writes a real PNG blob to the clipboard. Safari and unknown browsers keep
+// the button but carry an "effect not guaranteed" note, and a refused clipboard reports a failure without downloading anything. It
+// needs a Chromium-family browser, so it runs only with AM_E2E=1 (and AM_CHROME when the binary is not auto-detected, e.g. Edge).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -67,8 +68,26 @@ after(async () => {
   }
 });
 
-// Capture what the button writes to the clipboard (a real file:// page is a secure context, so the button reveals itself), then
-// read the PNG out of the ClipboardItem it passed.
+// The button's state after the runtime has read it: whether it is shown, whether it is disabled, its label and title/aria-label, and
+// the data-* texts the page carries so the assertions compare against the page's own labels, not a hard-coded string.
+const BUTTON_STATE = `(() => {
+  const btn = document.querySelector('[data-am="copy-image"]');
+  if (!btn) return { error: 'button not in the page' };
+  return {
+    hidden: btn.hidden,
+    disabled: btn.disabled,
+    text: btn.textContent,
+    title: btn.getAttribute('title'),
+    ariaLabel: btn.getAttribute('aria-label'),
+    unavailableBrowser: btn.dataset.unavailableBrowser,
+    unavailableClipboard: btn.dataset.unavailableClipboard,
+    unavailablePolicy: btn.dataset.unavailablePolicy,
+    unverifiedEffect: btn.dataset.unverifiedEffect,
+  };
+})()`;
+
+// Capture what the button writes to the clipboard (a real file:// page is a secure context, so the button enables itself), then read
+// the PNG out of the ClipboardItem it passed.
 const CLICK_AND_CAPTURE = `(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const btn = document.querySelector('[data-am="copy-image"]');
@@ -100,24 +119,6 @@ test('copy-image: the button appears and a click writes a real PNG to the clipbo
   assert.equal(r.label, 'Copied ✓', 'the button reports the copy');
 });
 
-// A refused clipboard downloads the PNG; the button must say so, not "Copied ✓".
-const CLICK_FALLBACK = `(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const btn = document.querySelector('[data-am="copy-image"]');
-  const revealed = !btn.hidden;
-  let wrote = false;
-  try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote = true; throw new Error('refused'); } }); }
-  catch (e) { navigator.clipboard.write = async () => { wrote = true; throw new Error('refused'); }; }
-  let clicked = 0;
-  const orig = HTMLAnchorElement.prototype.click;
-  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
-  btn.click();
-  for (let i = 0; i < 200 && !clicked; i++) await sleep(50);
-  HTMLAnchorElement.prototype.click = orig;
-  await sleep(30);
-  return { revealed, wrote, clicked, label: btn.textContent, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
-})()`;
-
 // Run the page with these overrides in place before its scripts, then remove them.
 const withOverrides = async (source, fn) => {
   const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source });
@@ -132,12 +133,28 @@ const NO_UA_DATA = "Object.defineProperty(Navigator.prototype, 'userAgentData', 
 const userAgent = (ua) => `Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => ${JSON.stringify(ua)}, configurable: true });`;
 const HIDDEN = 'document.querySelector(\'[data-am="copy-image"]\').hidden';
 
-test('copy-image: a browser that is not Chromium keeps the button hidden, even with the async Clipboard API', { skip: SKIP }, async () => {
-  // Safari and Firefox expose ClipboardItem and clipboard.write but no navigator.userAgentData, and no Chrome/ in their user agent.
+test('copy-image: Safari keeps the button enabled but says the effect is not guaranteed', { skip: SKIP }, async () => {
+  // Safari exposes ClipboardItem and clipboard.write but no navigator.userAgentData, and no Chrome/ or Firefox/ in its user agent.
   const safari = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
   await withOverrides(NO_UA_DATA + userAgent(safari), async () => {
     assert.equal(await evaluate('typeof ClipboardItem !== "undefined" && typeof navigator.clipboard.write === "function"'), true, 'the Clipboard API is there');
-    assert.equal(await evaluate(HIDDEN), true, 'the button stays hidden');
+    const s = await evaluate(BUTTON_STATE);
+    assert.equal(s.hidden, false, 'the button is shown');
+    assert.equal(s.disabled, false, 'the button stays enabled');
+    assert.ok(s.unverifiedEffect && s.title.includes(s.unverifiedEffect), `the title carries the unverified-effect note (${JSON.stringify(s)})`);
+    assert.ok(s.ariaLabel.includes(s.unverifiedEffect), `the accessible name carries the unverified-effect note (${JSON.stringify(s)})`);
+    // The note adds to what the button does; it must not replace it, or the accessible name no longer says "Copy as image".
+    assert.ok(s.text && s.ariaLabel.includes(s.text), `the accessible name still says what the button does (${JSON.stringify(s)})`);
+    assert.ok(s.title.includes(s.text), `the title still says what the button does (${JSON.stringify(s)})`);
+  });
+});
+
+test('copy-image: Firefox keeps the button enabled (it rasterizes the page since 160)', { skip: SKIP }, async () => {
+  const firefox = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0';
+  await withOverrides(NO_UA_DATA + userAgent(firefox), async () => {
+    const s = await evaluate(BUTTON_STATE);
+    assert.equal(s.hidden, false, 'the button is shown');
+    assert.equal(s.disabled, false, 'the button stays enabled');
   });
 });
 
@@ -148,47 +165,107 @@ test('copy-image: a Chromium host without navigator.userAgentData (Electron, Web
   });
 });
 
-// Count clipboard writes and download clicks after a click on the button.
-const CLICK_COUNT = `(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const btn = document.querySelector('[data-am="copy-image"]');
-  let wrote = 0;
-  if (navigator.clipboard) {
-    try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote += 1; } }); } catch {}
-  }
-  let clicked = 0;
-  const orig = HTMLAnchorElement.prototype.click;
-  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
-  btn.click();
-  for (let i = 0; i < 200 && !clicked && !wrote; i++) await sleep(50);
-  HTMLAnchorElement.prototype.click = orig;
-  await sleep(30);
-  return { wrote, clicked, label: btn.textContent };
-})()`;
+test('copy-image: a preview whose feature policy forbids clipboard-write disables the button with the policy note', { skip: SKIP }, async () => {
+  const policy = "Object.defineProperty(document, 'featurePolicy', { configurable: true, value: { allowsFeature: (name) => name !== 'clipboard-write' } });";
+  await withOverrides(policy, async () => {
+    const s = await evaluate(BUTTON_STATE);
+    assert.equal(s.hidden, false, 'the button is still shown');
+    assert.equal(s.disabled, true, 'the button is disabled');
+    assert.equal(s.text, s.unavailablePolicy, `the button explains the policy (${JSON.stringify(s)})`);
+  });
+});
 
 for (const [what, source] of [
   ['no ClipboardItem', 'delete window.ClipboardItem;'],
   ['a page that is not a secure context', "Object.defineProperty(window, 'isSecureContext', { get: () => false, configurable: true });"],
 ]) {
-  test(`copy-image: with ${what}, the button still shows and a click downloads the PNG`, { skip: SKIP }, async () => {
+  test(`copy-image: with ${what}, the button is disabled with the clipboard note`, { skip: SKIP }, async () => {
     await withOverrides(source, async () => {
-      assert.equal(await evaluate(HIDDEN), false, 'the button is shown');
-      const r = await evaluate(CLICK_COUNT);
-      assert.equal(r.wrote, 0, 'no clipboard write is tried');
-      assert.equal(r.clicked, 1, `the PNG is downloaded (${JSON.stringify(r)})`);
-      assert.equal(r.label, 'Downloaded', 'the button reports the download');
+      const s = await evaluate(BUTTON_STATE);
+      assert.equal(s.hidden, false, 'the button is still shown');
+      assert.equal(s.disabled, true, 'the button is disabled');
+      assert.equal(s.text, s.unavailableClipboard, `the button explains the missing clipboard (${JSON.stringify(s)})`);
     });
   });
 }
 
-test('copy-image: a refused clipboard downloads the PNG and says so, not "Copied"', { skip: SKIP }, async () => {
+// A refused clipboard reports a failure; it must not download a PNG.
+const CLICK_FAILURE = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  const revealed = !btn.hidden;
+  let wrote = false;
+  try { Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { wrote = true; throw new Error('refused'); } }); }
+  catch (e) { navigator.clipboard.write = async () => { wrote = true; throw new Error('refused'); }; }
+  let clicked = 0;
+  const orig = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () { clicked += 1; };
+  btn.click();
+  for (let i = 0; i < 200 && !wrote; i++) await sleep(50);
+  // The failure is reported once the drawing has settled too, which takes longer on a busy machine.
+  for (let i = 0; i < 200 && btn.textContent === btn.dataset.working; i++) await sleep(50);
+  await sleep(100);
+  HTMLAnchorElement.prototype.click = orig;
+  return { revealed, wrote, clicked, label: btn.textContent, failed: btn.dataset.failed, status: document.querySelector('[data-am="copy-image-status"]')?.textContent ?? null };
+})()`;
+
+test('copy-image: a refused clipboard reports the failure and downloads nothing', { skip: SKIP }, async () => {
   await load(pathToFileURL(file).href);
-  const r = await evaluate(CLICK_FALLBACK);
+  const r = await evaluate(CLICK_FAILURE);
   assert.equal(r.revealed, true, 'the button is revealed');
   assert.equal(r.wrote, true, 'the clipboard write was attempted');
-  assert.ok(r.clicked >= 1, 'a download was triggered');
-  assert.equal(r.label, 'Downloaded', `the fallback reports a download, not a copy (${JSON.stringify(r)})`);
-  assert.equal(r.status, 'Downloaded', 'a screen reader hears the result through the status region');
+  assert.equal(r.clicked, 0, `no download is triggered (${JSON.stringify(r)})`);
+  assert.equal(r.label, r.failed, `the button reports a failed copy (${JSON.stringify(r)})`);
+  assert.equal(r.status, r.failed, 'a screen reader hears the failure through the status region');
+});
+
+// The clipboard refuses at once (permission denied) while the page is still being drawn. The button must stay busy until the drawing
+// has settled too, so a second click cannot start a second full-page rasterization.
+const CLICK_REFUSED_EARLY = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.querySelector('[data-am="copy-image"]');
+  let drawings = 0;
+  const origSrc = Object.getOwnPropertyDescriptor(Image.prototype, 'src');
+  Object.defineProperty(Image.prototype, 'src', {
+    set(val) {
+      if (typeof val === 'string' && val.startsWith('data:image/svg+xml')) {
+        drawings += 1;
+        const image = this;
+        setTimeout(() => origSrc.set.call(image, val), 800); // a slow rasterization
+        return;
+      }
+      origSrc.set.call(this, val);
+    },
+    get() { return origSrc.get.call(this); },
+    configurable: true,
+  });
+  Object.defineProperty(navigator.clipboard, 'write', { configurable: true, value: async () => { throw new DOMException('denied', 'NotAllowedError'); } });
+  btn.click();
+  await sleep(300); // the write has been refused by now; the drawing has not finished
+  const busyAfterRefusal = btn.getAttribute('aria-disabled') === 'true';
+  const labelAfterRefusal = btn.textContent;
+  btn.click();
+  await sleep(300);
+  const drawingsAfterSecondClick = drawings;
+  let settled = false;
+  for (let i = 0; i < 200 && !settled; i++) { await sleep(50); settled = btn.getAttribute('aria-disabled') !== 'true'; }
+  const labelAtEnd = btn.textContent;
+  btn.click(); // a retry after everything settled starts a new drawing
+  await sleep(300);
+  const drawingsAfterRetry = drawings;
+  Object.defineProperty(Image.prototype, 'src', origSrc);
+  return { busyAfterRefusal, labelAfterRefusal, working: btn.dataset.working, drawingsAfterSecondClick, settled, labelAtEnd, failed: btn.dataset.failed, drawingsAfterRetry };
+})()`;
+
+test('copy-image: a clipboard refusal during a slow rasterization keeps the button busy until the drawing settles', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(CLICK_REFUSED_EARLY);
+  assert.equal(r.busyAfterRefusal, true, `the button is still busy while the page is being drawn (${JSON.stringify(r)})`);
+  assert.equal(r.labelAfterRefusal, r.working, `the button still shows the working state (${JSON.stringify(r)})`);
+  assert.equal(r.drawingsAfterSecondClick, 1, `a click during the drawing starts no second rasterization (${JSON.stringify(r)})`);
+  assert.equal(r.settled, true, `the button is free again once the drawing has settled (${JSON.stringify(r)})`);
+  assert.equal(r.labelAtEnd, r.failed, `the refusal is reported when everything has settled (${JSON.stringify(r)})`);
+  assert.equal(r.drawingsAfterRetry, 2, `a retry after everything settled draws again (${JSON.stringify(r)})`);
 });
 
 // A custom theme can give the body a multi-layer background. The PNG must keep its background (the wrapper is opaque), which

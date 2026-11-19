@@ -710,6 +710,6 @@ test('render: a doc page with fewer than 3 panels has no rail, and outline is no
 
 test('render: the copy-as-image button starts hidden with labels in the page language, and print hides it', () => {
   const { html } = renderDoc('---\nlang: zh\n---\n## A\n中文');
-  assert.match(html, /<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="正在生成图片…" data-done="已复制 ✓" data-downloaded="已下载" data-failed="复制失败" aria-label="复制为图片" title="复制为图片" hidden>复制为图片<\/button>/);
+  assert.match(html, /<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="正在生成图片…" data-done="已复制 ✓" data-failed="复制失败" data-unavailable-browser="当前浏览器不支持导出图片。" data-unavailable-clipboard="当前浏览器不支持写入剪贴板。" data-unavailable-policy="当前预览窗口未开启剪贴板权限，不支持复制。" data-unverified-effect="当前浏览器导出效果可能不保证。" aria-label="复制为图片" title="复制为图片" hidden>复制为图片<\/button>/);
   assert.match(html, /\.am-btn--copy-image \{ display: none !important; \}/);
 });
