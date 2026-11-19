@@ -280,16 +280,16 @@ test('export: with Copy disabled, focus opens on Download PNG and the arrow keys
   });
 });
 
-test('export: the menu stays inside the viewport at 390px, and in right-to-left', { skip: SKIP }, async () => {
-  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: false });
+test('export: the menu stays inside the viewport at 390px and 195px (390px at 200% zoom), and in right-to-left', { skip: SKIP }, async () => {
   try {
-    for (const dir of ['ltr', 'rtl']) {
+    for (const [vw, dir] of [[390, 'ltr'], [390, 'rtl'], [195, 'ltr'], [195, 'rtl']]) {
+      await send('Emulation.setDeviceMetricsOverride', { width: vw, height: 800, deviceScaleFactor: 1, mobile: false });
       await load(pathToFileURL(file).href);
       await evaluate(`document.documentElement.dir = '${dir}'`);
       await openMenu();
       const r = await evaluate(`(() => { ${UI} const m = menu.getBoundingClientRect(), b = toggle.getBoundingClientRect(); return { left: m.left, right: m.right, top: m.top, bottom: m.bottom, btnBottom: b.bottom, vw: document.documentElement.clientWidth }; })()`);
-      assert.ok(r.left >= 0 && r.right <= r.vw, `${dir}: the menu (${r.left}..${r.right}) is inside ${r.vw}px`);
-      assert.ok(r.top >= r.btnBottom, `${dir}: the menu sits under the button`);
+      assert.ok(r.left >= 0 && r.right <= r.vw, `${vw}px ${dir}: the menu (${r.left}..${r.right}) is inside ${r.vw}px`);
+      assert.ok(r.top >= r.btnBottom, `${vw}px ${dir}: the menu sits under the button`);
       await key('Escape', 'Escape', 27);
       await wait(SETTLED, 'Esc to close the menu');
     }

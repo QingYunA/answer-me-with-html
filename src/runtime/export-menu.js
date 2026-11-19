@@ -272,6 +272,10 @@
   // can sit near an edge). On a short viewport the menu is cut to the space below the button and scrolls, so every item stays reachable.
   const place = () => {
     const r = btn.getBoundingClientRect();
+    // clientWidth, not 100vw: the viewport width in CSS includes a classic scrollbar, so a menu sized from it can stick out.
+    const room = document.documentElement.clientWidth - 16;
+    menu.style.maxWidth = `${room}px`;
+    menu.style.minWidth = `${Math.min(200, room)}px`;
     const width = menu.offsetWidth;
     const rtl = getComputedStyle(btn).direction === 'rtl';
     const left = Math.max(8, Math.min(rtl ? r.left : r.right - width, document.documentElement.clientWidth - 8 - width));
