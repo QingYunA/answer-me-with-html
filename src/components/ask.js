@@ -46,7 +46,7 @@ export function previewEnd(lines, openIdx) {
  * The lines inside a preview belong to it, so a * or - there is content, not another option.
  * Preview.line is 1-based inside the block; render() maps it to the draft with the line renderFence passes in.
  */
-function read(text) {
+export function readAsk(text) {
   const lines = String(text).split('\n');
   let question = null;
   const options = [];
@@ -132,7 +132,7 @@ The question, one sentence
   render(text, { args, uid, ui = {}, line = 0, render }) {
     const multi = /(^|\s)multi(\s|$)/.test(args);
     const cards = /(^|\s)cards(\s|$)/.test(args);
-    const { question, options } = read(text);
+    const { question, options } = readAsk(text);
     if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, question.line);
     const suggested = options.filter((o) => o.suggested).length;
     if (!multi && suggested !== 1) {
