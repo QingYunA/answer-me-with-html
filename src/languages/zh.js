@@ -15,8 +15,9 @@ export default {
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
     scale: { down: '缩小文字', up: '放大文字' },
-    image: {
-      button: '复制为图片', working: '正在生成图片…', done: '已复制 ✓', failed: '复制失败',
+    export: {
+      button: '导出', copy: '复制为图片', download: '下载 PNG', pdf: '保存为 PDF',
+      working: '正在生成…', copied: '已复制 ✓', saved: '已保存 ✓', failed: '导出失败',
       unavailableBrowser: '当前浏览器不支持导出图片。',
       unavailableClipboard: '当前浏览器不支持写入剪贴板。',
       unavailablePolicy: '当前预览窗口未开启剪贴板权限，不支持复制。',

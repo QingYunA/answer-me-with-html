@@ -37,6 +37,8 @@ Produce a page if any of these is true:
 
 Otherwise answer in plain text. When unsure: the more the question "needs a picture to understand", the more it calls for a page.
 
+When the user asks you to explain a repository, draw its architecture or show how its code is organized: read `${CLAUDE_SKILL_DIR}/references/codebase.md` and follow it before you write the draft.
+
 Automatic pages are for replies to the user. An internal report returned to another agent is not one:
 
 - If a parent agent or a coordinator delegated research, implementation, a review or a progress report, return the text or structure it asked for, with the findings and the evidence. Render no page.

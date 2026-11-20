@@ -19,8 +19,9 @@ export default {
     theme: 'ערכת עיצוב', modeLabel: 'מצב',
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
     scale: { down: 'הקטנת הטקסט', up: 'הגדלת הטקסט' },
-    image: {
-      button: 'העתקה כתמונה', working: 'יוצר תמונה…', done: 'הועתק ✓', failed: 'ההעתקה נכשלה',
+    export: {
+      button: 'ייצוא', copy: 'העתקה כתמונה', download: 'הורדת PNG', pdf: 'שמירה כ-PDF',
+      working: 'מכין…', copied: 'הועתק ✓', saved: 'נשמר ✓', failed: 'הייצוא נכשל',
       unavailableBrowser: 'הדפדפן הזה אינו יכול לייצא את העמוד כתמונה.',
       unavailableClipboard: 'הדפדפן הזה אינו יכול לכתוב את התמונה ללוח.',
       unavailablePolicy: 'התצוגה המקדימה הזו אינה מאפשרת העתקה.',
