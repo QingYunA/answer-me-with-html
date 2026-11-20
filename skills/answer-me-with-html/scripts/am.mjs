@@ -14532,7 +14532,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   }
   const file = outputPath("pages", nameSource(result.meta), opts, ctx, pages);
   if (!file) return 2;
-  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages", pages });
+  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages", pages, modeFrom: replaced });
   if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
   if (replaced && replaced !== resolve8(written)) removeEarlier(replaced, ctx);
@@ -14931,14 +14931,14 @@ var inside = (dir, target) => {
   const rel = relative4(resolve8(dir), resolve8(target));
   return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep6}`) && !isAbsolute6(rel);
 };
-function writePage(file, html, env, pages = join14(amHome(env), "pages")) {
+function writePage(file, html, env, pages = join14(amHome(env), "pages"), modeFrom = null) {
   const home = resolve8(amHome(env));
   const path = resolve8(file);
   if (inside(home, path)) ensureHome(home);
   mkdirSync6(dirname5(file), { recursive: true });
   if (!inside(pages, path)) return writeFileSync8(file, html);
   const tmp = join14(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
-  const mode = statSync7(file, { throwIfNoEntry: false })?.mode;
+  const mode = (modeFrom && modeOf(modeFrom)) ?? statSync7(file, { throwIfNoEntry: false })?.mode;
   let fd = null;
   let created = false;
   try {
@@ -14954,7 +14954,15 @@ function writePage(file, html, env, pages = join14(amHome(env), "pages")) {
     if (created) rmSync7(tmp, { force: true });
   }
 }
-function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
+function modeOf(path) {
+  try {
+    return statSync7(path, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return 384;
+  }
+}
+function savePage(html, file, { fallback, inPlace, pages, modeFrom }, { fail, env }) {
   const home = amHome(env);
   const pageRoot = pages ?? join14(home, "pages");
   const inHome = inside(home, file);
@@ -14964,7 +14972,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   };
   const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
-    writePage(file, html, env, pageRoot);
+    writePage(file, html, env, pageRoot, modeFrom);
     return { file };
   } catch (e) {
     if (!isDenied(e)) throw e;
@@ -14972,7 +14980,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
     const spare = join14(tempHome(), fallback, basename6(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env, join14(tempHome(), "pages"));
+      writePage(spare, html, env, join14(tempHome(), "pages"), modeFrom);
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`\u2717 Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -14990,9 +14998,9 @@ function removeEarlier(file, { fail }) {
     fail(`! Kept the earlier page ${file} (permission denied, ${e.code})`);
   }
 }
-function emit(result, file, ctx, { note: note2 = "", fallback, inPlace, pages } = {}) {
+function emit(result, file, ctx, { note: note2 = "", fallback, inPlace, pages, modeFrom } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, { fallback, inPlace, pages }, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace, pages, modeFrom }, ctx);
   if (!saved) return null;
   print(`\u2713 ${saved.file}`);
   if (saved.notice) print(saved.notice);

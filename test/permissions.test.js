@@ -63,6 +63,19 @@ test('permissions: a data directory the session cannot write to falls back to a 
   assert.ok(!existsSync(join(home, 'pages')));
 });
 
+test('permissions: --replace of a page in a folder the session cannot enter still falls back, and the new page is private', { skip: SKIP }, async () => {
+  const made = await run(['render', '-']);
+  assert.equal(made.code, 0, made.err);
+  const earlier = made.out.match(/✓ (.+\.html)/)[1];
+  chmodSync(join(home, 'pages'), 0o000);
+  const { code, out, err } = await run(['render', '-', '--replace', earlier]);
+  assert.equal(code, 0, err);
+  const page = out.match(/✓ (.+\.html)/)[1];
+  assert.equal(dirname(page), join(fallback(), 'pages'));
+  // The mode of the earlier page cannot be read, so the new page stays private.
+  assert.equal(statSync(page).mode & 0o777, 0o600);
+});
+
 test('permissions: no fallback when the data directory is writable', { skip: SKIP }, async () => {
   const { code, out } = await run(['render', '-']);
   assert.equal(code, 0);

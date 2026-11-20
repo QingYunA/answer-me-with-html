@@ -19,12 +19,12 @@ function sink() {
   return { stream, get text() { return text; } };
 }
 
-async function run(args, { stdin = '', env = {} } = {}) {
+async function run(args, { stdin = '', env = {}, now } = {}) {
   const out = sink();
   const err = sink();
   const code = await main(args, {
     stdout: out.stream, stderr: err.stream, stdin: Readable.from([stdin]),
-    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir,
+    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir, now,
   });
   return { code, out: out.text, err: err.text };
 }
@@ -73,13 +73,17 @@ test('cli render: pages_dir writes pages into that folder, and the config list s
 test('cli render: --replace in a shared pages_dir keeps a private page private', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
   const outDir = join(dir, 'shared-out');
   assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
-  const made = await run(['render', '-'], { stdin: GOOD });
+  // The second render lands in a later second, so the new page gets a new name and the old page is removed.
+  const first = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const made = await run(['render', '-'], { stdin: GOOD, now: () => first });
   assert.equal(made.code, 0, made.err);
   const file = made.out.match(/✓ (.+\.html)/)[1];
   chmodSync(file, 0o600);
-  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD, now: () => first + 1000 });
   assert.equal(again.code, 0, again.err);
   const next = again.out.match(/✓ (.+\.html)/)[1];
+  assert.notEqual(next, file, 'the later render gets a new name');
+  assert.ok(!existsSync(file), 'the earlier page is removed');
   assert.equal(statSync(next).mode & 0o777, 0o600, 'the replaced page keeps its 0600 mode');
   assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
 });
