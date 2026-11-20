@@ -69,6 +69,51 @@ lang: en
 | larger | 9007199254740993.0 |
 | smaller | 9007199254740992.0 |
 {table sort}
+
+## G API migration
+\`\`\`api
+~ GET /users/{id}
+response 200 User
+  id string required
+  - email string optional
+  + email string required
++ POST /users/batch
+request BatchRequest
+  ids string[] required
+- RPC Users/GetLegacy
+response OK User
+  id string required
+\`\`\`
+
+## H Code diff palette
+\`\`\`diff
+-old
++new
+\`\`\`
+
+## I API views drop hidden space
+\`\`\`api
++ POST /orders
+request Order
+  id string
+- GET /legacy
+response 200 Legacy
+  id string
+GET /health
+response 200 Health
+  ok string
+  + detail string optional
+  - trace string | removed note
+\`\`\`
+
+## J API type names
+\`\`\`api
+GET /orders/{id}
+response 200 Order
+  id string required | Order id
+  status OrderStatus required | Current state of the order
+  refund_amount number optional
+\`\`\`
 `;
 
 let tmp;
@@ -209,6 +254,98 @@ test('e2e table: the filter hides only non-matching rows and clearing restores a
   assert.deepEqual(await evaluate('window.__csp'), []);
 });
 
+// API view changes must hide whole added/removed endpoints and select the correct old/new field definition together.
+test('e2e api: one switch changes multiple HTTP/RPC contracts and their exact field definitions', { skip: SKIP }, async () => {
+  // snapshot clicks the real view control and reads only contracts and rows that occupy visible layout boxes.
+  const snapshot = (view) => evaluate(`(() => {
+    const host = document.querySelector('#panel-G .am-api');
+    host.querySelector('button[data-view="${view}"]').click();
+    return [...host.querySelectorAll('.am-api-contract')].filter((el) => el.getClientRects().length).map((contract) => ({
+      target: [...contract.querySelector('.am-api-endpoint').querySelectorAll('strong,code')].map((el) => el.textContent).join(' '),
+      fields: [...contract.querySelectorAll('tbody tr')].filter((row) => row.getClientRects().length).map((row) => ({
+        name: row.cells[0].querySelector('code').textContent,
+        requirement: row.cells[2].textContent,
+      })),
+    }));
+  })()`);
+  const changes = await snapshot('changes');
+  assert.deepEqual(changes.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch', 'RPC Users/GetLegacy']);
+  assert.deepEqual(changes[0].fields.map((field) => field.name), ['id', 'email', 'email']);
+  const before = await snapshot('before');
+  assert.deepEqual(before.map((contract) => contract.target), ['GET /users/{id}', 'RPC Users/GetLegacy']);
+  assert.deepEqual(before[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Optional' }]);
+  const after = await snapshot('after');
+  assert.deepEqual(after.map((contract) => contract.target), ['GET /users/{id}', 'POST /users/batch']);
+  assert.deepEqual(after[0].fields, [{ name: 'id', requirement: 'Required' }, { name: 'email', requirement: 'Required' }]);
+  assert.equal(await evaluate(`document.querySelector('#panel-G [data-view="after"]').getAttribute('aria-pressed')`), 'true');
+  assert.deepEqual(await snapshot('changes'), changes);
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// A view must not keep the separator of a hidden first contract, nor a column that only hidden fields need.
+test('e2e api: Before and After collapse hidden contracts and columns', { skip: SKIP }, async () => {
+  const view = (name) => evaluate(`(() => {
+    const host = document.querySelector('#panel-I .am-api');
+    host.querySelector('button[data-view="${name}"]').click();
+    const shown = (el) => el.getClientRects().length > 0;
+    return [...host.querySelectorAll('.am-api-contract')].filter(shown).map((contract) => {
+      const style = getComputedStyle(contract);
+      return {
+        target: contract.querySelector('.am-api-endpoint code').textContent,
+        separator: [style.borderBlockStartWidth, style.marginBlockStart, style.paddingBlockStart].join(' '),
+        columns: [...contract.querySelectorAll('thead th')].filter(shown).map((th) => th.textContent),
+        cells: [...contract.querySelectorAll('tbody tr')].filter(shown).map((row) => [...row.cells].filter(shown).length),
+      };
+    });
+  })()`);
+  const before = await view('before');
+  assert.deepEqual(before.map((contract) => contract.target), ['/legacy', '/health']);
+  assert.equal(before[0].separator, '0px 0px 0px');
+  assert.notEqual(before[1].separator, '0px 0px 0px');
+  assert.deepEqual(before[1].columns, ['Field', 'Type', 'Description']);
+  assert.deepEqual(before[1].cells, [3, 3]);
+  const after = await view('after');
+  assert.deepEqual(after.map((contract) => contract.target), ['/orders', '/health']);
+  assert.equal(after[0].separator, '0px 0px 0px');
+  assert.notEqual(after[1].separator, '0px 0px 0px');
+  assert.deepEqual(after[1].columns, ['Field', 'Type', 'Requirement']);
+  assert.deepEqual(after[1].cells, [3, 3]);
+  const changes = await view('changes');
+  assert.deepEqual(changes.map((contract) => contract.target), ['/orders', '/legacy', '/health']);
+  assert.deepEqual(changes[2].columns, ['Field', 'Type', 'Requirement', 'Description']);
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// API additions and deletions must use the code diff palette for fields, endpoints, badges and counts, even when a theme's status color is blue.
+test('e2e api: change colors match code diffs in all built-in themes and light/dark modes', { skip: SKIP }, async () => {
+  for (const theme of ['blueprint', 'shadcn', 'paper']) {
+    for (const mode of ['light', 'dark']) {
+      const tones = await evaluate(`(() => {
+        document.documentElement.dataset.theme = '${theme}';
+        document.documentElement.dataset.mode = '${mode}';
+        const host = document.querySelector('#panel-G .am-api');
+        return ['added', 'removed'].map((state) => {
+          const sign = state === 'added' ? 'add' : 'del';
+          return {
+            expected: getComputedStyle(document.querySelector('.am-code-stat-' + sign)).color,
+            expectedBg: getComputedStyle(document.querySelector('.am-ln--' + sign)).backgroundColor,
+            field: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).color,
+            background: getComputedStyle(host.querySelector('tr[data-delta="' + state + '"] th')).backgroundColor,
+            endpoint: getComputedStyle(host.querySelector('article[data-delta="' + state + '"] .am-api-endpoint strong')).color,
+            badge: getComputedStyle(host.querySelector('.am-delta-badge--' + state)).color,
+            count: getComputedStyle(host.querySelector('.am-delta-count--' + state)).color,
+          };
+        });
+      })()`);
+      for (const tone of tones) {
+        for (const part of ['field', 'endpoint', 'badge', 'count']) assert.equal(tone[part], tone.expected, `${theme}/${mode}/${part}`);
+        assert.equal(tone.background, tone.expectedBg, `${theme}/${mode}/background`);
+      }
+    }
+  }
+  assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
 test('e2e table: print hides the controls and sort indicators', { skip: SKIP }, async () => {
   await send('Emulation.setEmulatedMedia', { media: 'print' });
   const print = await evaluate(`(() => {
@@ -240,4 +377,36 @@ test('e2e table: without JavaScript every row renders, no sort buttons appear, a
   assert.deepEqual(JSON.parse(result.result.value), { rows: 3, buttons: 0, hidden: true });
   await cdp.send('Target.closeTarget', { targetId });
   assert.deepEqual(await evaluate('window.__csp'), []);
+});
+
+// A field name or type wraps only between its words (refund_|amount, Order|Status), never at whatever letter a column width falls on,
+// on a 480px window and on a phone alike, and a phone needs no sideways scroll for it.
+test('e2e api: field names and types wrap only between their words', { skip: SKIP }, async () => {
+  // pieces: each run of text between <wbr> breaks, with the number of lines it takes; a piece split inside itself takes two.
+  const pieces = () => evaluate(`[...document.querySelectorAll('#panel-J tbody code')].flatMap((code) => [...code.childNodes].filter((n) => n.nodeType === 3).map((n) => {
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    return [n.textContent, new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size];
+  }))`);
+  // The load waiter is registered before the reload: Page.reload answers before the new document loads.
+  const reload = async () => {
+    const loaded = cdp.once('Page.loadEventFired');
+    await send('Page.reload', {});
+    await loaded;
+    await evaluate('new Promise((resolve) => requestAnimationFrame(() => resolve()))');
+  };
+  const reloadAt = async (width) => {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await reload();
+  };
+  try {
+    await reloadAt(480);
+    assert.deepEqual(await pieces(), [['id', 1], ['string', 1], ['status', 1], ['Order', 1], ['Status', 1], ['refund_', 1], ['amount', 1], ['number', 1]]);
+    await reloadAt(390);
+    assert.ok((await pieces()).every(([, lines]) => lines === 1));
+    assert.equal(await evaluate(`(() => { const wrap = document.querySelector('#panel-J .am-table-wrap'); return wrap.scrollWidth - wrap.clientWidth; })()`), 0);
+  } finally {
+    await send('Emulation.clearDeviceMetricsOverride', {});
+    await reload();
+  }
 });

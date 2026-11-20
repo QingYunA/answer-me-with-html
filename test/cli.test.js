@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync, chmodSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,12 +19,12 @@ function sink() {
   return { stream, get text() { return text; } };
 }
 
-async function run(args, { stdin = '', env = {} } = {}) {
+async function run(args, { stdin = '', env = {}, now } = {}) {
   const out = sink();
   const err = sink();
   const code = await main(args, {
     stdout: out.stream, stderr: err.stream, stdin: Readable.from([stdin]),
-    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir,
+    env: { AM_NO_OPEN: '1', AM_HOME: dir, ...env }, cwd: dir, now,
   });
   return { code, out: out.text, err: err.text };
 }
@@ -50,6 +50,57 @@ test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stat
   assert.match(readFileSync(file, 'utf8'), /<h1>CLI 测试<\/h1>/);
   assert.match(r.out, /sheet · blueprint · 1 panel · flow×1/);
   assert.match(r.out, /STE ✓ 0 warnings/);
+});
+
+test('cli render: pages_dir writes pages into that folder, and the config list shows the path setting', async () => {
+  const outDir = join(dir, 'notes-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const listed = await run(['config']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /pages_dir/);
+  assert.match(listed.out, /a folder path/);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  assert.ok(file.startsWith(outDir), file);
+  // --replace accepts a page in pages_dir (the earlier file is removed once the new one is written).
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  assert.equal(again.code, 0, again.err);
+  assert.ok(again.out.match(/✓ (.+\.html)/)[1].startsWith(outDir));
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
+test('cli render: --replace in a shared pages_dir keeps a private page private', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+  const outDir = join(dir, 'shared-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  // The second render lands in a later second, so the new page gets a new name and the old page is removed.
+  const first = new Date(2026, 0, 2, 3, 4, 5).getTime();
+  const made = await run(['render', '-'], { stdin: GOOD, now: () => first });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  chmodSync(file, 0o600);
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD, now: () => first + 1000 });
+  assert.equal(again.code, 0, again.err);
+  const next = again.out.match(/✓ (.+\.html)/)[1];
+  assert.notEqual(next, file, 'the later render gets a new name');
+  assert.ok(!existsSync(file), 'the earlier page is removed');
+  assert.equal(statSync(next).mode & 0o777, 0o600, 'the replaced page keeps its 0600 mode');
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
+test('cli patch: a planted symlink at the temp path in a shared pages_dir is not followed', { skip: process.platform === 'win32' && 'POSIX symlinks' }, async () => {
+  const outDir = join(dir, 'planted-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  const victim = join(dir, 'victim.txt');
+  writeFileSync(victim, 'secret');
+  // The temp name a writer that is not exclusive would use: another user of a shared folder can create it first.
+  symlinkSync(victim, join(outDir, `.${basename(file)}.${process.pid}.tmp`));
+  await run(['patch', file, '--panel', 'A'], { stdin: '## A 流程\n新的内容。\n' });
+  assert.equal(readFileSync(victim, 'utf8'), 'secret', 'the file behind the symlink is untouched');
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
 });
 
 test('cli render: the injected clock sets the default file name; the injected open runs as configured', async () => {

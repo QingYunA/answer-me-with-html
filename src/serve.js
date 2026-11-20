@@ -249,12 +249,12 @@ export function readServeInfo(home) {
 }
 
 // The link for a file just written by render / patch / video, or null. It never throws: a link problem must not break a render.
-export function serveLink(home, file) {
+export function serveLink(home, file, pages = resolve(home, 'pages')) {
   try {
     const info = readServeInfo(home);
     if (!info) return null;
     const path = resolve(file);
-    const dir = ['pages', 'videos'].find((d) => dirname(path) === resolve(home, d));
+    const dir = [['pages', resolve(pages)], ['videos', resolve(home, 'videos')]].find(([, root]) => dirname(path) === root)?.[0];
     const name = basename(path);
     return dir && validFileName(name) ? pageLink(info, dir, name) : null;
   } catch {
@@ -302,9 +302,9 @@ export const MAX_STATE_BYTES = 64 * 1024;
 const STATE_KEYS = Object.freeze(['reply', 'remark']);
 
 // A record is keyed to the page's version, so a re-render drops the old reply instead of attaching it to the new page.
-async function pageVersion(home, file) {
+async function pageVersion(home, file, pages = resolve(home, 'pages')) {
   try {
-    const s = await stat(await resolvePage(home, 'pages', file));
+    const s = await stat(await resolvePage(home, 'pages', file, pages));
     return `${s.mtimeMs}:${s.size}:${s.ino}`;
   } catch {
     return null;
@@ -407,10 +407,10 @@ async function saveState(req, res, home, secret, file, token, version) {
 }
 
 
-// The real path of a page that is a regular file directly inside its folder, or null.
-async function resolvePage(home, dir, file) {
+// The real path of a page that is a regular file directly inside its folder, or null. pages is the configured pages folder.
+async function resolvePage(home, dir, file, pages = resolve(home, 'pages')) {
   try {
-    const root = await realpath(join(home, dir));
+    const root = await realpath(dir === 'pages' ? pages : join(home, dir));
     const path = join(root, file);
     if (!(await lstat(path)).isFile()) return null; // lstat does not follow links, so a symlink is not a regular file
     const real = await realpath(path);
@@ -442,7 +442,7 @@ export function withLiveReload(html, eventPath, serve) {
 // a stream is compared with what it was; a page that changed gets one "changed" event on its own streams, and other pages get nothing.
 // The watcher runs only while a stream is open or opening: the last stream to close closes it and the next stream opens a new one, so
 // a pages/ folder that was removed and made again is watched again (on Linux the old watcher can go quiet there without an error).
-function liveStreams(home) {
+function liveStreams(home, pages = resolve(home, 'pages')) {
   const streams = new Map(); // file -> Set of responses
   const seen = new Map(); // file -> the page's version when it was last compared
   let watcher = null;
@@ -456,7 +456,7 @@ function liveStreams(home) {
   // null when the page is gone, or in the middle of a replace: the next file event compares it again.
   const version = async (file) => {
     try {
-      const s = await stat(await resolvePage(home, 'pages', file));
+      const s = await stat(await resolvePage(home, 'pages', file, pages));
       return `${s.mtimeMs}:${s.size}:${s.ino}`;
     } catch {
       return null;
@@ -497,7 +497,7 @@ function liveStreams(home) {
     // The folder, not the file: a page replaced by a rename is a new file, and a watch on the old one would go quiet.
     // Without a watcher (the folder went away) the stream stays open and quiet, and the next stream tries again.
     try {
-      watcher = watch(join(home, 'pages'), settle);
+      watcher = watch(pages, settle);
     } catch {
       return;
     }
@@ -548,7 +548,7 @@ function liveStreams(home) {
 
 // The event stream of one page. The page is sandboxed without allow-same-origin, so its EventSource arrives with Origin: null and
 // Sec-Fetch-Dest: empty; any other origin or destination is a 404, like a wrong token. GET only, and the stream carries no page content.
-async function openEvents(req, res, home, file, live) {
+async function openEvents(req, res, home, file, live, pages = resolve(home, 'pages')) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return reply(req, res, 405, 'text/plain; charset=utf-8', 'Method not allowed\n');
@@ -557,11 +557,11 @@ async function openEvents(req, res, home, file, live) {
   // A request with neither header (curl, an old browser) passes, as on the page route: whoever holds the token can already fetch the
   // page itself, and the stream carries less than the page.
   if ((origin !== undefined && origin !== 'null') || (dest !== undefined && dest !== 'empty')) return notFound(req, res);
-  if (!(await resolvePage(home, 'pages', file))) return notFound(req, res);
+  if (!(await resolvePage(home, 'pages', file, pages))) return notFound(req, res);
   return live.open(file, res, { ...HEADERS, 'Content-Type': 'text/event-stream; charset=utf-8', 'Access-Control-Allow-Origin': 'null' });
 }
 
-function handler(home, secret, allowedHosts, live) {
+function handler(home, secret, allowedHosts, live, pages = resolve(home, 'pages')) {
   return async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
@@ -578,7 +578,7 @@ function handler(home, secret, allowedHosts, live) {
       if (!validFileName(file)) return notFound(req, res);
       // The reply state has its own write route; every other route opens a page or a stream and is GET/HEAD only.
       if (prefix === SAVE) {
-        const version = await pageVersion(home, file);
+        const version = await pageVersion(home, file, pages);
         if (!token) return notFound(req, res);
         return await saveState(req, res, home, secret, file, token, version);
       }
@@ -590,12 +590,12 @@ function handler(home, secret, allowedHosts, live) {
       const dir = events ? 'pages' : Object.hasOwn(PREFIX, prefix) ? PREFIX[prefix] : undefined;
       if (!dir || !token) return notFound(req, res);
       if (!tokenMatches(secret, dir, file, token)) return notFound(req, res);
-      if (events) return await openEvents(req, res, home, file, live);
+      if (events) return await openEvents(req, res, home, file, live, pages);
       // A page is only opened, never fetched: a browser marks a script's fetch (or a service worker's) with another
       // destination, so a leaked token does not let a script read the page. curl sends no Sec-Fetch-Dest.
       const dest = req.headers['sec-fetch-dest'];
       if (dest !== undefined && dest !== 'document') return notFound(req, res);
-      const real = await resolvePage(home, dir, file);
+      const real = await resolvePage(home, dir, file, pages);
       if (!real) return notFound(req, res);
       // The new-version button is for the person who made the page: a reader through a LAN or public address gets the page without it.
       const html = await readFile(real);
@@ -603,7 +603,7 @@ function handler(home, secret, allowedHosts, live) {
       const body = dir === 'pages'
         ? withLiveReload(page, eventLink({ secret }, file), {
           save: `/${SAVE}/${token}/${encodeURIComponent(file)}`,
-          state: restorable(readState(home, token), await pageVersion(home, file)) ?? undefined,
+          state: restorable(readState(home, token), await pageVersion(home, file, pages)) ?? undefined,
         })
         : page;
       return reply(req, res, 200, 'text/html; charset=utf-8', body);
@@ -626,7 +626,7 @@ function listening(port, host = HOST, timeout = 500) {
 
 // Default: loopback only. LAN listening, the Tailscale address and the public link origin are explicit opt-ins.
 // tailscaleStatus and bindHost are test seams: the parsed `tailscale status --json`, and the address to listen on instead of the tailnet one.
-export async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost }) {
+export async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost, pagesDir = resolve(home, 'pages') }) {
   const addresses = lan ? (lanAddresses ?? lanIPv4Addresses()) : [];
   if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4
     || address === LAN_BIND || address.startsWith('127.')))) {
@@ -642,8 +642,8 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
   // The tailnet address stays the same, so its links last across restarts unless --secret-file names another file.
   if (tail && !secretFile) ensureHome(home); // the default secret file lives in home, which may not exist yet
   const secret = loadSecret(secretFile ?? (tail ? join(home, 'serve-secret') : undefined));
-  const live = liveStreams(home);
-  const server = createServer(handler(home, secret, allowedHosts, live));
+  const live = liveStreams(home, pagesDir);
+  const server = createServer(handler(home, secret, allowedHosts, live, pagesDir));
   await new Promise((done, fail) => {
     server.once('error', (e) => fail(e.code === 'EADDRINUSE'
       ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`)
@@ -677,10 +677,10 @@ export async function startServer({ home, port = DEFAULT_PORT, lan = false, publ
 }
 
 // am serve: run in the foreground until Ctrl-C / SIGTERM / SIGHUP. Resolves with the exit code.
-export async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, print, fail }) {
+export async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, pagesDir, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale });
+    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale, pagesDir });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`✗ ${e.message}`);

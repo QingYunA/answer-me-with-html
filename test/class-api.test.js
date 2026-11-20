@@ -104,7 +104,7 @@ test('class: reports empty input, duplicate declarations, stray members and unkn
 
 // HTTP parameter groups and multiple responses retain types and explicit requiredness without guessing defaults.
 test('api: parses HTTP parameters, request types, response statuses and field descriptions', () => {
-  const api = parseApi('POST /users/{id}\npath\n  id string required | User ID\nquery\n  expand string optional\nheaders\n  Authorization string required\nrequest CreateUserRequest\n  attributes Map<string, User> | Flags | values\nresponse 201 User\n  id string required\nresponse 204');
+  const { endpoints: [api] } = parseApi('POST /users/{id}\npath\n  id string required | User ID\nquery\n  expand string optional\nheaders\n  Authorization string required\nrequest CreateUserRequest\n  attributes Map<string, User> | Flags | values\nresponse 201 User\n  id string required\nresponse 204');
   assert.equal(api.method, 'POST');
   assert.equal(api.target, '/users/{id}');
   assert.deepEqual(api.sections.map((s) => s.kind), ['path', 'query', 'headers', 'request', 'response', 'response']);
@@ -116,7 +116,7 @@ test('api: parses HTTP parameters, request types, response statuses and field de
 // Escaped pipes belong to the type; later unescaped pipes retain the existing free-form description syntax.
 test('api: preserves union types with and without explicit requiredness', () => {
   for (const requirement of ['required', 'optional', '']) {
-    const api = parseApi(`GET /users\nresponse 200 User\n  email string \\| null ${requirement} | Contact | preferred`);
+    const { endpoints: [api] } = parseApi(`GET /users\nresponse 200 User\n  email string \\| null ${requirement} | Contact | preferred`);
     assert.deepEqual(api.sections[0].fields[0], { name: 'email', type: 'string | null', requirement, description: 'Contact | preferred' });
   }
 });
@@ -141,15 +141,24 @@ test('api: renders RPC messages, optional fields, empty responses and semantic t
 test('api: escapes markup in targets, types, section names and descriptions', () => {
   const html = render('api', 'GET /<img>\nresponse 200 <script>\n  data Array<User> optional | <img src=x onerror=alert(1)> **literal**');
   assert.match(html, /\/&lt;img&gt;/);
-  assert.match(html, /Array&lt;User&gt;/);
+  assert.match(html, /Array&lt;<wbr>User&gt;/);
   assert.match(html, /&lt;script&gt;/);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; \*\*literal\*\*/);
   assert.doesNotMatch(html, /<img|<script/);
 });
 
+// Field names and types wrap only between their words, so a narrow column never splits OrderStatus into OrderStatu and s.
+test('api: field names and types offer line breaks only between their words', () => {
+  const html = render('api', 'GET /orders\nresponse 200 Order\n  refund_amount OrderStatus required\n  items map<string, v1.Item> optional\n  id ID required');
+  assert.match(html, /<code>refund_<wbr>amount<\/code>/);
+  assert.match(html, /<code>Order<wbr>Status<\/code>/);
+  assert.match(html, /<code>map&lt;<wbr>string,<wbr> v1.<wbr>Item&gt;<\/code>/);
+  assert.match(html, /<code>ID<\/code>/);
+});
+
 // Invalid endpoint and section syntax must preserve the draft line in the error.
 test('api: reports malformed endpoints, fields, sections and missing response statuses', () => {
-  for (const [source, line] of [['', 1], ['GET users', 1], ['FETCH /users', 1], ['GET /users', 1], ['GET /users\n  id string', 2], ['GET /users\nresponse', 2], ['GET /users\nrequest\n  id', 3], ['GET /users\nunknown', 2], ['RPC S/Get\nquery', 2], ['GET /users\nresponse 200\nPOST /users\nresponse 201', 3]]) {
+  for (const [source, line] of [['', 1], ['GET users', 1], ['FETCH /users', 1], ['GET /users', 1], ['GET /users\n  id string', 2], ['GET /users\nresponse', 2], ['GET /users\nrequest\n  id', 3], ['GET /users\nunknown', 2], ['RPC S/Get\nquery', 2]]) {
     assert.throws(() => parseApi(source), (err) => err instanceof ComponentError && err.line === line, source);
   }
 });

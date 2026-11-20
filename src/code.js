@@ -13,7 +13,7 @@ import { parseDiff, diffRowsHtml, DiffError, DIFF_EXAMPLE } from './diff.js';
 export const MAX_CODE_LINES = 200;
 // Longer than this, readers skim past the block; the render warns but still writes the page.
 export const LONG_CODE_LINES = 40;
-const MAX_FILE_BYTES = 2 * 1024 * 1024;
+export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const KEYS = new Set(['src', 'lines', 'hl', 'title', 'start']);
 const DIFF_KEYS = new Set([...KEYS, 'file']);
 
@@ -73,15 +73,17 @@ export function parseCodeArgs(args, diff = false) {
 
 // The file under baseDir, or null when the path leaves it. Only the folder the agent works in is quoted, so a draft
 // (or a page someone sent, rendered again by am patch) cannot pull other files from the machine into a page.
-function localPath(ref, baseDir) {
+export function localPath(ref, baseDir) {
   const path = resolve(baseDir, ref);
   const rel = relative(baseDir, path);
   return rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
 }
 
 // Refuse a secret file or a file inside a secret folder. rel is the path under baseDir; via says how the draft reached the file.
+export const isSecretPath = (rel) => SECRET_FILE.test(basename(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part));
+
 function assertNotSecret(ref, rel, via) {
-  if (SECRET_FILE.test(basename(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+  if (isSecretPath(rel)) {
     throw new CodeError(`"${ref}" ${via ? 'points to' : 'is'} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
   }
 }

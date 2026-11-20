@@ -185,7 +185,7 @@ Change settings with a slash command. There are no config files to edit by hand.
 | Any agent | `/answer-me-with-html config open off`, or just say "stop opening the browser" |
 | Terminal | `am config` to view, `am config set open off` to change, `am config reset` to restore defaults |
 
-The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `scale` (text size on the page; diagrams and charts grow with it), `update_check`, `close_after_reply` (close the tab after the reply is copied) and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
+The settings are `open` (open pages in the browser), `theme`, `mode` (light or dark), `style` (writing check), `scale` (text size on the page; diagrams and charts grow with it), `pages_dir` (output folder for pages), `update_check`, `close_after_reply` (close the tab after the reply is copied) and `voice` (video narration). Defaults and values: [reference](docs/reference.md#settings).
 
 ## Always-on mode (recommended)
 
@@ -272,7 +272,7 @@ The agent picks a component by the shape of the information:
 | `state` | A state machine: states and the events that move between them, with an initial state, a final state and self-transitions |
 | `er` | A data model: entities with their columns (PK / FK / UK) and crow's-foot relationships |
 | `class` | UML classes, attributes, methods, interfaces and relationships |
-| `api` | HTTP / RPC contracts: parameters, request and response fields, status codes |
+| `api` | HTTP / RPC contracts and multi-endpoint diffs: parameters, requests, responses and status codes |
 | `sequence` | Messages going back and forth between several parties over time |
 | `tree` | Folders, modules, taxonomies |
 | `timeline` | History, releases, phases |

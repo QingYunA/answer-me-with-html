@@ -29,6 +29,27 @@ Which cache?
 
 ## B Notes
 Version ${version}.
+
+## C Sketch
+\`\`\`ask cards
+Which look?
+* Lead
+  :::html
+  <b class="mock-mark">lead</b>
+  <input type="text" class="mock-field" aria-label="mock">
+  :::
+- Visual
+\`\`\`
+
+## D Nested
+\`\`\`ask
+Which outer?
+* Outer A
+  :::html
+  <div class="am-ask am-ask--cards"><div class="am-ask-card"><label class="am-ask-opt"><input type="radio" name="mock"><span class="am-ask-body"><span class="am-ask-label">Inner</span></span></label><div class="am-ask-preview"><b class="nested-mark">inner</b></div></div></div>
+  :::
+- Outer B
+\`\`\`
 `;
 
 let tmp;
@@ -44,20 +65,32 @@ const evaluate = async (expression) => {
   if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
   return r.result.value;
 };
+// While am serve reloads the page, document.body can be null and the execution context can go away, so until counts an error as
+// "not yet" and polls again. An error that lasts to the deadline is thrown, so a broken expression still fails with its message.
 const until = async (expression, ms = 5000) => {
   const end = Date.now() + ms;
+  let error;
   while (Date.now() < end) {
-    if (await evaluate(expression)) return true;
+    try {
+      if (await evaluate(expression)) return true;
+      error = undefined;
+    } catch (e) {
+      error = e;
+    }
     await new Promise((r) => setTimeout(r, 50));
   }
+  if (error) throw error;
   return false;
 };
-const render = (version) => {
-  writeFileSync(join(tmp, 'd.md'), draft(version));
-  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'd.md'), '-o', join(home, 'pages', 'live.html'), '--no-open'], {
+const renderTo = (name, version) => {
+  writeFileSync(join(tmp, `${name}.md`), draft(version));
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, `${name}.md`), '-o', join(home, 'pages', `${name}.html`), '--no-open'], {
     env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: home }, stdio: 'pipe',
   });
 };
+const render = (version) => renderTo('live', version);
+const renderSketch = (version) => renderTo('sketch', version);
+const renderNested = (version) => renderTo('nested', version);
 
 before(async () => {
   if (SKIP) return;
@@ -65,12 +98,26 @@ before(async () => {
   home = join(tmp, 'home');
   mkdirSync(join(home, 'pages'), { recursive: true });
   render(1);
+  renderSketch(1);
+  renderNested(1);
   srv = await startServer({ home, port: 0 });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
   ({ sessionId: session } = await cdp.send('Target.attachToTarget', { targetId, flatten: true }));
   await send('Page.enable');
+  // am serve records a page's version when its event stream opens, so a file change before then is never reported. src/runtime/live.js
+  // keeps its EventSource to itself, so this counts the streams that opened; a test changes the file only after one has.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: `{
+    const Native = window.EventSource;
+    window.__amStreams = 0;
+    window.EventSource = class extends Native {
+      constructor(...args) {
+        super(...args);
+        this.addEventListener('open', () => { window.__amStreams += 1; });
+      }
+    };
+  }` });
   await send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 700, deviceScaleFactor: 1, mobile: false });
 });
 
@@ -100,6 +147,7 @@ test('live: with the reply bar shown, the "Page updated" notice sits above it, n
   const loaded = cdp.once('Page.loadEventFired');
   await send('Page.navigate', { url: pageLink(srv, 'pages', 'live.html') });
   await loaded;
+  assert.equal(await until('window.__amStreams > 0'), true, 'the page listens for changes');
   // A pick that is not the suggestion is reader input: the page keeps it and shows the reply bar, and a change asks before reloading.
   await evaluate('document.querySelector(\'input[value="Memcached"]\').click()');
   assert.equal(await until('Boolean(document.querySelector(".am-reply-bar:not([hidden])"))'), true, 'the reply bar shows');
@@ -109,4 +157,34 @@ test('live: with the reply bar shown, the "Page updated" notice sits above it, n
   const bar = await evaluate(RECT('.am-reply-bar'));
   assert.ok(notice.bottom <= bar.top, `the notice (bottom ${notice.bottom}) ends above the bar (top ${bar.top})`);
   assert.equal(await evaluate('document.querySelector(\'input[value="Memcached"]\').checked'), true, 'the page did not reload');
+});
+
+test('live: a control inside a preview is not reader input, so the page reloads by itself', { skip: SKIP }, async () => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await send('Page.navigate', { url: pageLink(srv, 'pages', 'sketch.html') });
+  await loaded;
+  assert.equal(await until('window.__amStreams > 0'), true, 'the page listens for changes');
+  await evaluate(`(() => {
+    const field = document.querySelector('.mock-field');
+    field.focus();
+    field.value = 'sketch';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.click();
+  })()`);
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
+  renderSketch(2);
+  assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
+  assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
+});
+
+test('live: a nested cards preview inside another preview is not reader input', { skip: SKIP }, async () => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await send('Page.navigate', { url: pageLink(srv, 'pages', 'nested.html') });
+  await loaded;
+  assert.equal(await until('window.__amStreams > 0'), true, 'the page listens for changes');
+  await evaluate('document.querySelector(".nested-mark").click()');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the drawing gave no answer');
+  renderNested(2);
+  assert.equal(await until('document.body.textContent.includes("Version 2")'), true, 'the page reloads by itself');
+  assert.equal(await evaluate('Boolean(document.querySelector(\'[role="status"]\'))'), false, 'no notice');
 });

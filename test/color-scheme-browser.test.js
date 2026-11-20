@@ -117,3 +117,25 @@ test('e2e color-scheme: a fixed-dark video theme computes to dark without dark t
   await loaded;
   assert.equal(await scheme(), 'dark');
 });
+
+// #405: a link inside a component (kv, timeline, tree, ask) had no colour rule, so it took the browser default: #0000EE on a dark
+// page when the system is light. Every link in a panel now takes the theme's link colour, the same as a link in plain text.
+test('e2e color-scheme: links inside components take the same colour as links in text, in light and dark mode', { skip: SKIP, timeout: 180000 }, async () => {
+  const draft = '---\ntitle: Links\nlang: en\ntheme: paper\n---\n## A Text\nA [text link](https://example.com).\n\n## B Key-value\n```kv\nEntry: [kv link](https://example.com)\n```\n\n## C Timeline\n```timeline\n2024 | [timeline link](https://example.com) | [note link](https://example.com)\n2025 | Release | done\n```\n\n## D Tree\n```tree\nsrc/ | [tree note link](https://example.com)\n  [tree link](https://example.com)\n```\n\n## E Ask\n```ask\nWhich one?\n* [option link](https://example.com) | [option note link](https://example.com)\n- Other\n```\n';
+  const links = join(tmp, 'links.html');
+  writeFileSync(links, renderDoc(draft).html);
+  const loaded = cdp.once('Page.loadEventFired');
+  await page('Page.navigate', { url: pathToFileURL(links).href });
+  await loaded;
+  await systemScheme('light');
+  for (const mode of ['light', 'dark']) {
+    assert.equal(await setMode(mode), mode);
+    const colours = await evaluate(`(() => {
+      const text = getComputedStyle(document.querySelector('#panel-A .am-md a')).color;
+      return { text, others: [...document.querySelectorAll('.am-panel a')].map((a) => [a.textContent, getComputedStyle(a).color]) };
+    })()`);
+    assert.equal(colours.others.length, 8, 'every link in the draft is on the page');
+    for (const [name, colour] of colours.others) assert.equal(colour, colours.text, `${mode}: "${name}" has the text link colour`);
+  }
+  await systemScheme(null);
+});

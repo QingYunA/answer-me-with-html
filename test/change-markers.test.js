@@ -85,6 +85,28 @@ test('parseFlow: without a space after it a marker is plain text; a bracket keep
   assert.deepEqual(states(m), { '-Gateway': null, '+1 votes': null, '- Gateway': null, B: null });
 });
 
+test('parseFlow: a marker before a node inside the line is an error with the line rewritten, not a second node', () => {
+  const at = (text, line, part) => assert.throws(() => parseFlow(text), (e) => e instanceof ComponentError && e.line === line && e.message.includes(part));
+  at('Observer -> {fix submitted?}\n{fix submitted?} -> + Queue job: yes', 2, 'Write: "+ {fix submitted?} -> Queue job: yes"');
+  at('+ Queue job -> + Async job: delay 0', 1, 'Write: "+ Queue job -> Async job: delay 0"');
+  at('A -> + B & + C', 1, 'Write: "+ A -> B & C"');
+  // ~ marks a node, not a link, so the hint puts the marked node on a line of its own instead of marking the whole line.
+  at('A -> B -> ~ C', 1, 'write it on a line of its own: "~ C"');
+  // A bracketed endpoint is not checked as a name, but the line still has a link.
+  at('[A] -> ~ B', 1, 'write it on a line of its own: "~ B"');
+  assert.throws(() => parseFlow('A -> B -> ~ C'), (e) => !e.message.includes('"~ A -> B -> C"'));
+  // Only the detected endpoint loses its marker; a bracketed name that starts with one stays as written.
+  at('[+ B] -> + B', 1, 'Write: "+ [+ B] -> B"');
+  at('A -> + B', 1, 'use brackets: [+ B]');
+  at('A -> + *B: yes', 1, 'Write: "+ A -> *B: yes".');
+  at('A -> + [(Table row)]', 1, 'Write: "+ A -> [(Table row)]".');
+  assert.throws(() => parseFlow('A -> + [(Table row)]'), (e) => !e.message.includes('use brackets'));
+  at('A -> - B & + C', 1, 'write one line per marker');
+  at('+ A -> - B', 1, 'write one line per marker');
+  // The bracket escape and a marker with no space after it stay node text.
+  assert.deepEqual([...parseFlow('A -> [+ B]\nA -> +1 votes').nodes.keys()], ['A', '+ B', '+1 votes']);
+});
+
 test('parseFlow: + group and - group mark a group box; groups do not count as an appearance of their members', () => {
   const m = parseFlow('A -> B\n+ C -> A\n+ group Backend: A, B\n- group Old: C');
   assert.deepEqual(m.groups.map((g) => [g.name, g.state]), [['Backend', 'added'], ['Old', 'removed']]);

@@ -2,7 +2,7 @@
 // with a following {table ...} line; status words in cells render as badges; an image on its own line becomes a captioned figure;
 // raw HTML is filtered (see raw-html.js): a placeholder such as <host> shows as text, tags that break the page are escaped, event handlers and javascript: links are removed.
 
-import { Marked } from 'marked';
+import { Marked, Lexer } from 'marked';
 import { filterBlocks, filterInline } from './raw-html.js';
 import { mathExtension } from './math.js';
 import { parseAttrs } from './attrs.js';
@@ -74,8 +74,11 @@ function tableOptions(tokens) {
   return tokens;
 }
 
-marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note }) } });
-inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+// The token passes of md() and mdInline(). codeSpans() runs them too, so it sees the tokens the page renders.
+const blockPass = (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note });
+const inlinePass = (tokens) => filterInline(tokens, note);
+marked.use({ hooks: { processAllTokens: blockPass } });
+inline.use({ hooks: { processAllTokens: inlinePass } });
 marked.use({ extensions: [{
   name: 'table',
   renderer(token) {
@@ -145,6 +148,56 @@ export function md(text, { ui, interactive = true } = {}) {
     tableUi = outerUi;
     tableInteractive = outerInteractive;
   }
+}
+
+// Every inline code span the page shows, in source order: [{ text, line }], line being the 0-based line of the span in text. Code blocks
+// hold no spans, and image alt text shows as plain text, so neither gives one.
+// The lexer and token passes are those of md(), or of mdInline() with inline: true, so a span here is a span on the page. The notes
+// those passes make are dropped: they belong to the render, not to this read.
+// Each token is found by its raw text inside its parent's part of the source, after the sibling before it. So a span's text that
+// also stands in a link title, a link destination or alt text earlier in the source cannot take its place. A token whose raw text
+// is not in the source as written (lines of a quote, without the >) leaves its children to search the rest of its parent's part.
+// Spans are located in the same wrapped text the lexer reads; wrapping adds no line, so the line counts in text too.
+export function codeSpans(text, { inline: inlineField = false } = {}) {
+  const source = wrapSpacedImages(String(text ?? ''));
+  const spans = [];
+  const lineAt = (index) => source.slice(0, index).split('\n').length - 1;
+  // { at, length } of the earliest place of raw in source[from, to), or null. A table cell drops the \\ of an escaped pipe before it is
+  // lexed, so a raw text with a | is looked for with the pipes escaped too.
+  const find = (raw, from, to) => {
+    const places = (raw.includes('|') ? [raw, raw.replaceAll('|', '\\|')] : [raw])
+      .map((written) => ({ at: source.indexOf(written, from), length: written.length }))
+      .filter(({ at, length }) => at >= 0 && at + length <= to);
+    return places.sort((a, b) => a.at - b.at)[0] ?? null;
+  };
+  // Walks tokens inside source[from, to) and returns where the last one found ends.
+  const walk = (tokens, from, to) => {
+    let cursor = from;
+    for (const token of Array.isArray(tokens) ? tokens : []) {
+      const found = token.raw ? find(token.raw, cursor, to) : null;
+      const start = found ? found.at : cursor;
+      const end = found ? found.at + found.length : to;
+      let inner = start;
+      if (token.type === 'codespan') spans.push({ text: token.text, line: lineAt(start) });
+      else if (token.type !== 'image') {
+        inner = walk(token.tokens, inner, end);
+        inner = walk(token.items, inner, end);
+        for (const row of [token.header, ...(token.rows ?? [])]) {
+          for (const cell of Array.isArray(row) ? row : []) inner = walk(cell.tokens, inner, end);
+        }
+      }
+      cursor = found ? end : Math.max(cursor, inner);
+    }
+    return cursor;
+  };
+  const outer = sink;
+  sink = null;
+  try {
+    walk(inlineField ? inlinePass(Lexer.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)), 0, source.length);
+  } finally {
+    sink = outer;
+  }
+  return spans;
 }
 
 export function mdInline(text) {

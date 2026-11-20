@@ -47,12 +47,56 @@ export const TTL = 30 * 60
 \`\`\`
 `;
 
+// A preview may contain a mock ask, a real ask, and a panel; none belongs to the page's decisions.
+const PREVIEW_DRAFT = `---
+title: Preview
+lang: en
+---
+## A Nested
+\`\`\`ask
+Which outer?
+* Outer A
+  :::html
+  <fieldset class="am-ask" data-ask="mock"><legend>Mock question?</legend><label><input type="radio" name="mock" value="Ghost" data-suggested checked>Ghost</label></fieldset>
+  <section class="am-panel" id="panel-A"><div class="am-panel-body">Mock panel</div></section>
+  :::
+- Outer B
+  :::ask
+  Which inner?
+  * Inner A
+  - Inner B
+  :::
+\`\`\`
+`;
+
+// In cards the whole card looks clickable; a control in the drawing is still a picture.
+const CARDS_DRAFT = `---
+title: Cards
+lang: en
+---
+## A Pick
+\`\`\`ask cards
+Which landing?
+* Lead with the outcome | the headline states the result
+  :::html
+  <b class="pick-mark">lead</b>
+  :::
+- Open with a visual | a full-width image sets the tone
+  :::html
+  <b class="pick-mark">visual</b>
+  <input type="text" class="mock-field" aria-label="mock">
+  :::
+\`\`\`
+`;
+
 let tmp;
 let chrome;
 let cdp;
 let session;
 let file;
 let closingFile;
+let previewFile;
+let cardsFile;
 
 const send = (method, params) => cdp.send(method, params, session);
 const evaluate = async (expression) => {
@@ -80,6 +124,16 @@ before(async () => {
   am('config', 'set', 'close_after_reply', 'on');
   closingFile = join(tmp, 'closing.html');
   am('render', join(tmp, 'd.md'), '-o', closingFile, '--no-open');
+  writeFileSync(join(tmp, 'preview.md'), PREVIEW_DRAFT);
+  previewFile = join(tmp, 'preview.html');
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'preview.md'), '-o', previewFile, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+  });
+  writeFileSync(join(tmp, 'cards.md'), CARDS_DRAFT);
+  cardsFile = join(tmp, 'cards.html');
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', join(tmp, 'cards.md'), '-o', cardsFile, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+  });
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -145,6 +199,52 @@ test('reply: picks and comments become one reply, and both survive a reload', { 
     open: !document.querySelector('#panel-C .am-comment').hidden,
   })`);
   assert.deepEqual(after, { memcached: true, comment: 'Make the TTL a setting.', open: true });
+});
+
+test('reply: a mock ask, suggested control, real ask and panel inside a preview stay out of the reply', { skip: SKIP }, async () => {
+  await load(previewFile);
+  assert.equal(await evaluate('document.querySelectorAll(".am-comment-btn").length'), 1, 'the mock panel gets no comment box');
+  assert.equal(await evaluate('document.querySelectorAll(".am-ask").length'), 3, 'the mock and the real ask render as drawings');
+  // A pick in the preview ask is part of the drawing, not the reader's answer.
+  await evaluate('document.querySelector(\'input[value="Inner A"]\').click()');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true, 'the preview ask does not mark an answer');
+  await evaluate(`(() => {
+    document.querySelector('input[value="Outer A"]').click();
+    document.querySelector('#panel-A .am-comment-btn').click();
+    const box = document.querySelector('#panel-A .am-comment textarea');
+    box.value = 'real note';
+    box.dispatchEvent(new Event('input'));
+  })()`);
+  const text = await evaluate(`(() => {
+    document.querySelector('[data-am="reply"]').click();
+    const sheet = document.querySelector('dialog.am-reply');
+    const value = sheet.querySelector('textarea').value;
+    sheet.close();
+    return value;
+  })()`);
+  assert.match(text, /1\. \[A\] Which outer\?\n {3}→ \*\*Outer A\*\* _\(suggestion confirmed\)_/);
+  assert.match(text, /- \*\*A · Nested\*\*\n {2}> real note/);
+  assert.doesNotMatch(text, /Mock question|Ghost|Which inner|Inner A|Inner B/);
+  assert.equal((text.match(/^\d+\. /gm) ?? []).length, 1, 'only the real ask is a decision');
+});
+
+test('reply: a click on a card preview picks its option, and a control in the drawing does not', { skip: SKIP }, async () => {
+  await load(cardsFile);
+  const picked = (n) => `document.querySelectorAll('.am-ask-card')[${n}].querySelector('input[type="radio"]').checked`;
+  await evaluate('document.querySelector(".mock-field").click()');
+  assert.equal(await evaluate(picked(1)), false, 'a control in the preview picks nothing');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar").hidden'), true);
+  await evaluate('document.querySelectorAll(".am-ask-preview")[1].querySelector(".pick-mark").click()');
+  assert.equal(await evaluate(picked(1)), true, 'the preview picks its option');
+  assert.equal(await evaluate('document.querySelector(".am-reply-bar-count").textContent'), 'Answered: 1');
+  const text = await evaluate(`(() => {
+    document.querySelector('[data-am="reply"]').click();
+    const sheet = document.querySelector('dialog.am-reply');
+    const value = sheet.querySelector('textarea').value;
+    sheet.close();
+    return value;
+  })()`);
+  assert.match(text, /Which landing\?\n {3}→ \*\*Open with a visual\*\* _\(was: Lead with the outcome\)_/);
 });
 
 test('reply: an untouched answer saved by an older page, which preselected the suggestion, comes back unselected', { skip: SKIP }, async () => {

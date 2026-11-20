@@ -30,10 +30,10 @@ var init_temml = __esm({
 
 // src/cli.js
 import { parseArgs } from "node:util";
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync6 } from "node:fs";
+import { readFileSync as readFileSync11, writeFileSync as writeFileSync8, mkdirSync as mkdirSync6, existsSync as existsSync8, rmSync as rmSync7, statSync as statSync7, chmodSync as chmodSync2, openSync as openSync2, closeSync as closeSync2 } from "node:fs";
 
 // src/assets.js
-var VERSION = "0.5.11";
+var VERSION = "0.6.2";
 var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -122,8 +122,10 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md li + li { margin-top: 3px; }
 .am-md h3, .am-md h4 { margin: 14px 0 6px; font-size: var(--am-fs-text); }
 .am-md a { color: var(--accent); }
+/* A link inside a component (kv, timeline, tree, ask) sits outside .am-md: give it the same colour, not the browser default (#405). */
+.am-panel a { color: var(--accent); }
 .am-md blockquote { margin: 0 0 8px; padding: 2px 12px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); }
-.am-md :not(pre) > code { font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
+.am-md :not(pre) > code { overflow-wrap: break-word; font-size: 0.9em; background: var(--fill); padding: 1px 5px; border-radius: 4px; }
 .am-md hr { border: 0; border-top: 1px solid var(--line-2); margin: 12px 0; }
 .am-md table { width: 100%; border-collapse: collapse; font-size: var(--am-fs-text); }
 .am-md th {
@@ -136,6 +138,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-md td { padding: 7px 10px; border-bottom: 1px solid var(--line-2); vertical-align: top; }
 .am-md tbody tr:nth-child(even) td { background: var(--fill); }
 .am-table-wrap { overflow-x: auto; }
+/* A table short of room (src/runtime/layout-dom.js fitTables) breaks a long word inside its cell rather than hold its column at full width. */
+.am-table-wrap > table.am-table-fit th, .am-table-wrap > table.am-table-fit td, .am-table-wrap > table.am-table-fit :not(pre) > code { overflow-wrap: anywhere; }
 /* Images scale down to the panel and never past 70% of the window height, keeping their shape. */
 .am-md img { max-width: 100%; max-height: 70vh; height: auto; }
 .am-figure { margin: 0; text-align: center; }
@@ -154,6 +158,28 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-ask-opt input { margin: 0; accent-color: var(--accent); position: relative; top: 2px; }
 .am-ask-tag { display: inline-block; font-size: var(--am-fs-label); line-height: 1.5; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 6px; white-space: nowrap; }
 .am-ask-note { display: block; color: var(--ink-2); }
+/* Options with a preview: the block under an option is the card's canvas. A dot grid reads as a drawing surface in every theme. */
+.am-ask-opts { clear: both; }
+.am-ask-card { min-width: 0; }
+.am-ask--cards .am-ask-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr)); align-items: stretch; }
+.am-ask--cards .am-ask-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius);
+}
+.am-ask--cards .am-ask-opt { padding: 9px 11px; }
+.am-ask-preview {
+  padding: 10px; overflow: hidden; border-top: 1px solid var(--line-2);
+  background-color: var(--fill);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--ink-3) 38%, transparent) 1px, transparent 1px);
+  background-size: 12px 12px;
+}
+.am-ask--cards .am-ask-preview { flex: 1; cursor: pointer; }
+.am-ask-preview > :first-child { margin-top: 0; }
+.am-ask-preview > :last-child { margin-bottom: 0; }
+/* A diagram keeps the card width, also on a phone, where a panel diagram may scroll instead. */
+.am-ask-preview .am-diagram { overflow: visible; }
+.am-ask-preview .am-diagram > svg { max-width: 100%; height: auto; }
+.am-ask-preview > svg { display: block; max-width: 100%; height: auto; }
 /* Comment box under each panel, and the Reply sheet */
 .am-comment-btn {
   display: flex; flex-shrink: 0; align-self: center; margin-block: 0; margin-inline: auto 6px; color: var(--ink-3); background: transparent;
@@ -268,20 +294,25 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 /* \u2500\u2500 timeline \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .am-timeline { list-style: none; margin: 0; padding: 0; }
 .am-timeline--h { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); padding-top: 4px; }
-.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; }
-.am-timeline--h li::before {
-  content: ""; position: absolute; top: calc(var(--am-ln-whenHeight) + 7px); left: 0; right: 0; border-top: var(--bw) solid var(--line);
+/* Every item spans the same four rows (date, dot, title, text) through subgrid, so a date that wraps to two lines moves every dot down
+   together instead of running into its own. The axis is drawn from each dot to both edges of its item; the item clips it, and the first
+   and last items leave out their outer half. Do not make the li a size container: Chrome then ignores subgrid. */
+.am-timeline--h { grid-template-rows: repeat(4, auto); }
+.am-timeline--h li { position: relative; text-align: center; padding: 0 6px; display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; overflow-x: clip; }
+.am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after {
+  content: ""; position: absolute; top: calc(50% - var(--bw) / 2); width: 100vw; border-top: var(--bw) solid var(--line);
 }
-.am-timeline--h li:first-child::before { inset-inline-start: 50%; }
-.am-timeline--h li:last-child::before { inset-inline-end: 50%; }
-.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; height: var(--am-ln-whenHeight); }
+.am-timeline--h .am-tl-dot::before { inset-inline-end: calc(100% + var(--bw)); }
+.am-timeline--h .am-tl-dot::after { inset-inline-start: calc(100% + var(--bw)); }
+.am-timeline--h li:first-child .am-tl-dot::before, .am-timeline--h li:last-child .am-tl-dot::after { content: none; }
+.am-tl-when { display: block; font-size: var(--am-fs-heading); font-weight: 500; min-height: var(--am-ln-whenHeight); align-self: end; }
 .am-tl-dot {
   position: relative; display: block; width: 11px; height: 11px; margin: 2px auto 8px;
   border: var(--bw) solid var(--line); border-radius: 50%; background: var(--paper);
 }
 .am-tl-item--hi .am-tl-dot { background: var(--hi-stroke, var(--accent)); border-color: var(--hi-stroke, var(--accent)); }
-.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; }
-.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; }
+.am-tl-title { display: block; font-size: var(--am-fs-code); font-weight: 500; overflow-wrap: break-word; min-width: 0; }
+.am-tl-text { display: block; font-size: var(--am-fs-small); color: var(--ink-2); line-height: 1.45; overflow-wrap: break-word; min-width: 0; }
 .am-timeline--v li { position: relative; padding: 0 0 14px; padding-inline-start: 22px; }
 .am-timeline--v li::before { content: ""; position: absolute; inset-inline-start: 5px; top: 6px; bottom: -6px; border-inline-start: var(--bw) solid var(--line-2); }
 .am-timeline--v li:last-child::before { display: none; }
@@ -295,9 +326,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tl-wrap { container-type: inline-size; }
 @container (max-width: 560px) {
   .am-timeline--h { display: block; padding-top: 0; }
-  .am-timeline--h li { text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
-  .am-timeline--h li::before, .am-timeline--h li:first-child::before {
-    top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
+  .am-timeline--h li { display: block; overflow-x: visible; text-align: start; padding: 0 0 14px; padding-inline-start: 22px; }
+  .am-timeline--h .am-tl-dot::before, .am-timeline--h .am-tl-dot::after { content: none; }
+  .am-timeline--h li::before {
+    content: ""; position: absolute; top: 6px; bottom: -6px; inset-inline-start: 5px; inset-inline-end: auto; border-top: 0; border-inline-start: var(--bw) solid var(--line-2);
   }
   .am-timeline--h li:last-child::before { display: none; }
   .am-timeline--h .am-tl-dot { position: absolute; inset-inline-start: 0; top: 4px; margin: 0; }
@@ -368,6 +400,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-tree-col:first-child::before { inset-inline-start: 50%; }
 .am-tree-col:last-child::before { inset-inline-end: 50%; }
 .am-tree-col::after { content: ""; position: absolute; top: 0; left: 50%; height: 18px; border-left: var(--bw) solid var(--line); }
+/* A forest (no single root) has nothing above its columns, so they draw no connectors. */
+.am-tree-cols--free > .am-tree-col { padding-top: 0; }
+.am-tree-cols--free > .am-tree-col::before, .am-tree-cols--free > .am-tree-col::after { content: none; }
 .am-tree-list, .am-tree-list ul { list-style: none; margin: 0; padding: 0; }
 .am-tree-col > .am-tree-list { margin: 8px 0 0; margin-inline-start: 14px; }
 .am-tree-list ul { margin-inline-start: 16px; }
@@ -382,6 +417,18 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 
 /* \u2500\u2500 Diagrams (flow / sequence) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 .am-diagram { margin: 0; overflow-x: auto; text-align: center; }
+/* A box that hides content past its left or right edge fades that edge (src/runtime/page.js sets the classes). A diagram keeps its
+   top row out of the fade: the expand button sits there at the end edge. */
+.am-more-left, .am-more-right {
+  --am-fade-l: #000; --am-fade-r: #000;
+  mask-image: linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+}
+.am-more-left { --am-fade-l: transparent; }
+.am-more-right { --am-fade-r: transparent; }
+.am-diagram.am-more-left, .am-diagram.am-more-right {
+  mask-image: linear-gradient(#000, #000), linear-gradient(to right, var(--am-fade-l), #000 48px, #000 calc(100% - 48px), var(--am-fade-r));
+  mask-size: 100% 32px, 100% 100%; mask-repeat: no-repeat;
+}
 /* Embedded previews can lose html[data-theme]; the fallbacks keep diagrams readable, and defined theme variables still win. */
 .am-diagram svg { max-width: 100%; height: auto; font-family: var(--font-sans, sans-serif); }
 .am-diagram text { fill: var(--ink, #16181d); font-size: var(--am-fs-d-node); }
@@ -414,8 +461,11 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-diagram .am-er-key { fill: var(--node-text, var(--ink-2, #4b5260)); }
 .am-diagram .am-node--hi .am-er-key { fill: var(--hi-text, var(--ink-2, #4b5260)); }
 /* API contracts use the existing prose and table styles; the endpoint keeps its protocol punctuation left to right. */
+.am-api-contract + .am-api-contract { margin-block-start: 20px; padding-block-start: 16px; border-block-start: 1px solid var(--line-2); }
 .am-api-endpoint { display: flex; gap: 10px; align-items: baseline; overflow-wrap: anywhere; }
 .am-api-endpoint strong { color: var(--accent); }
+/* The target is inline code, whose break-word keeps a flex item at its full word width; min-width: 0 lets it shrink and wrap. */
+.am-api-endpoint > code { min-width: 0; }
 .am-api .am-api-section h4 { margin: 16px 0 6px; font-size: var(--am-fs-text); }
 .am-api .am-api-section h4 code { font-weight: 400; }
 .am-api .am-api-section table { margin: 0; table-layout: fixed; }
@@ -515,9 +565,10 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 .am-lightbox-canvas {
   position: absolute; left: 0; top: 0;
   transform-origin: 0 0;
-  will-change: transform;
   pointer-events: none;
 }
+/* Only while the reader drags: a will-change layer keeps the bitmap it drew at the first scale and stretches it, so a zoomed-in diagram looks blurry (#430). */
+.am-lightbox-stage.am-panning .am-lightbox-canvas { will-change: transform; }
 .am-lightbox-canvas svg {
   max-width: none !important;
   max-height: none !important;
@@ -602,13 +653,40 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-lightbox-header { top: 8px; left: 12px; right: 12px; }
   .am-lightbox-stage { top: 46px; bottom: 12px; left: 12px; right: 12px; border-radius: max(var(--radius), 10px); }
 }
+/* \u2500\u2500 Export menu \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+   A native popover (src/render.js exportMenu): the top layer keeps it clear of the toolbar's sideways scroll box on a phone. It stays
+   hidden unless open; a browser without popovers gets the .is-open class from src/runtime/export-menu.js instead, and the runtime sets
+   top and left so the menu sits under the button. */
+.am-export { display: none; }
+.am-export:is(:popover-open, .is-open) {
+  display: flex; flex-direction: column; position: fixed; inset: 52px auto auto auto; margin: 0; z-index: 11;
+  width: max-content; min-width: 200px; max-width: calc(100vw - 16px); padding: 4px; overflow-y: auto;
+  color: var(--ink); background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.am-export-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; text-align: start;
+  font: var(--am-fs-text)/1.3 var(--font-sans); color: var(--ink); background: transparent; border: 0; border-radius: var(--radius); cursor: pointer;
+}
+.am-export-item:hover, .am-export-item:focus-visible { background: var(--fill); }
+.am-export-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.am-export-item[aria-disabled="true"] { cursor: default; }
+.am-export-item[aria-disabled="true"] > span { color: var(--ink-3); }
+.am-export-item[aria-disabled="true"]:hover { background: transparent; }
+.am-export-note { font-size: var(--am-fs-small); color: var(--ink-2); white-space: normal; }
+.am-export-note:empty { display: none; }
+/* Read by screen readers, not drawn (the Export status, src/runtime/export-menu.js). */
+.am-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .am-colophon { margin: 0 0 8px; font: var(--am-fs-label) var(--font-mono); color: var(--ink-3); }
 .am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 @media print {
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  .am-btn--export, .am-export { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
+  /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */
+  .am-diagram > svg { min-width: 0 !important; max-width: 100% !important; }
+  .am-more-left, .am-more-right { mask-image: none !important; }
 }
 /* Printed on paper narrower than three columns, the two-column grid left a hole beside every panel next to a full-width one
    (a wide table, a wide diagram): one panel per row instead. */
@@ -660,7 +738,7 @@ table.am-mark { background: none; }
 .am-remark-kind::before { content: attr(data-n); margin-inline-end: 5px; color: var(--ink-3); font-family: var(--font-mono); font-size: var(--am-fs-label); }
 @media print { .am-remark-pop { display: none !important; } }
 `;
-var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is never replaced.\n  const carrier = document.querySelector('.am-toolbar');\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    if (root.getAttribute(attr) === null && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  // \u2500\u2500 Text size \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  // A\u2212 / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow\n  // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no\n  // second copy of the numbers. A reader's choice is remembered in this browser and wins over the page's own scale; where storage\n  // is off (am serve, file://) it lasts for this tab, and the click still works.\n  const scaleDown = document.querySelector('[data-am=\"scale-down\"]');\n  const scaleUp = document.querySelector('[data-am=\"scale-up\"]');\n  if (scaleDown && scaleUp) {\n    const min = Number(scaleDown.dataset.min);\n    const max = Number(scaleDown.dataset.max);\n    const step = Number(scaleDown.dataset.step);\n    const storeKey = 'am-scale';\n    let value;\n\n    const inRange = (n) => Number.isFinite(n) && n >= min && n <= max;\n    const savedScale = () => {\n      try {\n        return Number(localStorage.getItem(storeKey));\n      } catch {\n        return NaN;\n      }\n    };\n    const saveScale = (n) => {\n      try {\n        localStorage.setItem(storeKey, String(n));\n      } catch {\n        // Storage may be off (am serve, file://); the size then lasts until the tab closes.\n      }\n    };\n\n    const updateButtons = () => {\n      const setUnavailable = (btn, unavailable) => {\n        if (unavailable) btn.setAttribute('aria-disabled', 'true');\n        else btn.removeAttribute('aria-disabled');\n      };\n      setUnavailable(scaleDown, value <= min);\n      setUnavailable(scaleUp, value >= max);\n    };\n\n    // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.\n    const setScale = (next, remember = false) => {\n      value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));\n      root.style.setProperty('--am-scale', String(value));\n      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role=\"img\"]')) {\n        const box = svg.viewBox?.baseVal;\n        if (!box || !(box.width > 0) || !(box.height > 0)) continue;\n        svg.setAttribute('width', String(Math.ceil(box.width * value)));\n        svg.setAttribute('height', String(Math.ceil(box.height * value)));\n      }\n      updateButtons();\n      if (remember) saveScale(value);\n      window.dispatchEvent(new Event('am-scale'));\n    };\n\n    // A page with no stored choice is left exactly as it was rendered: no inline variable, no svg rewrite, no extra layout pass.\n    value = parseFloat(getComputedStyle(root).getPropertyValue('--am-scale')) || 1;\n    updateButtons();\n    const saved = savedScale();\n    if (inRange(saved) && saved !== value) setScale(saved);\n    scaleDown.hidden = false;\n    scaleUp.hidden = false;\n    scaleDown.addEventListener('click', () => {\n      if (scaleDown.getAttribute('aria-disabled') === 'true') return;\n      setScale(value - step, true);\n    });\n    scaleUp.addEventListener('click', () => {\n      if (scaleUp.getAttribute('aria-disabled') === 'true') return;\n      setScale(value + step, true);\n    });\n  }\n\n  // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size\n  // buttons, so open at that end: Theme, Mode and A\u2212 / A+ are reached by scrolling toward the start. A reader scroll leaves the\n  // position we set, so a later resize does not pull the toolbar back.\n  if (carrier) {\n    const rtl = getComputedStyle(carrier).direction === 'rtl';\n    let lastProgrammatic = null;\n    let readerScrolled = false;\n    const scrollToEnd = () => {\n      if (carrier.scrollWidth <= carrier.clientWidth) return;\n      // Chrome keeps a right-to-left box's scrollLeft negative; the browser clamps either value to the real end.\n      carrier.scrollTo({ left: rtl ? -carrier.scrollWidth : carrier.scrollWidth });\n      lastProgrammatic = carrier.scrollLeft;\n    };\n    carrier.addEventListener('scroll', () => {\n      if (Math.abs(carrier.scrollLeft - lastProgrammatic) > 1) readerScrolled = true;\n    });\n    scrollToEnd();\n    addEventListener('resize', () => {\n      if (!readerScrolled) scrollToEnd();\n    });\n  }\n\n  // True when the text is on the clipboard, false when both paths failed. The async clipboard API is refused on some origins\n  // (a page the browser treats as insecure), so the textarea and execCommand are the fallback, and execCommand reports whether\n  // it copied anything. A button that says it copied when nothing did is worse than one that admits the copy failed: the reader\n  // pastes whatever the clipboard already held.\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n      return true;\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      const copied = document.execCommand?.('copy') === true;\n      ta.remove();\n      return copied;\n    }\n  };\n  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is\n  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,\n  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and\n  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have). A failed copy shows \u2717 instead,\n  // the mark a copy button on the site shows: it is a symbol, so no language has to translate it.\n  const flasher = (btn) => {\n    const idle = btn.textContent;\n    let clicks = 0;\n    return (copied) => {\n      btn.textContent = copied ? btn.dataset.done : '\u2717';\n      const mine = ++clicks;\n      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);\n    };\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  if (copyBtn) {\n    const flash = flasher(copyBtn);\n    copyBtn.addEventListener('click', async () => {\n      const nodes = document.querySelectorAll('#am-source');\n      flash(await copyText(nodes[nodes.length - 1]?.value ?? ''));\n    });\n  }\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    const flash = flasher(btn);\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      flash(await copyText([...lines].map((l) => l.textContent).join('\\n')));\n    });\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      // Every option starts unselected, so an ask the reader never clicked has no answer: the reply names the suggestion\n      // instead of passing it off as the reader's choice.\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const suggested = d.suggested.join(', ') || '\u2014';\n      const why = !d.touched ? `${ui.untouched}: ${suggested}` : same ? ui.confirmed : `${ui.was}: ${suggested}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  // A page served by `am serve` runs without localStorage and the phone may discard its tab, so it keeps the answers on the\n  // server: data-am-save names the write route and data-am-state carries what the server already holds for this page version.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before\n  };\n  // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  const panels = [...document.querySelectorAll('.am-panel')];\n  const asks = [...document.querySelectorAll('.am-ask')];\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    if (serve?.restored?.reply) return serve.restored.reply;\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n    if (serve) saveSoon({ reply: state });\n  };\n  const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = [...ask.querySelectorAll('input')];\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started\n    // with the suggestion selected and saved it untouched, and that state must come back unselected.\n    if (state?.touched && Array.isArray(state.picked) && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = () => {\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the\n  // same record as the answers (reply.js), so a re-opened page finds them again.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {});\n  };\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    const restored = serve?.restored?.remark;\n    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).\n  const drafts = new Map();\n  const clearBtn = document.createElement('button');\n  clearBtn.type = 'button';\n  clearBtn.className = 'am-btn am-btn--remark-clear';\n  clearBtn.textContent = ui.clear;\n  // Clear all drops saved marks and drafts, so it shows while either exists.\n  const toClear = () => marks.size + drafts.size;\n  const showClear = () => { clearBtn.hidden = toClear() === 0; };\n  btn.insertAdjacentElement('afterend', clearBtn);\n  let clearTimer = null;\n  let clearArmed = false;\n  const resetClear = () => {\n    if (clearTimer !== null) clearTimeout(clearTimer);\n    clearTimer = null;\n    clearArmed = false;\n    clearBtn.classList.remove('is-armed');\n    clearBtn.textContent = ui.clear;\n    showClear();\n  };\n  const armClear = () => {\n    clearArmed = true;\n    clearBtn.classList.add('is-armed');\n    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());\n    clearTimer = setTimeout(resetClear, 4000);\n  };\n  clearBtn.addEventListener('click', () => {\n    if (!clearArmed) {\n      armClear();\n      return;\n    }\n    for (const el of document.querySelectorAll('.am-mark')) unpaint(el);\n    marks.clear();\n    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.\n    drafts.clear();\n    try {\n      localStorage.removeItem(storeKey);\n    } catch {\n      // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.\n    }\n    if (serve) saveSoon({ remark: [] });\n    resetClear();\n    document.dispatchEvent(new Event('am-remark-change'));\n  });\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    if (serve) saveSoon({ remark: [...marks.values()] });\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n    showClear();\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  showClear();\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1\u20134 pick a kind from the keyboard and\n  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  let keepDraft = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    keepDraft?.();\n    keepDraft = null;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    const draft = drafts.get(key);\n    let kind = draft?.kind ?? mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });\n    keepDraft = () => {\n      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });\n      else drafts.delete(key);\n      showClear();\n    };\n    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };\n    keep.addEventListener('click', () => {\n      done();\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        done();\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const choose = (k) => {\n      kind = k;\n      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));\n      keep.disabled = false;\n      need.hidden = true;\n    };\n    const kindBtns = KINDS.map((k, i) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.dataset.n = i + 1;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => choose(k));\n      return kb;\n    });\n    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind\n    // only while the focus is outside the note.\n    pop.onkeydown = (e) => {\n      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {\n        e.preventDefault();\n        if (!keep.disabled) keep.click();\n        return;\n      }\n      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;\n      e.preventDefault();\n      choose(KINDS[Number(e.key) - 1]);\n      note.focus();\n    };\n    actions.append(need);\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block\n  // that already had a tabindex keeps it; only the ones the mode added lose it again.\n  const pickKey = (e) => {\n    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;\n    e.preventDefault();\n    open(e.target);\n  };\n  const focusable = (on) => {\n    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys\n    for (const el of keyMap().keys()) {\n      if (on && !el.hasAttribute('tabindex')) {\n        el.tabIndex = 0;\n        el.setAttribute('data-am-pick', '');\n      } else if (!on && el.hasAttribute('data-am-pick')) {\n        el.removeAttribute('tabindex');\n        el.removeAttribute('data-am-pick');\n      }\n    }\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    document.body[toggle]('keydown', pickKey);\n    focusable(on);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  // The width floors are text sizes (px at scale 1). They take the page scale on every pass, so a runtime change of --am-scale re-plans.\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const pageScale = () => {\n    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--am-scale'));\n    return Number.isFinite(scale) && scale > 0 ? scale : 1;\n  };\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  const columnWidths = new Map();\n  function comfortableWidth(table, scale) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const least = columns('min-content');\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));\n    columnWidths.set(table, { least, want });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${Math.ceil(least[i] + (want[i] - least[i]) * k)}px`; });\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    const scale = pageScale();\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t, scale) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN * scale + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN * scale, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN * scale, shrunk, tableCols * TABLE_COL_MIN * scale + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      let planned = -1;\n      for (let pass = 0; pass < 3 && planned !== containerWidth(); pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = containerWidth();\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== containerWidth()) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.\n  addEventListener('am-scale', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n// The outline rail of a doc page (src/templates/doc.js): the markup already works without a script, <details> opens the list and the\n// links jump. This adds the hover dwell, the open direction, the keys, the tap outside and the marking of the current section.\n(() => {\n  const nav = document.querySelector('nav.am-toc');\n  const box = nav && nav.querySelector('details.am-outline');\n  if (!box) return;\n  const sum = box.querySelector('summary');\n  const links = Array.from(box.querySelectorAll('.am-outline-list a'));\n  const ticks = Array.from(box.querySelectorAll('.am-tick'));\n  const LIST_W = 240; // keep in step with .am-outline-list in src/themes/base.css\n  const EDGE = 10; // the 6px gap to the rail plus a margin to the viewport edge\n  let current = '';\n  let byHover = false;\n  let dwell = 0;\n  let leave = 0;\n\n  // Open away from the body when the room outside the rail fits the list; otherwise over the body. Never past the viewport.\n  const place = () => {\n    const r = sum.getBoundingClientRect();\n    const right = r.left + r.width / 2 > innerWidth / 2;\n    const room = right ? innerWidth - r.right : r.left;\n    nav.dataset.flow = room >= Math.min(LIST_W, innerWidth - 48) + EDGE ? 'out' : 'in';\n  };\n  const setOpen = (open) => {\n    if (open) place();\n    box.open = open;\n    if (!open) byHover = false;\n  };\n  const peek = (tick) => ticks.forEach((t) => t.classList.toggle('is-peek', t === tick));\n  const currentLink = () => links.find((a) => a.getAttribute('aria-current') === 'true') || links[0];\n\n  const mark = (id) => {\n    current = id;\n    ticks.forEach((t) => t.classList.toggle('is-current', t.dataset.id === id));\n    links.forEach((a) => {\n      if (a.getAttribute('href') === `#panel-${id}`) a.setAttribute('aria-current', 'true');\n      else a.removeAttribute('aria-current');\n    });\n  };\n  const sections = ticks.map((t) => document.getElementById(`panel-${t.dataset.id}`)).filter(Boolean);\n  if (sections.length) mark(sections[0].id.slice(6));\n  if (sections.length && 'IntersectionObserver' in window) {\n    // A thin band a third of the way down the viewport: the section across it is the one being read.\n    const seen = new Set();\n    const io = new IntersectionObserver((entries) => {\n      entries.forEach((e) => (e.isIntersecting ? seen.add(e.target) : seen.delete(e.target)));\n      const hit = sections.filter((s) => seen.has(s)).pop();\n      if (hit && hit.id.slice(6) !== current) mark(hit.id.slice(6));\n    }, { rootMargin: '-30% 0px -65% 0px' });\n    sections.forEach((s) => io.observe(s));\n  }\n\n  place();\n  addEventListener('resize', place);\n\n  // Mouse: dwelling on the rail opens the list, leaving it closes a list opened that way. A tap or click opens it for good.\n  box.addEventListener('pointerenter', (e) => {\n    clearTimeout(leave);\n    if (e.pointerType !== 'mouse' || box.open) return;\n    dwell = setTimeout(() => { setOpen(true); byHover = true; }, 300);\n  });\n  box.addEventListener('pointerleave', () => {\n    clearTimeout(dwell);\n    // A link the keyboard moved into keeps the list open; focusout closes it once the focus leaves the nav.\n    if (byHover) leave = setTimeout(() => { if (!nav.contains(document.activeElement)) setOpen(false); }, 250);\n  });\n  sum.addEventListener('click', (e) => {\n    clearTimeout(dwell);\n    if (box.open && byHover) { e.preventDefault(); byHover = false; return; }\n    place();\n  });\n  box.addEventListener('toggle', () => { if (box.open) peek(null); });\n\n  // Keyboard: the summary opens with Enter or Space (native); arrows move through the links; Esc closes and returns to the rail.\n  sum.addEventListener('focus', () => {\n    if (sum.matches(':focus-visible')) peek(ticks.find((t) => t.dataset.id === current));\n  });\n  sum.addEventListener('blur', () => peek(null));\n  nav.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape' && box.open) {\n      e.preventDefault();\n      setOpen(false);\n      sum.focus();\n      return;\n    }\n    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;\n    const at = links.indexOf(document.activeElement);\n    if (at < 0 && e.target !== sum) return;\n    e.preventDefault();\n    if (!box.open) setOpen(true);\n    let next;\n    if (e.key === 'Home') next = links[0];\n    else if (e.key === 'End') next = links[links.length - 1];\n    else if (at < 0) next = e.key === 'ArrowDown' ? currentLink() : links[links.length - 1];\n    else next = links[Math.min(links.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];\n    next.focus();\n  });\n  nav.addEventListener('focusout', (e) => {\n    if (box.open && e.relatedTarget && !nav.contains(e.relatedTarget)) setOpen(false);\n  });\n\n  // Choosing a section or tapping outside closes the list.\n  links.forEach((a) => a.addEventListener('click', () => setOpen(false)));\n  document.addEventListener('pointerdown', (e) => { if (box.open && !nav.contains(e.target)) setOpen(false); });\n  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && box.open && !nav.contains(e.target)) setOpen(false); });\n})();\n})();\n";
+var RUNTIME_JS = "(() => {\n// How a formula reads in a quote. MathML has no plain text, so src/math.js writes the formula as the draft wrote it, delimiters included, in\n// data-am-tex on the <math> element, and the Remark and Reply scripts read page text through this file. On a page without math there is no\n// such element, so formulaOf is null and every text comes out as it did before.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n\nconst TEX = 'data-am-tex';\n\n// The formula that holds a node, or null.\nconst formulaOf = (node) => node.parentElement?.closest(`[${TEX}]`) ?? null;\n\nconst firstText = (el) => {\n  for (const child of el.childNodes) {\n    const found = child.nodeType === 3 ? child : firstText(child);\n    if (found) return found;\n  }\n  return null;\n};\n\n// What a text node adds to a quote: its data. The first text node of a formula adds the formula, and the others add nothing.\n// (A formula in an error style is plain text with its delimiters, not a <math>, so it comes out once.)\nfunction nodeText(node) {\n  const math = formulaOf(node);\n  if (!math) return node.data;\n  return firstText(math) === node ? math.getAttribute(TEX) : '';\n}\n\n// The text of a node as textContent reads it, but with each formula as written.\nconst textWithMath = (node) => (node.nodeType === 3 ? nodeText(node) : [...node.childNodes].map(textWithMath).join(''));\n\n(() => {\n  const root = document.documentElement;\n  // A host that serves this page inside its own document leaves the real root without the page's settings. The toolbar keeps a copy;\n  // set back what the root lacks, before anything below reads the root. A root's own value, even an empty one, is kept, except a\n  // theme or mode that no toolbar option names: that is the host's own setting (the Claude desktop app sets data-theme=\"dark\"), and\n  // keeping it would leave the page unstyled.\n  const carrier = document.querySelector('.am-toolbar');\n  const listFor = { 'data-theme': 'theme', 'data-mode': 'mode' };\n  const foreign = (attr, value) => {\n    const options = listFor[attr] && document.querySelector(`select[data-am=\"${listFor[attr]}\"]`)?.options;\n    return Boolean(value) && options != null && ![...options].some((o) => o.value === value);\n  };\n  for (const [attr, key] of [['lang', 'data-am-root-lang'], ['dir', 'data-am-root-dir'], ['data-theme', 'data-am-root-theme'], ['data-mode', 'data-am-root-mode'], ['data-style', 'data-am-root-style']]) {\n    const own = root.getAttribute(attr);\n    if ((own === null || foreign(attr, own)) && carrier?.getAttribute(key) != null) root.setAttribute(attr, carrier.getAttribute(key));\n  }\n  // Each toolbar list sets one root attribute; its options name the values, so the runtime names no theme or mode.\n  for (const [name, attr] of [['theme', 'data-theme'], ['mode', 'data-mode']]) {\n    const select = document.querySelector(`select[data-am=\"${name}\"]`);\n    if (!select) continue;\n    select.value = root.getAttribute(attr);\n    select.addEventListener('change', () => root.setAttribute(attr, select.value));\n  }\n\n  // \u2500\u2500 Text size \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  // A\u2212 / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow\n  // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no\n  // second copy of the numbers. A reader's choice is remembered in this browser and wins over the page's own scale; where storage\n  // is off (am serve, file://) it lasts for this tab, and the click still works.\n  const scaleDown = document.querySelector('[data-am=\"scale-down\"]');\n  const scaleUp = document.querySelector('[data-am=\"scale-up\"]');\n  if (scaleDown && scaleUp) {\n    const min = Number(scaleDown.dataset.min);\n    const max = Number(scaleDown.dataset.max);\n    const step = Number(scaleDown.dataset.step);\n    const storeKey = 'am-scale';\n    let value;\n\n    const inRange = (n) => Number.isFinite(n) && n >= min && n <= max;\n    const savedScale = () => {\n      try {\n        return Number(localStorage.getItem(storeKey));\n      } catch {\n        return NaN;\n      }\n    };\n    const saveScale = (n) => {\n      try {\n        localStorage.setItem(storeKey, String(n));\n      } catch {\n        // Storage may be off (am serve, file://); the size then lasts until the tab closes.\n      }\n    };\n\n    const updateButtons = () => {\n      const setUnavailable = (btn, unavailable) => {\n        if (unavailable) btn.setAttribute('aria-disabled', 'true');\n        else btn.removeAttribute('aria-disabled');\n      };\n      setUnavailable(scaleDown, value <= min);\n      setUnavailable(scaleUp, value >= max);\n    };\n\n    // One step is a multiple of `step`: Math.round first, then two decimals, so 1.1500000000000001 becomes 1.15.\n    const setScale = (next, remember = false) => {\n      value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));\n      root.style.setProperty('--am-scale', String(value));\n      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role=\"img\"]')) {\n        const box = svg.viewBox?.baseVal;\n        if (!box || !(box.width > 0) || !(box.height > 0)) continue;\n        svg.setAttribute('width', String(Math.ceil(box.width * value)));\n        svg.setAttribute('height', String(Math.ceil(box.height * value)));\n      }\n      updateButtons();\n      if (remember) saveScale(value);\n      window.dispatchEvent(new Event('am-scale'));\n    };\n\n    // A page with no stored choice is left exactly as it was rendered: no inline variable, no svg rewrite, no extra layout pass.\n    value = parseFloat(getComputedStyle(root).getPropertyValue('--am-scale')) || 1;\n    updateButtons();\n    const saved = savedScale();\n    if (inRange(saved) && saved !== value) setScale(saved);\n    scaleDown.hidden = false;\n    scaleUp.hidden = false;\n    scaleDown.addEventListener('click', () => {\n      if (scaleDown.getAttribute('aria-disabled') === 'true') return;\n      setScale(value - step, true);\n    });\n    scaleUp.addEventListener('click', () => {\n      if (scaleUp.getAttribute('aria-disabled') === 'true') return;\n      setScale(value + step, true);\n    });\n  }\n\n  // A phone cannot show the whole toolbar. Its end (Reply, Remark, Copy source) is what a phone showed before the text-size\n  // buttons, so open at that end: Theme, Mode and A\u2212 / A+ are reached by scrolling toward the start. A reader scroll leaves the\n  // position we set, so a later resize does not pull the toolbar back.\n  if (carrier) {\n    const rtl = getComputedStyle(carrier).direction === 'rtl';\n    let lastProgrammatic = null;\n    let readerScrolled = false;\n    const scrollToEnd = () => {\n      if (carrier.scrollWidth <= carrier.clientWidth) return;\n      // Chrome keeps a right-to-left box's scrollLeft negative; the browser clamps either value to the real end.\n      carrier.scrollTo({ left: rtl ? -carrier.scrollWidth : carrier.scrollWidth });\n      lastProgrammatic = carrier.scrollLeft;\n    };\n    carrier.addEventListener('scroll', () => {\n      if (Math.abs(carrier.scrollLeft - lastProgrammatic) > 1) readerScrolled = true;\n    });\n    scrollToEnd();\n    addEventListener('resize', () => {\n      if (!readerScrolled) scrollToEnd();\n    });\n  }\n\n  // True when the text is on the clipboard, false when both paths failed. The async clipboard API is refused on some origins\n  // (a page the browser treats as insecure), so the textarea and execCommand are the fallback, and execCommand reports whether\n  // it copied anything. A button that says it copied when nothing did is worse than one that admits the copy failed: the reader\n  // pastes whatever the clipboard already held.\n  const copyText = async (text) => {\n    try {\n      await navigator.clipboard.writeText(text);\n      return true;\n    } catch {\n      const ta = Object.assign(document.createElement('textarea'), { value: text });\n      document.body.append(ta);\n      ta.select();\n      const copied = document.execCommand?.('copy') === true;\n      ta.remove();\n      return copied;\n    }\n  };\n  // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is\n  // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,\n  // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and\n  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have). A failed copy shows \u2717 instead,\n  // the mark a copy button on the site shows: it is a symbol, so no language has to translate it.\n  const flasher = (btn) => {\n    const idle = btn.textContent;\n    let clicks = 0;\n    return (copied) => {\n      btn.textContent = copied ? btn.dataset.done : '\u2717';\n      const mine = ++clicks;\n      setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);\n    };\n  };\n\n  const copyBtn = document.querySelector('[data-am=\"copy\"]');\n  if (copyBtn) {\n    const flash = flasher(copyBtn);\n    copyBtn.addEventListener('click', async () => {\n      const nodes = document.querySelectorAll('#am-source');\n      flash(await copyText(nodes[nodes.length - 1]?.value ?? ''));\n    });\n  }\n\n  // Each code block copies its own lines, without the line numbers.\n  for (const btn of document.querySelectorAll('[data-am=\"copy-code\"]')) {\n    const flash = flasher(btn);\n    btn.addEventListener('click', async () => {\n      const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];\n      flash(await copyText([...lines].map((l) => l.textContent).join('\\n')));\n    });\n  }\n\n  // \u2500\u2500 Sideways scroll cue \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  // Overlay scrollbars (macOS) show nothing until the reader scrolls, so a wide code block or diagram looked cut off. While a box\n  // hides content past its left or right edge it carries am-more-left / am-more-right, and base.css fades that edge. The sides are\n  // physical because a box can read in the other direction than the page (code stays left to right on a right-to-left page); there\n  // scrollLeft counts down from 0, so the hidden amounts use its size.\n  const scrollers = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas), .am-code, .am-annot-scroll');\n  const markMore = (el) => {\n    const hidden = el.scrollWidth - el.clientWidth;\n    let left = false;\n    let right = false;\n    if (hidden > 1) {\n      const atStart = Math.abs(el.scrollLeft);\n      const rtl = getComputedStyle(el).direction === 'rtl';\n      [left, right] = rtl ? [atStart < hidden - 1, atStart > 1] : [atStart > 1, atStart < hidden - 1];\n    }\n    el.classList.toggle('am-more-left', left);\n    el.classList.toggle('am-more-right', right);\n  };\n  if (scrollers.length) {\n    const resized = typeof ResizeObserver === 'function' ? new ResizeObserver((entries) => entries.forEach((e) => markMore(e.target))) : null;\n    for (const el of scrollers) {\n      el.addEventListener('scroll', () => markMore(el), { passive: true });\n      resized?.observe(el);\n      markMore(el);\n    }\n  }\n\n  // \u2500\u2500 Diagram Lightbox & Pan-Zoom Viewer \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');\n  const lb = document.querySelector('.am-lightbox');\n  if (diagrams.length && lb) {\n    const backdrop = lb.querySelector('.am-lightbox-backdrop');\n    const titleText = lb.querySelector('.am-lightbox-title-text');\n    const stage = lb.querySelector('.am-lightbox-stage');\n    const canvas = lb.querySelector('.am-lightbox-canvas');\n    const closeBtn = lb.querySelector('.am-lightbox-close');\n    const expandLabel = lb.getAttribute('data-expand') || 'Expand diagram';\n\n    let scale = 1, x = 0, y = 0, fitScale = 1, curVw = 800, curVh = 600;\n    let isDragging = false, activePointerId = null, startX = 0, startY = 0, origX = 0, origY = 0;\n    let lastTrigger = null;\n\n    const apply = () => {\n      canvas.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;\n    };\n\n    const zoomTo = (newScale, pivotX, pivotY) => {\n      newScale = Math.max(0.2, Math.min(6.0, newScale));\n      if (Math.abs(newScale - scale) < 0.0001) return;\n      const r = newScale / scale;\n      x = pivotX - (pivotX - x) * r;\n      y = pivotY - (pivotY - y) * r;\n      scale = newScale;\n      apply();\n    };\n\n    const open = (diag, trigger) => {\n      const svg = [...diag.children].find((el) => el.tagName.toLowerCase() === 'svg');\n      if (!svg) return;\n      lastTrigger = trigger;\n\n      const panel = diag.closest('.am-panel');\n      const panelTitle = panel?.querySelector('.am-panel-head h2')?.textContent?.trim() || panel?.querySelector('h2')?.textContent?.trim() || lb.getAttribute('aria-label') || 'Diagram viewer';\n      if (titleText) titleText.textContent = panelTitle;\n\n      const clone = svg.cloneNode(true);\n      const defElements = clone.querySelectorAll('[id]');\n      if (defElements.length) {\n        const idMap = new Map();\n        defElements.forEach((el, i) => {\n          const oldId = el.id;\n          const newId = `${oldId}-lb-${i}`;\n          idMap.set(oldId, newId);\n          el.id = newId;\n        });\n        const urlAttrs = ['marker-start', 'marker-mid', 'marker-end', 'fill', 'stroke', 'filter', 'clip-path', 'mask'];\n        clone.querySelectorAll('*').forEach((el) => {\n          for (const attr of urlAttrs) {\n            const val = el.getAttribute(attr);\n            if (val && val.startsWith('url(#')) {\n              const id = val.slice(5, -1);\n              if (idMap.has(id)) el.setAttribute(attr, `url(#${idMap.get(id)})`);\n            }\n          }\n          const href = el.getAttribute('href') || el.getAttribute('xlink:href');\n          if (href && href.startsWith('#')) {\n            const id = href.slice(1);\n            if (idMap.has(id)) {\n              if (el.hasAttribute('href')) el.setAttribute('href', `#${idMap.get(id)}`);\n              if (el.hasAttribute('xlink:href')) el.setAttribute('xlink:href', `#${idMap.get(id)}`);\n            }\n          }\n        });\n      }\n\n      const vb = svg.viewBox?.baseVal;\n      curVw = (vb && vb.width > 0) ? vb.width : (parseFloat(svg.getAttribute('width')) || svg.clientWidth || 800);\n      curVh = (vb && vb.height > 0) ? vb.height : (parseFloat(svg.getAttribute('height')) || svg.clientHeight || 600);\n      // The panel's svg carries the reading floor as min-width (layout-dom.js floorDiagrams); the viewer sizes the clone itself.\n      clone.style.minWidth = '';\n      clone.style.width = `${curVw}px`;\n      clone.style.height = `${curVh}px`;\n      canvas.innerHTML = '';\n      canvas.append(clone);\n      lb.removeAttribute('hidden');\n      document.body.style.overflow = 'hidden';\n\n      const rect = stage.getBoundingClientRect();\n      const pad = 48;\n      const availW = Math.max(100, rect.width - pad * 2);\n      const availH = Math.max(100, rect.height - pad * 2);\n      fitScale = Math.min(availW / curVw, availH / curVh, 1.0);\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n      closeBtn.focus();\n    };\n\n    const close = () => {\n      if (lb.hasAttribute('hidden')) return;\n      lb.setAttribute('hidden', '');\n      canvas.innerHTML = '';\n      document.body.style.overflow = '';\n      lastTrigger?.focus();\n    };\n\n    stage.addEventListener('wheel', (e) => {\n      e.preventDefault();\n      const rect = stage.getBoundingClientRect();\n      const dy = e.deltaMode === 1 ? e.deltaY * 16 : (e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY);\n      const factor = Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015);\n      zoomTo(scale * factor, e.clientX - rect.left, e.clientY - rect.top);\n    }, { passive: false });\n\n    stage.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0 || isDragging) return;\n      isDragging = true;\n      activePointerId = e.pointerId;\n      startX = e.clientX;\n      startY = e.clientY;\n      origX = x;\n      origY = y;\n      stage.setPointerCapture(e.pointerId);\n      stage.classList.add('am-panning');\n    });\n\n    stage.addEventListener('pointermove', (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      x = origX + (e.clientX - startX);\n      y = origY + (e.clientY - startY);\n      apply();\n    });\n\n    const endDrag = (e) => {\n      if (!isDragging || e.pointerId !== activePointerId) return;\n      isDragging = false;\n      activePointerId = null;\n      stage.classList.remove('am-panning');\n      try { stage.releasePointerCapture(e.pointerId); } catch {}\n    };\n    stage.addEventListener('pointerup', endDrag);\n    stage.addEventListener('pointercancel', endDrag);\n\n    stage.addEventListener('dblclick', () => {\n      const rect = stage.getBoundingClientRect();\n      scale = fitScale;\n      x = (rect.width - curVw * scale) / 2;\n      y = (rect.height - curVh * scale) / 2;\n      apply();\n    });\n\n    closeBtn.addEventListener('click', close);\n    backdrop.addEventListener('click', close);\n    window.addEventListener('keydown', (e) => {\n      if (e.key === 'Escape' && !lb.hasAttribute('hidden')) close();\n    });\n\n    lb.addEventListener('keydown', (e) => {\n      if (e.key !== 'Tab') return;\n      const focusables = lb.querySelectorAll('button:not([disabled]), [tabindex]:not([tabindex=\"-1\"])');\n      if (!focusables.length) return;\n      const first = focusables[0];\n      const last = focusables[focusables.length - 1];\n      if (e.shiftKey && document.activeElement === first) {\n        e.preventDefault();\n        last.focus();\n      } else if (!e.shiftKey && document.activeElement === last) {\n        e.preventDefault();\n        first.focus();\n      }\n    });\n\n    const expandSvg = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><polyline points=\"15 3 21 3 21 9\"></polyline><polyline points=\"9 21 3 21 3 15\"></polyline><line x1=\"21\" y1=\"3\" x2=\"14\" y2=\"10\"></line><line x1=\"3\" y1=\"21\" x2=\"10\" y2=\"14\"></line></svg>';\n    diagrams.forEach((diag) => {\n      const btn = document.createElement('button');\n      btn.type = 'button';\n      btn.className = 'am-diagram-expand';\n      btn.title = expandLabel;\n      btn.setAttribute('aria-label', expandLabel);\n      btn.innerHTML = expandSvg;\n      btn.addEventListener('click', () => open(diag, btn));\n      diag.prepend(btn);\n    });\n  }\n})();\n(() => {\n// The reply a reader copies from the page: one Markdown text with the decisions, the panel comments and the block remarks.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// decisions: [{ panel, question, picked: [label], suggested: [label], touched }]; comments: [{ panel, title, text }];\n// remarks: [{ panel, quote, kind, note }], where quote is the start of the marked block and kind is a key of ui.kinds.\n// Comment and remark text is quoted line by line, so text the reader typed cannot pass as part of the structure.\n// rtl: the page reads right to left, so the arrow before each answer points left, the way the text runs.\nfunction replyText({ title, decisions, comments, remarks = [], ui, rtl = false }) {\n  const arrow = rtl ? '\u2190' : '\u2192';\n  const out = [`# Re: ${title}`];\n  if (decisions.length) {\n    out.push('', `## ${ui.decisions}`);\n    decisions.forEach((d, i) => {\n      const answer = d.picked.length ? d.picked.map((l) => `**${l}**`).join(', ') : '**\u2014**';\n      // Every option starts unselected, so an ask the reader never clicked has no answer: the reply names the suggestion\n      // instead of passing it off as the reader's choice.\n      const same = d.picked.length === d.suggested.length && d.picked.every((l) => d.suggested.includes(l));\n      const suggested = d.suggested.join(', ') || '\u2014';\n      const why = !d.touched ? `${ui.untouched}: ${suggested}` : same ? ui.confirmed : `${ui.was}: ${suggested}`;\n      out.push(`${i + 1}. [${d.panel}] ${d.question}`, `   ${arrow} ${answer} _(${why})_`);\n    });\n  }\n  const written = comments.filter((c) => c.text.trim());\n  const quoted = (text) => (text.trim() ? text.trim().split('\\n').map((l) => `  > ${l}`) : []);\n  if (written.length) {\n    out.push('', `## ${ui.comments}`);\n    for (const c of written) out.push(`- **${c.panel} \xB7 ${c.title}**`, ...quoted(c.text));\n  }\n  if (remarks.length) {\n    out.push('', `## ${ui.remarks}`);\n    for (const r of remarks) {\n      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' \xB7 ');\n      out.push(`- **${label}** \"${r.quote}\"`, ...quoted(r.note));\n    }\n  }\n  if (written.length || remarks.some((r) => r.note.trim())) out.push('', `_${ui.typed}_`);\n  return `${out.join('\\n')}\\n`;\n}\n\n// A letter of a right-to-left script. One definition for the page builder (src/bidi.js) and for the right-to-left page script\n// (src/runtime/reply-view.js), so the two cannot drift apart. A plain ES module; the page script gets this file in front of\n// reply-view.js, with its `export` keyword dropped and reply-view.js's import of it removed (src/runtime/compose.js).\nconst RTL_LETTER = /[\\p{Script=Hebrew}\\p{Script=Arabic}\\p{Script=Syriac}\\p{Script=Thaana}\\p{Script=Nko}\\p{Script=Samaritan}\\p{Script=Mandaic}]/u;\n\n// The reply as the reader sees it in the Reply sheet (src/runtime/reply.js): the Markdown that Copy copies, drawn as headings, bold answers\n// and quoted comments instead of raw \"# Re: ...\", \"1. [E] ...\" and \"- **A \xB7 ...**\" lines. Each line gets its own direction, so a\n// Hebrew reader sees Latin answers and paths in place; a line with no right-to-left letter reads left to right, as on any other page.\n// The raw Markdown stays in the sheet under a fold, so the copied text does not change.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped and rtl-letter.js in front of it in place of the\n// import (src/runtime/compose.js).\n\nconst escHtml = (s) => s.replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\n// A line with a right-to-left letter reads right to left; a line without one (an English comment, a path) reads left to right.\nconst dirOf = (s) => (RTL_LETTER.test(s) ? 'rtl' : 'ltr');\n\n// The only inline Markdown src/runtime/reply-text.js writes: **answer**, _(note)_ and the \"quote\" of a remark. Each piece is isolated in its own direction,\n// so a Latin answer inside a Hebrew line keeps its place, and \"A \xB7 title\" still starts with the panel letter.\nconst piece = (tag, text) => `<${tag}><bdi dir=\"${dirOf(text)}\">${text}</bdi></${tag}>`;\nfunction inline(s) {\n  return escHtml(s)\n    .replace(/\\*\\*(.+?)\\*\\*/g, (_, t) => piece('strong', t))\n    .replace(/(^|\\s)_(.+?)_(?=\\s|$)/g, (_, pre, t) => pre + piece('em', t))\n    // The quoted start of a marked block (\"- **A \xB7 concern** \"text\"\"): isolated, so Latin text in a Hebrew line keeps its place.\n    .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir=\"${dirOf(t)}\">${t}</bdi>&quot;`);\n}\n\n// The reply text (src/runtime/reply-text.js) as HTML, one block per line.\nfunction replyViewHtml(text) {\n  return text\n    .replace(/\\n$/, '')\n    .split('\\n')\n    .map((line) => {\n      const dir = dirOf(line);\n      let m;\n      if (!line.trim()) return '<div class=\"am-rv-gap\"></div>';\n      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class=\"am-rv-h${m[1].length}\" dir=\"${dir}\">${inline(m[2])}</div>`;\n      if ((m = line.match(/^(\\d+)\\. \\[([^\\]]*)\\] (.*)$/))) {\n        return `<div class=\"am-rv-q\" dir=\"${dir}\"><bdi>${m[1]}.</bdi> <bdi class=\"am-rv-tag\">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;\n      }\n      if ((m = line.match(/^ {3}([\u2190\u2192]) (.*)$/))) return `<div class=\"am-rv-a\" dir=\"${dir}\">${m[1]} ${inline(m[2])}</div>`;\n      if ((m = line.match(/^- (.*)$/))) return `<div class=\"am-rv-c\" dir=\"${dir}\">${inline(m[1])}</div>`;\n      // A comment line is shown exactly as the reader typed it.\n      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class=\"am-rv-quote\" dir=\"${dirOf(m[1])}\">${escHtml(m[1]) || '&nbsp;'}</div>`;\n      return `<div dir=\"${dir}\">${inline(line)}</div>`;\n    })\n    .join('');\n}\n\n// Answer on the page: every panel gets a Comment box, and the Reply button collects the ask answers, the comments and the remarks\n// into one Markdown reply (replyText) to copy back to the agent. Answers and comments stay in localStorage across reloads.\n// The remark script (remark.js) adds the blocks the reader marked, through window.__amRemarkData, and tells this script about a change\n// with an \"am-remark-change\" event on the document.\n// The Reply sheet shows the reply drawn (replyViewHtml) with the Markdown that Copy copies under a fold. Once the reader has given any\n// input, a bar at the bottom of the page shows the counts and copies the reply in one click, so there is no trip to the top-right button.\nconst replyBtn = document.querySelector('[data-am=\"reply\"]');\nconst COMMENT_ICON = '<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"></path></svg>';\nif (replyBtn) {\n  const ui = JSON.parse(replyBtn.dataset.ui);\n  const storeKey = `am-reply:${location.pathname}`;\n  // A page served by `am serve` runs without localStorage and the phone may discard its tab, so it keeps the answers on the\n  // server: data-am-save names the write route and data-am-state carries what the server already holds for this page version.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {}); // a page that cannot reach the server keeps its state until it closes, as before\n  };\n  // Typing must not put one request per keystroke on the server; localStorage is written at once, the network follows.\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // A preview may draw a mock panel; it gets no comment box and cannot shadow the real panel's id.\n  const panels = [...document.querySelectorAll('.am-panel')].filter((panel) => !panel.closest('.am-ask-preview'));\n  // An ask inside a preview is part of the drawing, not a decision of the page.\n  const asks = [...document.querySelectorAll('.am-ask')].filter((a) => !a.closest('.am-ask-preview'));\n  // Answers are saved by question text, so they still match after am patch has renumbered the asks.\n  // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved\n  // answers hold the text as the draft wrote it, a formula too (src/runtime/math-text.js).\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g');\n  const textOf = (el) => el && textWithMath(el).replace(WJ, '').trim();\n  const keyOf = (ask) => textOf(ask.querySelector('legend')) ?? ask.dataset.ask;\n  const touched = new Set();\n  const boxes = new Map();\n  // The bar is built below with the sheet; the handlers that change the counts only call this.\n  let refreshBar = () => {};\n  // The textarea a failed copy keeps selected, so the reader can still use the keyboard shortcut.\n  let stuck = null;\n\n  const load = () => {\n    if (serve?.restored?.reply) return serve.restored.reply;\n    try {\n      return JSON.parse(localStorage.getItem(storeKey)) || {};\n    } catch {\n      return {};\n    }\n  };\n  const save = () => {\n    const state = {\n      asks: Object.fromEntries(asks.map((a) => [keyOf(a), { picked: picked(a), touched: touched.has(a) }])),\n      comments: Object.fromEntries([...boxes].map(([id, box]) => [id, box.value]).filter(([, text]) => text.trim())),\n    };\n    try {\n      localStorage.setItem(storeKey, JSON.stringify(state));\n    } catch {\n      // Storage may be off (private window, file:// policy); answers then last until the page closes.\n    }\n    if (serve) saveSoon({ reply: state });\n  };\n  // A preview can hold a mock form; those controls are a picture, not the reader's answer.\n  const inputsOf = (ask) => [...ask.querySelectorAll('input')].filter((i) => !i.closest('.am-ask-preview'));\n  const picked = (ask) => inputsOf(ask).filter((i) => i.checked).map((i) => i.value);\n  const panelOf = (el) => {\n    const panel = el.closest('.am-panel');\n    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };\n  };\n\n  const saved = load();\n  for (const ask of asks) {\n    const inputs = inputsOf(ask);\n    const state = saved.asks?.[keyOf(ask)];\n    // A saved answer applies only while every picked option still exists on the page, and only if the reader clicked: older versions started\n    // with the suggestion selected and saved it untouched, and that state must come back unselected.\n    if (state?.touched && Array.isArray(state.picked) && state.picked.every((v) => inputs.some((i) => i.value === v))) {\n      for (const input of inputs) input.checked = state.picked.includes(input.value);\n      touched.add(ask);\n    }\n    // A click counts even on the option that is already picked: the reader confirms the suggestion.\n    const answer = (e) => {\n      if (e?.target?.closest?.('.am-ask-preview')) return;\n      touched.add(ask);\n      save();\n      refreshBar();\n    };\n    ask.addEventListener('change', answer);\n    ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(e); });\n    // In cards the whole card looks clickable, so a click on its preview picks the option too. A control in the drawing is not the answer.\n    ask.addEventListener('click', (e) => {\n      if (!ask.classList.contains('am-ask--cards')) return;\n      if (!e.target.closest?.('.am-ask-preview') || e.target.closest('input, button, a, select, textarea, summary, label')) return;\n      const input = e.target.closest('.am-ask-card')?.querySelector('input');\n      if (!input) return;\n      const wasPicked = input.checked;\n      input.click();\n      // A radio that is already on sends no change event, and the click still confirms the suggestion.\n      if (wasPicked && input.type === 'radio') answer();\n    });\n  }\n\n  for (const panel of panels) {\n    const id = panel.id.replace(/^panel-/, '');\n    // An icon only: narrow panels have no room for a word next to the title.\n    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'am-comment-btn', title: ui.comment, innerHTML: COMMENT_ICON });\n    btn.setAttribute('aria-label', `${ui.comment} ${id}`);\n    btn.setAttribute('aria-expanded', 'false');\n    const wrap = Object.assign(document.createElement('div'), { className: 'am-comment', hidden: true });\n    const box = Object.assign(document.createElement('textarea'), { rows: 3, placeholder: ui.commentHint, value: saved.comments?.[id] ?? '' });\n    box.setAttribute('aria-label', `${ui.comment} ${id}`);\n    wrap.append(box);\n    const show = (open) => {\n      wrap.hidden = !open;\n      btn.setAttribute('aria-expanded', String(open));\n    };\n    btn.addEventListener('click', () => {\n      show(wrap.hidden);\n      if (!wrap.hidden) box.focus();\n    });\n    box.addEventListener('input', () => {\n      btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n      save();\n      refreshBar();\n    });\n    btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));\n    if (box.value.trim()) show(true);\n    (panel.querySelector('.am-panel-head') ?? panel).append(btn);\n    panel.append(wrap);\n    boxes.set(id, box);\n  }\n\n  const sheet = document.createElement('dialog');\n  sheet.className = 'am-reply';\n  sheet.setAttribute('aria-label', ui.title);\n  sheet.innerHTML = '<div class=\"am-reply-head\"><strong></strong><span></span></div><div class=\"am-reply-view\" tabindex=\"0\"></div><details class=\"am-reply-raw\"><summary></summary><textarea readonly rows=\"10\"></textarea></details><div class=\"am-reply-actions\"><button type=\"button\" class=\"am-btn\" data-act=\"copy\"></button><button type=\"button\" class=\"am-btn\" data-act=\"close\"></button></div>';\n  sheet.querySelector('strong').textContent = ui.title;\n  sheet.querySelector('span').textContent = ui.hint;\n  sheet.querySelector('summary').textContent = ui.raw;\n  const view = sheet.querySelector('.am-reply-view');\n  const raw = sheet.querySelector('details');\n  const text = sheet.querySelector('textarea');\n  const copy = sheet.querySelector('[data-act=\"copy\"]');\n  const close = sheet.querySelector('[data-act=\"close\"]');\n  copy.textContent = ui.copy;\n  close.textContent = ui.close;\n  document.body.append(sheet);\n\n  const compose = () => {\n    const decisions = asks.map((ask) => ({\n      panel: panelOf(ask).id,\n      question: textOf(ask.querySelector('legend')) ?? '',\n      picked: picked(ask),\n      suggested: inputsOf(ask).filter((i) => i.hasAttribute('data-suggested')).map((i) => i.value),\n      touched: touched.has(ask),\n    }));\n    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));\n    const remarks = window.__amRemarkData?.() ?? [];\n    const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;\n    const title = textOf(document.querySelector('.am-head h1')) ?? document.title;\n    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });\n  };\n\n  // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary\n  // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.\n  // That fallback reports whether it worked. When it does not, the text stays selected (so Cmd/Ctrl+C still copies it) and the\n  // button says what to do instead of showing the \"Copied \u2713\" label the reader cannot trust.\n  const copyText = async (str, btn) => {\n    stuck?.remove();\n    stuck = null;\n    try {\n      await navigator.clipboard.writeText(str);\n      // The close_after_reply script (close-after-reply.js) closes the tab once the reply is on the clipboard.\n      document.dispatchEvent(new Event('am-reply-copied'));\n    } catch {\n      const tmp = Object.assign(document.createElement('textarea'), { value: str });\n      tmp.style.cssText = 'position:fixed;top:-100px;opacity:0';\n      // Inside the sheet while it is open: while a modal dialog is open the rest of the document cannot take focus, so a textarea\n      // in the body can be selected but not focused, and the keyboard shortcut the reader is told to press would copy nothing.\n      // The bottom bar copies while the sheet is closed, and a closed dialog is not rendered, so there the textarea goes in the body.\n      (sheet.open ? sheet : document.body).append(tmp);\n      tmp.select();\n      let copied = false;\n      try {\n        copied = document.execCommand('copy');\n      } catch {\n        copied = false;\n      }\n      if (!copied) {\n        stuck = tmp;\n        btn.textContent = ui.copyFailed;\n        setTimeout(() => { btn.textContent = ui.copy; }, 3000);\n        return;\n      }\n      tmp.remove();\n    }\n    btn.textContent = ui.done;\n    setTimeout(() => { btn.textContent = ui.copy; }, 1400);\n  };\n\n  const open = () => {\n    const reply = compose();\n    if (reply) view.innerHTML = replyViewHtml(reply);\n    else view.textContent = ui.empty;\n    view.scrollTop = 0;\n    text.value = reply;\n    raw.open = false;\n    raw.hidden = !reply;\n    copy.disabled = !reply;\n    if (sheet.showModal) sheet.showModal();\n    else sheet.setAttribute('open', '');\n    (reply ? copy : close).focus();\n  };\n  replyBtn.addEventListener('click', open);\n  close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));\n  // A failed copy leaves the text selected for Cmd/Ctrl+C; closing the sheet drops that textarea.\n  sheet.addEventListener('close', () => { stuck?.remove(); stuck = null; });\n  copy.addEventListener('click', () => copyText(text.value, copy));\n\n  const bar = Object.assign(document.createElement('div'), { className: 'am-reply-bar', hidden: true });\n  bar.setAttribute('role', 'region');\n  bar.setAttribute('aria-label', ui.title);\n  const summary = Object.assign(document.createElement('span'), { className: 'am-reply-bar-count' });\n  summary.setAttribute('aria-live', 'polite');\n  const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });\n  const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });\n  preview.addEventListener('click', open);\n  barCopy.addEventListener('click', () => copyText(compose(), barCopy));\n  bar.append(summary, preview, barCopy);\n  document.body.append(bar);\n\n  // The bar shows only the counts that are above zero, and only once there is any input at all.\n  refreshBar = () => {\n    const counts = {\n      answered: touched.size,\n      comments: [...boxes.values()].filter((box) => box.value.trim()).length,\n      remarks: (window.__amRemarkData?.() ?? []).length,\n    };\n    const parts = Object.entries(counts).filter(([, n]) => n > 0).map(([kind, n]) => ui.count[kind].replace('{n}', n));\n    summary.textContent = parts.join(' \xB7 ');\n    bar.hidden = !parts.length;\n    document.body.classList.toggle('am-has-reply-bar', parts.length > 0);\n  };\n  document.addEventListener('am-remark-change', () => refreshBar());\n  // Saved remarks are restored by remark.js, which runs after this script in the same <script> element: its data is not there yet.\n  // A microtask runs when that whole element has finished, so the first count includes them.\n  queueMicrotask(() => refreshBar());\n}\n})();\n(() => {\n// Text helpers for remark mode (src/runtime/remark.js): how a marked block is named and quoted.\n// A plain ES module for tests; the page gets it with its `export` keyword dropped (src/runtime/compose.js).\n// A block keeps its mark across `am patch` because the key is its panel, its tag and the start of its text, not its position.\n\nconst collapse = (text) => String(text).replace(/\\s+/g, ' ').trim();\n\n// The start of a block's text with whitespace collapsed: the readable identity of the block.\nfunction fingerprint(text, len = 80) {\n  return collapse(text).slice(0, len);\n}\n\n// What the reply quotes of a block: the start of its text, with an ellipsis when it is cut.\nfunction quote(text, len = 60) {\n  const t = collapse(text);\n  return t.length > len ? `${t.slice(0, len).trimEnd()}\u2026` : t;\n}\n\n// Two blocks with the same text (two identical list items) get the same base key. The n-th one in the page gets \"\\t<n>\" added;\n// a tab cannot be in a fingerprint, which has its whitespace collapsed, so the new key never meets another base key.\nfunction occurrenceKeys(bases) {\n  const seen = new Map();\n  return bases.map((base) => {\n    const n = seen.get(base) ?? 0;\n    seen.set(base, n + 1);\n    return n ? `${base}\\t${n}` : base;\n  });\n}\n\n// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.\n// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it\n// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.\n(() => {\n  const btn = document.querySelector('[data-am=\"remark\"]');\n  if (!btn) return;\n  const ui = JSON.parse(btn.dataset.ui);\n  const KINDS = ['suggestion', 'keep', 'question', 'concern'];\n  const storeKey = `am-remark:${location.pathname}`;\n  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the\n  // same record as the answers (reply.js), so a re-opened page finds them again.\n  const serve = (() => {\n    const { amSave: save, amState: state } = document.body?.dataset ?? {};\n    if (!save) return null;\n    try {\n      return { save, restored: state ? JSON.parse(state) : null };\n    } catch {\n      return { save, restored: null };\n    }\n  })();\n  let saveTimer = null;\n  let pendingPatch = null;\n  const sendSave = (patch) => {\n    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })\n      .catch(() => {});\n  };\n  const saveSoon = (patch) => {\n    clearTimeout(saveTimer);\n    pendingPatch = patch;\n    saveTimer = setTimeout(() => {\n      pendingPatch = null;\n      sendSave(patch);\n    }, 400);\n  };\n  // A hidden or closing page sends the change it still holds, before the timer can run.\n  const flushSave = () => {\n    if (!pendingPatch) return;\n    clearTimeout(saveTimer);\n    sendSave(pendingPatch);\n    pendingPatch = null;\n  };\n  document.addEventListener('visibilitychange', () => {\n    if (document.visibilityState === 'hidden') flushSave();\n  });\n  window.addEventListener('pagehide', flushSave);\n  // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the\n  // reply reads them as text; a panel has its Comment button.\n  // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.\n  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';\n  // A click on these does what it always did.\n  const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';\n  const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));\n\n  const WJ = new RegExp(String.fromCharCode(0x2060), 'g'); // word joiners of a right-to-left page (src/bidi.js); not part of the draft's text\n  // A narrow horizontal timeline shows its date and title inline (src/themes/base.css). They stay parts of their own, so a block key\n  // does not change with the width of the window (#194).\n  const OWN_BOX = '.am-timeline--h .am-tl-when, .am-timeline--h .am-tl-title';\n  const inlineBox = new WeakMap();\n  const isInline = (el) => {\n    if (!inlineBox.has(el)) inlineBox.set(el, !el.matches(OWN_BOX) && getComputedStyle(el).display.startsWith('inline'));\n    return inlineBox.get(el);\n  };\n  // The text of a block as the reader sees it: separate lines, cells and timeline parts are joined by a space (textContent would run\n  // \"2026\" and \"Ship\" together), and the note chip is not part of it. A formula is one box and reads as the TeX the draft wrote\n  // (src/runtime/math-text.js), not as the MathML tokens.\n  const blockText = (el) => {\n    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);\n    let text = '';\n    let last = null;\n    for (let node = walker.nextNode(); node; node = walker.nextNode()) {\n      if (node.parentElement.closest('.am-mark-note')) continue;\n      let box = formulaOf(node) ?? node.parentElement;\n      while (box !== el && isInline(box)) box = box.parentElement;\n      if (last && box !== last) text += ' ';\n      text += nodeText(node).replace(WJ, '');\n      last = box;\n    }\n    return text;\n  };\n\n  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';\n  // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.\n  let keys = null;\n  const keyMap = () => {\n    if (!keys) {\n      const blocks = [...document.querySelectorAll(BLOCK)];\n      const ids = occurrenceKeys(blocks.map((el) => `${panelOf(el)}|${el.localName}|${fingerprint(blockText(el))}`));\n      keys = new Map(blocks.map((el, i) => [el, ids[i]]));\n    }\n    return keys;\n  };\n\n  const load = () => {\n    const restored = serve?.restored?.remark;\n    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];\n    } catch {\n      return [];\n    }\n  };\n  // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.\n  const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));\n  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).\n  const drafts = new Map();\n  const clearBtn = document.createElement('button');\n  clearBtn.type = 'button';\n  clearBtn.className = 'am-btn am-btn--remark-clear';\n  clearBtn.textContent = ui.clear;\n  // Clear all drops saved marks and drafts, so it shows while either exists.\n  const toClear = () => marks.size + drafts.size;\n  const showClear = () => { clearBtn.hidden = toClear() === 0; };\n  btn.insertAdjacentElement('afterend', clearBtn);\n  let clearTimer = null;\n  let clearArmed = false;\n  const resetClear = () => {\n    if (clearTimer !== null) clearTimeout(clearTimer);\n    clearTimer = null;\n    clearArmed = false;\n    clearBtn.classList.remove('is-armed');\n    clearBtn.textContent = ui.clear;\n    showClear();\n  };\n  const armClear = () => {\n    clearArmed = true;\n    clearBtn.classList.add('is-armed');\n    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());\n    clearTimer = setTimeout(resetClear, 4000);\n  };\n  clearBtn.addEventListener('click', () => {\n    if (!clearArmed) {\n      armClear();\n      return;\n    }\n    for (const el of document.querySelectorAll('.am-mark')) unpaint(el);\n    marks.clear();\n    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.\n    drafts.clear();\n    try {\n      localStorage.removeItem(storeKey);\n    } catch {\n      // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.\n    }\n    if (serve) saveSoon({ remark: [] });\n    resetClear();\n    document.dispatchEvent(new Event('am-remark-change'));\n  });\n  const save = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify([...marks.values()]));\n    } catch {\n      // Storage may be off (private window, a sandboxed page); marks then last until the page closes.\n    }\n    if (serve) saveSoon({ remark: [...marks.values()] });\n    // The reply bar (reply.js) shows the number of marks.\n    document.dispatchEvent(new Event('am-remark-change'));\n    showClear();\n  };\n\n  const chip = (el, mark) => {\n    const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');\n    note.className = 'am-mark-note';\n    const kind = document.createElement('b');\n    kind.textContent = ui.kinds[mark.kind];\n    note.append(kind, mark.note ? ` ${mark.note}` : '');\n    return note;\n  };\n  const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();\n  const paint = (el, mark) => {\n    clearChip(el);\n    el.classList.add('am-mark');\n    el.dataset.kind = mark.kind;\n    // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows\n    // it under its own text, before the sub-list.\n    const sub = el.querySelector(':scope > ul, :scope > ol');\n    if (el.localName === 'table') el.prepend(chip(el, mark));\n    else if (sub) sub.before(chip(el, mark));\n    else el.append(chip(el, mark));\n  };\n  const unpaint = (el) => {\n    clearChip(el);\n    el.classList.remove('am-mark');\n    delete el.dataset.kind;\n  };\n  showClear();\n  if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));\n\n  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1\u20134 pick a kind from the keyboard and\n  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.\n  const pop = document.createElement('div');\n  pop.className = 'am-remark-pop';\n  pop.hidden = true;\n  pop.setAttribute('role', 'dialog');\n  pop.setAttribute('aria-label', ui.button);\n  document.body.append(pop);\n  let opener = null;\n  let anchor = null;\n  let keepDraft = null;\n  const close = (restoreFocus) => {\n    if (pop.hidden) return;\n    keepDraft?.();\n    keepDraft = null;\n    pop.hidden = true;\n    if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();\n  };\n  const place = () => {\n    const rect = anchor.getBoundingClientRect();\n    const rtl = getComputedStyle(document.documentElement).direction === 'rtl';\n    const x = rtl ? rect.right - pop.offsetWidth : rect.left;\n    // Under the block; a block taller than the window gets the popover at the bottom of the window instead.\n    const y = Math.min(rect.bottom + 6, window.innerHeight - pop.offsetHeight - 8);\n    pop.style.left = `${window.scrollX + Math.min(Math.max(8, x), window.innerWidth - pop.offsetWidth - 8)}px`;\n    pop.style.top = `${window.scrollY + Math.max(8, y)}px`;\n  };\n  const make = (tag, props) => Object.assign(document.createElement(tag), props);\n  const open = (el) => {\n    const key = keyMap().get(el);\n    const mark = marks.get(key);\n    const draft = drafts.get(key);\n    let kind = draft?.kind ?? mark?.kind ?? '';\n    opener = document.activeElement;\n    anchor = el;\n\n    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });\n    note.setAttribute('aria-label', ui.hint);\n    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });\n    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });\n    keepDraft = () => {\n      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });\n      else drafts.delete(key);\n      showClear();\n    };\n    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };\n    keep.addEventListener('click', () => {\n      done();\n      const saved = { key, kind, note: note.value.trim() };\n      marks.set(key, saved);\n      save();\n      paint(el, saved);\n      close(true);\n    });\n    const actions = make('div', { className: 'am-remark-actions' });\n    actions.append(keep);\n    if (mark) {\n      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });\n      drop.addEventListener('click', () => {\n        done();\n        marks.delete(key);\n        save();\n        unpaint(el);\n        close(true);\n      });\n      actions.append(drop);\n    }\n    const choose = (k) => {\n      kind = k;\n      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));\n      keep.disabled = false;\n      need.hidden = true;\n    };\n    const kindBtns = KINDS.map((k, i) => {\n      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });\n      kb.dataset.kind = k;\n      kb.dataset.n = i + 1;\n      kb.setAttribute('aria-pressed', String(k === kind));\n      kb.addEventListener('click', () => choose(k));\n      return kb;\n    });\n    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind\n    // only while the focus is outside the note.\n    pop.onkeydown = (e) => {\n      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {\n        e.preventDefault();\n        if (!keep.disabled) keep.click();\n        return;\n      }\n      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;\n      e.preventDefault();\n      choose(KINDS[Number(e.key) - 1]);\n      note.focus();\n    };\n    actions.append(need);\n    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);\n    pop.firstChild.append(...kindBtns);\n    pop.hidden = false;\n    place();\n    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });\n  };\n\n  // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.\n  // The block under the pointer gets an outline: the same blockAt decides what is outlined and what a click picks.\n  let hover = null;\n  const track = (e) => {\n    const el = e.type === 'mouseout' && e.relatedTarget === null ? null : blockAt(e.target);\n    if (el === hover) return;\n    hover?.classList.remove('am-remark-hover');\n    hover = el;\n    hover?.classList.add('am-remark-hover');\n  };\n  const pick = (e) => {\n    const el = blockAt(e.target);\n    if (el) open(el);\n  };\n  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block\n  // that already had a tabindex keeps it; only the ones the mode added lose it again.\n  const pickKey = (e) => {\n    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;\n    e.preventDefault();\n    open(e.target);\n  };\n  const focusable = (on) => {\n    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys\n    for (const el of keyMap().keys()) {\n      if (on && !el.hasAttribute('tabindex')) {\n        el.tabIndex = 0;\n        el.setAttribute('data-am-pick', '');\n      } else if (!on && el.hasAttribute('data-am-pick')) {\n        el.removeAttribute('tabindex');\n        el.removeAttribute('data-am-pick');\n      }\n    }\n  };\n  const setMode = (on) => {\n    btn.classList.toggle('is-on', on);\n    btn.setAttribute('aria-pressed', String(on));\n    const toggle = on ? 'addEventListener' : 'removeEventListener';\n    document.body[toggle]('click', pick);\n    document.body[toggle]('mouseover', track);\n    document.body[toggle]('mouseout', track);\n    document.body[toggle]('keydown', pickKey);\n    focusable(on);\n    if (!on) {\n      track({ type: 'mouseout', relatedTarget: null });\n      close(false);\n    }\n  };\n  btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));\n  document.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape') close(true);\n  });\n  // A click outside the popover closes it; the same click may then start another mark.\n  document.addEventListener('click', (e) => {\n    if (!pop.hidden && !pop.contains(e.target)) close(false);\n  }, true);\n  setMode(false);\n\n  // What the Reply button reads: the marked blocks that are on the page, in page order.\n  window.__amRemarkData = () => {\n    if (!marks.size) return [];\n    const live = [];\n    for (const [el, key] of keyMap()) {\n      const mark = marks.get(key);\n      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });\n    }\n    return live;\n  };\n})();\n})();\n(() => {\n// Pure planner for justified (\"photo wall\") rows on sheet pages. No DOM access.\n//\n// This file must stay inlinable into the page script: top-level declarations only, no imports, and the exports are\n// `planLayout` and the constants the DOM adapter shares (STEP, MAX_SCALE, MIN_SCALE). The page build strips the `export ` keyword,\n// and test/layout-plan.test.js checks that this still works.\n//\n// planLayout({ width, gap, cols, panels }) -> { rows: [{ columns: [{ panels: [index, ...], width }], height }] }\n//\n// Input (all lengths in px):\n//   width   container width\n//   gap     space between columns, and between two panels stacked in one column\n//   cols    most columns in one row (the planner never uses more than MAX_COLUMNS, but spans stay shares of `cols`)\n//   panels  one entry per panel, in reading order:\n//     samples   [{ w, h }] panel height at sampled widths, ascending by w (heights between samples are interpolated)\n//     minWidth  narrowest feasible width (clamped to `width`)\n//     maxWidth  widest useful width; beyond it the panel only gains empty space (default: no limit)\n//     natural   natural diagram width for a diagram-only panel (default: none)\n//     pad       panel width not used by the diagram (padding and border; default 0)\n//     span      the author's width hint in grid columns (default 1); span >= cols keeps the panel alone in its row\n//\n// Output: { rows, maxScale }. Rows are in reading order; a row is a list of columns (at most `cols`); a column holds one panel or two\n// consecutive panels, stacked. For integer inputs the column widths plus the gaps between them equal `width`.\n// Rows are chosen by dynamic programming over break points; widths by a search in STEP px steps. Cost per row:\n//   H = tallest column; waste = sum((H - columnHeight) * columnWidth) + sum over diagrams wider than maxWidth of (w - maxWidth) * h\n//   dev = sum(((w - preferred) / oneColumn)^2) + SCALE_WEIGHT * sum over diagrams of (ln(scale) / ln(MAX_SCALE))^2\n//   cost = waste / 1000 + PREF_WEIGHT * dev * H\n// Scale band: diagrams on one page stay at similar sizes. With the result's `maxScale` as the diagram size limit, a diagram is\n// shown at scale min(maxScale, (width - pad) / natural). The planner tries a few bands [lo, lo * BAND_RATIO] (lo in BAND_LOS) and\n// keeps the cheapest plan in which no diagram is narrower than scale lo and none is shown above the band's top, so the largest and\n// smallest diagram scale on the page differ by at most BAND_RATIO. A panel wider than its diagram's top size keeps the diagram at\n// that size, and the page script must set the diagram's max-width to natural * maxScale. The band starts no higher than the\n// largest scale the page allows the least roomy diagram, so one wide diagram lowers the band for the others.\n// If no band is feasible the plan is made without a band (maxScale = MAX_SCALE); if no plan fits (or the input is unusable) the\n// result is a single column: one panel per row at the full width.\n\nconst STEP = 10;\nconst MAX_SCALE = 1.25;\nconst MIN_SCALE = 0.75; // the narrowest a diagram is shown, as a share of its natural width\nconst MAX_COLUMNS = 6; // rows with more columns are unreadable, and the search grows steeply with the column count\nconst BAND_RATIO = 1.25; // the largest and smallest diagram scale on a page differ by at most this\nconst BAND_LOS = [MIN_SCALE, 0.85, 0.95, 1]; // lower ends tried for the band; lo * BAND_RATIO is the upper end (1.25 means no upper limit)\nconst SCALE_WEIGHT = 3;\nconst PREF_WEIGHT = 0.15;\n\nfunction heightAt(samples, w) {\n  const i = samples.findIndex((s) => s.w >= w);\n  if (i === -1) return samples[samples.length - 1].h;\n  if (i === 0) return samples[0].h;\n  const a = samples[i - 1];\n  const b = samples[i];\n  return a.h + ((b.h - a.h) * (w - a.w)) / (b.w - a.w);\n}\n\n// Every way to split `len` consecutive panels into columns of 1 or 2 panels, as lists of column sizes.\nfunction splits(len) {\n  if (len === 0) return [[]];\n  return [1, 2].filter((k) => k <= len).flatMap((k) => splits(len - k).map((rest) => [k, ...rest]));\n}\n\nfunction singleColumn(width, panels) {\n  return { rows: panels.map((_, i) => ({ columns: [{ panels: [i], width }], height: 0 })) };\n}\n\nfunction planLayout({ width, gap = 0, cols = 3, panels }) {\n  const usable = Number.isFinite(width) && width > 0 && panels.every((p) => Array.isArray(p.samples) && p.samples.length > 0);\n  if (!usable) return singleColumn(width, panels);\n\n  // `cols` stays the unit of the author's spans; no row gets more than MAX_COLUMNS columns however large `cols` is.\n  const maxColumns = Math.min(cols, MAX_COLUMNS);\n  const oneColumn = Math.max(1, (width - gap * (cols - 1)) / cols);\n  // Per-panel limits. With a band [lo, lo * BAND_RATIO], a diagram is no narrower than scale lo and shown at most at the top of the\n  // band: a wider panel keeps it at that size and gains empty space, which the cost counts as waste.\n  const prepare = (lo) => panels.map((p) => {\n    const pad = p.pad ?? 0;\n    const diagram = lo > 0 && p.natural > 0;\n    const scaleCap = diagram ? Math.min(MAX_SCALE, lo * BAND_RATIO) : MAX_SCALE;\n    return {\n      ...p,\n      minWidth: Math.min(width, Math.max(Math.ceil(p.minWidth || 0), diagram ? Math.ceil(p.natural * lo + pad) : 0)),\n      maxWidth: Math.min(p.maxWidth ?? Infinity, diagram ? p.natural * scaleCap + pad : Infinity),\n      scaleCap,\n      pad,\n      preferred: Math.min(width, (p.span ?? 1) * oneColumn + ((p.span ?? 1) - 1) * gap),\n      alone: (p.span ?? 1) >= cols,\n    };\n  });\n  let info = prepare(0);\n  // Beyond its maxWidth a panel only gains empty space, so its height stops changing there (matters when a band lowers maxWidth).\n  const heightOf = (p, w) => heightAt(p.samples, Math.min(w, p.maxWidth));\n  const columnHeight = (col, w) => col.reduce((h, k) => h + heightOf(info[k], w), 0) + gap * (col.length - 1);\n\n  function bestColumns(columns) {\n    const avail = width - gap * (columns.length - 1);\n    const mins = columns.map((c) => Math.max(...c.map((k) => info[k].minWidth)));\n    const minsFrom = mins.map((_, n) => mins.slice(n).reduce((s, w) => s + w, 0));\n    if (minsFrom[0] > avail) return null;\n    let best = null;\n    const evaluate = (ws) => {\n      const hs = ws.map((w, n) => columnHeight(columns[n], w));\n      const H = Math.max(...hs);\n      let waste = 0;\n      let dev = 0;\n      ws.forEach((w, n) => {\n        waste += (H - hs[n]) * w;\n        for (const k of columns[n]) {\n          const p = info[k];\n          if (w > p.maxWidth) waste += (w - p.maxWidth) * heightOf(p, w);\n          dev += ((w - p.preferred) / oneColumn) ** 2;\n          if (p.natural > 0) {\n            const scale = Math.min(p.scaleCap, Math.max(w - p.pad, 1) / p.natural);\n            dev += SCALE_WEIGHT * (Math.log(scale) / Math.log(MAX_SCALE)) ** 2;\n          }\n        }\n      });\n      const cost = waste / 1000 + PREF_WEIGHT * dev * H;\n      if (!best || cost < best.cost) best = { cost, ws, height: H, columns };\n    };\n    const choose = (n, used, ws) => {\n      if (n === columns.length - 1) {\n        const w = avail - used;\n        if (w >= mins[n]) evaluate([...ws, w]);\n        return;\n      }\n      for (let w = mins[n]; used + w + minsFrom[n + 1] <= avail; w += STEP) choose(n + 1, used + w, [...ws, w]);\n    };\n    choose(0, 0, []);\n    return best;\n  }\n\n  // Best columns for one row of panels i..j.\n  function bestRow(i, j) {\n    if (j > i && info.slice(i, j + 1).some((p) => p.alone)) return null;\n    let best = null;\n    for (const split of splits(j - i + 1)) {\n      if (split.length > maxColumns) continue;\n      let next = i;\n      const columns = split.map((size) => Array.from({ length: size }, () => next++));\n      const r = bestColumns(columns);\n      if (r && (!best || r.cost < best.cost)) best = r;\n    }\n    return best;\n  }\n\n  // Row breaks in reading order, for the band set up in `info`. A row holds at most 2 * maxColumns panels. Null if nothing fits.\n  function solve() {\n    const n = panels.length;\n    const total = Array(n + 1).fill(Infinity);\n    const from = Array(n + 1).fill(-1);\n    const chosen = Array(n + 1).fill(null);\n    total[0] = 0;\n    for (let j = 1; j <= n; j++) {\n      for (let i = Math.max(0, j - 2 * maxColumns); i < j; i++) {\n        if (total[i] === Infinity) continue;\n        const r = bestRow(i, j - 1);\n        if (r && total[i] + r.cost < total[j]) {\n          total[j] = total[i] + r.cost;\n          from[j] = i;\n          chosen[j] = r;\n        }\n      }\n    }\n    if (total[n] === Infinity) return null;\n    const rows = [];\n    for (let j = n; j > 0; j = from[j]) {\n      const r = chosen[j];\n      rows.unshift({ columns: r.columns.map((panelsInColumn, c) => ({ panels: panelsInColumn, width: r.ws[c] })), height: r.height });\n    }\n    return { rows, cost: total[n] };\n  }\n\n  let best = null;\n  const diagrams = panels.filter((p) => p.natural > 0);\n  if (diagrams.length > 1) {\n    // No diagram can be shown larger than the page allows, so the band cannot start above the smallest of those limits.\n    const reach = Math.min(...diagrams.map((p) => Math.min(MAX_SCALE, Math.max(width - (p.pad ?? 0), 1) / p.natural)));\n    for (const lo of new Set([...BAND_LOS.filter((x) => x < reach), reach])) {\n      info = prepare(lo);\n      const r = solve();\n      if (r && (!best || r.cost < best.cost)) best = { ...r, maxScale: Math.min(MAX_SCALE, lo * BAND_RATIO) };\n    }\n    info = prepare(0);\n  }\n  best ??= solve();\n  return best ? { rows: best.rows, maxScale: best.maxScale ?? MAX_SCALE } : singleColumn(width, panels);\n}\n\n// DOM adapter for the sheet's justified (\"photo wall\") layout. Not a module: compose.js puts it after src/runtime/layout-plan.js\n// (which defines planLayout and the shared STEP, MAX_SCALE, MIN_SCALE) inside one function scope of the page script.\n//\n// It measures every panel at sampled widths, asks planLayout for rows and column widths, and applies them with flexbox.\n// The rendered HTML keeps the plain CSS grid: with JavaScript off, at the single-column breakpoint, or while printing, the grid is what\n// shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.\n\n// A diagram is never drawn under MIN_SCALE of its natural width, the floor the planner keeps: below it the text is too small to read,\n// so its figure scrolls sideways instead. This covers what the planner does not size: the plain grid, a phone, a one-panel page and a\n// panel that holds more than the diagram. The svg width follows the reader's text size (page.js), so the floor follows am-scale;\n// restore() puts it back after resetting the inline styles. Printing drops it (base.css).\nconst floorDiagrams = () => {\n  for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg')) {\n    const width = Number(svg.getAttribute('width'));\n    if (width > 0) svg.style.minWidth = `${Math.floor(width * MIN_SCALE)}px`;\n  }\n};\nfloorDiagrams();\naddEventListener('am-scale', floorDiagrams);\n\nconst grid = document.querySelector('.am-grid');\nconst panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];\n\nif (panels.length > 1) {\n  const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css\n  const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns\n  const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples\n  // The width floors are text sizes (px at scale 1). They take the page scale on every pass, so a runtime change of --am-scale re-plans.\n  const TEXT_MIN = 260; // text keeps at least about 16 CJK characters per line\n  const TABLE_COL_MIN = 96; // per table column, px\n  const TABLE_COL_COMFORT = 220; // a table column this wide reads three or four words per line\n  const TABLE_WORD_MAX = 160; // a longer word (an id, a path) counts as this wide and may break inside its cell when room is short\n  const KV_COL_MIN = 120; // per key-value column, px: a value of two short words stays on one line\n  const DIAGRAM_MIN = 160;\n  const RESIZE_DELAY = 150;\n  const pageScale = () => {\n    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--am-scale'));\n    return Number.isFinite(scale) && scale > 0 ? scale : 1;\n  };\n  const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';\n\n  // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.\n  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];\n  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];\n  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));\n  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));\n\n  // Back to the plain grid markup and styles.\n  const restore = () => {\n    for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);\n    for (const el of original.keys()) restoreStyle(el);\n    for (const table of tables) table.classList.remove('am-table-fit');\n    floorDiagrams();\n  };\n\n  // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback\n  // and may hold spans the server added, so it is never read here.\n  const spanHint = (el) => Number(el.dataset.span) || 1;\n  const diagramOnly = (el) => {\n    const body = el.querySelector(':scope > .am-panel-body');\n    return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;\n  };\n  const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;\n\n  // The width each column of a table reads well at: its natural width, but no wider than TABLE_COL_COMFORT unless its longest word\n  // needs more. Below it the cells wrap one word per line, so a panel with a table is not planned narrower than the sum, and\n  // fitTables() keeps each column at its share (the browser would otherwise give the room to the longest column).\n  // A column's floor is its longest word, but no more than TABLE_WORD_MAX: a long id would otherwise hold its column at full width and\n  // leave a prose column one word per line. fitTables() lets such a word break (am-table-fit) when the table is short of room.\n  const columnWidths = new Map();\n  function comfortableWidth(table, scale) {\n    const saved = table.getAttribute('style');\n    const columns = (width) => {\n      table.style.width = width;\n      return headCells(table).map((cell) => cell.getBoundingClientRect().width);\n    };\n    const most = columns('max-content');\n    const unbroken = columns('min-content');\n    const least = unbroken.map((w) => Math.min(w, TABLE_WORD_MAX * scale));\n    if (saved === null) table.removeAttribute('style');\n    else table.setAttribute('style', saved);\n    // A max-content column comes out a fraction under its text in Chrome, enough to wrap the last word, so it gets one pixel more.\n    const want = most.map((w, i) => Math.min(Math.ceil(w) + 1, Math.max(least[i], TABLE_COL_COMFORT * scale)));\n    // unbroken: each column's longest word. A column the browser lays out is at least that wide, whatever its min-width, so\n    // fitTables() turns am-table-fit on when the columns would not fit at those widths, even if the capped widths do.\n    columnWidths.set(table, { least, want, unbroken });\n    return want.reduce((sum, w) => sum + w, 0);\n  }\n\n  // After the layout: each column gets at least its comfortable width, scaled down toward its longest word when the panel came out\n  // narrower than planned (a page narrower than the table), so a table scrolls sideways only when even its longest words do not fit.\n  function fitTables() {\n    for (const [table, { least, want, unbroken }] of columnWidths) {\n      // Each width is rounded up to a whole pixel (a column a fraction too narrow wraps its last word), so keep a pixel per column spare.\n      const room = table.parentElement.clientWidth - want.length;\n      const low = least.reduce((s, w) => s + w, 0);\n      const high = want.reduce((s, w) => s + w, 0);\n      const k = high > room ? Math.max(0, (room - low) / (high - low || 1)) : 1;\n      const widths = want.map((w, i) => Math.ceil(least[i] + (w - least[i]) * k));\n      headCells(table).forEach((cell, i) => { cell.style.minWidth = `${widths[i]}px`; });\n      // Without am-table-fit a column holds its longest word, so a long id can widen the table past the room the widths left.\n      const whole = widths.reduce((s, w, i) => s + Math.max(w, unbroken[i]), 0);\n      table.classList.toggle('am-table-fit', high > room || whole > room);\n    }\n  }\n\n  // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.\n  // Only one panel is displayed while it is measured, so each width change lays out that panel alone.\n  function measure(width) {\n    const scale = pageScale();\n    grid.style.display = 'block';\n    for (const el of panels) {\n      el.style.display = 'none';\n      el.style.boxSizing = 'border-box';\n      for (const svg of el.querySelectorAll('.am-diagram > svg')) {\n        svg.style.width = '100%';\n        svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;\n      }\n    }\n    const info = panels.map((el) => {\n      const svg = diagramOnly(el);\n      const svgs = [...el.querySelectorAll('.am-diagram > svg')];\n      const scrollers = el.querySelectorAll(OVERFLOWING);\n      const tableCols = Math.max(0, ...[...el.querySelectorAll('table tr:first-child')].map((tr) => tr.children.length));\n      el.style.display = '';\n      el.style.width = `${width}px`;\n      const pad = svg ? el.offsetWidth - svg.parentElement.clientWidth : 0;\n      const natural = svg ? naturalWidth(svg) : 0;\n      const shrunk = Math.max(0, ...svgs.map((s) => naturalWidth(s) * MIN_SCALE)) + (svg ? pad : 34);\n      const tableFloors = [...el.querySelectorAll('.am-table-wrap > table')].map((t) => comfortableWidth(t, scale) + el.offsetWidth - t.parentElement.clientWidth);\n      // A key-value grid gets the same care: the room a table gains must not squeeze a neighbouring grid to one word per line.\n      const kvs = [...el.querySelectorAll('.am-kv')].map((kv) => (Number(kv.style.getPropertyValue('--kv-cols')) || 1) * KV_COL_MIN * scale + el.offsetWidth - kv.clientWidth);\n      const floor = svg ? Math.max(DIAGRAM_MIN * scale, natural * MIN_SCALE + pad) : Math.max(TEXT_MIN * scale, shrunk, tableCols * TABLE_COL_MIN * scale + 34, ...tableFloors, ...kvs);\n      const from = Math.min(width, Math.floor(floor / STEP) * STEP);\n      const samples = [];\n      let fits = null;\n      for (let w = from; ; w += SAMPLE_STEP) {\n        w = Math.min(w, width);\n        el.style.width = `${w}px`;\n        if (fits === null && !svg && scrollers.length && ![...scrollers].some((s) => s.scrollWidth > s.clientWidth + 1)) fits = w;\n        samples.push({ w, h: el.offsetHeight });\n        if (w === width) break;\n      }\n      el.style.display = 'none';\n      return {\n        samples,\n        minWidth: svg ? floor : Math.max(floor, fits ?? (scrollers.length ? width : 0)),\n        maxWidth: svg ? natural * MAX_SCALE + pad : Infinity,\n        natural,\n        pad,\n        span: spanHint(el),\n      };\n    });\n    for (const el of panels) {\n      el.style.display = '';\n      el.style.width = '';\n    }\n    return info;\n  }\n\n  // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.\n  // Stacked panels go into a column wrapper whose last panel absorbs the extra height.\n  function apply(plan, gap) {\n    grid.style.display = 'flex';\n    grid.style.flexWrap = 'wrap';\n    grid.style.alignItems = 'stretch';\n    grid.style.gap = `${gap}px`;\n    for (const el of panels) {\n      el.style.gridColumn = '';\n      el.style.gridRow = '';\n      el.style.flex = '0 0 auto';\n    }\n    for (const row of plan.rows) {\n      for (const col of row.columns) {\n        const width = `${col.width}px`;\n        if (col.panels.length === 1) {\n          panels[col.panels[0]].style.width = width;\n          continue;\n        }\n        const box = document.createElement('div');\n        box.className = 'am-col';\n        box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;\n        panels[col.panels[0]].before(box);\n        for (const k of col.panels) {\n          panels[k].style.width = '';\n          box.append(panels[k]);\n        }\n        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';\n      }\n    }\n  }\n\n  // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.\n  function capDiagrams(maxScale) {\n    for (const el of panels) {\n      const svg = diagramOnly(el);\n      if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;\n    }\n  }\n\n  const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);\n\n  function justify() {\n    if (printing || printQuery.matches) return;\n    try {\n      // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.\n      // A later pass plans for the width the previous layout left, not the grid's: restoring the grid first would bring back the\n      // grid's scrollbar, so a page whose grid scrolls and whose rows do not (or the reverse) would never settle.\n      let planned = -1;\n      let laidOut = NaN;\n      for (let pass = 0; pass < 3 && planned !== laidOut; pass++) {\n        restore();\n        if (matchMedia(SINGLE_COLUMN).matches) return;\n        planned = pass === 0 ? containerWidth() : laidOut;\n        const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;\n        const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);\n        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });\n        apply(plan, gap);\n        capDiagrams(plan.maxScale);\n        fitTables();\n        laidOut = containerWidth();\n      }\n      // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.\n      if (planned !== laidOut) restore();\n    } catch {\n      restore();\n    }\n  }\n\n  // Printing: back to the plain grid (spans and all), and the layout again afterwards. Browsers disagree on which of the\n  // `beforeprint` event and the print media query change fires first, or at all, so listen to both; both are idempotent.\n  // While `printing` is set (beforeprint to afterprint) justify() does nothing, so a late resize cannot bring flex widths into the print layout.\n  let printing = false;\n  const printQuery = matchMedia('print');\n  let timer = 0;\n  const later = () => {\n    clearTimeout(timer);\n    timer = setTimeout(justify, RESIZE_DELAY);\n  };\n  const toPrint = () => {\n    clearTimeout(timer);\n    restore();\n  };\n  justify();\n  addEventListener('resize', later);\n  // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.\n  addEventListener('am-scale', later);\n  addEventListener('beforeprint', () => {\n    printing = true;\n    toPrint();\n  });\n  addEventListener('afterprint', () => {\n    printing = false;\n    later();\n  });\n  printQuery.addEventListener('change', (e) => (e.matches ? toPrint() : later()));\n  // Late changes to panel heights: web fonts arriving, and images inside the grid finishing their load (load does not bubble, so capture it).\n  document.fonts?.ready.then(later);\n  grid.addEventListener('load', later, true);\n  // Switching theme changes paddings and fonts, hence panel heights.\n  document.querySelector('[data-am=\"theme\"]')?.addEventListener('click', later);\n}\n})();\n// The outline rail of a doc page (src/templates/doc.js): the markup already works without a script, <details> opens the list and the\n// links jump. This adds the hover dwell, the open direction, the keys, the tap outside and the marking of the current section.\n(() => {\n  const nav = document.querySelector('nav.am-toc');\n  const box = nav && nav.querySelector('details.am-outline');\n  if (!box) return;\n  const sum = box.querySelector('summary');\n  const links = Array.from(box.querySelectorAll('.am-outline-list a'));\n  const ticks = Array.from(box.querySelectorAll('.am-tick'));\n  const LIST_W = 240; // keep in step with .am-outline-list in src/themes/base.css\n  const EDGE = 10; // the 6px gap to the rail plus a margin to the viewport edge\n  let current = '';\n  let byHover = false;\n  let dwell = 0;\n  let leave = 0;\n\n  // Open away from the body when the room outside the rail fits the list; otherwise over the body. Never past the viewport.\n  const place = () => {\n    const r = sum.getBoundingClientRect();\n    const right = r.left + r.width / 2 > innerWidth / 2;\n    const room = right ? innerWidth - r.right : r.left;\n    nav.dataset.flow = room >= Math.min(LIST_W, innerWidth - 48) + EDGE ? 'out' : 'in';\n  };\n  const setOpen = (open) => {\n    if (open) place();\n    box.open = open;\n    if (!open) byHover = false;\n  };\n  const peek = (tick) => ticks.forEach((t) => t.classList.toggle('is-peek', t === tick));\n  const currentLink = () => links.find((a) => a.getAttribute('aria-current') === 'true') || links[0];\n\n  const mark = (id) => {\n    current = id;\n    ticks.forEach((t) => t.classList.toggle('is-current', t.dataset.id === id));\n    links.forEach((a) => {\n      if (a.getAttribute('href') === `#panel-${id}`) a.setAttribute('aria-current', 'true');\n      else a.removeAttribute('aria-current');\n    });\n  };\n  const sections = ticks.map((t) => document.getElementById(`panel-${t.dataset.id}`)).filter(Boolean);\n  if (sections.length) mark(sections[0].id.slice(6));\n  if (sections.length && 'IntersectionObserver' in window) {\n    // A thin band a third of the way down the viewport: the section across it is the one being read.\n    const seen = new Set();\n    const io = new IntersectionObserver((entries) => {\n      entries.forEach((e) => (e.isIntersecting ? seen.add(e.target) : seen.delete(e.target)));\n      const hit = sections.filter((s) => seen.has(s)).pop();\n      if (hit && hit.id.slice(6) !== current) mark(hit.id.slice(6));\n    }, { rootMargin: '-30% 0px -65% 0px' });\n    sections.forEach((s) => io.observe(s));\n  }\n\n  place();\n  addEventListener('resize', place);\n\n  // Mouse: dwelling on the rail opens the list, leaving it closes a list opened that way. A tap or click opens it for good.\n  box.addEventListener('pointerenter', (e) => {\n    clearTimeout(leave);\n    if (e.pointerType !== 'mouse' || box.open) return;\n    dwell = setTimeout(() => { setOpen(true); byHover = true; }, 300);\n  });\n  box.addEventListener('pointerleave', () => {\n    clearTimeout(dwell);\n    // A link the keyboard moved into keeps the list open; focusout closes it once the focus leaves the nav.\n    if (byHover) leave = setTimeout(() => { if (!nav.contains(document.activeElement)) setOpen(false); }, 250);\n  });\n  sum.addEventListener('click', (e) => {\n    clearTimeout(dwell);\n    if (box.open && byHover) { e.preventDefault(); byHover = false; return; }\n    place();\n  });\n  box.addEventListener('toggle', () => { if (box.open) peek(null); });\n\n  // Keyboard: the summary opens with Enter or Space (native); arrows move through the links; Esc closes and returns to the rail.\n  sum.addEventListener('focus', () => {\n    if (sum.matches(':focus-visible')) peek(ticks.find((t) => t.dataset.id === current));\n  });\n  sum.addEventListener('blur', () => peek(null));\n  nav.addEventListener('keydown', (e) => {\n    if (e.key === 'Escape' && box.open) {\n      e.preventDefault();\n      setOpen(false);\n      sum.focus();\n      return;\n    }\n    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;\n    const at = links.indexOf(document.activeElement);\n    if (at < 0 && e.target !== sum) return;\n    e.preventDefault();\n    if (!box.open) setOpen(true);\n    let next;\n    if (e.key === 'Home') next = links[0];\n    else if (e.key === 'End') next = links[links.length - 1];\n    else if (at < 0) next = e.key === 'ArrowDown' ? currentLink() : links[links.length - 1];\n    else next = links[Math.min(links.length - 1, Math.max(0, at + (e.key === 'ArrowDown' ? 1 : -1)))];\n    next.focus();\n  });\n  nav.addEventListener('focusout', (e) => {\n    if (box.open && e.relatedTarget && !nav.contains(e.relatedTarget)) setOpen(false);\n  });\n\n  // Choosing a section or tapping outside closes the list.\n  links.forEach((a) => a.addEventListener('click', () => setOpen(false)));\n  document.addEventListener('pointerdown', (e) => { if (box.open && !nav.contains(e.target)) setOpen(false); });\n  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && box.open && !nav.contains(e.target)) setOpen(false); });\n})();\n\n// The toolbar's Export menu: Copy as image, Download PNG and Save as PDF. The menu is a native popover that src/render.js writes next to\n// the toolbar (a click on the button, Esc and a click outside open and close it with no script); this script shows the button, moves\n// focus with the arrow keys, says why an item cannot run, and does the work. A browser without popovers gets the same menu from a class\n// toggle instead of losing it.\n//\n// Copy and Download share one rasterizer. An item that cannot run is marked aria-disabled and carries the reason as its muted second\n// line (also its accessible description), never as the toolbar button's text: no rasterizer disables both; a preview frame whose feature\n// policy forbids clipboard-write, or a missing async Clipboard API / secure context, disables only Copy. Chromium and Firefox (as of\n// version 160) can rasterize the page; Safari and unknown browsers keep both items but carry a note that the effect is not guaranteed.\n// A refused copy reports a failure and never falls back to downloading. Save as PDF is the browser's print dialog and always works\n// (the page's print CSS hides the toolbar and the menu).\n//\n// Pipeline: clone the page body \u2192 inline every computed style (CSS variables are resolved there, so a clone keeps theme colours and\n// sizes) and the ::before / ::after decorations \u2192 wrap it in an SVG foreignObject \u2192 draw that image on a canvas \u2192 toBlob('image/png')\n// \u2192 navigator.clipboard.write(new ClipboardItem(...)), passing the blob as a promise so the write keeps the user's click activation,\n// or a download through <a download>.\n(() => {\n  const XHTML = 'http://www.w3.org/1999/xhtml';\n  const SVG = 'http://www.w3.org/2000/svg';\n  const MAX_DIM = 16384;        // Chrome refuses a canvas wider or taller than this\n  const MAX_AREA = 268435456;   // and one with more pixels than this (16384 * 16384)\n\n  const btn = document.querySelector('[data-am=\"export\"]');\n  const menu = document.getElementById('am-export');\n  if (!btn || !menu) return;\n  const main = document.querySelector('main.am-sheet, main.am-doc');\n  if (!main) return;\n  const items = [...menu.querySelectorAll('[data-export]')];\n  const item = (kind) => menu.querySelector(`[data-export=\"${kind}\"]`);\n  const [copyItem, downloadItem, pdfItem] = ['copy', 'download', 'pdf'].map(item);\n  const note = (el) => document.getElementById(el.getAttribute('aria-describedby'));\n  const text = menu.dataset;\n\n  const canRasterize = typeof XMLSerializer !== 'undefined' && typeof document.createElement('canvas').getContext === 'function';\n  const canCopy = window.isSecureContext && typeof ClipboardItem !== 'undefined' && typeof navigator.clipboard?.write === 'function';\n  // Chromium (including an embedded Chromium without navigator.userAgentData, whose UA still names Chrome/) and Firefox can rasterize\n  // the page. Safari and unknown browsers are not rejected outright: their items stay usable but carry a note that the effect is not\n  // guaranteed.\n  const brands = navigator.userAgentData?.brands;\n  const chromium = brands ? brands.some((b) => /Chromium/.test(b.brand)) : /\\bChrome\\//.test(navigator.userAgent);\n  const gecko = /\\bFirefox\\//.test(navigator.userAgent);\n  const native = Object.hasOwn(HTMLElement.prototype, 'popover') && typeof menu.showPopover === 'function';\n  btn.hidden = false;\n\n  const idle = btn.textContent;\n  // The button keeps its name (\"Export\") while its text shows progress, so a screen reader hears each result through a hidden live\n  // region beside it. aria-live, not\n  // role=\"status\": the live-update notice owns role=\"status\" (src/runtime/page.js), and the two must stay apart.\n  const status = document.createElement('span');\n  status.setAttribute('aria-live', 'polite');\n  status.dataset.am = 'export-status';\n  status.className = 'am-visually-hidden';\n  btn.after(status);\n  btn.setAttribute('aria-label', idle);\n  // Short feedback on the button itself, restored after a moment; the live region carries the same words.\n  const say = (message, restore) => {\n    btn.textContent = message;\n    status.textContent = message;\n    clearTimeout(say.timer);\n    if (restore) say.timer = setTimeout(() => { btn.textContent = idle; }, 1800);\n  };\n\n  // An item that can never run here (aria-disabled, reason as its second line), in the order of the conditions the page can act on.\n  const unavailable = new Map();\n  if (!canRasterize) {\n    unavailable.set(copyItem, text.unavailableBrowser);\n    unavailable.set(downloadItem, text.unavailableBrowser);\n  } else {\n    if (document.featurePolicy && document.featurePolicy.allowsFeature('clipboard-write') === false) unavailable.set(copyItem, text.unavailablePolicy);\n    else if (!canCopy) unavailable.set(copyItem, text.unavailableClipboard);\n    // Safari and unknown browsers can draw the page often enough to keep the items, but the result is not guaranteed.\n    if (!chromium && !gecko) for (const el of [copyItem, downloadItem]) if (!unavailable.has(el)) note(el).textContent = text.unverifiedEffect;\n  }\n  for (const [el, reason] of unavailable) note(el).textContent = reason;\n\n  // A running export blocks the next copy or download (a second full-page rasterization beside the first); Save as PDF stays free.\n  let busy = false;\n  const sync = () => {\n    for (const el of items) {\n      const off = unavailable.has(el) || (busy && el !== pdfItem);\n      if (off) el.setAttribute('aria-disabled', 'true');\n      else el.removeAttribute('aria-disabled');\n    }\n    if (busy) btn.setAttribute('aria-busy', 'true');\n    else btn.removeAttribute('aria-busy');\n  };\n  sync();\n\n  // A stylesheet of only the local font declarations, so a font a theme embeds still draws inside the SVG.\n  const fontFaceCss = () => {\n    let css = '';\n    for (const sheet of document.styleSheets) {\n      let rules;\n      try { rules = sheet.cssRules; } catch { continue; } // a cross-origin sheet has no readable rules; pages never carry one\n      for (const rule of rules) {\n        if (rule.type === 5 /* CSSRule.FONT_FACE_RULE */) css += `${rule.cssText}\\n`;\n      }\n    }\n    return css;\n  };\n\n  // Copy every computed declaration of src onto dst. The clone then needs no page stylesheet: var() is already resolved.\n  const inlineStyle = (src, dst) => {\n    const cs = getComputedStyle(src);\n    let css = '';\n    for (let i = 0; i < cs.length; i++) {\n      const name = cs[i];\n      const value = cs.getPropertyValue(name);\n      if (value) css += `${name}:${value};`;\n    }\n    dst.style.cssText = css;\n  };\n\n  // A ::before / ::after box exists only while the rule applies, so copy its computed declarations into a rule of its own. Each element\n  // that has one gets a data-cp marker; the marker keeps the rule from touching any other node in the picture.\n  let cpSeq = 0;\n  const pseudoRule = (src, dst, pseudo) => {\n    const cs = getComputedStyle(src, pseudo);\n    const content = cs.getPropertyValue('content');\n    if (!content || content === 'none' || content === 'normal') return '';\n    let css = '';\n    for (let i = 0; i < cs.length; i++) {\n      const name = cs[i];\n      const value = cs.getPropertyValue(name);\n      if (value) css += `${name}:${value};`;\n    }\n    if (!css) return '';\n    const mark = dst.getAttribute('data-cp') ?? String(++cpSeq);\n    dst.setAttribute('data-cp', mark);\n    return `[data-cp=\"${mark}\"]${pseudo}{${css}}\\n`;\n  };\n\n  // The page's chrome means nothing in a picture: remove the controls and the navigational rail from the clone.\n  const CHROME = '.am-code-copy, .am-diagram-expand, .am-table-controls, [class*=\"delta-switch\"], .am-toc, .am-remark-hover, .am-mark-note';\n\n  function buildSvg(width, height) {\n    const clone = main.cloneNode(true);\n    // The clone has the same node order as the original, so one index walks both trees.\n    const srcNodes = [main, ...main.querySelectorAll('*')];\n    const dstNodes = [clone, ...clone.querySelectorAll('*')];\n    for (let i = 0; i < srcNodes.length; i++) {\n      inlineStyle(srcNodes[i], dstNodes[i]);\n    }\n    let pseudoCss = '';\n    for (let i = 0; i < srcNodes.length; i++) {\n      pseudoCss += pseudoRule(srcNodes[i], dstNodes[i], '::before');\n      pseudoCss += pseudoRule(srcNodes[i], dstNodes[i], '::after');\n    }\n    for (const node of clone.querySelectorAll(CHROME)) node.remove();\n    // A rasterized image is a static snapshot, not a scrollable viewport. Inlined computed styles turn auto heights\n    // into fixed fractional heights on scrolling containers (.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre),\n    // and subpixel rounding inside the foreignObject can trigger unwanted scrollbars. Reset unconstrained containers to visible and auto.\n    // For containers with an author-specified finite max-height, keep inlined height and max-height, and hide overflow.\n    for (const scroller of clone.querySelectorAll('.am-table-wrap, .am-diagram, .am-annot-scroll, .am-math-block, pre')) {\n      const maxH = parseFloat(scroller.style.maxHeight || scroller.style.getPropertyValue('max-height'));\n      if (Number.isFinite(maxH) && maxH >= 0) {\n        scroller.style.setProperty('overflow', 'hidden', 'important');\n      } else {\n        scroller.style.setProperty('overflow', 'visible', 'important');\n        scroller.style.setProperty('height', 'auto', 'important');\n        scroller.style.setProperty('max-height', 'none', 'important');\n      }\n    }\n    clone.style.margin = '0';\n    clone.style.width = `${width}px`;\n    clone.style.maxWidth = 'none';\n\n    const wrap = document.createElementNS(XHTML, 'div');\n    wrap.setAttribute('xmlns', XHTML);\n    const body = getComputedStyle(document.body);\n    wrap.style.cssText = `width:${width}px;height:${height}px;margin:0;padding:0;box-sizing:border-box;color:${body.color};font-family:${body.fontFamily};font-size:${body.fontSize};line-height:${body.lineHeight};background-color:${body.backgroundColor};background-image:${body.backgroundImage};`;\n\n    const style = document.createElementNS(XHTML, 'style');\n    style.textContent = `${fontFaceCss()}\\n${pseudoCss}`;\n    wrap.append(style, clone);\n\n    const svg = document.createElementNS(SVG, 'svg');\n    svg.setAttribute('xmlns', SVG);\n    svg.setAttribute('width', String(width));\n    svg.setAttribute('height', String(height));\n    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);\n    const foreign = document.createElementNS(SVG, 'foreignObject');\n    foreign.setAttribute('x', '0');\n    foreign.setAttribute('y', '0');\n    foreign.setAttribute('width', String(width));\n    foreign.setAttribute('height', String(height));\n    foreign.append(wrap);\n    svg.append(foreign);\n    return new XMLSerializer().serializeToString(svg);\n  }\n\n  // A canvas may not exceed the browser's dimension or area limit: shrink the pixels rather than fail on a long page. No lower bound:\n  // one would let a very long page exceed the limits again.\n  const pixelScale = (width, height) => {\n    const wanted = Math.min(2, window.devicePixelRatio || 1);\n    return Math.min(wanted, MAX_DIM / width, MAX_DIM / height, Math.sqrt(MAX_AREA / (width * height)));\n  };\n\n  async function rasterize() {\n    await document.fonts?.ready;\n    const rect = main.getBoundingClientRect();\n    const width = Math.max(1, Math.ceil(Math.max(rect.width, main.scrollWidth)));\n    const height = Math.max(1, Math.ceil(Math.max(rect.height, main.scrollHeight)));\n    const svg = buildSvg(width, height);\n    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;\n    const image = new Image();\n    image.decoding = 'async';\n    await new Promise((resolve, reject) => {\n      image.onload = resolve;\n      image.onerror = () => reject(new Error('the browser cannot draw the page as an SVG image'));\n      image.src = url;\n    });\n    const scale = pixelScale(width, height);\n    const canvas = document.createElement('canvas');\n    canvas.width = Math.max(1, Math.round(width * scale));\n    canvas.height = Math.max(1, Math.round(height * scale));\n    const ctx = canvas.getContext('2d');\n    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);\n    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));\n    if (!blob) throw new Error('the browser could not encode the image');\n    return blob;\n  }\n\n  // The PNG is saved under the page title (letters and digits of any script, joined by dashes).\n  const fileName = () => {\n    const slug = (document.title || '').toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, '-').slice(0, 40).replace(/^-+|-+$/g, '');\n    return `${slug || 'page'}.png`;\n  };\n  const download = (blob) => {\n    const link = document.createElement('a');\n    link.href = URL.createObjectURL(blob);\n    link.download = fileName();\n    document.body.append(link);\n    link.click();\n    link.remove();\n    setTimeout(() => URL.revokeObjectURL(link.href), 4000);\n  };\n\n  // Start rasterizing, then hand the pending blob to ClipboardItem and write within the same click task so the browser keeps the\n  // user's activation. Awaiting the raster first would spend it, and the write would be rejected. The write can be refused at once\n  // while the page is still being drawn; wait for both to settle, so a retry cannot start a second rasterization beside the first.\n  const copy = async () => {\n    const blobPromise = rasterize();\n    const written = (async () => {\n      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);\n    })();\n    const [write] = await Promise.allSettled([written, blobPromise]);\n    if (write.status === 'rejected') throw write.reason;\n  };\n  const save = async () => { download(await rasterize()); };\n\n  async function run(work, done) {\n    busy = true;\n    sync();\n    say(text.working, false);\n    try {\n      await work();\n      say(done, true);\n    } catch (e) {\n      console.error('[am] export failed', e);\n      say(text.failed, true);\n    } finally {\n      busy = false;\n      sync();\n    }\n  }\n\n  // The menu. Native: the popover opens and closes itself and tells us through toggle events. Fallback: the same menu toggled by a\n  // class, with Esc and a click outside handled here.\n  const isOpen = () => (native ? menu.matches(':popover-open') : menu.classList.contains('is-open'));\n  // Under the button, aligned to its inline-end edge, and inside the viewport (the toolbar scrolls sideways on a phone, so the button\n  // can sit near an edge). On a short viewport the menu is cut to the space below the button and scrolls, so every item stays reachable.\n  const place = () => {\n    const r = btn.getBoundingClientRect();\n    // clientWidth, not 100vw: the viewport width in CSS includes a classic scrollbar, so a menu sized from it can stick out.\n    const room = document.documentElement.clientWidth - 16;\n    menu.style.maxWidth = `${room}px`;\n    menu.style.minWidth = `${Math.min(200, room)}px`;\n    const width = menu.offsetWidth;\n    const rtl = getComputedStyle(btn).direction === 'rtl';\n    const left = Math.max(8, Math.min(rtl ? r.left : r.right - width, document.documentElement.clientWidth - 8 - width));\n    const top = r.bottom + 6;\n    menu.style.top = `${top}px`;\n    menu.style.left = `${left}px`;\n    menu.style.maxHeight = `${Math.max(48, document.documentElement.clientHeight - 8 - top)}px`;\n  };\n  const firstEnabled = () => items.find((el) => el.getAttribute('aria-disabled') !== 'true');\n  const opened = () => {\n    btn.setAttribute('aria-expanded', 'true');\n    place();\n    menu.style.visibility = '';\n    firstEnabled()?.focus();\n  };\n  const closed = (restoreFocus) => {\n    btn.setAttribute('aria-expanded', 'false');\n    if (restoreFocus || menu.contains(document.activeElement)) btn.focus();\n  };\n  const close = (restoreFocus = true) => {\n    if (!isOpen()) return;\n    if (native) menu.hidePopover();\n    else { menu.classList.remove('is-open'); closed(restoreFocus); }\n  };\n\n  if (native) {\n    // Place the box before it is first drawn, so it never flashes in the wrong spot.\n    menu.addEventListener('beforetoggle', (e) => {\n      btn.setAttribute('aria-expanded', String(e.newState === 'open'));\n      if (e.newState === 'open') menu.style.visibility = 'hidden';\n    });\n    menu.addEventListener('toggle', (e) => { if (e.newState === 'open') opened(); else closed(false); });\n  } else {\n    // No popover: the browser must not half-handle the attributes, and the button toggles the class itself.\n    menu.removeAttribute('popover');\n    btn.removeAttribute('popovertarget');\n    btn.addEventListener('click', () => {\n      if (isOpen()) close();\n      else { menu.classList.add('is-open'); opened(); }\n    });\n    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) { e.preventDefault(); close(); } });\n    document.addEventListener('pointerdown', (e) => { if (isOpen() && !menu.contains(e.target) && !btn.contains(e.target)) close(false); });\n  }\n  window.addEventListener('resize', () => { if (isOpen()) place(); });\n\n  menu.addEventListener('keydown', (e) => {\n    const at = items.indexOf(document.activeElement);\n    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[e.key];\n    if (to !== undefined) {\n      e.preventDefault();\n      items[(to + items.length) % items.length].focus();\n    } else if (e.key === 'Tab') {\n      close(true); // focus goes back to the button and Tab then moves on from there\n    }\n  });\n\n  menu.addEventListener('click', (e) => {\n    const el = e.target.closest('[data-export]');\n    if (!el || el.getAttribute('aria-disabled') === 'true') return;\n    close();\n    if (el === pdfItem) window.print();\n    else if (el === copyItem) run(copy, text.copied);\n    else run(save, text.saved);\n  });\n})();\n})();\n";
 var TABLE_JS = "(() => {\n  const NUMBER = /^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?$/i;\n  const FORMATTED_NUMBER = /^[+-]?\\$?(?:(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d*)?|\\.\\d+)%?$/;\n  const INTEGER = /^[+-]?\\d+$/;\n  const ZERO_FRACTION = /^[+-]?\\d+\\.0*$/;\n  const DATE = /^\\d{4}-\\d{2}-\\d{2}(?:[T ]\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{1,3})?)?(?:Z|[+-]\\d{2}:?\\d{2})?)?$/;\n  const INTERACTIVE = 'a, button, input, select, textarea, details, audio[controls], video[controls], [contenteditable], [tabindex]';\n  const validDate = (text) => {\n    if (!DATE.test(text)) return false;\n    const [year, month, day] = text.slice(0, 10).split('-').map(Number);\n    const date = new Date(0);\n    date.setUTCHours(0, 0, 0, 0);\n    date.setUTCFullYear(year, month - 1, day);\n    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day && Number.isFinite(Date.parse(text));\n  };\n  const numberValue = (text) => {\n    let normalized = text;\n    if (FORMATTED_NUMBER.test(text)) normalized = text.replace(/[$,%]/g, '');\n    else if (!NUMBER.test(text)) return null;\n    if (INTEGER.test(normalized)) return BigInt(normalized);\n    if (ZERO_FRACTION.test(normalized)) return BigInt(normalized.slice(0, normalized.indexOf('.')));\n    const value = Number(normalized);\n    return Number.isFinite(value) ? value : null;\n  };\n  const typedValue = (text) => {\n    const number = numberValue(text);\n    if (number !== null) return number;\n    return validDate(text) ? Date.parse(text) : null;\n  };\n  const relayout = () => window.dispatchEvent(new Event('resize'));\n\n  for (const table of document.querySelectorAll('table[data-am-table]')) {\n    const options = new Set(table.dataset.amTable.split(/\\s+/));\n    const body = table.tBodies[0];\n    if (!body) continue;\n\n    if (options.has('filter')) {\n      const controls = table.parentElement.previousElementSibling;\n      const input = controls?.classList.contains('am-table-controls') ? controls.querySelector('[data-am-table-filter]') : null;\n      if (input) {\n        controls.hidden = false;\n        input.addEventListener('input', () => {\n          const query = input.value.trim().toLocaleLowerCase();\n          for (const row of body.rows) row.hidden = Boolean(query) && !row.textContent.toLocaleLowerCase().includes(query);\n          relayout();\n        });\n      }\n    }\n\n    if (!options.has('sort')) continue;\n    const headers = [...(table.tHead?.rows[0]?.cells ?? [])];\n    headers.forEach((head, column) => {\n      const button = document.createElement('button');\n      button.type = 'button';\n      button.className = 'am-table-sort';\n      button.setAttribute('aria-label', head.textContent.trim());\n      const moved = [...head.childNodes].filter((child) => !(child.nodeType === 1 && (child.matches(INTERACTIVE) || child.querySelector(INTERACTIVE))));\n      head.insertBefore(button, moved[0] ?? null);\n      button.append(...moved);\n      button.addEventListener('click', () => {\n        const direction = head.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';\n        for (const cell of headers) cell.removeAttribute('aria-sort');\n        head.setAttribute('aria-sort', direction);\n        const rows = [...body.rows];\n        const texts = rows.map((row) => row.cells[column]?.textContent.trim() ?? '');\n        const numeric = texts.every((text) => numberValue(text) !== null);\n        const dates = texts.every(validDate);\n        const byValue = head.getAttribute('align') === 'right' || numeric || dates;\n        const sorted = rows.map((row, index) => ({ row, index, text: texts[index], value: byValue ? typedValue(texts[index]) : null }));\n        sorted.sort((a, b) => {\n          let compared;\n          if (byValue && (a.value !== null || b.value !== null)) {\n            if (a.value === null) compared = 1;\n            else if (b.value === null) compared = -1;\n            else compared = a.value < b.value ? -1 : a.value > b.value ? 1 : 0;\n          }\n          compared ??= a.text.localeCompare(b.text);\n          return compared === 0 ? a.index - b.index : direction === 'ascending' ? compared : -compared;\n        });\n        body.append(...sorted.map(({ row }) => row));\n        relayout();\n      });\n    });\n  }\n})();\n";
 var TABLE_CSS = `.am-table-controls { margin: 0 0 8px; }
 .am-table-filter { display: flex; align-items: center; gap: 8px; font-size: var(--am-fs-small); color: var(--ink-2); }
@@ -735,6 +813,32 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 .am-view-changes .am-er-sign[data-delta="changed"], .am-view-changes .am-er-field[data-delta="changed"], .am-view-changes .am-er-key[data-delta="changed"] { fill: var(--warn); }
 .am-view-changes .am-er-field[data-delta="removed"] { text-decoration: line-through; }
 .am-view-changes .am-node .am-er-sign[data-delta] { text-decoration: none; }
+
+/* API changes use the shared switch but collapse hidden HTML rows and contracts so Before and After remain readable. */
+/* Use the code diff hues and ink/fill mixes: a theme's status --ok can be blue, but additions must stay green in every theme and mode. */
+.am-api {
+  --diff-add: #1f9d4d; --diff-del: #d1344a;
+  --ok: color-mix(in srgb, var(--diff-add) 75%, var(--ink));
+  --ok-bg: color-mix(in srgb, var(--diff-add) 14%, var(--fill));
+  --err: color-mix(in srgb, var(--diff-del) 75%, var(--ink));
+  --err-bg: color-mix(in srgb, var(--diff-del) 14%, var(--fill));
+}
+.am-api.am-view-before [data-delta="added"], .am-api.am-view-after [data-delta="removed"],
+.am-api.am-view-before .am-delta-badge, .am-api.am-view-after .am-delta-badge { display: none; }
+/* A view hides the columns and tables none of its fields need, and the first contract it shows drops the separator above it. */
+.am-api.am-view-before [data-api-hide~="before"], .am-api.am-view-after [data-api-hide~="after"] { display: none; }
+.am-api.am-view-before .am-api-contract[data-api-lead~="before"], .am-api.am-view-after .am-api-contract[data-api-lead~="after"] { margin-block-start: 0; padding-block-start: 0; border-block-start: 0; }
+.am-api .am-delta-badge { display: inline-block; color: var(--badge); margin-inline-end: 6px; font-weight: 700; }
+.am-view-changes .am-api-contract[data-delta="added"], .am-view-changes .am-api-contract [data-delta="added"] { --api-change: var(--ok); --api-change-bg: var(--ok-bg); }
+.am-view-changes .am-api-contract[data-delta="removed"], .am-view-changes .am-api-contract [data-delta="removed"] { --api-change: var(--err); --api-change-bg: var(--err-bg); }
+.am-view-changes .am-api-contract[data-delta="changed"], .am-view-changes .am-api-contract [data-delta="changed"] { --api-change: var(--warn); --api-change-bg: var(--warn-bg); }
+.am-view-changes .am-api-contract tr[data-delta] > * { color: var(--api-change); background: var(--api-change-bg); }
+.am-view-changes .am-api-section[data-delta] > h4,
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint { color: var(--api-change); }
+.am-view-changes .am-api-contract[data-delta] > .am-api-endpoint strong { color: inherit; }
+.am-view-changes .am-api-contract tr[data-delta="removed"] > *,
+.am-view-changes .am-api-section[data-delta="removed"] > h4,
+.am-view-changes .am-api-contract[data-delta="removed"] > .am-api-endpoint { text-decoration: line-through; }
 
 /* tree */
 .am-tree .am-delta-badge {
@@ -1195,7 +1299,7 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
   }
 })();
 `;
-var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
+var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input. A control inside an option preview is a picture, not an answer.\n  let input = false;\n  const inPreview = (el) => Boolean(el.closest?.('.am-ask-preview'));\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar') && !inPreview(e.target)) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => {\n    if (e.target.closest?.('.am-ask input') && !inPreview(e.target)) input = true;\n    // In cards the preview picks its option too (src/runtime/reply.js); a control in the drawing does not.\n    else if (e.target.closest?.('.am-ask--cards .am-ask-preview') && !inPreview(e.target) && !e.target.closest('input, button, a, select, textarea, summary, label')) input = true;\n  }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
 var CLOSE_AFTER_CSS = "/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the\n   window in the top layer and stays hidden unless open. */\n.am-closing { display: none; }\n.am-closing:popover-open {\n  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  padding: 10px 14px; font-size: var(--am-fs-text); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n@media print {\n  .am-closing { display: none !important; }\n}\n";
 var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src/render.js adds this script after the page script. When the reply is copied,
 // the reply sheet closes and a popover counts down to closing the tab. Browsers close only a tab no link has moved on, so a tab that
@@ -1409,8 +1513,9 @@ var VIDEO_EXPORT_JS = "// The export engine for the path that has no ffmpeg: the
 var VIDEO_MUX_JS = "// Minimal WebM (Matroska) writer for the export path that has no ffmpeg: the browser encodes the frames (WebCodecs,\n// see src/runtime/video.js) and this module writes the container. One VP8/VP9 video track and an optional Opus audio\n// track. The blocks are buffered, sorted by time and cut into clusters of about a second, so the sound and the\n// picture of a moment sit next to each other in the file. The Segment and the Clusters carry the unknown size, which\n// is how a stream is written: nothing needs to be measured first and nothing is patched afterwards.\n// Plain bytes only (no Buffer, no imports), so the same source runs in Node and inside a page (scripts/inline-assets.mjs\n// turns it into a script for the player page).\nconst APP = 'answer-me-with-html';   // MuxingApp / WritingApp\nconst CLUSTER_MS = 1000;              // how much time one cluster holds\nconst SEEK_PRE_ROLL_NS = 80_000_000;  // what the Opus specification asks for\n\nconst ID = {\n  EBML: [0x1a, 0x45, 0xdf, 0xa3],\n  EBMLVersion: [0x42, 0x86], EBMLReadVersion: [0x42, 0xf7], EBMLMaxIDLength: [0x42, 0xf2], EBMLMaxSizeLength: [0x42, 0xf3],\n  DocType: [0x42, 0x82], DocTypeVersion: [0x42, 0x87], DocTypeReadVersion: [0x42, 0x85],\n  Segment: [0x18, 0x53, 0x80, 0x67], Info: [0x15, 0x49, 0xa9, 0x66], TimecodeScale: [0x2a, 0xd7, 0xb1],\n  MuxingApp: [0x4d, 0x80], WritingApp: [0x57, 0x41], Duration: [0x44, 0x89],\n  Tracks: [0x16, 0x54, 0xae, 0x6b], TrackEntry: [0xae], TrackNumber: [0xd7], TrackUID: [0x73, 0xc5], FlagLacing: [0x9c],\n  CodecID: [0x86], TrackType: [0x83], Video: [0xe0], PixelWidth: [0xb0], PixelHeight: [0xba],\n  Audio: [0xe1], SamplingFrequency: [0xb5], Channels: [0x9f], CodecPrivate: [0x63, 0xa2],\n  CodecDelay: [0x56, 0xaa], SeekPreRoll: [0x56, 0xbb],\n  Cluster: [0x1f, 0x43, 0xb6, 0x75], Timecode: [0xe7], SimpleBlock: [0xa3],\n};\nconst UNKNOWN_SIZE = new Uint8Array([0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);\n\nconst concat = (parts) => {\n  let total = 0;\n  for (const p of parts) total += p.length;\n  const out = new Uint8Array(total);\n  let at = 0;\n  for (const p of parts) { out.set(p, at); at += p.length; }\n  return out;\n};\nconst bytes = (id) => new Uint8Array(id);\nconst text = (s) => new TextEncoder().encode(s);\n\n// Element size as a variable-size integer, in the shortest length that fits; the all-ones value is reserved.\nfunction size(n) {\n  for (let len = 1; len <= 8; len++) {\n    if (len === 8 || n < 2 ** (7 * len) - 1) {\n      const out = new Uint8Array(len);\n      let v = n;\n      for (let i = len - 1; i >= 0; i--) {\n        out[i] = v & 0xff;\n        v = Math.floor(v / 256);\n      }\n      out[0] |= 0x80 >> (len - 1);\n      return out;\n    }\n  }\n}\n\n// Unsigned integer, big endian, as short as it can be (a Matroska integer drops leading zero bytes).\nfunction uint(n) {\n  const out = [];\n  let v = Math.round(n);\n  do {\n    out.unshift(v & 0xff);\n    v = Math.floor(v / 256);\n  } while (v > 0);\n  return new Uint8Array(out);\n}\n\nfunction f64(x) {\n  const out = new Uint8Array(8);\n  new DataView(out.buffer).setFloat64(0, x);\n  return out;\n}\n\nconst elem = (id, payload) => concat([bytes(id), size(payload.length), payload]);\n\n// WebM writer. video: { width, height, codec } with codec 'V_VP9' or 'V_VP8'; audio: null or\n// { channels, codecPrivate, preSkipSamples }. Duration is written up front, so a player knows the length at once.\nclass WebmWriter {\n  constructor({ width, height, durationMs, videoCodec = 'V_VP9', audio = null }) {\n    this.width = width;\n    this.height = height;\n    this.durationMs = durationMs;\n    this.videoCodec = videoCodec;\n    this.audio = audio;\n    this.blocks = [];\n  }\n\n  // track 1 is the picture, track 2 the sound. key marks a key frame; tsUs is the time in microseconds.\n  block({ track, key, tsUs, data }) {\n    this.blocks.push({ track, key: Boolean(key), ms: Math.round(tsUs / 1000), data });\n  }\n\n  count(track) {\n    return this.blocks.reduce((n, b) => n + (b.track === track ? 1 : 0), 0);\n  }\n\n  build() {\n    const parts = [\n      elem(ID.EBML, concat([\n        elem(ID.EBMLVersion, uint(1)),\n        elem(ID.EBMLReadVersion, uint(1)),\n        elem(ID.EBMLMaxIDLength, uint(4)),\n        elem(ID.EBMLMaxSizeLength, uint(8)),\n        elem(ID.DocType, text('webm')),\n        elem(ID.DocTypeVersion, uint(4)),\n        elem(ID.DocTypeReadVersion, uint(2)),\n      ])),\n      concat([bytes(ID.Segment), UNKNOWN_SIZE]),\n      elem(ID.Info, concat([\n        elem(ID.TimecodeScale, uint(1_000_000)),\n        elem(ID.MuxingApp, text(APP)),\n        elem(ID.WritingApp, text(APP)),\n        elem(ID.Duration, f64(this.durationMs)),\n      ])),\n      elem(ID.Tracks, concat([this.#videoTrack(), ...(this.audio ? [this.#audioTrack()] : [])])),\n    ];\n    for (const cluster of this.#clusters()) parts.push(cluster);\n    return concat(parts);\n  }\n\n  #track(num, type, codecId, extra) {\n    return elem(ID.TrackEntry, concat([\n      elem(ID.TrackNumber, uint(num)),\n      elem(ID.TrackUID, uint(num)),\n      elem(ID.FlagLacing, uint(0)),\n      elem(ID.CodecID, text(codecId)),\n      elem(ID.TrackType, uint(type)),\n      ...extra,\n    ]));\n  }\n\n  #videoTrack() {\n    return this.#track(1, 1, this.videoCodec, [\n      elem(ID.Video, concat([elem(ID.PixelWidth, uint(this.width)), elem(ID.PixelHeight, uint(this.height))])),\n    ]);\n  }\n\n  #audioTrack() {\n    const { channels, codecPrivate, preSkipSamples } = this.audio;\n    const extra = [elem(ID.Audio, concat([elem(ID.SamplingFrequency, f64(48000)), elem(ID.Channels, uint(channels))]))];\n    if (codecPrivate) extra.unshift(elem(ID.CodecPrivate, codecPrivate));\n    // The encoder adds pre-skip samples of silence; CodecDelay tells the player to drop them again.\n    extra.push(elem(ID.CodecDelay, uint((preSkipSamples / 48000) * 1e9)), elem(ID.SeekPreRoll, uint(SEEK_PRE_ROLL_NS)));\n    return this.#track(2, 2, 'A_OPUS', extra);\n  }\n\n  #clusters() {\n    const blocks = [...this.blocks].sort((a, b) => a.ms - b.ms || a.track - b.track);\n    const out = [];\n    for (let i = 0; i < blocks.length; ) {\n      const start = blocks[i].ms;\n      const body = [elem(ID.Timecode, uint(start))];\n      while (i < blocks.length && blocks[i].ms - start <= CLUSTER_MS) {\n        body.push(this.#block(blocks[i], start));\n        i++;\n      }\n      out.push(concat([bytes(ID.Cluster), UNKNOWN_SIZE, ...body]));\n    }\n    return out;\n  }\n\n  #block(b, clusterStart) {\n    const head = new Uint8Array(4);\n    head[0] = 0x80 | b.track;                 // the track number as a variable-size integer\n    new DataView(head.buffer).setInt16(1, b.ms - clusterStart);\n    head[3] = b.key ? 0x80 : 0x00;\n    return elem(ID.SimpleBlock, concat([head, b.data]));\n  }\n}\n\nwindow.__amvWebm = { WebmWriter };\n";
 
 // src/cli.js
-import { join as join13, resolve as resolve6, dirname as dirname5, basename as basename5, extname as extname3, sep as sep4 } from "node:path";
+import { join as join14, resolve as resolve8, relative as relative4, isAbsolute as isAbsolute6, dirname as dirname5, basename as basename6, extname as extname3, sep as sep6 } from "node:path";
 import { spawn as spawn5 } from "node:child_process";
+import { randomBytes as randomBytes2 } from "node:crypto";
 
 // src/languages/zh.js
 var zh_default = {
@@ -1434,6 +1539,20 @@ var zh_default = {
     modeLabel: "\u660E\u6697",
     mode: { auto: "\u8DDF\u968F\u7CFB\u7EDF", light: "\u4EAE", dark: "\u6697" },
     scale: { down: "\u7F29\u5C0F\u6587\u5B57", up: "\u653E\u5927\u6587\u5B57" },
+    export: {
+      button: "\u5BFC\u51FA",
+      copy: "\u590D\u5236\u4E3A\u56FE\u7247",
+      download: "\u4E0B\u8F7D PNG",
+      pdf: "\u4FDD\u5B58\u4E3A PDF",
+      working: "\u6B63\u5728\u751F\u6210\u2026",
+      copied: "\u5DF2\u590D\u5236 \u2713",
+      saved: "\u5DF2\u4FDD\u5B58 \u2713",
+      failed: "\u5BFC\u51FA\u5931\u8D25",
+      unavailableBrowser: "\u5F53\u524D\u6D4F\u89C8\u5668\u4E0D\u652F\u6301\u5BFC\u51FA\u56FE\u7247\u3002",
+      unavailableClipboard: "\u5F53\u524D\u6D4F\u89C8\u5668\u4E0D\u652F\u6301\u5199\u5165\u526A\u8D34\u677F\u3002",
+      unavailablePolicy: "\u5F53\u524D\u9884\u89C8\u7A97\u53E3\u672A\u5F00\u542F\u526A\u8D34\u677F\u6743\u9650\uFF0C\u4E0D\u652F\u6301\u590D\u5236\u3002",
+      unverifiedEffect: "\u5F53\u524D\u6D4F\u89C8\u5668\u5BFC\u51FA\u6548\u679C\u53EF\u80FD\u4E0D\u4FDD\u8BC1\u3002"
+    },
     copy: "\u590D\u5236\u6E90\u7A3F",
     done: "\u5DF2\u590D\u5236 \u2713",
     copyCode: "\u590D\u5236",
@@ -1520,6 +1639,20 @@ var zh_Hant_default = {
     modeLabel: "\u660E\u6697",
     mode: { auto: "\u8DDF\u96A8\u7CFB\u7D71", light: "\u6DFA\u8272", dark: "\u6DF1\u8272" },
     scale: { down: "\u7E2E\u5C0F\u6587\u5B57", up: "\u653E\u5927\u6587\u5B57" },
+    export: {
+      button: "\u532F\u51FA",
+      copy: "\u8907\u88FD\u70BA\u5716\u7247",
+      download: "\u4E0B\u8F09 PNG",
+      pdf: "\u5132\u5B58\u70BA PDF",
+      working: "\u6B63\u5728\u7522\u751F\u2026",
+      copied: "\u5DF2\u8907\u88FD \u2713",
+      saved: "\u5DF2\u5132\u5B58 \u2713",
+      failed: "\u532F\u51FA\u5931\u6557",
+      unavailableBrowser: "\u76EE\u524D\u700F\u89BD\u5668\u4E0D\u652F\u63F4\u532F\u51FA\u5716\u7247\u3002",
+      unavailableClipboard: "\u76EE\u524D\u700F\u89BD\u5668\u4E0D\u652F\u63F4\u5BEB\u5165\u526A\u8CBC\u7C3F\u3002",
+      unavailablePolicy: "\u76EE\u524D\u9810\u89BD\u8996\u7A97\u672A\u958B\u555F\u526A\u8CBC\u7C3F\u6B0A\u9650\uFF0C\u4E0D\u652F\u63F4\u8907\u88FD\u3002",
+      unverifiedEffect: "\u76EE\u524D\u700F\u89BD\u5668\u532F\u51FA\u6548\u679C\u53EF\u80FD\u4E0D\u4FDD\u8B49\u3002"
+    },
     copy: "\u8907\u88FD\u6E90\u7A3F",
     done: "\u5DF2\u8907\u88FD \u2713",
     copyCode: "\u8907\u88FD",
@@ -1600,6 +1733,20 @@ var en_default = {
     modeLabel: "Mode",
     mode: { auto: "Auto", light: "Light", dark: "Dark" },
     scale: { down: "Smaller text", up: "Larger text" },
+    export: {
+      button: "Export",
+      copy: "Copy as image",
+      download: "Download PNG",
+      pdf: "Save as PDF",
+      working: "Rendering\u2026",
+      copied: "Copied \u2713",
+      saved: "Saved \u2713",
+      failed: "Export failed",
+      unavailableBrowser: "This browser cannot export the page as an image.",
+      unavailableClipboard: "This browser cannot write the image to the clipboard.",
+      unavailablePolicy: "This preview does not allow copying.",
+      unverifiedEffect: "Export may not work correctly in this browser."
+    },
     copy: "Copy source",
     done: "Copied \u2713",
     copyCode: "Copy",
@@ -1686,6 +1833,20 @@ var ja_default = {
     modeLabel: "\u8868\u793A",
     mode: { auto: "\u81EA\u52D5", light: "\u30E9\u30A4\u30C8", dark: "\u30C0\u30FC\u30AF" },
     scale: { down: "\u6587\u5B57\u3092\u5C0F\u3055\u304F", up: "\u6587\u5B57\u3092\u5927\u304D\u304F" },
+    export: {
+      button: "\u66F8\u304D\u51FA\u3057",
+      copy: "\u753B\u50CF\u3068\u3057\u3066\u30B3\u30D4\u30FC",
+      download: "PNG \u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9",
+      pdf: "PDF \u3068\u3057\u3066\u4FDD\u5B58",
+      working: "\u751F\u6210\u4E2D\u2026",
+      copied: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
+      saved: "\u4FDD\u5B58\u3057\u307E\u3057\u305F \u2713",
+      failed: "\u66F8\u304D\u51FA\u305B\u307E\u305B\u3093\u3067\u3057\u305F",
+      unavailableBrowser: "\u3053\u306E\u30D6\u30E9\u30A6\u30B6\u306F\u753B\u50CF\u3092\u66F8\u304D\u51FA\u305B\u307E\u305B\u3093\u3002",
+      unavailableClipboard: "\u3053\u306E\u30D6\u30E9\u30A6\u30B6\u306F\u30AF\u30EA\u30C3\u30D7\u30DC\u30FC\u30C9\u306B\u753B\u50CF\u3092\u66F8\u304D\u8FBC\u3081\u307E\u305B\u3093\u3002",
+      unavailablePolicy: "\u3053\u306E\u30D7\u30EC\u30D3\u30E5\u30FC\u3067\u306F\u30AF\u30EA\u30C3\u30D7\u30DC\u30FC\u30C9\u6A29\u9650\u304C\u306A\u3044\u305F\u3081\u30B3\u30D4\u30FC\u3067\u304D\u307E\u305B\u3093\u3002",
+      unverifiedEffect: "\u3053\u306E\u30D6\u30E9\u30A6\u30B6\u3067\u306F\u66F8\u304D\u51FA\u3057\u7D50\u679C\u304C\u4FDD\u8A3C\u3055\u308C\u307E\u305B\u3093\u3002"
+    },
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     copyCode: "\u30B3\u30D4\u30FC",
@@ -1770,6 +1931,20 @@ var he_default = {
     modeLabel: "\u05DE\u05E6\u05D1",
     mode: { auto: "\u05D0\u05D5\u05D8\u05D5\u05DE\u05D8\u05D9", light: "\u05D1\u05D4\u05D9\u05E8", dark: "\u05DB\u05D4\u05D4" },
     scale: { down: "\u05D4\u05E7\u05D8\u05E0\u05EA \u05D4\u05D8\u05E7\u05E1\u05D8", up: "\u05D4\u05D2\u05D3\u05DC\u05EA \u05D4\u05D8\u05E7\u05E1\u05D8" },
+    export: {
+      button: "\u05D9\u05D9\u05E6\u05D5\u05D0",
+      copy: "\u05D4\u05E2\u05EA\u05E7\u05D4 \u05DB\u05EA\u05DE\u05D5\u05E0\u05D4",
+      download: "\u05D4\u05D5\u05E8\u05D3\u05EA PNG",
+      pdf: "\u05E9\u05DE\u05D9\u05E8\u05D4 \u05DB-PDF",
+      working: "\u05DE\u05DB\u05D9\u05DF\u2026",
+      copied: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
+      saved: "\u05E0\u05E9\u05DE\u05E8 \u2713",
+      failed: "\u05D4\u05D9\u05D9\u05E6\u05D5\u05D0 \u05E0\u05DB\u05E9\u05DC",
+      unavailableBrowser: "\u05D4\u05D3\u05E4\u05D3\u05E4\u05DF \u05D4\u05D6\u05D4 \u05D0\u05D9\u05E0\u05D5 \u05D9\u05DB\u05D5\u05DC \u05DC\u05D9\u05D9\u05E6\u05D0 \u05D0\u05EA \u05D4\u05E2\u05DE\u05D5\u05D3 \u05DB\u05EA\u05DE\u05D5\u05E0\u05D4.",
+      unavailableClipboard: "\u05D4\u05D3\u05E4\u05D3\u05E4\u05DF \u05D4\u05D6\u05D4 \u05D0\u05D9\u05E0\u05D5 \u05D9\u05DB\u05D5\u05DC \u05DC\u05DB\u05EA\u05D5\u05D1 \u05D0\u05EA \u05D4\u05EA\u05DE\u05D5\u05E0\u05D4 \u05DC\u05DC\u05D5\u05D7.",
+      unavailablePolicy: "\u05D4\u05EA\u05E6\u05D5\u05D2\u05D4 \u05D4\u05DE\u05E7\u05D3\u05D9\u05DE\u05D4 \u05D4\u05D6\u05D5 \u05D0\u05D9\u05E0\u05D4 \u05DE\u05D0\u05E4\u05E9\u05E8\u05EA \u05D4\u05E2\u05EA\u05E7\u05D4.",
+      unverifiedEffect: "\u05D9\u05D9\u05EA\u05DB\u05DF \u05E9\u05D4\u05D9\u05D9\u05E6\u05D5\u05D0 \u05DC\u05D0 \u05D9\u05E2\u05D1\u05D5\u05D3 \u05DB\u05E8\u05D0\u05D5\u05D9 \u05D1\u05D3\u05E4\u05D3\u05E4\u05DF \u05D4\u05D6\u05D4."
+    },
     copy: "\u05D4\u05E2\u05EA\u05E7\u05EA \u05D4\u05DE\u05E7\u05D5\u05E8",
     done: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
     copyCode: "\u05D4\u05E2\u05EA\u05E7\u05D4",
@@ -1859,8 +2034,103 @@ var he_default = {
   }
 };
 
+// src/languages/tr.js
+var tr_default = {
+  id: "tr",
+  language: "tr",
+  voice: { say: "tr_TR", espeak: "tr" },
+  ui: {
+    remark: {
+      button: "\u0130\u015Faretle",
+      need: "Kaydetmek i\xE7in bir etiket se\xE7in",
+      hint: "\u0130ste\u011Fe ba\u011Fl\u0131 not",
+      save: "Kaydet",
+      remove: "Kald\u0131r",
+      clear: "T\xFCm i\u015Faretleri temizle",
+      clearConfirm: "{n} i\u015Fareti temizlemek i\xE7in tekrar t\u0131klay\u0131n",
+      section: "\u0130\u015Faretler",
+      kinds: { suggestion: "\xF6neri", keep: "kals\u0131n", question: "soru", concern: "endi\u015Fe" }
+    },
+    theme: "Tema",
+    modeLabel: "Mod",
+    mode: { auto: "Otomatik", light: "A\xE7\u0131k", dark: "Koyu" },
+    scale: { down: "Daha k\xFC\xE7\xFCk yaz\u0131", up: "Daha b\xFCy\xFCk yaz\u0131" },
+    copy: "Kayna\u011F\u0131 kopyala",
+    done: "Kopyaland\u0131 \u2713",
+    copyCode: "Kopyala",
+    update: { button: "Yeni s\xFCr\xFCm {version}", current: "Sizdeki s\xFCr\xFCm {current}. Yeni s\xFCr\xFCm bu sayfa olu\u015Fturulurken bulundu.", whatsNew: "Yenilikler:", run: "Terminalde \xE7al\u0131\u015Ft\u0131r\u0131n:", agent: "Ya da Agent\u2019a s\xF6yleyin:", agentText: "answer-me-with-html\u2019i g\xFCncelle", notes: "Yenilikleri g\xF6r" },
+    live: { updated: "Sayfa g\xFCncellendi", reload: "Yeniden y\xFCkle" },
+    reply: {
+      button: "Yan\u0131tla",
+      comment: "Yorum",
+      commentHint: "Bu panel hakk\u0131ndaki yorumunuz",
+      title: "Yan\u0131t\u0131n\u0131z",
+      hint: "Kopyalay\u0131p Agent ile sohbetinize yap\u0131\u015Ft\u0131r\u0131n; se\xE7imleriniz ve yorumlar\u0131n\u0131zdan devam eder.",
+      copy: "Yan\u0131t\u0131 kopyala",
+      copyFailed: "Kopyalanamad\u0131 \u2014 Cmd/Ctrl+C tu\u015Flar\u0131na bas\u0131n",
+      close: "Kapat",
+      suggested: "\xF6nerilen",
+      empty: "\xD6nce se\xE7enekleri i\u015Faretleyin ya da bir panele yorum yaz\u0131n.",
+      decisions: "Kararlar",
+      comments: "Yorumlar",
+      confirmed: "\xF6neri onayland\u0131",
+      untouched: "yan\u0131tlanmad\u0131; \xF6nerilen",
+      was: "\xF6nceki",
+      typed: '">" ile ba\u015Flayan sat\u0131rlar okuyucunun yazd\u0131\u011F\u0131 metindir.',
+      raw: "Kopyalanacak metni g\xF6ster",
+      preview: "\xD6nizleme",
+      count: { answered: "Yan\u0131tlanan: {n}", comments: "Yorum: {n}", remarks: "\u0130\u015Faret: {n}" }
+    },
+    closeAfter: { closing: "Bu sekme {n} sn i\xE7inde kapanacak", keep: "A\xE7\u0131k kals\u0131n", closeFailed: "Yan\u0131t kopyaland\u0131. Bu sekmeyi art\u0131k kapatabilirsiniz." },
+    toc: "\u0130\xE7indekiler",
+    flow: "Ak\u0131\u015F \u015Femas\u0131",
+    state: "Durum makinesi diyagram\u0131",
+    sequence: "S\u0131ralama diyagram\u0131",
+    er: "Varl\u0131k-ili\u015Fki diyagram\u0131",
+    class: "S\u0131n\u0131f diyagram\u0131",
+    colon: ": ",
+    sep: ", ",
+    expand: "Diyagram\u0131 b\xFCy\xFCt",
+    close: "Kapat",
+    diagram: "Diyagram g\xF6r\xFCnt\xFCleyici",
+    delta: { added: "eklendi", removed: "kald\u0131r\u0131ld\u0131", changed: "de\u011Fi\u015Fti", view: "G\xF6r\xFCn\xFCm", before: "\xD6nce", changes: "De\u011Fi\u015Fiklikler", after: "Sonra" },
+    generated: "Olu\u015Fturan:",
+    limits: { value: "{value} / en fazla {limit}", limit: "en fazla {limit}" },
+    chart: { name: "Grafik", data: "Veri", value: "De\u011Fer", share: "Pay" },
+    api: { path: "Yol parametreleri", query: "Sorgu parametreleri", headers: "Ba\u015Fl\u0131klar", request: "\u0130stek", response: "Yan\u0131t", field: "Alan", type: "T\xFCr", description: "A\xE7\u0131klama", requirement: "Gereklilik", required: "Zorunlu", optional: "\u0130ste\u011Fe ba\u011Fl\u0131" },
+    table: { filter: "Tabloyu filtrele" },
+    export: {
+      button: "D\u0131\u015Fa aktar",
+      copy: "G\xF6rsel olarak kopyala",
+      download: "PNG indir",
+      pdf: "PDF olarak kaydet",
+      working: "Haz\u0131rlan\u0131yor\u2026",
+      copied: "Kopyaland\u0131 \u2713",
+      saved: "Kaydedildi \u2713",
+      failed: "D\u0131\u015Fa aktar\u0131lamad\u0131",
+      unavailableBrowser: "Bu taray\u0131c\u0131 sayfay\u0131 g\xF6rsel olarak d\u0131\u015Fa aktaramaz.",
+      unavailableClipboard: "Bu taray\u0131c\u0131 g\xF6rseli panoya yazamaz.",
+      unavailablePolicy: "Bu \xF6nizleme kopyalamaya izin vermiyor.",
+      unverifiedEffect: "Bu taray\u0131c\u0131da d\u0131\u015Fa aktarma d\xFCzg\xFCn \xE7al\u0131\u015Fmayabilir."
+    }
+  },
+  // Player labels. drawn..duration are the title block cells; sheet is the scene header, with {n} and {total} the zero-padded numbers.
+  videoUi: {
+    play: "Oynat",
+    pause: "Duraklat",
+    chapters: "B\xF6l\xFCmler",
+    speed: "H\u0131z",
+    export: "D\u0131\u015Fa aktar",
+    drawn: "\xC7\u0130ZEN",
+    date: "TAR\u0130H",
+    scenes: "SAHNELER",
+    duration: "S\xDCRE",
+    sheet: "PAFTA {n} / {total}"
+  }
+};
+
 // src/languages/registry.js
-var LANGUAGES = Object.freeze([zh_default, zh_Hant_default, en_default, ja_default, he_default]);
+var LANGUAGES = Object.freeze([zh_default, zh_Hant_default, en_default, ja_default, he_default, tr_default]);
 var FALLBACK = en_default;
 var languageIds = () => LANGUAGES.map((l) => l.id);
 function findLanguage(language, script) {
@@ -1878,7 +2148,7 @@ var serifByLanguage = (variable, head) => fontLanguages().map((l) => `${langSele
 var blueprint_default = {
   name: "blueprint",
   summary: "Blueprint drawing",
-  label: { zh: "\u56FE\u7EB8", "zh-Hant": "\u5716\u7D19", en: "Blueprint", ja: "\u56F3\u9762", he: "\u05E9\u05E8\u05D8\u05D5\u05D8" },
+  label: { zh: "\u56FE\u7EB8", "zh-Hant": "\u5716\u7D19", en: "Blueprint", ja: "\u56F3\u9762", he: "\u05E9\u05E8\u05D8\u05D5\u05D8", tr: "Teknik \xE7izim" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -1960,7 +2230,7 @@ var blueprint_default = {
 var shadcn_default = {
   name: "shadcn",
   summary: "shadcn cards",
-  label: { zh: "\u5361\u7247", "zh-Hant": "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9", he: "\u05DB\u05E8\u05D8\u05D9\u05E1\u05D9\u05DD" },
+  label: { zh: "\u5361\u7247", "zh-Hant": "\u5361\u7247", en: "Cards", ja: "\u30AB\u30FC\u30C9", he: "\u05DB\u05E8\u05D8\u05D9\u05E1\u05D9\u05DD", tr: "Kartlar" },
   // lang-ok: viewer-facing theme labels
   scope: ["page", "video"],
   tokens: {
@@ -2022,7 +2292,7 @@ var LANGUAGE_SERIF_HEAD = '"Iowan Old Style", Palatino, Georgia';
 var paper_default = {
   name: "paper",
   summary: "Paper, for long reading",
-  label: { zh: "\u7EB8\u5F20", "zh-Hant": "\u7D19\u5F35", en: "Paper", ja: "\u7D19", he: "\u05E0\u05D9\u05D9\u05E8" },
+  label: { zh: "\u7EB8\u5F20", "zh-Hant": "\u7D19\u5F35", en: "Paper", ja: "\u7D19", he: "\u05E0\u05D9\u05D9\u05E8", tr: "K\xE2\u011F\u0131t" },
   // lang-ok: viewer-facing theme labels
   scope: ["page"],
   tokens: {
@@ -4471,8 +4741,10 @@ function tableOptions(tokens) {
   }
   return tokens;
 }
-marked.use({ hooks: { processAllTokens: (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note }) } });
-inline.use({ hooks: { processAllTokens: (tokens) => filterInline(tokens, note) } });
+var blockPass = (tokens) => filterBlocks(tableOptions(tokens), { lex: (source) => tableOptions(marked.lexer(source)), note });
+var inlinePass = (tokens) => filterInline(tokens, note);
+marked.use({ hooks: { processAllTokens: blockPass } });
+inline.use({ hooks: { processAllTokens: inlinePass } });
 marked.use({ extensions: [{
   name: "table",
   renderer(token) {
@@ -4524,6 +4796,42 @@ function md(text2, { ui, interactive = true } = {}) {
     tableUi = outerUi;
     tableInteractive = outerInteractive;
   }
+}
+function codeSpans(text2, { inline: inlineField = false } = {}) {
+  const source = wrapSpacedImages(String(text2 ?? ""));
+  const spans = [];
+  const lineAt = (index) => source.slice(0, index).split("\n").length - 1;
+  const find = (raw, from, to) => {
+    const places = (raw.includes("|") ? [raw, raw.replaceAll("|", "\\|")] : [raw]).map((written) => ({ at: source.indexOf(written, from), length: written.length })).filter(({ at: at3, length }) => at3 >= 0 && at3 + length <= to);
+    return places.sort((a3, b) => a3.at - b.at)[0] ?? null;
+  };
+  const walk2 = (tokens, from, to) => {
+    let cursor = from;
+    for (const token of Array.isArray(tokens) ? tokens : []) {
+      const found = token.raw ? find(token.raw, cursor, to) : null;
+      const start = found ? found.at : cursor;
+      const end = found ? found.at + found.length : to;
+      let inner = start;
+      if (token.type === "codespan") spans.push({ text: token.text, line: lineAt(start) });
+      else if (token.type !== "image") {
+        inner = walk2(token.tokens, inner, end);
+        inner = walk2(token.items, inner, end);
+        for (const row of [token.header, ...token.rows ?? []]) {
+          for (const cell of Array.isArray(row) ? row : []) inner = walk2(cell.tokens, inner, end);
+        }
+      }
+      cursor = found ? end : Math.max(cursor, inner);
+    }
+    return cursor;
+  };
+  const outer = sink;
+  sink = null;
+  try {
+    walk2(inlineField ? inlinePass(O.lexInline(source, inline.defaults)) : blockPass(marked.lexer(source)), 0, source.length);
+  } finally {
+    sink = outer;
+  }
+  return spans;
 }
 function mdInline(text2) {
   return inline.parseInline(wrapSpacedImages(String(text2 ?? "")));
@@ -4595,10 +4903,20 @@ key: value
       const body = wide ? t.slice(1).trim() : t;
       const m2 = body.match(/^([^:：]+)[:：]\s*(.*)$/);
       if (!m2) throw new ComponentError(`kv line has no colon: "${t}"; expected key: value`, line);
-      return `<div class="am-kv-cell${wide ? " am-kv-cell--wide" : ""}"><dt>${esc(m2[1].trim())}</dt><dd>${mdInline(m2[2])}</dd></div>`;
+      return { wide, key: m2[1].trim(), value: m2[2] };
     });
+    const span = new Array(cells.length).fill(1);
+    let pos = 0;
+    cells.forEach((c2, i) => {
+      if (c2.wide) {
+        if (pos > 0) span[i - 1] += cols - pos;
+        pos = 0;
+      } else pos = (pos + 1) % cols;
+    });
+    if (pos > 0) span[cells.length - 1] += cols - pos;
+    const html = cells.map((c2, i) => `<div class="am-kv-cell${c2.wide ? " am-kv-cell--wide" : ""}"${span[i] > 1 ? ` style="grid-column: span ${span[i]}"` : ""}><dt>${esc(c2.key)}</dt><dd>${mdInline(c2.value)}</dd></div>`);
     if (!cells.length) throw new ComponentError("kv needs at least one key: value line", 1);
-    return `<dl class="am-kv" style="--kv-cols: ${cols}">${cells.join("")}</dl>`;
+    return `<dl class="am-kv" style="--kv-cols: ${cols}">${html.join("")}</dl>`;
   }
 };
 
@@ -4715,6 +5033,20 @@ function splitMarker(text2) {
   return m2 ? { mark: m2[1], text: m2[2] } : { mark: null, text: text2 };
 }
 var markState = (mark) => STATE_OF[mark] ?? null;
+function innerMarkMessage(component, names2, mark, text2, escape = "", link = names2.length > 1) {
+  const inner = names2.map((name2) => ({ name: name2, m: splitMarker(name2) })).filter(({ m: m2 }) => m2.mark);
+  if (!inner.length) return null;
+  const first = inner[0].name;
+  const marks = new Set([mark, ...inner.map(({ m: m2 }) => m2.mark)].filter(Boolean));
+  const head = `${component}: "${first}" has a change marker inside the line, so "${inner[0].m.mark} " would become part of the name and draw a second box.`;
+  if (marks.size > 1) return `${head} A marker starts the line and marks the whole line; write one line per marker`;
+  if ([...marks][0] === "~" && link) return `${head} ~ marks a node, not a link: write it on a line of its own: "~ ${inner[0].m.text}"`;
+  const quote = (name2) => name2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let fixed2 = text2;
+  for (const { name: name2, m: m2 } of inner) fixed2 = fixed2.replace(new RegExp(`(?<!\\[)${quote(name2)}(?!\\])`), m2.text);
+  const plain = !/^[*[({]/.test(inner[0].m.text);
+  return `${head} A marker starts the line and marks the whole line. Write: "${[...marks][0]} ${fixed2}".${escape && plain ? ` ${escape.replace("NAME", first)}` : ""}`;
+}
 var deltaAttr = (state) => state ? ` data-delta="${state}"` : "";
 function deltaBadge(state, ui) {
   if (!state) return "";
@@ -5041,6 +5373,7 @@ function scaleSvgBoxes(html, scale = 1) {
   return String(html).replace(SVG_OPEN_BOX, (tag, w2, h) => `<svg viewBox="0 0 ${w2} ${h}" width="${Math.ceil(w2 * scale)}" height="${Math.ceil(h * scale)}"`);
 }
 var mirror = (width, rtl) => rtl ? (x) => width - x : (x) => x;
+var SEARCH_LIMIT = 4e4;
 function orderRanks(g, order) {
   order(g);
   const ranks = {};
@@ -5048,20 +5381,55 @@ function orderRanks(g, order) {
     const { rank, order: at3 } = g.node(v2);
     if (rank !== void 0) (ranks[rank] ??= [])[at3] = v2;
   }
+  const rows = Object.values(ranks);
   const pairs = (as, bs) => as.reduce((n, a3) => n + bs.filter((b) => g.node(b).order < g.node(a3).order).length, 0);
   const crossings2 = (left, right) => pairs(g.predecessors(left), g.predecessors(right)) + pairs(g.successors(left), g.successors(right));
   const border = (v2) => g.node(v2).dummy === "border";
-  let swapped = true;
-  while (swapped) {
-    swapped = false;
-    for (const rank of Object.values(ranks)) {
-      for (let i = 1; i < rank.length; i++) {
-        const [a3, b] = [rank[i - 1], rank[i]];
-        if (g.parent(a3) !== g.parent(b) || border(a3) || border(b) || crossings2(b, a3) >= crossings2(a3, b)) continue;
-        [rank[i - 1], rank[i]] = [b, a3];
-        g.node(a3).order = i;
-        g.node(b).order = i - 1;
-        swapped = true;
+  const fixed2 = (a3, b) => g.parent(a3) !== g.parent(b) || border(a3) || border(b);
+  let compared = 0;
+  const gain = (a3, b) => {
+    compared++;
+    return crossings2(a3, b) - crossings2(b, a3);
+  };
+  const swap = (row, i) => {
+    [row[i - 1], row[i]] = [row[i], row[i - 1]];
+    g.node(row[i - 1]).order = i - 1;
+    g.node(row[i]).order = i;
+  };
+  const settle3 = () => {
+    let removed = 0;
+    for (let swapped = true; swapped; ) {
+      swapped = false;
+      for (const row of rows) {
+        for (let i = 1; i < row.length; i++) {
+          const won = fixed2(row[i - 1], row[i]) ? 0 : gain(row[i - 1], row[i]);
+          if (won <= 0) continue;
+          swap(row, i);
+          removed += won;
+          swapped = true;
+        }
+      }
+    }
+    return removed;
+  };
+  settle3();
+  for (let better = true; better; ) {
+    better = false;
+    for (const row of rows) {
+      for (let i = 1; i < row.length; i++) {
+        if (compared > SEARCH_LIMIT) return;
+        if (fixed2(row[i - 1], row[i])) continue;
+        const before = rows.map((r) => [...r]);
+        const cost = -gain(row[i - 1], row[i]);
+        swap(row, i);
+        if (settle3() > cost) {
+          better = true;
+          continue;
+        }
+        rows.forEach((r, k) => before[k].forEach((v2, at3) => {
+          r[at3] = v2;
+          g.node(v2).order = at3;
+        }));
       }
     }
   }
@@ -5145,10 +5513,12 @@ function layout({ participants: ps, steps: steps2 }, { num, id, ui, dir = "ltr" 
   const gaps = ps.slice(1).map((_2, i) => (actorW[i] + actorW[i + 1]) / 2 + 28);
   let extraRight = 0;
   let extraLeft = 0;
+  let msgs = 0;
   const prepared = steps2.map((s) => {
     if (s.kind === "msg") {
+      msgs++;
       const lines2 = s.label ? wrap(s.label, LABEL_MAX, FS) : [];
-      const width2 = Math.max(0, ...lines2.map((l) => measure(l, FS))) + (num ? 34 : 22);
+      const width2 = Math.max(0, ...lines2.map((l) => measure(l, FS))) + (num ? 2 * (10 + 7 * String(msgs).length) : 22);
       const a3 = idx.get(s.from);
       const b = idx.get(s.to);
       if (a3 === b) {
@@ -7270,7 +7640,7 @@ Client -> Gateway
   - ~ on a line with an arrow is an error: remove the old link with - and add the new one with +. That is also how a link's label changes. The same link both unmarked and marked is an error too.
   - + group Name: A, B and - group Name: A, B mark a group box. A group that is not removed and holds only removed nodes is a warning. Markers combine with * and every shape bracket.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, \u2212 or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
-  - A line that starts with a marker and a space is always read as a marker. To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a node ("A -> + B"), is an error: write it at the start, "+ A -> B". To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: "```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```",
   render(text2, { args, uid, ui, warn, video, dir: pageDir = "ltr" }) {
     const model = parseFlow(text2);
@@ -7304,6 +7674,8 @@ function parseFlow(text2) {
       continue;
     }
     const { chain, label } = parseChain(t, line);
+    const inner = innerMarkMessage("flow", chain.flatMap((step) => step.nodes.filter((n) => !n.explicit).map((n) => n.label)), mark, t, "To keep a name that starts with a marker, use brackets: [NAME]", chain.length > 1);
+    if (inner) throw new ComponentError(inner, line);
     if (mark === "~" && chain.length > 1) {
       throw new ComponentError('flow: ~ marks a node, not a link. To change a link, remove the old one and add the new one: "- A -> B" then "+ A -> C"', line);
     }
@@ -7472,12 +7844,12 @@ function runLayout({ nodes, edges, groups }, rankdir, rtl, widths, reserve) {
     g.setParent(reserveKey(i), gkey(i));
     const down = edges.map((e) => rankdir === "TB" ? [e.from, e.to] : [e.to, e.from]);
     const link = (a3, b, name2) => rankdir === "TB" ? g.setEdge(a3, b, {}, name2) : g.setEdge(b, a3, {}, name2);
-    const inside = new Set(grp.members);
-    const first = grp.members.filter((m2) => !down.some(([a3, b]) => b === m2 && a3 !== m2 && inside.has(a3)));
+    const inside2 = new Set(grp.members);
+    const first = grp.members.filter((m2) => !down.some(([a3, b]) => b === m2 && a3 !== m2 && inside2.has(a3)));
     (first.length ? first : grp.members.slice(0, 1)).forEach((m2, k) => {
       link(reserveKey(i), key.get(m2), `r${i}-${k}`);
       down.forEach(([a3, b], j) => {
-        if (b === m2 && !inside.has(a3)) link(key.get(a3), reserveKey(i), `r${i}-${k}-${j}`);
+        if (b === m2 && !inside2.has(a3)) link(key.get(a3), reserveKey(i), `r${i}-${k}-${j}`);
       });
     });
   });
@@ -7757,7 +8129,7 @@ Polling -> Open: reply
   - A marker applies to the transition and to each state on its line. A state is removed when it appears only on - lines, added when it appears only on + lines, and unchanged when it also appears on an unmarked line. ~ State on a line without an arrow marks that state as changed.
   - ~ on a transition is an error: remove the old transition with - and add the new one with +. The same transition both unmarked and marked is an error too.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked state with a +, \u2212 or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
-  - A line that starts with a marker and a space is always read as a marker.`,
+  - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a state ("A -> + B"), is an error: write it at the start, "+ A -> B".`,
   example: "```state LR\n[*] -> Idle\nIdle -> Connecting: connect()\nConnecting -> Open: SYN-ACK\nConnecting -> Closed: RST\nOpen -> Open: retransmit\nOpen -> Closed: close()\nClosed -> [*]\n```",
   render(text2, { args, uid, ui, video, dir: pageDir = "ltr" }) {
     const model = parseState(text2);
@@ -7778,7 +8150,7 @@ function parseState(text2) {
     else nodes.set(id, { ...prev, before: prev.before || seen.before, after: prev.after || seen.after, tilde: prev.tilde || seen.tilde, ...tildeLine && { tildeLine: prev.tildeLine ?? tildeLine } });
     return id;
   };
-  const resolve7 = (name2, line, mark, side) => {
+  const resolve9 = (name2, line, mark, side) => {
     if (name2 !== "[*]") return add2(name2, name2, "state", line, mark);
     return add2(side === "from" ? INITIAL : FINAL, "[*]", side === "from" ? "initial" : "final", line, mark);
   };
@@ -7791,7 +8163,9 @@ function parseState(text2) {
     const at3 = t.indexOf("->");
     if (at3 === -1) {
       if (/[:：]/.test(t)) throw new ComponentError(`state cannot parse "${raw}". Write a transition as A -> B: event`, n);
-      resolve7(t.trim(), n, mark, "from");
+      const lone = innerMarkMessage("state", [t.trim()], mark, t, "", false);
+      if (lone) throw new ComponentError(lone, n);
+      resolve9(t.trim(), n, mark, "from");
       continue;
     }
     if (mark === "~") throw new ComponentError('state: ~ marks a state, not a transition. To change a transition, remove the old one and add the new one: "- A -> B" then "+ A -> C"', n);
@@ -7802,8 +8176,10 @@ function parseState(text2) {
     const label = colon === -1 ? "" : rest.slice(colon + 1).trim();
     if (to.includes("->")) throw new ComponentError(`state takes one transition per line: "${raw}" has two. Split it into two lines`, n);
     if (!from || !to) throw new ComponentError(`state: a transition needs a state on each side of ->; write "${raw}" as A -> B: event`, n);
-    const fromId = resolve7(from, n, mark, "from");
-    const toId = resolve7(to, n, mark, "to");
+    const inner = innerMarkMessage("state", [from, to], mark, t, "", true);
+    if (inner) throw new ComponentError(inner, n);
+    const fromId = resolve9(from, n, mark, "from");
+    const toId = resolve9(to, n, mark, "to");
     edges.push({ from: fromId, to: toId, label, line: n, ...state && { state } });
   }
   if (!nodes.size) throw new ComponentError("state needs at least one state", 1);
@@ -8447,16 +8823,22 @@ User ..|> Store: implements
 };
 
 // src/components/api.js
-function parseApi(text2) {
-  const lines = contentLines(text2);
-  const first = lines.shift();
-  const endpoint = first?.text.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
-  if (!endpoint || (endpoint[1] === "RPC" ? !/^[^/]+\/[^/]+$/.test(endpoint[2]) : !endpoint[2].startsWith("/"))) {
-    throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", first?.line ?? 1);
+function apiState(mark, parent, line) {
+  const own = markState(mark);
+  const inherited = ["added", "removed"].includes(parent?.state) ? parent.state : null;
+  if (inherited && own && own !== inherited) {
+    throw new ComponentError(`api: "${mark}" contradicts its ${inherited} parent; remove the marker or move the item`, line);
   }
-  const sections = [];
+  const state = inherited ?? own;
+  return state ? { state } : {};
+}
+var identifier = (text2) => text2.split(/(?<=[_./,:<>|-])(?=.)|(?<=[a-z0-9])(?=[A-Z])/).map(esc).join("<wbr>");
+function parseApi(text2) {
+  const endpoints = [];
+  let endpoint;
   let current;
-  for (const { raw, text: line, line: n } of lines) {
+  for (const { raw, text: source, line: n } of contentLines(text2)) {
+    const { mark, text: line } = splitMarker(source);
     if (/^\s/.test(raw)) {
       const [spec, ...description] = line.split(/(?<!\\)\|/).map((part) => part.replace(/\\\|/g, "|"));
       const parts = spec.trim().split(/\s+/);
@@ -8464,28 +8846,39 @@ function parseApi(text2) {
       const requirement = /^(required|optional)$/.test(parts.at(-1)) ? parts.pop() : "";
       const type = parts.join(" ");
       if (!current || !type) throw new ComponentError("api: indent name type [required|optional] | description under a section", n);
-      current.fields.push({ name: name2, type, requirement, description: description.join("|").trim() });
+      current.fields.push({ name: name2, type, requirement, description: description.join("|").trim(), ...apiState(mark, current, n) });
       continue;
     }
+    const declaration = line.match(/^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|TRACE|CONNECT|RPC)\s+(\S+)$/);
+    if (declaration && (declaration[1] === "RPC" ? /^[^/]+\/[^/]+$/.test(declaration[2]) : declaration[2].startsWith("/"))) {
+      endpoint = { method: declaration[1], target: declaration[2], sections: [], line: n, ...apiState(mark, null, n) };
+      endpoints.push(endpoint);
+      current = null;
+      continue;
+    }
+    if (!endpoint) throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", n);
     const section = line.match(/^(path|query|headers|request|response)(?:\s+(.+))?$/);
     if (!section || section[1] === "response" && !section[2]) {
       throw new ComponentError("api: use path, query, headers, request [Type], or response STATUS [Type]", n);
     }
-    if (section[1] === "response" && endpoint[1] !== "RPC" && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
+    if (section[1] === "response" && endpoint.method !== "RPC" && !/^[1-5]\d{2}(?:\s|$)/.test(section[2])) {
       throw new ComponentError("api: HTTP responses need a status code from 100 to 599, for example response 200 User", n);
     }
-    if (endpoint[1] === "RPC" && ["path", "query", "headers"].includes(section[1])) {
+    if (endpoint.method === "RPC" && ["path", "query", "headers"].includes(section[1])) {
       throw new ComponentError("api: RPC contracts use request and response sections", n);
     }
-    current = { kind: section[1], detail: section[2] ?? "", fields: [] };
-    sections.push(current);
+    current = { kind: section[1], detail: section[2] ?? "", fields: [], ...apiState(mark, endpoint, n) };
+    endpoint.sections.push(current);
   }
-  if (!sections.length) throw new ComponentError("api needs at least one request, parameter or response section", first.line);
-  return { method: endpoint[1], target: endpoint[2], sections };
+  if (!endpoints.length) throw new ComponentError("api: start with METHOD /path or RPC package.Service/Method", 1);
+  for (const item of endpoints) {
+    if (!item.sections.length) throw new ComponentError("api: each endpoint needs at least one request, parameter or response section", item.line);
+  }
+  return { endpoints };
 }
 var api_default = {
   name: "api",
-  summary: "HTTP API or RPC contract (parameters, request and response fields)",
+  summary: "HTTP/RPC contracts and multi-endpoint changes (parameters, requests and responses)",
   syntax: `\`\`\`api
 POST /users
 headers
@@ -8498,64 +8891,166 @@ response 201 User
 response 400 Error
   message string required
 \`\`\`
-- One endpoint per block: an uppercase HTTP method and /path, or RPC package.Service/Method.
+- One or more endpoints per block: start each with an uppercase HTTP method and /path, or RPC package.Service/Method, at column 0.
 - Sections: path, query, headers, request [Type], response STATUS [Type]. RPC uses request and response.
 - Indent fields: name type [required|optional] | description. Types and descriptions are shown as text, including generics and nested field paths.
 - Write \\| for a literal | inside a type, such as string \\| null; the first unescaped | starts the description.
 - required and optional are explicit and visible in the Requirement column. If any field declares one, unspecified fields show a dash; otherwise this column is omitted.
 - A response requires a status (HTTP code 100-599 or RPC status name). A section without fields can describe an empty response, such as response 204.
+- Prefix an endpoint, section or indented field with + (added), - (removed), or ~ (changed), followed by a space. Children inherit + or -, and a contradictory child marker is an error. ~ marks only the written item.
+- To show exact old and new types, names or requirements, write the old field/section/endpoint with - and its replacement with +. A lone ~ has no old value to reconstruct.
+- One Before / Changes / After switch applies to every endpoint in the block. Before hides added items; After hides removed items; unchanged items stay in both views. Counts include inherited markers.
 - This displays a contract; it does not send requests or import OpenAPI / protobuf files.`,
   example: "```api\nRPC users.UserService/GetUser\nrequest GetUserRequest\n  id string required\nresponse OK User\n  id string required\n  email string optional\nresponse NOT_FOUND\n```",
   // render emits semantic tables, escaping every author-supplied contract value and translating the surrounding labels.
-  render(text2, { ui } = {}) {
-    const { method, target, sections } = parseApi(text2);
+  render(text2, { ui, video } = {}) {
+    const { endpoints } = parseApi(text2);
     const words3 = ui?.api ?? FALLBACK.ui.api;
-    const body = sections.map(({ kind: kind2, detail, fields: fields2 }) => {
-      const described = fields2.some((field) => field.description);
-      const specified = fields2.some((field) => field.requirement);
-      const table = fields2.length ? `<div class="am-table-wrap"><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col">${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col">${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${fields2.map((field) => `<tr><th scope="row"><code>${esc(field.name)}</code></th><td><code>${esc(field.type)}</code></td>${specified ? `<td>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td>${esc(field.description)}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : "";
-      return `<section class="am-api-section"><h4>${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
+    const VISIBLE = { before: (state) => state !== "added", after: (state) => state !== "removed" };
+    const hideIn = (needed) => {
+      const views = Object.keys(VISIBLE).filter((view) => !needed(VISIBLE[view]));
+      return views.length ? ` data-api-hide="${views.join(" ")}"` : "";
+    };
+    const column = (fields2, key) => hideIn((visible) => fields2.some((field) => visible(field.state) && field[key]));
+    const leadIn = (index) => {
+      if (!index) return "";
+      const views = Object.keys(VISIBLE).filter((view) => VISIBLE[view](endpoints[index].state) && !endpoints.slice(0, index).some((item) => VISIBLE[view](item.state)));
+      return views.length ? ` data-api-lead="${views.join(" ")}"` : "";
+    };
+    const contracts = endpoints.map(({ method, target, sections, state }, index) => {
+      const body = sections.map(({ kind: kind2, detail, fields: fields2, state: sectionState }) => {
+        const described = fields2.some((field) => field.description);
+        const specified = fields2.some((field) => field.requirement);
+        const req = specified ? column(fields2, "requirement") : "";
+        const desc = described ? column(fields2, "description") : "";
+        const rows = fields2.map((field) => `<tr${deltaAttr(field.state)}><th scope="row">${deltaBadge(field.state, ui)}<code>${identifier(field.name)}</code></th><td><code>${identifier(field.type)}</code></td>${specified ? `<td${req}>${field.requirement ? esc(words3[field.requirement]) : "\u2014"}</td>` : ""}${described ? `<td${desc}>${esc(field.description)}</td>` : ""}</tr>`).join("");
+        const table = fields2.length ? `<div class="am-table-wrap"${hideIn((visible) => fields2.some((field) => visible(field.state)))}><table><thead><tr><th scope="col">${esc(words3.field)}</th><th scope="col">${esc(words3.type)}</th>${specified ? `<th scope="col"${req}>${esc(words3.requirement)}</th>` : ""}${described ? `<th scope="col"${desc}>${esc(words3.description)}</th>` : ""}</tr></thead><tbody>${rows}</tbody></table></div>` : "";
+        return `<section class="am-api-section"${deltaAttr(sectionState)}><h4>${deltaBadge(sectionState, ui)}${esc(words3[kind2])}${detail ? ` <code>${esc(detail)}</code>` : ""}</h4>${table}</section>`;
+      }).join("");
+      return `<article class="am-api-contract"${deltaAttr(state)}${leadIn(index)}><div class="am-api-endpoint" dir="ltr">${deltaBadge(state, ui)}<strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</article>`;
     }).join("");
-    return `<div class="am-api am-md"><div class="am-api-endpoint" dir="ltr"><strong>${esc(method)}</strong> <code>${esc(target)}</code></div>${body}</div>`;
+    const states = endpoints.flatMap((endpoint) => [endpoint.state, ...endpoint.sections.flatMap((section) => [section.state, ...section.fields.map((field) => field.state)])]);
+    return withDelta(`<div class="am-api am-md">${contracts}</div>`, states, { ui, video });
   }
 };
 
 // src/components/ask.js
 var OPTION = /^([*-])\s+(.+)$/;
+var PREVIEW_OPEN = /^(\s*):::([^\s:]+)(?:\s+(.*))?$/;
+var PREVIEW_CLOSE = /^(\s*):::\s*$/;
+var FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+var RAW_PREVIEW = /* @__PURE__ */ new Set(["html", "svg"]);
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+function previewEnd(lines, openIdx) {
+  const open = lines[openIdx]?.match(PREVIEW_OPEN);
+  if (!open) return -1;
+  const indent = open[1].length;
+  const raw = RAW_PREVIEW.has(open[2].toLowerCase());
+  const body = lines.map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
+  for (let j = openIdx + 1; j < lines.length; j++) {
+    const end = lines[j].match(PREVIEW_CLOSE);
+    if (end && end[1].length === indent) return j;
+    const mark = raw ? null : body[j].match(FENCE_MARK)?.[1];
+    const close = mark ? fenceClose(body, j, mark) : -1;
+    if (close !== -1) j = close;
+  }
+  return -1;
+}
+function readAsk(text2) {
+  const lines = String(text2).split("\n");
+  let question = null;
+  const options = [];
+  let current = null;
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("//")) continue;
+    if (question === null) {
+      if (OPTION.test(trimmed)) throw new ComponentError("ask: the first line is the question", i + 1);
+      question = { text: trimmed, line: i + 1 };
+      continue;
+    }
+    const open = raw.match(PREVIEW_OPEN);
+    if (open) {
+      if (!current) throw new ComponentError("ask: put a preview under an option", i + 1);
+      if (current.preview) throw new ComponentError("ask: one preview per option", i + 1);
+      const indent = open[1].length;
+      const close = previewEnd(lines, i);
+      if (close === -1) throw new ComponentError("ask: the preview block is not closed", i + 1);
+      const content = lines.slice(i + 1, close).map((line) => line.slice(Math.min(indent, line.match(/^\s*/)[0].length)));
+      current.preview = { lang: open[2].toLowerCase(), args: (open[3] ?? "").trim(), text: content.join("\n"), line: i + 1 };
+      i = close;
+      continue;
+    }
+    const option = trimmed.match(OPTION);
+    if (option) {
+      const [label, note2 = ""] = fields(option[2]);
+      if (!label) throw new ComponentError("ask: an option needs a label before |", i + 1);
+      current = { label, note: note2, suggested: option[1] === "*", line: i + 1, preview: null };
+      options.push(current);
+      continue;
+    }
+    throw new ComponentError(`ask: "${trimmed}" is not an option; start it with * (suggested) or -`, i + 1);
+  }
+  if (!question) throw new ComponentError("ask: write the question on the first line", 1);
+  return { question, options };
+}
 var ask_default = {
   name: "ask",
   summary: "A decision the reader makes on the page (collected by Reply)",
   pageOnly: true,
   panelOnly: true,
-  syntax: `\`\`\`ask [multi]
+  // Preview blocks are rendered with the page's scale, so the ask output must not take the factor again.
+  scalesOwnSvg: true,
+  syntax: `\`\`\`ask [multi] [cards]
 The question, one sentence
-* The option you suggest | optional note   \u2190 * marks the suggestion with a tag; nothing starts selected
+* The option you suggest | optional note
 - Another option | optional note
+  :::flow
+  A -> B: its preview, drawn in an indented block
+  :::
 \`\`\`
 - The first line is the question. Each option starts with * or -. Write 2 to 6 options.
 - One choice: exactly one * option. multi lets the reader pick several; * marks the ones you suggest.
+- An option may carry one preview: indent a ::: block under it. Any component works, plus html and svg. Leave it out when a picture does not help.
+- cards lays the options out in a grid, for a landing-page choice. Each preview becomes the card's canvas.
 - Place the ask in the panel whose content the answer changes. The Reply button turns the answers into one reply.`,
   example: "```ask\nWhich cache do we use?\n* Redis | keeps data after a restart\n- Memcached | simpler, no disk\n```",
-  // The text the STE check reads: options are list items; the note reads as a second clause of the item.
+  // The text the STE check reads: options are list items; the note reads as a second clause of the item. A preview is a picture, not prose.
   lint(text2) {
-    return text2.split("\n").map((l) => l.replace(OPTION, (_2, mark, body) => `- ${fields(body).filter(Boolean).join(": ")}`)).join("\n");
+    const out = [];
+    const lines = String(text2).split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const close = line.match(PREVIEW_OPEN) ? previewEnd(lines, i) : -1;
+      if (close !== -1) {
+        out.push(...Array(close - i + 1).fill(""));
+        i = close;
+        continue;
+      }
+      const option = line.trim().match(OPTION);
+      out.push(option ? `- ${fields(option[2]).filter(Boolean).join(": ")}` : line);
+    }
+    return out.join("\n");
   },
-  render(text2, { args, uid, ui = {} }) {
+  /**
+   * Render the ask fieldset. A preview is passed to the caller's nested block renderer,
+   * so it can use any component, html or svg.
+   */
+  render(text2, { args, uid, ui = {}, line = 0, render }) {
     const multi = /(^|\s)multi(\s|$)/.test(args);
-    const lines = contentLines(text2);
-    const [first, ...rest] = lines;
-    if (!first || OPTION.test(first.text)) throw new ComponentError("ask: the first line is the question", first?.line ?? 1);
-    const options = rest.map(({ text: t, line }) => {
-      const m2 = t.match(OPTION);
-      if (!m2) throw new ComponentError(`ask: "${t}" is not an option; start it with * (suggested) or -`, line);
-      const [label, note2 = ""] = fields(m2[2]);
-      if (!label) throw new ComponentError("ask: an option needs a label before |", line);
-      return { label, note: note2, suggested: m2[1] === "*", line };
-    });
-    if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, first.line);
+    const cards = /(^|\s)cards(\s|$)/.test(args);
+    const { question, options } = readAsk(text2);
+    if (options.length < 2 || options.length > 6) throw new ComponentError(`ask: write 2 to 6 options, not ${options.length}`, question.line);
     const suggested = options.filter((o) => o.suggested).length;
     if (!multi && suggested !== 1) {
-      throw new ComponentError(`ask: mark exactly one option with * as your suggestion (found ${suggested}); add multi to let the reader pick several`, first.line);
+      throw new ComponentError(`ask: mark exactly one option with * as your suggestion (found ${suggested}); add multi to let the reader pick several`, question.line);
     }
     const seen = /* @__PURE__ */ new Set();
     for (const o of options) {
@@ -8564,8 +9059,18 @@ The question, one sentence
     }
     const id = uid();
     const type = multi ? "checkbox" : "radio";
-    const items = options.map((o) => `<label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? " data-suggested" : ""}><span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? "suggested")}</span>` : ""}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ""}</span></label>`);
-    return `<fieldset class="am-ask" data-ask="${id}"${multi ? " data-multi" : ""}><legend class="am-ask-q">${mdInline(first.text)}</legend>${items.join("")}</fieldset>`;
+    const items = options.map((o) => {
+      let preview2 = "";
+      if (o.preview) {
+        if (!render) throw new ComponentError("ask: a preview needs a page, not a video", o.preview.line);
+        const at3 = line + o.preview.line;
+        const block2 = { type: "fence", lang: o.preview.lang, args: o.preview.args, text: o.preview.text, line: at3 };
+        preview2 = `<div class="am-ask-preview">${render([block2])}</div>`;
+      }
+      const body = `<span class="am-ask-body"><span class="am-ask-label">${mdInline(o.label)}</span>${o.suggested ? ` <span class="am-ask-tag">${esc(ui.reply?.suggested ?? "suggested")}</span>` : ""}${o.note ? `<small class="am-ask-note">${mdInline(o.note)}</small>` : ""}</span>`;
+      return `<div class="am-ask-card"><label class="am-ask-opt"><input type="${type}" name="${id}" value="${esc(o.label)}"${o.suggested ? " data-suggested" : ""}>${body}</label>${preview2}</div>`;
+    });
+    return `<fieldset class="am-ask${cards ? " am-ask--cards" : ""}" data-ask="${id}"${multi ? " data-multi" : ""}><legend class="am-ask-q">${mdInline(question.text)}</legend><div class="am-ask-opts">${items.join("")}</div></fieldset>`;
   }
 };
 
@@ -9144,7 +9649,7 @@ function applyOverrides(meta, overrides, choices = CHOICES) {
   }
   return { ...meta, ...Object.fromEntries(set) };
 }
-var VOICES = Object.freeze(["auto", "elevenlabs", "local", "system", "off"]);
+var VOICES = Object.freeze(["auto", "elevenlabs", "local", "cmd", "system", "off"]);
 var DEFAULT_META = Object.freeze({
   template: "sheet",
   theme: AUTO,
@@ -9237,7 +9742,7 @@ function splitSections(lines, start, errors) {
     const colonName = colon?.[2].toLowerCase();
     if (colon && COMPONENTS.has(colonName)) {
       flushMd();
-      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      const close = findColonClose(lines, i, colon[1], colonName);
       if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
       current.blocks.push({ type: "fence", lang: colonName, args: (colon[3] ?? "").trim(), text: lines.slice(i + 1, close).join("\n"), line: i + 1 });
       i = close;
@@ -9324,6 +9829,44 @@ function checkTables(lines, first) {
     }
     return [];
   });
+}
+var FENCE_MARK2 = /^ {0,3}(`{3,}|~{3,})/;
+function fenceClose2(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK2)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+function findColonClose(lines, openIdx, marker, name2) {
+  const stack = [marker.length];
+  for (let j = openIdx + 1; j < lines.length; j++) {
+    if (name2 === "ask") {
+      const end = previewEnd(lines, j);
+      if (end !== -1) {
+        j = end;
+        continue;
+      }
+    }
+    const line = lines[j];
+    const mark = line.match(FENCE_MARK2)?.[1];
+    if (mark) {
+      const close2 = fenceClose2(lines, j, mark);
+      if (close2 === -1) continue;
+      j = close2;
+      continue;
+    }
+    const open = line.match(COLON_OPEN);
+    if (open) {
+      stack.push(open[1].length);
+      continue;
+    }
+    const close = line.match(COLON_CLOSE);
+    if (!close || close[1].length < stack[stack.length - 1]) continue;
+    stack.pop();
+    if (!stack.length) return j;
+  }
+  return -1;
 }
 function findFenceClose(lines, openIdx, marker) {
   const closeRe = new RegExp(`^${marker[0] === "`" ? "`" : "~"}{${marker.length},}\\s*$`);
@@ -10075,8 +10618,9 @@ function localPath(ref, baseDir) {
   const rel = relative(baseDir, path);
   return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : path;
 }
+var isSecretPath = (rel) => SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part));
 function assertNotSecret(ref, rel, via) {
-  if (SECRET_FILE.test(basename2(rel)) || rel.split(sep).some((part) => SECRET_DIR.has(part))) {
+  if (isSecretPath(rel)) {
     throw new CodeError(`"${ref}" ${via ? "points to" : "is"} a file that holds keys or passwords by convention; it is not embedded. Write a sketch instead`);
   }
 }
@@ -10281,6 +10825,102 @@ function readEmbeddedImages(html) {
   return new Map([...String(html).matchAll(EMBEDDED)].map(([, src, uri]) => [decodeRef(src), uri]));
 }
 
+// src/refs.js
+import { lstatSync, readFileSync as readFileSync4, realpathSync as realpathSync3, statSync as statSync3 } from "node:fs";
+import { isAbsolute as isAbsolute3, join as join2, relative as relative2, sep as sep3 } from "node:path";
+var REF = /^([^\s:`]+):(\d+)(?:-(\d+))?$/;
+var FILE_LIKE = /\/|\.[A-Za-z][\w-]*$/;
+var INLINE_PARTS = new Map(Object.entries({
+  tree: { lines: (text2) => String(text2).split("\n").map((raw, i) => ({ text: raw.trim(), line: i + 1 })).filter((l) => l.text), parts: (t) => fields(t).slice(0, 2) },
+  // label and note; tree ignores a third field
+  timeline: { lines: contentLines, parts: (t) => fields(t).slice(1, 3) },
+  // title and note; the time is plain text
+  kv: { lines: contentLines, parts: (t) => [(t.startsWith("*") ? t.slice(1).trim() : t).match(/^[^:：]+[:：]\s*(.*)$/)?.[1] ?? ""] }
+  // the value; the key is plain text
+}));
+function inlineTexts(block2) {
+  if (block2.type === "md") return [{ text: block2.text, line: block2.line, inline: false }];
+  if (block2.lang === "callout") return [{ text: block2.text, line: block2.line + 1, inline: false }];
+  if (block2.lang === "ask") return askTexts(block2);
+  const component = INLINE_PARTS.get(block2.lang);
+  if (!component) return [];
+  return component.lines(block2.text).flatMap(({ text: text2, line }) => component.parts(text2).map((part) => ({ text: part, line: block2.line + line, inline: true })));
+}
+function askTexts(block2) {
+  let ask;
+  try {
+    ask = readAsk(block2.text);
+  } catch {
+    return [];
+  }
+  return [
+    { text: ask.question.text, line: block2.line + ask.question.line, inline: true },
+    ...ask.options.flatMap((o) => [
+      { text: o.label, line: block2.line + o.line, inline: true },
+      { text: o.note, line: block2.line + o.line, inline: true },
+      ...o.preview ? inlineTexts({ type: "fence", lang: o.preview.lang, text: o.preview.text, line: block2.line + o.preview.line }) : []
+    ])
+  ];
+}
+function checkRefs(blocks, { baseDir }) {
+  const files = /* @__PURE__ */ new Map();
+  const warnings = [];
+  for (const { text: text2, line, inline: inline2 } of blocks.flatMap(inlineTexts)) {
+    for (const span of codeSpans(text2, { inline: inline2 })) {
+      const problem = checkRef(span.text.trim(), baseDir, files);
+      if (problem) warnings.push({ line: line + span.line, rule: "ref", message: problem });
+    }
+  }
+  return warnings.sort((a3, b) => a3.line - b.line);
+}
+function checkRef(text2, baseDir, files) {
+  const m2 = text2.match(REF);
+  if (!m2 || !FILE_LIKE.test(m2[1]) || isAbsolute3(m2[1]) || /^[~\\]/.test(m2[1]) || m2[1].includes("\\")) return null;
+  const [, path, a3, b = a3] = m2;
+  const from = Number(a3);
+  const to = Number(b);
+  if (!files.has(path)) files.set(path, inspect(path, baseDir));
+  const file = files.get(path);
+  if (!file) return null;
+  if (from < 1) return `\`${text2}\`: lines start at 1`;
+  if (to < from) return `\`${text2}\`: the first line comes after the last; write ${path}:${to}-${from}`;
+  if (file.missing) return `\`${text2}\`: no such file in ${baseDir}`;
+  if (file.folder) return `\`${text2}\`: ${path} is a folder, not a file`;
+  if (to > file.lines) return `\`${text2}\`: the file has ${file.lines} line${file.lines === 1 ? "" : "s"}`;
+  return null;
+}
+function inspect(path, baseDir) {
+  const written = localPath(path, baseDir);
+  const rel = written && relative2(baseDir, written);
+  if (!rel || isSecretPath(rel)) return null;
+  if (!exists(written)) {
+    const parts = rel.split(sep3);
+    return parts.length > 1 && exists(join2(baseDir, parts[0])) ? { missing: true } : null;
+  }
+  try {
+    const real = realpathSync3(written);
+    const root = realpathSync3(baseDir);
+    if (!localPath(real, root) || isSecretPath(relative2(root, real))) return null;
+    const stat2 = statSync3(real);
+    if (stat2.isDirectory()) return { folder: true };
+    if (!stat2.isFile() || stat2.size > MAX_FILE_BYTES) return null;
+    const buf = readFileSync4(real);
+    if (buf.includes(0)) return null;
+    const text2 = buf.toString("utf8").replace(/\r\n?/g, "\n").replace(/\n$/, "");
+    return { lines: text2 ? text2.split("\n").length : 0 };
+  } catch {
+    return null;
+  }
+}
+function exists(path) {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // src/sha256.js
 var K3 = Uint32Array.from({ length: 64 }, (_2, i) => {
   let n = 2;
@@ -10383,7 +11023,8 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
     raiseAll(errors);
     throw new LintError(warnings);
   }
-  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
+  const refWarnings = codeDir ? checkRefs([...doc2.intro, ...doc2.panels.flatMap((p) => p.blocks)], { baseDir: codeDir }) : [];
+  const stats = { panels: doc2.panels.length, components: {}, code: [], codeWarnings: [], refWarnings, componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   const loose = doc2.intro.filter((b) => b.type === "fence" && COMPONENTS.get(b.lang)?.panelOnly);
@@ -10486,8 +11127,17 @@ function renderFence(block2, ctx) {
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at3 = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at3, component: lang, message });
-    const html = comp.render(text2, { args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? "ltr", video: ctx.video, warn });
-    return ctx.video ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
+    const html = comp.render(text2, {
+      args,
+      uid: () => `am${++ctx.seq}`,
+      ui: ctx.ui,
+      dir: ctx.dir ?? "ltr",
+      video: ctx.video,
+      warn,
+      line,
+      render: (blocks) => renderBlocks(blocks, ctx)
+    });
+    return ctx.video || comp.scalesOwnSvg ? html : scaleSvgBoxes(html, ctx.scale ?? 1);
   } catch (err) {
     if (!(err instanceof ComponentError)) throw err;
     throw new RenderError(err.message, {
@@ -10549,6 +11199,20 @@ ${row(t.agentText, false)}
 `
   };
 }
+function exportMenu(ui) {
+  const t = ui.export;
+  const item = (kind2, label) => `<button class="am-export-item" type="button" role="menuitem" data-export="${kind2}" aria-describedby="am-export-${kind2}-note"><span>${esc(label)}</span><small class="am-export-note" id="am-export-${kind2}-note" aria-hidden="true"></small></button>`;
+  const labels = [["working", t.working], ["copied", t.copied], ["saved", t.saved], ["failed", t.failed], ["unavailable-browser", t.unavailableBrowser], ["unavailable-clipboard", t.unavailableClipboard], ["unavailable-policy", t.unavailablePolicy], ["unverified-effect", t.unverifiedEffect]].map(([key, text2]) => `data-${key}="${esc(text2)}"`).join(" ");
+  return {
+    button: `<button class="am-btn am-btn--export" type="button" data-am="export" popovertarget="am-export" aria-haspopup="menu" aria-expanded="false" aria-controls="am-export" hidden>${esc(t.button)}</button>`,
+    menu: `<div class="am-export" id="am-export" popover role="menu" aria-label="${esc(t.button)}" ${labels}>
+${item("copy", t.copy)}
+${item("download", t.download)}
+${item("pdf", t.pdf)}
+</div>
+`
+  };
+}
 function withoutUpdateNotice(html) {
   return html.replace(/<button class="am-btn am-btn--update"[^]*?<\/button>\n/, "").replace(/<div class="am-update" id="am-update" popover>[^]*?\n<\/div>\n/, "");
 }
@@ -10582,6 +11246,7 @@ function scaleButtons(ui) {
 function shell({ meta, language, body, source, embedded, update: update2, closeAfter, colophon: colophon2, scale }) {
   const { ui, labelKey } = language;
   const notice = updateNotice(ui, update2, labelKey);
+  const exporter = exportMenu(ui);
   const pick = (name2, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name2}">${values.map(([value, text2]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text2)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   const interactiveTable = body.includes("<table data-am-table=");
@@ -10607,8 +11272,9 @@ ${scaleButtons(ui)}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {} }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
+${exporter.button}
 </div>
-${notice.popover}${colophon2 ? withColophon(body, language) : body}
+${notice.popover}${exporter.menu}${colophon2 ? withColophon(body, language) : body}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>${script}</script>
 </body>
@@ -10617,24 +11283,25 @@ ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 }
 
 // src/theme-market.js
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 
 // src/config.js
-import { readFileSync as readFileSync4, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
-import { join as join3, dirname } from "node:path";
+import { readFileSync as readFileSync5, writeFileSync, rmSync, existsSync as existsSync3 } from "node:fs";
+import { join as join4, dirname, isAbsolute as isAbsolute4, resolve as resolve3 } from "node:path";
+import { homedir as homedir3 } from "node:os";
 
 // src/home.js
-import { mkdirSync, existsSync as existsSync2, statSync as statSync3, lstatSync, chmodSync } from "node:fs";
+import { mkdirSync, existsSync as existsSync2, statSync as statSync4, lstatSync as lstatSync2, chmodSync } from "node:fs";
 import { homedir as homedir2, tmpdir } from "node:os";
-import { join as join2 } from "node:path";
-var defaultHome = () => join2(homedir2(), ".answer-me-with-html");
+import { join as join3 } from "node:path";
+var defaultHome = () => join3(homedir2(), ".answer-me-with-html");
 function ensureHome(home) {
   const fresh = !existsSync2(home);
   mkdirSync(home, { recursive: true, mode: 448 });
   if (process.platform === "win32" || !(fresh || home === defaultHome())) return;
-  if ((statSync3(home).mode & 511) !== 448) chmodSync(home, 448);
+  if ((statSync4(home).mode & 511) !== 448) chmodSync(home, 448);
 }
-var tempHome = () => join2(tmpdir(), process.getuid ? `answer-me-with-html-${process.getuid()}` : "answer-me-with-html");
+var tempHome = () => join3(tmpdir(), process.getuid ? `answer-me-with-html-${process.getuid()}` : "answer-me-with-html");
 var UnsafeTempHome = class extends Error {
   constructor(dir) {
     super(`${dir} is not a private folder of this user`);
@@ -10653,7 +11320,7 @@ function checkedTempHome({ create = false } = {}) {
   }
   let info;
   try {
-    info = lstatSync(dir);
+    info = lstatSync2(dir);
   } catch (e) {
     if (e.code === "ENOENT" && !create) return null;
     throw e;
@@ -10679,15 +11346,24 @@ var CONFIG_KEYS = Object.freeze({
   update_check: { type: "bool", default: true, label: "Check for a new version once a day in the background and tell you (never updates by itself)" },
   close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
   colophon: { type: "bool", default: true, label: 'Show the "Generated by Answer me with HTML" line above the page title' },
-  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
+  pages_dir: { type: "path", default: "", label: "Folder for generated pages (empty: pages/ in the data directory; a relative path is inside the data directory)" },
+  voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL; cmd: the command-line TTS in AM_TTS_CMD)" }
 });
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
 var FALSE = /* @__PURE__ */ new Set(["off", "false", "no", "0", "\u5173", "\u5173\u95ED"]);
 function amHome(env = process.env) {
   return env.AM_HOME || defaultHome();
 }
+function pagesDir(env = process.env, config = {}) {
+  const values = config && typeof config === "object" && config.values ? config.values : config;
+  const raw = typeof values === "string" ? values : values?.pages_dir ?? "";
+  const text2 = String(raw).trim();
+  if (!text2) return join4(amHome(env), "pages");
+  const expanded = text2.replace(/^~(?=$|[\\/])/, () => homedir3());
+  return isAbsolute4(expanded) ? resolve3(expanded) : resolve3(amHome(env), expanded);
+}
 function configPath(env = process.env) {
-  return join3(amHome(env), "config.json");
+  return join4(amHome(env), "config.json");
 }
 var defaults = () => Object.fromEntries(Object.entries(CONFIG_KEYS).map(([k, s]) => [k, s.default]));
 function configChoices(key, themes2) {
@@ -10711,6 +11387,12 @@ function coerce2(key, raw, themes2) {
     }
     return n;
   }
+  if (spec.type === "path") {
+    const v3 = String(raw).trim();
+    if (!v3) return spec.default;
+    if (v3.includes("\0")) throw new ConfigError(`${key} must be a folder path`);
+    return v3;
+  }
   const v2 = String(raw).trim();
   const choices = configChoices(key, themes2);
   if (!choices.includes(v2)) throw new ConfigError(`Invalid ${key} value "${v2}". Choose one of: ${choices.join(" | ")}`);
@@ -10720,7 +11402,7 @@ function readStored(env) {
   const file = configPath(env);
   if (!existsSync3(file)) return { stored: {} };
   try {
-    const data = JSON.parse(readFileSync4(file, "utf8"));
+    const data = JSON.parse(readFileSync5(file, "utf8"));
     return { stored: data && typeof data === "object" && !Array.isArray(data) ? data : {} };
   } catch (e) {
     return { stored: {}, warning: `Cannot parse ${file}; using the default settings (${e.message})` };
@@ -10765,17 +11447,17 @@ function resetConfig(key, env = process.env) {
 
 // src/themes/catalog.js
 import { createHash } from "node:crypto";
-import { mkdirSync as mkdirSync2, readFileSync as readFileSync6, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join5 } from "node:path";
+import { mkdirSync as mkdirSync2, readFileSync as readFileSync7, renameSync as renameSync2, rmSync as rmSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join6 } from "node:path";
 
 // src/state.js
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, renameSync } from "node:fs";
-import { join as join4 } from "node:path";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync2, renameSync } from "node:fs";
+import { join as join5 } from "node:path";
 var DAY = 24 * 60 * 60 * 1e3;
-var statePath = (home) => join4(home, "state.json");
+var statePath = (home) => join5(home, "state.json");
 function readState(home) {
   try {
-    const data = JSON.parse(readFileSync5(statePath(home), "utf8"));
+    const data = JSON.parse(readFileSync6(statePath(home), "utf8"));
     return data && typeof data === "object" && !Array.isArray(data) ? data : {};
   } catch {
     return {};
@@ -10812,8 +11494,8 @@ var CatalogError = class extends Error {
   }
 };
 var sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
-var themesDir = (home) => join5(home, "themes");
-var themeFile = (home, name2) => join5(themesDir(home), `${name2}.json`);
+var themesDir = (home) => join6(home, "themes");
+var themeFile = (home, name2) => join6(themesDir(home), `${name2}.json`);
 function catalogUrl(env = process.env) {
   const url = env.AM_CATALOG_URL || CATALOG.url;
   let parsed;
@@ -10943,7 +11625,7 @@ function forget(home, name2) {
 }
 function readInstalledFile(home, name2) {
   try {
-    return readFileSync6(themeFile(home, name2));
+    return readFileSync7(themeFile(home, name2));
   } catch {
     return null;
   }
@@ -11155,7 +11837,7 @@ function removeTheme(name2, { print, fail, env }) {
   }
   const wasDefault = readConfig(env, loadThemes(home)).stored.theme === name2;
   remove(home, name2);
-  print(`\u2713 Removed ${join6(themesDir(home), `${name2}.json`)}`);
+  print(`\u2713 Removed ${join7(themesDir(home), `${name2}.json`)}`);
   if (wasDefault) {
     resetConfig("theme", env);
     print(`! ${name2} was the default theme; the default is auto again`);
@@ -11287,9 +11969,9 @@ var round3 = (x) => Math.round(x * 1e3) / 1e3;
 // src/video/tts.js
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, readFileSync as readFileSync7, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4, statSync as statSync4 } from "node:fs";
+import { mkdirSync as mkdirSync3, readFileSync as readFileSync8, writeFileSync as writeFileSync4, existsSync as existsSync4, rmSync as rmSync3, mkdtempSync, renameSync as renameSync4, statSync as statSync5 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
-import { dirname as dirname2, join as join7, resolve as resolve3 } from "node:path";
+import { dirname as dirname2, join as join8, resolve as resolve4 } from "node:path";
 
 // src/sys.js
 import { spawnSync } from "node:child_process";
@@ -11327,7 +12009,7 @@ var TtsError = class extends Error {
     this.name = "TtsError";
   }
 };
-function pickProvider(choice, env, { platform = process.platform, which = hasCommand } = {}) {
+function pickProvider(choice, env, { platform = process.platform, which = hasCommand, timeoutMs = LOCAL_TIMEOUT_MS } = {}) {
   const eleven = () => elevenLabs(env);
   const system = () => systemVoice(platform, which);
   if (choice === "off") return null;
@@ -11336,6 +12018,7 @@ function pickProvider(choice, env, { platform = process.platform, which = hasCom
     return eleven();
   }
   if (choice === "local") return localSpeech(env);
+  if (choice === "cmd") return commandVoice(env, { which, timeoutMs });
   if (choice === "system") {
     const p = system();
     if (!p) throw new TtsError("No system TTS found: macOS has say built in; on Linux install espeak-ng");
@@ -11440,13 +12123,94 @@ function localSpeech(env) {
     }
   };
 }
+var CMD_EXAMPLE = "edge-tts --voice zh-CN-XiaoxiaoNeural --file {text_file} --write-media {out}";
+function commandVoice(env, { which, timeoutMs }) {
+  const template = env.AM_TTS_CMD?.trim();
+  if (!template) throw new TtsError(`voice=cmd needs the AM_TTS_CMD environment variable: a command that writes the audio of one line to {out}, such as ${CMD_EXAMPLE} (pip install edge-tts)`);
+  if (!template.includes("{out}")) throw new TtsError(`AM_TTS_CMD must name {out}, the file the command writes its audio to, such as ${CMD_EXAMPLE}`);
+  commandArgs(template, {});
+  const usesLanguage = template.includes("{lang}");
+  return {
+    name: "cmd",
+    voice: "cmd",
+    id: `cmd:${template}`,
+    concurrency: 2,
+    usesLanguage,
+    synth: (text2, { language } = {}) => withTemp(async (out) => {
+      const textFile2 = `${out}.txt`;
+      writeFileSync4(textFile2, text2);
+      const [program, ...args] = commandArgs(template, { text: text2, text_file: textFile2, out, lang: language ?? "" });
+      await runCommandTts(program, args, text2, timeoutMs);
+      let buf;
+      try {
+        buf = readFileSync8(out);
+      } catch {
+        buf = Buffer.alloc(0);
+      }
+      if (!buf.length) throw new TtsError(`AM_TTS_CMD finished but wrote no audio to {out} for the line "${text2}"`);
+      const samples = trimSilence(await mappedSamples(buf, out, "the audio AM_TTS_CMD wrote", { which, runCommand: run }));
+      if (!samples.some((x) => Math.abs(x) >= SILENCE)) {
+        throw new TtsError(`AM_TTS_CMD wrote only silence for the line "${text2}" (macOS say does this inside a sandbox)`);
+      }
+      return samples;
+    })
+  };
+}
+function commandArgs(template, values) {
+  const words3 = [];
+  let word = null;
+  for (let i = 0; i < template.length; i++) {
+    const ch = template[i];
+    if (ch === '"' || ch === "'") {
+      const end = template.indexOf(ch, i + 1);
+      if (end < 0) throw new TtsError(`AM_TTS_CMD has an unclosed ${ch}`);
+      word = (word ?? "") + template.slice(i + 1, end);
+      i = end;
+    } else if (/\s/.test(ch)) {
+      if (word !== null) words3.push(word);
+      word = null;
+    } else {
+      word = (word ?? "") + ch;
+    }
+  }
+  if (word !== null) words3.push(word);
+  return words3.map((w2) => w2.replace(/\{(text|text_file|out|lang)\}/g, (_2, key) => values[key] ?? `{${key}}`));
+}
+function runCommandTts(program, args, text2, timeoutMs) {
+  return new Promise((resolve9, reject) => {
+    const p = spawn(program, args, { stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
+    let err = "";
+    let settled = false;
+    const settle3 = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve9();
+    };
+    const timer = setTimeout(() => {
+      p.kill("SIGKILL");
+      p.stdin.destroy();
+      p.stderr.destroy();
+      settle3(new TtsError(`AM_TTS_CMD did not finish within ${timeoutMs / 1e3} seconds`));
+    }, timeoutMs);
+    p.stderr.on("data", (d) => {
+      err = (err + d).slice(-4e3);
+    });
+    p.stdin.on("error", () => {
+    });
+    p.stdin.end(text2);
+    p.on("error", (e) => settle3(new TtsError(e.code === "ENOENT" ? `AM_TTS_CMD runs "${program}", which is not installed or not on PATH; install it or fix AM_TTS_CMD` : `Cannot run "${program}" from AM_TTS_CMD: ${e.message}`)));
+    p.on("close", (code) => settle3(code === 0 ? null : new TtsError(`AM_TTS_CMD exited with code ${code}: ${err.trim().split(/\s*\n\s*/).slice(-3).join(" | ").slice(-300)}`)));
+  });
+}
 function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}) {
-  const mapFile = resolve3(mapPath);
+  const mapFile = resolve4(mapPath);
   let source;
   let mapStat;
   try {
-    source = readFileSync7(mapFile, "utf8").replace(/^\uFEFF/, "");
-    mapStat = statSync4(mapFile);
+    source = readFileSync8(mapFile, "utf8").replace(/^\uFEFF/, "");
+    mapStat = statSync5(mapFile);
   } catch (e) {
     throw new TtsError(`Cannot read audio map ${mapFile}: ${e.message}`);
   }
@@ -11466,13 +12230,13 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
     if (!text2) throw new TtsError(`Audio map ${mapFile} has an empty narration key`);
     if (entries.has(text2)) throw new TtsError(`Audio map ${mapFile} has more than one entry for narration line "${text2}"`);
     if (typeof value !== "string" || !value.trim()) throw new TtsError(`Audio map entry for narration line "${text2}" must name an audio file`);
-    const audioFile = resolve3(dirname2(mapFile), value);
+    const audioFile = resolve4(dirname2(mapFile), value);
     let stat2;
     let audio;
     try {
-      stat2 = statSync4(audioFile);
+      stat2 = statSync5(audioFile);
       if (!stat2.isFile()) throw new TtsError(`Audio file for narration line "${text2}" is not a file: ${audioFile}`);
-      audio = readFileSync7(audioFile);
+      audio = readFileSync8(audioFile);
     } catch (e) {
       if (e instanceof TtsError) throw e;
       throw new TtsError(`Cannot read audio file for narration line "${text2}": ${audioFile}: ${e.message}`);
@@ -11494,33 +12258,33 @@ function audioMapProvider(mapPath, { which = hasCommand, runCommand = run } = {}
       if (!entry) throw new TtsError(`No audio map entry for narration line "${key}"`);
       let buf;
       try {
-        buf = readFileSync7(entry.file);
+        buf = readFileSync8(entry.file);
       } catch (e) {
         throw new TtsError(`Cannot read audio file for narration line "${key}": ${entry.file}: ${e.message}`);
       }
-      const samples = await mappedSamples(buf, entry.file, { which, runCommand });
+      const samples = await mappedSamples(buf, entry.file, `audio map file ${entry.file}`, { which, runCommand });
       const trimmed = trimSilence(samples);
       if (!trimmed.some((x) => Math.abs(x) >= SILENCE)) throw new TtsError(`Audio file for narration line "${key}" contains only silence: ${entry.file}`);
       return trimmed;
     }
   };
 }
-async function mappedSamples(buf, file, { which, runCommand }) {
+async function mappedSamples(buf, file, label, { which, runCommand }) {
   if (buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WAVE") {
     try {
       return readWav(buf, { downmix: true });
     } catch (e) {
-      if (!which("ffmpeg")) throw new TtsError(`Cannot decode audio map file ${file} (needs 16-bit PCM WAV): ${e.message}`);
+      if (!which("ffmpeg")) throw new TtsError(`Cannot decode ${label} (needs 16-bit PCM WAV): ${e.message}`);
     }
   } else if (!which("ffmpeg")) {
-    throw new TtsError(`Audio map file ${file} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
+    throw new TtsError(`${label[0].toUpperCase()}${label.slice(1)} is not WAV; converting it needs ffmpeg. Install ffmpeg or use 16-bit PCM WAV`);
   }
   return withTemp(async (out) => {
     try {
       await runCommand("ffmpeg", ["-v", "error", "-y", "-i", file, "-ac", "1", "-ar", String(SAMPLE_RATE), "-c:a", "pcm_s16le", out]);
-      return readWav(readFileSync7(out));
+      return readWav(readFileSync8(out));
     } catch (e) {
-      throw new TtsError(`Cannot convert audio map file ${file} with ffmpeg: ${e.message}`);
+      throw new TtsError(`Cannot convert ${label} with ffmpeg: ${e.message}`);
     }
   });
 }
@@ -11576,7 +12340,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in (languageOf is optional) gets the system default voice.
       synth: (text2, { voice } = {}) => withTemp(async (file) => {
         await run("say", [...voice ? ["-v", voice] : [], "-o", file, "--file-format=WAVE", `--data-format=LEI16@${SAMPLE_RATE}`, "-f", textFile(file, text2)]);
-        return readWav(readFileSync7(file));
+        return readWav(readFileSync8(file));
       })
     };
   }
@@ -11592,7 +12356,7 @@ function systemVoice(platform, which) {
       // A caller that does not say which language a line is in gets the English voice, which every espeak-ng build has.
       synth: (text2, { voice } = {}) => withTemp(async (file) => {
         await run("espeak-ng", ["-v", voice ?? "en-us", "-w", file, "-f", textFile(file, text2)]);
-        return readWav(readFileSync7(file));
+        return readWav(readFileSync8(file));
       })
     };
   }
@@ -11647,14 +12411,14 @@ function bestVoice(candidates, base) {
 }
 var stripName = (name2) => name2.replace(/\s*[(（].*$/, "");
 function run(cmd, args) {
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     const p = spawn(cmd, args, { stdio: ["ignore", "ignore", "pipe"] });
     let err = "";
     p.stderr.on("data", (d) => {
       err += d;
     });
     p.on("error", reject);
-    p.on("close", (code) => code === 0 ? resolve7() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
+    p.on("close", (code) => code === 0 ? resolve9() : reject(new TtsError(`${cmd} failed (${code}): ${err.slice(0, 200)}`)));
   });
 }
 function textFile(wavFile, text2) {
@@ -11663,9 +12427,9 @@ function textFile(wavFile, text2) {
   return p;
 }
 async function withTemp(fn2) {
-  const dir = mkdtempSync(join7(tmpdir2(), "am-tts-"));
+  const dir = mkdtempSync(join8(tmpdir2(), "am-tts-"));
   try {
-    return await fn2(join7(dir, "out.wav"));
+    return await fn2(join8(dir, "out.wav"));
   } finally {
     rmSync3(dir, { recursive: true, force: true });
   }
@@ -11727,7 +12491,7 @@ async function synthAll(texts, provider, { cacheDir: wanted, languageOf } = {}) 
       const key = `${provider.id}${voice ? `:${voice}` : ""}${language ? `
 ${language}` : ""}
 ${texts[i]}`;
-      const file = cacheDir && join7(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
+      const file = cacheDir && join8(cacheDir, `${createHash2("sha1").update(key).digest("hex")}.pcm`);
       const cached = file && readCache(file);
       if (cached) {
         results[i] = cached;
@@ -11753,7 +12517,7 @@ function readCache(file) {
   if (!existsSync4(file)) return null;
   let buf;
   try {
-    buf = readFileSync7(file);
+    buf = readFileSync8(file);
   } catch (e) {
     if (!isDenied(e)) throw e;
     return null;
@@ -11961,14 +12725,14 @@ ${sourceTag(source)}
 // src/video/export.js
 import { spawn as spawn3 } from "node:child_process";
 import { writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 import { pathToFileURL } from "node:url";
 
 // src/chrome.js
 import { spawn as spawn2 } from "node:child_process";
 import { existsSync as existsSync5, mkdtempSync as mkdtempSync2, rmSync as rmSync4 } from "node:fs";
 import { tmpdir as tmpdir3 } from "node:os";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 var ExportError = class extends Error {
 };
 var CDP_TIMEOUT_MS = 3e4;
@@ -12009,11 +12773,11 @@ async function openPage(url, {
   scriptError = "Page script error"
 } = {}) {
   if (!chromePath) throw new ExportError("No Chrome / Chromium / Edge found. Set the browser path with the AM_CHROME environment variable");
-  const tmp = mkdtempSync2(join8(tmpdir3(), "am-chrome-"));
+  const tmp = mkdtempSync2(join9(tmpdir3(), "am-chrome-"));
   const chrome = spawn2(chromePath, [
     "--headless=new",
     "--remote-debugging-port=0",
-    `--user-data-dir=${join8(tmp, "profile")}`,
+    `--user-data-dir=${join9(tmp, "profile")}`,
     "--no-first-run",
     "--no-default-browser-check",
     "--hide-scrollbars",
@@ -12074,7 +12838,7 @@ function waitForLoad(loaded, timeoutMs = LOAD_TIMEOUT_MS) {
   ]).finally(() => clearTimeout(timer));
 }
 function devtoolsUrl(chrome, timeoutMs = CHROME_START_TIMEOUT_MS) {
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     let buf = "";
     const fail = (msg) => {
       clearTimeout(timer);
@@ -12090,13 +12854,13 @@ ${tail}` : msg));
       const m2 = buf.match(/DevTools listening on (ws:\/\/\S+)/);
       if (m2) {
         clearTimeout(timer);
-        resolve7(m2[1]);
+        resolve9(m2[1]);
       }
     });
   });
 }
 function connect(url) {
-  return new Promise((resolve7, reject) => {
+  return new Promise((resolve9, reject) => {
     const ws = new WebSocket(url);
     const pending = /* @__PURE__ */ new Map();
     const waiters = /* @__PURE__ */ new Map();
@@ -12114,7 +12878,7 @@ function connect(url) {
         waiters.delete(msg.method);
       }
     });
-    ws.addEventListener("open", () => resolve7({
+    ws.addEventListener("open", () => resolve9({
       send(method, params = {}, sessionId) {
         return new Promise((ok, fail) => {
           const msgId = ++id;
@@ -12172,7 +12936,7 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
   const player = await openPlayer(htmlFile, { env, startTimeoutMs });
   try {
     const { info, evaluate, screenshot, tmp } = player;
-    const wavFile = wav2 ? join9(tmp, "voice.wav") : null;
+    const wavFile = wav2 ? join10(tmp, "voice.wav") : null;
     if (wav2) writeFileSync5(wavFile, wav2);
     const ffmpeg = spawn3("ffmpeg", [
       "-y",
@@ -12207,14 +12971,14 @@ async function exportMp4(htmlFile, mp4File, { wav: wav2, env = process.env, onPr
     });
     ffmpeg.stdin.on("error", () => {
     });
-    const done = new Promise((resolve7, reject) => {
+    const done = new Promise((resolve9, reject) => {
       ffmpeg.on("error", (e) => {
         exited = true;
         reject(new ExportError(`Cannot run ffmpeg: ${e.message}`));
       });
       ffmpeg.on("close", (code) => {
         exited = true;
-        if (code === 0) resolve7();
+        if (code === 0) resolve9();
         else reject(new ExportError(`ffmpeg failed (${code}): ${ffErr.slice(0, 300)}`));
       });
     });
@@ -12271,15 +13035,15 @@ async function exportWebm(htmlFile, webmFile, { env = process.env, onProgress = 
 }
 
 // src/export.js
-import { existsSync as existsSync6, lstatSync as lstatSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readlinkSync, realpathSync as realpathSync3, statSync as statSync5, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
-import { basename as basename3, dirname as dirname3, join as join10, resolve as resolve4 } from "node:path";
+import { existsSync as existsSync6, lstatSync as lstatSync3, mkdirSync as mkdirSync4, readdirSync as readdirSync2, readlinkSync, realpathSync as realpathSync4, statSync as statSync6, unlinkSync, writeFileSync as writeFileSync6 } from "node:fs";
+import { basename as basename3, dirname as dirname3, join as join11, resolve as resolve5 } from "node:path";
 import { pathToFileURL as pathToFileURL2 } from "node:url";
 var VIEWPORT = 1200;
 var DEVICE_SCALE = 2;
 var MAX_SLICE = 1800;
 var SETTLE_MS = 400;
 var CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comment-btn, .am-remark-pop,
-.am-update, .am-btn--update, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
+.am-update, .am-btn--update, .am-btn--export, .am-export, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
   display: none !important;
 }
 .am-table-sort::after { content: none !important; }`;
@@ -12316,8 +13080,8 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   if (pdf && png && sameDirectory(dirname3(pdf), png) && isSliceOf(basename3(pdf), sliceName(file))) {
     throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
   }
-  if (pdf && png && lstatSync2(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
-    const target = resolve4(dirname3(pdf), readlinkSync(pdf));
+  if (pdf && png && lstatSync3(pdf, { throwIfNoEntry: false })?.isSymbolicLink()) {
+    const target = resolve5(dirname3(pdf), readlinkSync(pdf));
     if (sameDirectory(dirname3(target), png) && isSliceOf(basename3(target), sliceName(file))) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
     }
@@ -12331,7 +13095,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
   }
   let inputStat;
   try {
-    inputStat = statSync5(file);
+    inputStat = statSync6(file);
   } catch (e) {
     throw new ExportError(`Cannot read the page ${file}: ${e.message}`);
   }
@@ -12364,7 +13128,7 @@ async function exportPage(file, { pdf, png, env = process.env, onFile = () => {
 function checkPdfCollision(file, pdf, png) {
   let entries;
   try {
-    entries = statSync5(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync2(png) : [];
+    entries = statSync6(png, { throwIfNoEntry: false })?.isDirectory() ? readdirSync2(png) : [];
   } catch (e) {
     throw new ExportError(`Cannot check the PNG folder ${png} for a PDF collision: ${e.message}`);
   }
@@ -12373,7 +13137,7 @@ function checkPdfCollision(file, pdf, png) {
     const index = entry.match(/-([1-9]\d*)\.png$/i)?.[1];
     if (!index || checked.has(index)) continue;
     checked.add(index);
-    const slice = join10(png, `${sliceName(file)}-${index}.png`);
+    const slice = join11(png, `${sliceName(file)}-${index}.png`);
     if (existsSync6(slice) && sameFile(slice, pdf)) {
       throw new ExportError(`The PDF ${pdf} has the name of a PNG slice in ${png}: choose another file name`);
     }
@@ -12401,7 +13165,7 @@ async function writePdf(page, file) {
   return file;
 }
 async function writePngSlices(page, htmlFile, folder, onWarn = () => {
-}, inputStat = statSync5(htmlFile)) {
+}, inputStat = statSync6(htmlFile)) {
   await page.page("Emulation.setEmulatedMedia", { media: "screen" });
   await settle2(page);
   const layout5 = await page.evaluate(`(async () => {
@@ -12426,7 +13190,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
   if (layout5.empty) throw new ExportError("The page is empty: there is nothing to export");
   try {
     mkdirSync4(folder, { recursive: true });
-    if (!statSync5(folder).isDirectory()) throw new Error("not a folder");
+    if (!statSync6(folder).isDirectory()) throw new Error("not a folder");
   } catch (e) {
     throw new ExportError(`Cannot use the PNG folder ${folder}: ${e.message}`);
   }
@@ -12444,7 +13208,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
       captureBeyondViewport: true,
       clip: { x: 0, y: top2, width: VIEWPORT, height, scale: 1 }
     });
-    const file = join10(folder, `${name2}-${i}.png`);
+    const file = join11(folder, `${name2}-${i}.png`);
     if (isInputFile(file, htmlFile, inputStat)) throw new ExportError(`The PNG ${file} is the input page: choose another folder`);
     try {
       writeFileSync6(file, Buffer.from(data, "base64"));
@@ -12457,7 +13221,7 @@ async function writePngSlices(page, htmlFile, folder, onWarn = () => {
   return written;
 }
 function removeStaleSlices(folder, name2, kept, htmlFile, onWarn = () => {
-}, inputStat = statSync5(htmlFile, { throwIfNoEntry: false })) {
+}, inputStat = statSync6(htmlFile, { throwIfNoEntry: false })) {
   let entries;
   try {
     entries = readdirSync2(folder);
@@ -12467,9 +13231,9 @@ function removeStaleSlices(folder, name2, kept, htmlFile, onWarn = () => {
   }
   for (const entry of entries) {
     if (!isSliceOf(entry, name2) || kept.has(entry)) continue;
-    const file = join10(folder, entry);
+    const file = join11(folder, entry);
     try {
-      const st3 = lstatSync2(file);
+      const st3 = lstatSync3(file);
       if (!st3.isFile() && !st3.isSymbolicLink()) {
         onWarn(`Left ${file} in place: it is not a PNG file`);
         continue;
@@ -12491,7 +13255,7 @@ var settle2 = (page) => page.evaluate(`(async () => {
   return true;
 })()`);
 function isHtmlPage(file) {
-  return /\.html?$/i.test(file) && statSync5(file, { throwIfNoEntry: false })?.isFile() === true;
+  return /\.html?$/i.test(file) && statSync6(file, { throwIfNoEntry: false })?.isFile() === true;
 }
 var sliceName = (htmlFile) => basename3(htmlFile).replace(/\.html?$/i, "") || "page";
 var isSliceOf = (fileName, name2) => {
@@ -12499,29 +13263,29 @@ var isSliceOf = (fileName, name2) => {
   return /^[1-9]\d*$/.test(fileName.slice(name2.length + 1, -".png".length));
 };
 var sameFile = (a3, b) => {
-  return sameIdentity(statSync5(a3), statSync5(b));
+  return sameIdentity(statSync6(a3), statSync6(b));
 };
 var sameIdentity = (a3, b) => a3.dev === b.dev && a3.ino === b.ino;
 var isInputFile = (file, htmlFile, inputStat) => {
   if (!existsSync6(file)) return false;
-  const st3 = statSync5(file);
-  return inputStat && sameIdentity(st3, inputStat) || existsSync6(htmlFile) && sameIdentity(st3, statSync5(htmlFile));
+  const st3 = statSync6(file);
+  return inputStat && sameIdentity(st3, inputStat) || existsSync6(htmlFile) && sameIdentity(st3, statSync6(htmlFile));
 };
 var realOrAncestor = (path) => {
   const missing = [];
-  let current = resolve4(path);
+  let current = resolve5(path);
   while (!existsSync6(current) && dirname3(current) !== current) {
     missing.unshift(basename3(current));
     current = dirname3(current);
   }
-  return join10(realpathSync3(current), ...missing);
+  return join11(realpathSync4(current), ...missing);
 };
 var sameDirectory = (a3, b) => {
-  if (resolve4(a3) === resolve4(b)) return true;
+  if (resolve5(a3) === resolve5(b)) return true;
   try {
     if (realOrAncestor(a3) === realOrAncestor(b)) return true;
-    const x = statSync5(a3);
-    const y2 = statSync5(b);
+    const x = statSync6(a3);
+    const y2 = statSync6(b);
     return x.dev === y2.dev && x.ino === y2.ino;
   } catch {
     return false;
@@ -12530,8 +13294,8 @@ var sameDirectory = (a3, b) => {
 var isPath = (value) => value.includes("/") || value.includes("\\");
 
 // src/housekeeping.js
-import { readdirSync as readdirSync3, lstatSync as lstatSync3, rmSync as rmSync5, readFileSync as readFileSync8 } from "node:fs";
-import { join as join11 } from "node:path";
+import { readdirSync as readdirSync3, lstatSync as lstatSync4, rmSync as rmSync5, readFileSync as readFileSync9 } from "node:fs";
+import { join as join12, basename as basename4, resolve as resolve6, relative as relative3, isAbsolute as isAbsolute5, sep as sep4 } from "node:path";
 
 // src/update.js
 import { spawn as spawn4 } from "node:child_process";
@@ -12640,19 +13404,20 @@ var CLEAN = Object.freeze({
 });
 var DIRS4 = ["pages", "videos", "cache"];
 var HOUR = DAY / 24;
+var PAGE_FILE = /^[a-z0-9-]+-\d{8}-\d{6}(-\d+)?\.html$/;
 function walk(dir) {
   let entries;
   try {
-    if (!lstatSync3(dir).isDirectory()) return [];
+    if (!lstatSync4(dir).isDirectory()) return [];
     entries = readdirSync3(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   return entries.flatMap((e) => {
-    const p = join11(dir, e.name);
+    const p = join12(dir, e.name);
     if (e.isDirectory()) return walk(p);
     try {
-      const s = lstatSync3(p);
+      const s = lstatSync4(p);
       return s.isFile() ? [{ path: p, bytes: s.size, mtime: s.mtimeMs }] : [];
     } catch {
       return [];
@@ -12660,26 +13425,42 @@ function walk(dir) {
   });
 }
 var sum = (files) => files.reduce((n, f2) => n + f2.bytes, 0);
-function usage2(home) {
+var insideDir = (dir, path) => {
+  const rel = relative3(resolve6(dir), resolve6(path));
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep4}`) && !isAbsolute5(rel);
+};
+var DATA_DIRS = ["videos", "drafts", "cache", "serve-state", "themes"];
+var samePath = (a3, b) => relative3(resolve6(a3), resolve6(b)) === "";
+var outsidePages = (root, pages) => insideDir(root, pages) || samePath(root, pages) ? (f2) => !insideDir(pages, f2.path) : () => true;
+var pageFiles = (home, pages) => {
+  const nested = DATA_DIRS.map((d) => join12(home, d)).filter((root) => insideDir(pages, root));
+  return walk(pages).filter((f2) => !nested.some((root) => insideDir(root, f2.path)));
+};
+function usage2(home, pages = join12(home, "pages")) {
+  const roots = { pages, videos: join12(home, "videos"), cache: join12(home, "cache") };
   const parts = Object.fromEntries(DIRS4.map((d) => {
-    const files = walk(join11(home, d));
+    const files = d === "pages" ? pageFiles(home, pages) : walk(roots[d]).filter(outsidePages(roots[d], pages));
     return [d, { count: files.length, bytes: sum(files) }];
   }));
   return { ...parts, total: DIRS4.reduce((n, d) => n + parts[d].bytes, 0) };
 }
-function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp } = {}) {
+var pageVictims = (home, pages, cutoff, all, custom) => pageFiles(home, pages).filter((f2) => (all || f2.mtime < cutoff) && (!custom || PAGE_FILE.test(basename4(f2.path))));
+function clean2(home, { days = CLEAN.days, all = false, dryRun = false, now = Date.now(), temp, pages = join12(home, "pages") } = {}) {
   const cutoff = now - days * DAY;
+  const custom = resolve6(pages) !== resolve6(join12(home, "pages"));
   const victims = [
-    ...[home, temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join11(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
-    ...walk(join11(home, "cache"))
+    ...pageVictims(home, pages, cutoff, all, custom),
+    ...["videos", "drafts"].flatMap((d) => walk(join12(home, d)).filter((f2) => outsidePages(join12(home, d), pages)(f2) && (all || f2.mtime < cutoff))),
+    ...[temp].filter(Boolean).flatMap((dir) => ["pages", "videos", "drafts"].flatMap((d) => walk(join12(dir, d)).filter((f2) => all || f2.mtime < cutoff))),
+    ...walk(join12(home, "cache")).filter(outsidePages(join12(home, "cache"), pages))
   ];
-  const gone = new Set(walk(join11(home, "pages")).filter((f2) => all || f2.mtime < cutoff).map((f2) => f2.path));
-  const states = walk(join11(home, "serve-state")).filter((f2) => {
+  const gone = new Set(pageVictims(home, pages, cutoff, all, custom).map((f2) => f2.path));
+  const states = walk(join12(home, "serve-state")).filter(outsidePages(join12(home, "serve-state"), pages)).filter((f2) => {
     if (!f2.path.endsWith(".json")) return f2.mtime < now - HOUR;
     if (all || f2.mtime < cutoff) return true;
     try {
-      const file = JSON.parse(readFileSync8(f2.path, "utf8"))?.file;
-      return typeof file !== "string" || gone.has(join11(home, "pages", file)) || !lstatSync3(join11(home, "pages", file)).isFile();
+      const file = JSON.parse(readFileSync9(f2.path, "utf8"))?.file;
+      return typeof file !== "string" || gone.has(join12(pages, file)) || !lstatSync4(join12(pages, file)).isFile();
     } catch {
       return true;
     }
@@ -12703,11 +13484,11 @@ function cleanHint(state, use, now = Date.now()) {
   const when = state.lastClean ? `last cleaned ${days} days ago` : "never cleaned";
   return `! Cleanup hint: the data directory uses ${mb(use.total)} (${parts}), ${when}. Ask the user whether to run am clean (deletes pages, videos and drafts older than ${CLEAN.days} days and empties the voice-over cache; am clean --all deletes everything).`;
 }
-function afterRender({ home, env, config, current, scriptPath, background, now = Date.now() }) {
+function afterRender({ home, env, config, current, scriptPath, background, now = Date.now(), pages = join12(home, "pages") }) {
   let state = readState(home);
   if (!state.firstSeen) state = writeState(home, { firstSeen: now });
   const hints = [];
-  const c2 = cleanHint(state, usage2(home), now);
+  const c2 = cleanHint(state, usage2(home, pages), now);
   if (c2) {
     hints.push(c2);
     state = writeState(home, { lastCleanHint: now });
@@ -12788,9 +13569,9 @@ import { connect as connect2, isIP } from "node:net";
 import { spawnSync as spawnSync3 } from "node:child_process";
 import { networkInterfaces, uptime } from "node:os";
 import { createHmac, createHash as createHash3, randomBytes, timingSafeEqual } from "node:crypto";
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync4, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
+import { readFileSync as readFileSync10, writeFileSync as writeFileSync7, renameSync as renameSync5, rmSync as rmSync6, mkdirSync as mkdirSync5, watch, lstatSync as lstatSync5, existsSync as existsSync7, openSync, fstatSync, closeSync, linkSync, constants as fsConstants } from "node:fs";
 import { lstat, realpath, readFile, stat } from "node:fs/promises";
-import { join as join12, resolve as resolve5, dirname as dirname4, basename as basename4, sep as sep3 } from "node:path";
+import { join as join13, resolve as resolve7, dirname as dirname4, basename as basename5, sep as sep5 } from "node:path";
 var DEFAULT_PORT = 8765;
 var HOST = "127.0.0.1";
 var LAN_BIND = "0.0.0.0";
@@ -12885,7 +13666,7 @@ var SECRET_PATTERN = /^[0-9a-f]{64}$/;
 function loadSecret(secretFile) {
   if (secretFile === void 0) return randomBytes(32).toString("hex");
   try {
-    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync4(secretFile).isSymbolicLink()) {
+    if (fsConstants.O_NOFOLLOW === void 0 && lstatSync5(secretFile).isSymbolicLink()) {
       throw new ServeError("--secret-file must not be a symbolic link");
     }
     const flags = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
@@ -12894,7 +13675,7 @@ function loadSecret(secretFile) {
       const mode = fstatSync(fd);
       if (!mode.isFile()) throw new ServeError("--secret-file must be a regular file");
       if (process.platform !== "win32" && mode.mode & 36) throw new ServeError("--secret-file must not be readable by group or others");
-      const secret = readFileSync9(fd, "utf8");
+      const secret = readFileSync10(fd, "utf8");
       if (!SECRET_PATTERN.test(secret)) throw new ServeError("--secret-file must contain exactly 64 lowercase hex characters");
       return secret;
     } finally {
@@ -12922,7 +13703,7 @@ function loadSecret(secretFile) {
     }
   }
 }
-var infoPath = (home) => join12(home, "serve.json");
+var infoPath = (home) => join13(home, "serve.json");
 function pageToken(secret, dir, file) {
   return createHmac("sha256", secret).update(`${dir}/${file}`).digest("base64url").slice(0, TOKEN_LENGTH);
 }
@@ -12954,7 +13735,7 @@ var BOOT_SLACK_MS = 5e3;
 var bootedBefore = (startedAt) => startedAt < Date.now() - uptime() * 1e3 - BOOT_SLACK_MS;
 function readServeInfo(home) {
   try {
-    const info = JSON.parse(readFileSync9(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync10(infoPath(home), "utf8"));
     const validBase = info?.baseUrl === void 0 || typeof info.baseUrl === "string" && publicUrlOrigin(info.baseUrl) === info.baseUrl;
     const ok = info && Number.isInteger(info.port) && typeof info.secret === "string" && info.secret.length > 0 && Number.isFinite(info.startedAt) && !bootedBefore(info.startedAt) && alive(info.pid) && validBase;
     const host = isIP(info.host) ? info.host : void 0;
@@ -12963,13 +13744,13 @@ function readServeInfo(home) {
     return null;
   }
 }
-function serveLink(home, file) {
+function serveLink(home, file, pages = resolve7(home, "pages")) {
   try {
     const info = readServeInfo(home);
     if (!info) return null;
-    const path = resolve5(file);
-    const dir = ["pages", "videos"].find((d) => dirname4(path) === resolve5(home, d));
-    const name2 = basename4(path);
+    const path = resolve7(file);
+    const dir = [["pages", resolve7(pages)], ["videos", resolve7(home, "videos")]].find(([, root]) => dirname4(path) === root)?.[0];
+    const name2 = basename5(path);
     return dir && validFileName(name2) ? pageLink(info, dir, name2) : null;
   } catch {
     return null;
@@ -12989,7 +13770,7 @@ function writeInfo(home, info) {
 }
 function removeInfo(home, secret, port) {
   try {
-    const info = JSON.parse(readFileSync9(infoPath(home), "utf8"));
+    const info = JSON.parse(readFileSync10(infoPath(home), "utf8"));
     if (info.secret === secret && info.port === port) rmSync6(infoPath(home), { force: true });
   } catch {
   }
@@ -13002,25 +13783,25 @@ var notFound = (req, res) => reply(req, res, 404, "text/plain; charset=utf-8", "
 var STATE_DIR = "serve-state";
 var MAX_STATE_BYTES = 64 * 1024;
 var STATE_KEYS = Object.freeze(["reply", "remark"]);
-async function pageVersion(home, file) {
+async function pageVersion(home, file, pages = resolve7(home, "pages")) {
   try {
-    const s = await stat(await resolvePage(home, "pages", file));
+    const s = await stat(await resolvePage(home, "pages", file, pages));
     return `${s.mtimeMs}:${s.size}:${s.ino}`;
   } catch {
     return null;
   }
 }
-var stateFile = (home, token) => join12(home, STATE_DIR, `${createHash3("sha256").update(token).digest("hex")}.json`);
+var stateFile = (home, token) => join13(home, STATE_DIR, `${createHash3("sha256").update(token).digest("hex")}.json`);
 function readState2(home, token) {
   try {
-    const record2 = JSON.parse(readFileSync9(stateFile(home, token), "utf8"));
+    const record2 = JSON.parse(readFileSync10(stateFile(home, token), "utf8"));
     return record2 && typeof record2 === "object" ? record2 : null;
   } catch {
     return null;
   }
 }
 function writeState2(home, token, record2) {
-  const dir = join12(home, STATE_DIR);
+  const dir = join13(home, STATE_DIR);
   mkdirSync5(dir, { recursive: true, mode: 448 });
   const path = stateFile(home, token);
   const tmp = `${path}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
@@ -13095,13 +13876,13 @@ async function saveState(req, res, home, secret, file, token, version) {
   res.writeHead(204, { ...HEADERS, ...cors });
   return res.end();
 }
-async function resolvePage(home, dir, file) {
+async function resolvePage(home, dir, file, pages = resolve7(home, "pages")) {
   try {
-    const root = await realpath(join12(home, dir));
-    const path = join12(root, file);
+    const root = await realpath(dir === "pages" ? pages : join13(home, dir));
+    const path = join13(root, file);
     if (!(await lstat(path)).isFile()) return null;
     const real = await realpath(path);
-    return real.startsWith(root + sep3) ? real : null;
+    return real.startsWith(root + sep5) ? real : null;
   } catch {
     return null;
   }
@@ -13115,7 +13896,7 @@ function withLiveReload(html, eventPath, serve) {
   const at3 = withState.search(/<\/body>(?![\s\S]*<\/body>)/i);
   return at3 === -1 ? withState + script : withState.slice(0, at3) + script + withState.slice(at3);
 }
-function liveStreams(home) {
+function liveStreams(home, pages = resolve7(home, "pages")) {
   const streams = /* @__PURE__ */ new Map();
   const seen = /* @__PURE__ */ new Map();
   let watcher = null;
@@ -13128,7 +13909,7 @@ function liveStreams(home) {
   };
   const version = async (file) => {
     try {
-      const s = await stat(await resolvePage(home, "pages", file));
+      const s = await stat(await resolvePage(home, "pages", file, pages));
       return `${s.mtimeMs}:${s.size}:${s.ino}`;
     } catch {
       return null;
@@ -13166,7 +13947,7 @@ function liveStreams(home) {
   const startWatching = () => {
     if (watcher) return;
     try {
-      watcher = watch(join12(home, "pages"), settle3);
+      watcher = watch(pages, settle3);
     } catch {
       return;
     }
@@ -13214,17 +13995,17 @@ function liveStreams(home) {
     }
   };
 }
-async function openEvents(req, res, home, file, live) {
+async function openEvents(req, res, home, file, live, pages = resolve7(home, "pages")) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return reply(req, res, 405, "text/plain; charset=utf-8", "Method not allowed\n");
   }
   const { origin, "sec-fetch-dest": dest } = req.headers;
   if (origin !== void 0 && origin !== "null" || dest !== void 0 && dest !== "empty") return notFound(req, res);
-  if (!await resolvePage(home, "pages", file)) return notFound(req, res);
+  if (!await resolvePage(home, "pages", file, pages)) return notFound(req, res);
   return live.open(file, res, { ...HEADERS, "Content-Type": "text/event-stream; charset=utf-8", "Access-Control-Allow-Origin": "null" });
 }
-function handler(home, secret, allowedHosts, live) {
+function handler(home, secret, allowedHosts, live, pages = resolve7(home, "pages")) {
   return async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, allowedHosts)) return notFound(req, res);
@@ -13239,7 +14020,7 @@ function handler(home, secret, allowedHosts, live) {
       }
       if (!validFileName(file)) return notFound(req, res);
       if (prefix === SAVE) {
-        const version = await pageVersion(home, file);
+        const version = await pageVersion(home, file, pages);
         if (!token) return notFound(req, res);
         return await saveState(req, res, home, secret, file, token, version);
       }
@@ -13251,16 +14032,16 @@ function handler(home, secret, allowedHosts, live) {
       const dir = events ? "pages" : Object.hasOwn(PREFIX2, prefix) ? PREFIX2[prefix] : void 0;
       if (!dir || !token) return notFound(req, res);
       if (!tokenMatches(secret, dir, file, token)) return notFound(req, res);
-      if (events) return await openEvents(req, res, home, file, live);
+      if (events) return await openEvents(req, res, home, file, live, pages);
       const dest = req.headers["sec-fetch-dest"];
       if (dest !== void 0 && dest !== "document") return notFound(req, res);
-      const real = await resolvePage(home, dir, file);
+      const real = await resolvePage(home, dir, file, pages);
       if (!real) return notFound(req, res);
       const html = await readFile(real);
       const page = LOOPBACK_HOST.test(req.headers.host) ? html.toString("utf8") : withoutUpdateNotice(html.toString("utf8"));
       const body = dir === "pages" ? withLiveReload(page, eventLink({ secret }, file), {
         save: `/${SAVE}/${token}/${encodeURIComponent(file)}`,
-        state: restorable(readState2(home, token), await pageVersion(home, file)) ?? void 0
+        state: restorable(readState2(home, token), await pageVersion(home, file, pages)) ?? void 0
       }) : page;
       return reply(req, res, 200, "text/html; charset=utf-8", body);
     } catch {
@@ -13280,7 +14061,7 @@ function listening(port, host = HOST, timeout = 500) {
     socket.once("error", () => end(false));
   });
 }
-async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost }) {
+async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, lanAddresses, secretFile, tailscale = false, tailscaleStatus, bindHost, pagesDir: pagesDir2 = resolve7(home, "pages") }) {
   const addresses = lan ? lanAddresses ?? lanIPv4Addresses() : [];
   if (lan && (!addresses.length || addresses.some((address) => isIP(address) !== 4 || address === LAN_BIND || address.startsWith("127.")))) {
     throw new ServeError("--lan needs at least one active non-loopback IPv4 interface");
@@ -13293,9 +14074,9 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
   const running = readServeInfo(home);
   if (running && await listening(running.port, running.host)) throw new ServeError(`am serve is already running on ${running.baseUrl ?? `http://${HOST}:${running.port}`} (pid ${running.pid}); stop it first`);
   if (tail && !secretFile) ensureHome(home);
-  const secret = loadSecret(secretFile ?? (tail ? join12(home, "serve-secret") : void 0));
-  const live = liveStreams(home);
-  const server = createServer(handler(home, secret, allowedHosts, live));
+  const secret = loadSecret(secretFile ?? (tail ? join13(home, "serve-secret") : void 0));
+  const live = liveStreams(home, pagesDir2);
+  const server = createServer(handler(home, secret, allowedHosts, live, pagesDir2));
   await new Promise((done, fail) => {
     server.once("error", (e) => fail(e.code === "EADDRINUSE" ? new ServeError(`Port ${port} is already in use; pick another with am serve --port <n>`) : tail && e.code === "EADDRNOTAVAIL" ? new ServeError(`Cannot listen on ${listenHost}: Tailscale in userspace-networking mode has no interface for it. For tailnet devices, run \`tailscale serve --bg ${port}\` and am serve --public-url https://<machine>.<tailnet>.ts.net; --lan reaches only the local network`) : e));
     server.listen(port, listenHost, done);
@@ -13320,12 +14101,12 @@ async function startServer({ home, port = DEFAULT_PORT, lan = false, publicUrl, 
     });
     return closed;
   };
-  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join12(home, "serve-secret") : secretFile };
+  return { port: actual, secret, close, baseUrl, addresses, lan, tailscale: !!tail, secretPath: tail && !secretFile ? join13(home, "serve-secret") : secretFile };
 }
-async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, print, fail }) {
+async function runServe({ home, port, lan = false, publicUrl, secretFile, tailscale = false, pagesDir: pagesDir2, print, fail }) {
   let srv;
   try {
-    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale });
+    srv = await startServer({ home, port, lan, publicUrl, secretFile, tailscale, pagesDir: pagesDir2 });
   } catch (e) {
     if (!(e instanceof ServeError)) throw e;
     fail(`\u2717 ${e.message}`);
@@ -13364,7 +14145,7 @@ Usage:
                       [--template sheet|doc] [--style off|80|strict] [--mode auto|light|dark]
   am patch  <html> --panel <title> [file|-] [--from file] [--theme \u2026] [--no-open]
                                                   replace one ## panel of an existing page and overwrite that HTML in place
-  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off | --audio-map <file.json>]
+  am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|cmd|system|off | --audio-map <file.json>]
                       [--mp4] [--webm] [--no-open] [--theme ${["auto", ...themeNames("video")].join("|")}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
   am export <page.html> [--pdf <file.pdf>] [--png <dir>]
@@ -13382,7 +14163,7 @@ Usage:
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
-- A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
+- A page with STE, code or ref warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 var FORMAT = `Draft format (extended Markdown)
@@ -13451,6 +14232,10 @@ export const LIMIT = 50
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ \u2026) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
+- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file (also in tree, timeline, kv and ask text;
+  diagram text is not checked). The render checks it against the same
+  folder and prints a refs warning when the file is missing, the lines go past its end, or the range runs backwards; the page then does not open.
+  A missing path is a warning only when its first folder exists here, so a path of another project is not checked.
 
 Diff blocks: show a change
 
@@ -13507,7 +14292,7 @@ Client -> Server: ACK
   with more narration lines than steps, the extra first lines act as an opening and show nothing new.
 - Write [name] in narration: the camera zooms in on the element with that name and highlights it, and the word turns yellow in the caption.
 - Nodes / participants with the same name in adjacent scenes move smoothly from the old position to the new one (cross-scene morph).
-- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | system | off.
+- Voice-over: --voice auto (default: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS) | elevenlabs | local | cmd | system | off.
   The system voice is picked for each line from the languages installed on the machine: macOS say takes the installed voice of
   the line's language (a Taiwan voice for Traditional Chinese), Linux takes the espeak-ng voice for it.
   A line whose language has no installed voice keeps its caption without narration, and the run says which language that was.
@@ -13518,6 +14303,11 @@ Client -> Server: ACK
   and am always sets input, response_format and stream. A line whose duration is clearly wrong is synthesized again,
   up to AM_TTS_ATTEMPTS times per line (default 3; set 1 to turn this off).
   Example: AM_TTS_URL=http://127.0.0.1:8000 AM_TTS_MODEL=mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit       AM_TTS_VOICE=vivian am video draft.md --voice local
+  cmd runs a command-line TTS once per line, with no server: AM_TTS_CMD is the command, split into words by am and run
+  without a shell. In each word {text} is the line, {text_file} a file holding it, {out} the file the command writes its audio to
+  (required) and {lang} the line's language tag; the line is also written to its stdin. Audio that is not 16-bit PCM WAV needs ffmpeg.
+  Example (edge-tts reads with Microsoft's online voices, so it needs the network; pip install edge-tts):
+      AM_TTS_CMD='edge-tts --voice zh-CN-XiaoxiaoNeural --file {text_file} --write-media {out}' am video draft.md --voice cmd
   --audio-map lines.json reads ready-made audio from a JSON object of narration line to audio file, for example
   {"First the client sends SYN.":"audio/01.mp3"}. Relative audio paths start at the map file's folder. Keys ignore > and [ ]
   markers and extra whitespace. Non-WAV audio needs ffmpeg; every line needs an entry and every audio file must exist.
@@ -13625,7 +14415,7 @@ async function withSource(arg, io, fail, fn2) {
   const cwd = io.cwd ?? process.cwd();
   let src;
   try {
-    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve6(cwd, arg), "utf8");
+    src = arg === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync11(resolve8(cwd, arg), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the draft: ${e.message}`);
     return 2;
@@ -13634,7 +14424,7 @@ async function withSource(arg, io, fail, fn2) {
     fail("\u2717 The draft is empty");
     return 2;
   }
-  return fn2(src, arg === "-" ? cwd : dirname5(resolve6(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve6(cwd, arg) });
+  return fn2(src, arg === "-" ? cwd : dirname5(resolve8(cwd, arg)), arg === "-" ? { stdin: true } : { file: resolve8(cwd, arg) });
 }
 async function readStream(stream) {
   const chunks = [];
@@ -13654,12 +14444,13 @@ function shouldOpen(opts, env, config) {
 }
 async function cmdRender(src, opts, ctx, baseDir, from) {
   const { fail, print } = ctx;
-  const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx);
+  const config = loadConfig(ctx);
+  const pages = pagesDir(ctx.env, config);
+  const replaced = opts.replace === void 0 ? null : pagePath(opts.replace, ctx, pages);
   if (replaced === false) {
-    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${join13(amHome(ctx.env), "pages")} or ${join13(tempHome(), "pages")})`);
+    fail(`\u2717 --replace takes a page that am render wrote (a .html file in ${pages} or ${join14(tempHome(), "pages")})`);
     return 2;
   }
-  const config = loadConfig(ctx);
   const { theme, mode, style } = config.values;
   await loadMath(src);
   let result;
@@ -13668,12 +14459,12 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }
-  const file = outputPath("pages", nameSource(result.meta), opts, ctx);
+  const file = outputPath("pages", nameSource(result.meta), opts, ctx, pages);
   if (!file) return 2;
-  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages" });
+  const written = emit(result, file, ctx, { fallback: opts.out ? void 0 : "pages", pages, modeFrom: replaced });
   if (!written) return 1;
   if (opts.out && !extname3(file)) print("! -o names a file without an extension; use .html for an HTML page");
-  if (replaced && replaced !== resolve6(written)) removeEarlier(replaced, ctx);
+  if (replaced && replaced !== resolve8(written)) removeEarlier(replaced, ctx);
   keepDraft(result, src, from, ctx);
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
@@ -13681,7 +14472,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
 }
 var updateFor = (config, { env, io }) => pageUpdate(readState(amHome(env)), VERSION, io.scriptPath, env, config.values);
 var hasWarnings = (result) => hasRetryWarnings(result) || (result.stats.componentWarnings ?? []).length > 0 || (result.stats.htmlWarnings ?? []).length > 0;
-var draftsDir = (home) => join13(resolve6(home), "drafts");
+var draftsDir = (home) => join14(resolve8(home), "drafts");
 function draftTitle(src) {
   const m2 = src.match(/^title:\s*["']?(.+?)["']?\s*$/m) ?? src.match(/^#\s+(.+)$/m);
   return m2?.[1] ?? "";
@@ -13711,7 +14502,7 @@ function saveDraft(src, { env, io }) {
 }
 function writeNew(dir, name2, text2) {
   for (let n = 1; ; n++) {
-    const file = join13(dir, n === 1 ? name2 : name2.replace(/\.md$/, `-${n}.md`));
+    const file = join14(dir, n === 1 ? name2 : name2.replace(/\.md$/, `-${n}.md`));
     try {
       writeFileSync8(file, text2, { flag: "wx" });
       return file;
@@ -13734,7 +14525,7 @@ function keepDraft(result, src, from, ctx) {
   }
 }
 function isKeptDraft(path, { env }) {
-  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname5(path)) && basename5(path).endsWith(".md");
+  return [draftsDir(amHome(env)), draftsDir(tempHome())].includes(dirname5(path)) && basename6(path).endsWith(".md");
 }
 var isDraftError = (e) => e instanceof DraftErrors || e instanceof RenderError || e instanceof LintError || e instanceof ParseError && e.line > 0;
 function reportDraftError(e, src, from, ctx) {
@@ -13745,11 +14536,11 @@ function reportDraftError(e, src, from, ctx) {
   }
   return code;
 }
-var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
-function pagePath(arg, { env, io }) {
-  const path = resolve6(io.cwd ?? process.cwd(), arg);
-  const folders = [resolve6(amHome(env), "pages"), resolve6(tempHome(), "pages")];
-  return folders.includes(dirname5(path)) && basename5(path).endsWith(".html") ? path : false;
+var hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.refWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
+function pagePath(arg, { env, io }, pages = join14(amHome(env), "pages")) {
+  const path = resolve8(io.cwd ?? process.cwd(), arg);
+  const folders = [resolve8(pages), resolve8(tempHome(), "pages")];
+  return folders.includes(dirname5(path)) && basename6(path).endsWith(".html") ? path : false;
 }
 var EXPORT_HELP = `Export a rendered page as an A4 PDF and/or PNG slices for a chat app
 
@@ -13844,10 +14635,10 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     return 2;
   }
   const cwd = io.cwd ?? process.cwd();
-  const file = resolve6(cwd, htmlArg);
+  const file = resolve8(cwd, htmlArg);
   let html;
   try {
-    html = readFileSync10(file, "utf8");
+    html = readFileSync11(file, "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the HTML: ${e.message}`);
     return 2;
@@ -13861,7 +14652,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const from = opts.from ?? fromArg;
   let replacement;
   try {
-    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync10(resolve6(cwd, from), "utf8");
+    replacement = !from || from === "-" ? await readStream(io.stdin ?? process.stdin) : readFileSync11(resolve8(cwd, from), "utf8");
   } catch (e) {
     fail(`\u2717 Cannot read the new panel draft: ${e.message}`);
     return 2;
@@ -13880,6 +14671,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     return 1;
   }
   const config = loadConfig(ctx);
+  const pages = pagesDir(ctx.env, config);
   const { theme, mode, style } = config.values;
   const overrides = {
     template: video ? void 0 : opts.template ?? page.template,
@@ -13909,7 +14701,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
     }
     return reportError(e, fail);
   }
-  if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "", inPlace: true })) return 1;
+  if (!emit(result, file, ctx, { note: video ? " (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)" : "", inPlace: true, pages })) return 1;
   return finish(file, opts, config, ctx);
 }
 async function cmdExport(arg, opts, ctx) {
@@ -13928,7 +14720,7 @@ async function cmdExport(arg, opts, ctx) {
     return 2;
   }
   const cwd = io.cwd ?? process.cwd();
-  const file = resolve6(cwd, arg);
+  const file = resolve8(cwd, arg);
   let isPage;
   try {
     isPage = isHtmlPage(file);
@@ -13940,8 +14732,8 @@ async function cmdExport(arg, opts, ctx) {
     fail(`\u2717 ${arg} is not an existing .html file: am export takes a page am render wrote`);
     return 2;
   }
-  const pdf = opts.pdf === void 0 ? void 0 : resolve6(cwd, opts.pdf);
-  const png = opts.png === void 0 ? void 0 : resolve6(cwd, opts.png);
+  const pdf = opts.pdf === void 0 ? void 0 : resolve8(cwd, opts.pdf);
+  const png = opts.png === void 0 ? void 0 : resolve8(cwd, opts.png);
   try {
     await exportPage(file, { pdf, png, env, onFile: (f2) => print(`\u2713 ${f2}`), onWarn: (message) => fail(`! ${message}`) });
     return 0;
@@ -13996,7 +14788,7 @@ function validAudioMap(opts, fail) {
   return true;
 }
 async function buildVideo(src, voice, opts, config, { fail, env, io, themes: themes2 }) {
-  const provider = opts["audio-map"] !== void 0 ? audioMapProvider(resolve6(io.cwd ?? process.cwd(), opts["audio-map"])) : io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
+  const provider = opts["audio-map"] !== void 0 ? audioMapProvider(resolve8(io.cwd ?? process.cwd(), opts["audio-map"])) : io.ttsProvider !== void 0 ? io.ttsProvider : pickProvider(voice, env);
   const result = await renderVideo(src, {
     provider,
     cacheDir: provider ? narrationCache(amHome(env)) : void 0,
@@ -14015,7 +14807,7 @@ function narrationCache(home) {
     if (!isDenied(e)) throw e;
     return void 0;
   }
-  return join13(home, "cache", "tts");
+  return join14(home, "cache", "tts");
 }
 function voiceSummary(provider, captionsOnly = []) {
   if (!provider) return "none (captions only)";
@@ -14046,16 +14838,16 @@ function loadConfig({ fail, env, themes: themes2 }) {
 function themeWarnings({ fail, themes: themes2 }) {
   themes2.warnings.forEach((w2) => fail(`! ${w2}`));
 }
-function outputPath(dir, title, opts, { env, io, fail }) {
+function outputPath(dir, title, opts, { env, io, fail }, folder = join14(amHome(env), dir)) {
   if (opts.out) {
-    const file2 = resolve6(io.cwd ?? process.cwd(), opts.out);
-    if (statSync6(file2, { throwIfNoEntry: false })?.isDirectory()) {
+    const file2 = resolve8(io.cwd ?? process.cwd(), opts.out);
+    if (statSync7(file2, { throwIfNoEntry: false })?.isDirectory()) {
       fail("\u2717 -o names a folder; give a file path, for example -o page.html");
       return null;
     }
     return file2;
   }
-  const file = join13(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join14(folder, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
   return opts.replace === void 0 ? unusedPagePath(file) : file;
 }
 function unusedPagePath(file) {
@@ -14064,38 +14856,60 @@ function unusedPagePath(file) {
     if (!existsSync8(candidate)) return candidate;
   }
 }
-function writePage(file, html, env) {
-  const home = resolve6(amHome(env));
-  const path = resolve6(file);
-  if (path.startsWith(home + sep4)) ensureHome(home);
+var inside = (dir, target) => {
+  const rel = relative4(resolve8(dir), resolve8(target));
+  return rel !== "" && rel !== ".." && !rel.startsWith(`..${sep6}`) && !isAbsolute6(rel);
+};
+function writePage(file, html, env, pages = join14(amHome(env), "pages"), modeFrom = null) {
+  const home = resolve8(amHome(env));
+  const path = resolve8(file);
+  if (inside(home, path)) ensureHome(home);
   mkdirSync6(dirname5(file), { recursive: true });
-  if (!path.startsWith(join13(home, "pages") + sep4)) return writeFileSync8(file, html);
-  const tmp = join13(dirname5(file), `.${basename5(file)}.${process.pid}.tmp`);
+  if (!inside(pages, path)) return writeFileSync8(file, html);
+  const tmp = join14(dirname5(file), `.${basename6(file)}.${process.pid}.${randomBytes2(6).toString("hex")}.tmp`);
+  const mode = (modeFrom && modeOf(modeFrom)) ?? statSync7(file, { throwIfNoEntry: false })?.mode;
+  let fd = null;
+  let created = false;
   try {
-    writeFileSync8(tmp, html);
+    fd = openSync2(tmp, "wx", mode === void 0 ? 438 : 384);
+    created = true;
+    writeFileSync8(fd, html);
+    closeSync2(fd);
+    fd = null;
+    if (mode !== void 0) chmodSync2(tmp, mode & 511);
     renameOver(tmp, file);
   } finally {
-    rmSync7(tmp, { force: true });
+    if (fd !== null) closeSync2(fd);
+    if (created) rmSync7(tmp, { force: true });
   }
 }
-function savePage(html, file, { fallback, inPlace }, { fail, env }) {
+function modeOf(path) {
+  try {
+    return statSync7(path, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return 384;
+  }
+}
+function savePage(html, file, { fallback, inPlace, pages, modeFrom }, { fail, env }) {
   const home = amHome(env);
-  const inHome = resolve6(file).startsWith(resolve6(home) + sep4);
+  const pageRoot = pages ?? join14(home, "pages");
+  const inHome = inside(home, file);
   const hint = (path) => {
     if (inPlace) return "Copy the page to a folder this session can write to and patch the copy";
-    return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename5(path)}"` : "Give -o a file in a folder this session can write to";
+    return inHome ? `If this session can write only inside the workspace, run the command again with -o "<workspace>/.tmp/answers/${basename6(path)}"` : "Give -o a file in a folder this session can write to";
   };
   const refuse = (path, e) => fail(`\u2717 Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
-    writePage(file, html, env);
+    writePage(file, html, env, pageRoot, modeFrom);
     return { file };
   } catch (e) {
     if (!isDenied(e)) throw e;
     if (!(fallback && inHome)) return refuse(file, e), null;
-    const spare = join13(tempHome(), fallback, basename5(file));
+    const spare = join14(tempHome(), fallback, basename6(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env);
+      writePage(spare, html, env, join14(tempHome(), "pages"), modeFrom);
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`\u2717 Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -14113,13 +14927,13 @@ function removeEarlier(file, { fail }) {
     fail(`! Kept the earlier page ${file} (permission denied, ${e.code})`);
   }
 }
-function emit(result, file, ctx, { note: note2 = "", fallback, inPlace } = {}) {
+function emit(result, file, ctx, { note: note2 = "", fallback, inPlace, pages, modeFrom } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, { fallback, inPlace }, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace, pages, modeFrom }, ctx);
   if (!saved) return null;
   print(`\u2713 ${saved.file}`);
   if (saved.notice) print(saved.notice);
-  const link = serveLink(amHome(env), saved.file);
+  const link = serveLink(amHome(env), saved.file, pages);
   if (link) print(`  link: ${link}`);
   print(`  ${summaryLine(result)}${note2}`);
   if (result.stats.code?.length) print(`  code embedded from: ${result.stats.code.join(", ")}`);
@@ -14128,11 +14942,18 @@ function emit(result, file, ctx, { note: note2 = "", fallback, inPlace } = {}) {
     print(`  code ${count(long.length, "warning")} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w2) => print(`  L${w2.line} [${w2.rule}] ${w2.message}`));
   }
+  printRefWarnings(result.stats.refWarnings, print);
   printComponentWarnings(result.stats.componentWarnings, print);
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printMathWarnings(result.stats.mathWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
   return saved.file;
+}
+function printRefWarnings(notes = [], print) {
+  if (!notes.length) return;
+  print(`  refs ${count(notes.length, "warning")} (fix the path or the lines and run again; keep it if the path is from another project):`);
+  notes.slice(0, MAX_LISTED_WARNINGS).forEach((w2) => print(`  L${w2.line} [${w2.rule}] ${w2.message}`));
+  if (notes.length > MAX_LISTED_WARNINGS) print(`  \u2026 ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 function printComponentWarnings(notes = [], print) {
   if (!notes.length) return;
@@ -14174,6 +14995,7 @@ function printHints(config, { env, io, print }) {
       env,
       config: config.values,
       current: VERSION,
+      pages: pagesDir(env, config),
       scriptPath: io.scriptPath,
       background: Boolean(io.background)
     });
@@ -14188,11 +15010,12 @@ function cmdClean(opts, { print, fail, env }) {
   }
   const days = opts.days === void 0 ? CLEAN.days : Number(opts.days);
   const home = amHome(env);
-  const before = usage2(home);
+  const pages = pagesDir(env, readConfig(env));
+  const before = usage2(home, pages);
   const temp = existingTempHome();
   const tempBefore = temp && usage2(temp);
   const dry = Boolean(opts["dry-run"]);
-  const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry, temp });
+  const r = clean2(home, { days, all: Boolean(opts.all), dryRun: dry, temp, pages });
   const scope = opts.all ? "all pages, videos and drafts" : `pages, videos and drafts older than ${count(days, "day")}`;
   print(`Data directory: ${home} (${mb(before.total)} in total: ${count(before.pages.count, "page")}, ${count(before.videos.count, "video")}, ${mb(before.cache.bytes)} voice-over cache)`);
   if (temp) print(`Temporary folder: ${temp} (${mb(tempBefore.total)} in total: ${count(tempBefore.pages.count, "page")}, ${count(tempBefore.videos.count, "video")})`);
@@ -14217,8 +15040,9 @@ function cmdServe(opts, { print, fail, env, io }) {
     return 2;
   }
   const port = opts.port === void 0 ? DEFAULT_PORT : Number(opts.port);
-  const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve6(io?.cwd ?? process.cwd(), opts["secret-file"]);
-  return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts["public-url"], secretFile, print, fail });
+  const secretFile = opts["secret-file"] === void 0 ? void 0 : resolve8(io?.cwd ?? process.cwd(), opts["secret-file"]);
+  const pages = pagesDir(env, readConfig(env));
+  return runServe({ home: amHome(env), port, lan: !!opts.lan, tailscale: !!opts.tailscale, publicUrl: opts["public-url"], secretFile, pagesDir: pages, print, fail });
 }
 function cmdLint(src, opts, { print, fail }) {
   let doc2;
@@ -14306,8 +15130,9 @@ function cmdConfig(args, { print, fail, env, themes: themes2 }) {
   print(`Config file: ${path}`);
   for (const [k, spec] of Object.entries(CONFIG_KEYS)) {
     const mark = k in stored ? "*" : " ";
-    const options = spec.type === "bool" ? "on | off" : spec.type === "number" ? `${spec.min}\u2013${spec.max}, step ${spec.step}` : configChoices(k, themes2).join(" | ");
-    print(`${mark} ${k.padEnd(19)}${showValue(values[k]).padEnd(10)}${spec.label} (${options})`);
+    const options = spec.type === "bool" ? "on | off" : spec.type === "number" ? `${spec.min}\u2013${spec.max}, step ${spec.step}` : spec.type === "path" ? "a folder path" : configChoices(k, themes2).join(" | ");
+    const shown2 = showValue(values[k]);
+    print(`${mark} ${k.padEnd(19)}${shown2.length >= 10 ? `${shown2} ` : shown2.padEnd(10)}${spec.label} (${options})`);
   }
   if (env.AM_NO_OPEN && env.AM_NO_OPEN !== "0") print("Note: the AM_NO_OPEN environment variable is set and overrides the open setting.");
   print("* marks a value you changed. Change: am config set <key> <value>; reset to default: am config reset [key]");
@@ -14347,8 +15172,8 @@ function cmdTheme(action, target, opts, ctx) {
     return 2;
   }
   const isFile = /\.json$/i.test(target) || /[\\/]/.test(target);
-  const path = isFile ? resolve6(io.cwd ?? process.cwd(), target) : join13(amHome(env), "themes", `${target}.json`);
-  const name2 = isFile ? basename5(path).replace(/\.json$/i, "") : target;
+  const path = isFile ? resolve8(io.cwd ?? process.cwd(), target) : join14(amHome(env), "themes", `${target}.json`);
+  const name2 = isFile ? basename6(path).replace(/\.json$/i, "") : target;
   let theme;
   let errors = [];
   if (!isFile && getTheme(name2)) {
@@ -14370,10 +15195,11 @@ function cmdTheme(action, target, opts, ctx) {
   if (!theme.scope.includes("page")) return 0;
   const themes2 = isFile ? loadThemes(amHome(env), { extra: path }) : ctx.themes;
   const config = readConfig(env, themes2);
+  const pages = pagesDir(env, config);
   const files = ["light", "dark"].map((mode) => {
     const result = renderDoc(specimenDraft(name2, mode), { theme: name2, mode, style: "off" }, {}, { themes: themes2, colophon: config.values.colophon });
-    const file = outputPath("pages", `theme-${name2}-${mode}`, {}, ctx);
-    writePage(file, result.html, env);
+    const file = outputPath("pages", `theme-${name2}-${mode}`, {}, ctx, pages);
+    writePage(file, result.html, env, pages);
     print(`\u2713 ${file}`);
     return file;
   });

@@ -82,18 +82,43 @@ response NOT_FOUND
 ```
 ````
 
-- One endpoint per `api` block. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
+- One `api` block can group the HTTP/RPC endpoints changed by one requirement; declare each at column 0. HTTP uses an uppercase method and a `/path`; RPC uses `RPC` and the service/method name.
 - Sections are `path`, `query`, `headers`, `request [Type]` and `response STATUS [Type]`. RPC uses `request` and `response`. HTTP response codes are 100-599; RPC supports named statuses. A response with no fields can describe an empty body.
 - Indent fields as `name type [required|optional] | description`. Types, nested field paths and descriptions are plain text. The Requirement column shows explicit Required or Optional labels. An unspecified value shows a dash when the column is present; tables with no explicit requirements omit the column.
 - Escape a literal type pipe as `\|`: write `email string \| null optional | Contact` for the union type `string | null`. The first unescaped `|` starts the description.
 - Labels follow the page language. Class diagrams use the existing theme tokens, scaling and diagram viewer; contract fields use semantic tables. Both render offline.
 - These blocks display definitions. They do not send requests or import OpenAPI / protobuf files. Class diagrams do not interpret `+` / `-` visibility signs as change markers.
 
+To show a coordinated API change, mark endpoints, sections or indented fields with `+`, `-` or `~` followed by a space:
+
+````markdown
+```api
+~ GET /users/{id}
+response 200 User
+  id string required
+  - email string optional
+  + email string required
+~ RPC users.UserService/GetUser
+response OK User
+  - email string optional
+  + email string required
++ POST /users/batch
+request BatchRequest
+  ids string[] required
+- GET /v1/users/{id}
+response 200 User
+```
+````
+
+One **Before / Changes / After** switch controls all endpoints in the block. Before hides added endpoints, sections and fields; After hides removed ones. Unchanged items stay in both views. Hidden HTML items take no space. The children of an added or removed item inherit its marker; contradictory markers are errors. `~` marks only its item, not its children. Counts include inherited markers. For exact before/after values, write `-` for the old definition and `+` for its replacement; `~` alone has no old value to reconstruct. This includes a change of path, type, requiredness or response status.
+
 Full syntax: `am help class`, `am help er`, `am help api`.
 
 ## Answer on the page
 
 Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
+
+The toolbar also has an **Export** button that opens a small menu. **Copy as image** draws the whole page into a PNG and puts it on the clipboard; **Download PNG** saves the same PNG, named after the page title; **Save as PDF** opens the browser's print dialog (the toolbar and the menu do not print). Chromium (including Chromium embedded in an app: Electron, WebView2) and Firefox can draw the page; in Safari and other browsers the two image items stay available but say the result is not guaranteed. An item that cannot work says why on its own line in the menu: Copy as image needs a secure context (a local file, `localhost` or HTTPS), the Clipboard API and a preview that allows clipboard writes, while Download PNG and Save as PDF do not need the clipboard. A refused copy reports a failure and does not download anything. From a terminal, `am export --png` and `am export --pdf` do the same jobs.
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
@@ -111,6 +136,7 @@ Which cache do we use?
 
 - The first line is the question. Each option starts with `*` (the suggestion, shown with a tag; every option starts unselected) or `-`. Write 2 to 6 options.
 - One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options you suggest; they start unselected too.
+- An option may carry one preview: indent a `:::` block under it. The block takes any component, plus `html` and `svg`; add it only when a picture helps. `ask cards` lays the options out in a grid, so each preview becomes a card canvas.
 - The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text and remark notes come back quoted with `>`.
 
 Full syntax: `am help ask`.
@@ -129,6 +155,7 @@ Quote code that exists in the project instead of typing it:
 - `hl=22` or `hl=20-22,25` highlights lines. For code you type, `title="limits.ts · sketch"` names it and `start=38` numbers it from line 38.
 - A block longer than 40 lines gets a warning; more than 200 lines is an error. Files that hold keys by convention (`.env`, `*.pem`, `id_rsa`, `.ssh/`, `.git/` …) and files with anything that looks like a key or a token are refused. The rules follow html-plan's.
 - The render lists every file it embedded. The page keeps the path; `am patch` reads the file again, or keeps the page's copy when the file has moved.
+- An inline code span in the text that is only a path and a line, such as `` `src/cli.js:42` `` or `` `src/cli.js:18-30` ``, cites the file. This holds in the text, tables, callouts, `tree` labels and notes, `timeline` titles and notes, `kv` values and `ask` questions and options; diagram text (`flow`, `sequence`, `state` …) shows backticks as they are and is not checked. The render checks it against the same folder and prints a `refs` warning with the draft line (`L12 [ref] ...`) when the file is missing, the lines go past its end, or the range runs backwards. A page with these warnings does not open, the same as with code warnings. A missing path is a warning only when its first folder exists in the current folder (`src/clii.js:4` when `src/` exists); a path of another project (`other-repo/x.py:3`), a file outside the current folder, a secret file, `localhost:3000`, URLs, absolute paths and spans in code blocks are not checked.
 
 To show a change, paste a unified diff in a `diff` fence and the CLI draws it:
 
@@ -248,7 +275,7 @@ AM_EOF
 
 After you render the page again, an automatic ID can name a different panel, and a patch by that letter changes the wrong panel with no warning: the tool cannot tell it from a rename. Before you patch by letter, give the panels explicit letters in the draft.
 
-Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. When the session may not write there (a host sandbox that allows writes only in the workspace), `am render` and `am video` without `-o` save the page in a private folder in the system temporary folder instead (`answer-me-with-html-<uid>/pages/`; mode 0700, and a folder that is not private to your user is refused) and say so; the system may clear it. `am clean` and `--replace` cover that folder, `am serve` does not. `am patch` never moves a page. A page or video without `-o` is named the same way as a saved draft (below): `<name>-<time>.html`, so a draft whose title is all Chinese gets a readable name from `file: tcp-handshake`. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE or code warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. A render lists every draft error at once, in line order, and writes no page. When the draft came from stdin (`am render -`) and has errors or warnings, it is saved as `drafts/<name>-<time>.md` in the data directory, where `<name>` is the draft's `file:` field, or the title when `file:` is missing or has no ASCII letter or digit, reduced to lowercase ASCII letters and digits (runs of other characters become one `-`, at most 24 characters, or `page` when none are left), and the output prints `draft: <path>`; the line numbers match that file, so edit the flagged lines there and run `am render <path>`. A draft in `drafts/` is deleted after a render with no warnings. A draft you give as a file is never copied. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
+Pages go to `~/.answer-me-with-html/pages/` by default. Set `AM_HOME` to move them. When the session may not write there (a host sandbox that allows writes only in the workspace), `am render` and `am video` without `-o` save the page in a private folder in the system temporary folder instead (`answer-me-with-html-<uid>/pages/`; mode 0700, and a folder that is not private to your user is refused) and say so; the system may clear it. `am clean` and `--replace` cover that folder, `am serve` does not. `am patch` never moves a page. A page or video without `-o` is named the same way as a saved draft (below): `<name>-<time>.html`, so a draft whose title is all Chinese gets a readable name from `file: tcp-handshake`. `-o` names a file, not a folder; use a name such as `page.html`. An explicit name without an extension is still a file, and the CLI prints a notice recommending `.html`. A page with STE, code or ref warnings does not open in the browser (add `--open` to open it anyway). To render the fixed draft again, run `am render … --replace <page>`: the earlier page is deleted once the new one is written, so `pages/` keeps one page per answer. A render lists every draft error at once, in line order, and writes no page. When the draft came from stdin (`am render -`) and has errors or warnings, it is saved as `drafts/<name>-<time>.md` in the data directory, where `<name>` is the draft's `file:` field, or the title when `file:` is missing or has no ASCII letter or digit, reduced to lowercase ASCII letters and digits (runs of other characters become one `-`, at most 24 characters, or `page` when none are left), and the output prints `draft: <path>`; the line numbers match that file, so edit the flagged lines there and run `am render <path>`. A draft in `drafts/` is deleted after a render with no warnings. A draft you give as a file is never copied. The default folder is private to your user (mode 0700), so other users on a shared host cannot read your pages; an existing `AM_HOME` folder keeps its mode.
 
 ## Export a page
 
@@ -422,7 +449,7 @@ am serve --tailscale  # listen on your Tailscale address only; open the links fr
 **Cleaning up.** Pages, videos and the narration cache build up in `~/.answer-me-with-html/`. If that folder grows past 200 MB, or passes 20 MB with no cleanup for 30 days, the agent asks once a week whether to clean it. Nothing is deleted without your OK.
 
 - `/answer-me-with-html:clean` (plugin), or say "clean up the pages", previews first and then asks.
-- `am clean` deletes pages, videos and saved drafts older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page, video and draft, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them.
+- `am clean` deletes pages, videos and saved drafts older than 30 days and empties the narration cache. `--days N` changes the cutoff, `--all` removes every page, video and draft, and `--dry-run` only shows what would go. Your settings and themes are always kept. If `pages`, `videos` or `cache` is itself a symlink, it is skipped: `am clean` never touches the files it points to, and the size count and cleanup hint ignore it. A folder that cannot be read is skipped too: its files are left out of the size count and the cleanup hint, so the size you see can be lower than the real use, and `am clean` does not delete them. With a custom `pages_dir`, only page files named `<slug>-<stamp>.html` are deleted there; your other files stay.
 
 **Old always-on plugin.** It is gone from this repository, but your copy keeps adding the reminder until you remove it. Run `/plugin uninstall answer-me-with-html-always@answer-me-with-html`, then add the always-on rule from the [README](../README.md#always-on-mode-recommended).
 
@@ -435,10 +462,11 @@ am serve --tailscale  # listen on your Tailscale address only; open the links fr
 | `mode` | `auto` | Default color mode: `auto`, `light` or `dark` |
 | `style` | `80` | Writing check: `off`, `80` (warn only) or `strict` (refuse to render) |
 | `scale` | `1` | Text size on the page: 0.8–1.5 in steps of 0.05. 1.2 makes text 20% larger; diagrams and charts grow with it. The toolbar's A− / A+ buttons change it too; the choice is remembered in this browser and wins over this setting, but under `am serve` it lasts for the tab only |
+| `pages_dir` | empty | Folder for generated pages. Empty means `pages/` in the data directory; a leading `~` is your home folder, and a relative path is inside the data directory. `am render`, `am theme check`, `--replace` and `am serve` all follow it. `am clean` deletes only the `<slug>-<stamp>.html` files it generated there, so other files in your folder stay |
 | `update_check` | `on` | Check GitHub for a new version once a day and mention it. Never updates by itself |
 | `close_after_reply` | `off` | Close the page tab 3 seconds after you copy the reply, with a countdown and a Keep open button. See the note below |
 | `colophon` | `on` | Show the "Generated by Answer me with HTML · time · ★ Star on GitHub" line above the title. `off` leaves it out of pages made or patched afterwards; the `generator` meta tag stays |
-| `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `system` or `off` |
+| `voice` | `auto` | Video narration: `auto` (ElevenLabs if `ELEVENLABS_API_KEY` is set, else system voice), `elevenlabs`, `local`, `cmd` (the command-line TTS in `AM_TTS_CMD`, see [Command voice](video.md)), `system` or `off` |
 
 Settings live in `~/.answer-me-with-html/config.json`. A theme written in a draft beats the default. `--open` and `--no-open` affect one run only.
 
