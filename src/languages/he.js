@@ -10,6 +10,7 @@ export default {
     serif: '"Noto Serif Hebrew", "Frank Ruehl CLM", David, "Times New Roman"',
   },
   ui: {
+    width: { title: 'רוחב העמוד', pixels: 'רוחב בפיקסלים', full: 'רוחב מלא', reset: 'איפוס לברירת המחדל', left: 'הקצה השמאלי של התוכן', right: 'הקצה הימני של התוכן' },
     remark: {
       button: 'סימון', need: 'בחרו תגית כדי לשמור',
       hint: 'הערה (אופציונלי)', save: 'שמירה', remove: 'הסרה', clear: 'ניקוי כל הסימונים', clearConfirm: 'לחצו שוב כדי לנקות {n} סימונים',

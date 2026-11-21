@@ -12,6 +12,7 @@ export default {
     serif: '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Songti SC"',
   },
   ui: {
+    width: { title: 'ページ幅', pixels: '幅（ピクセル）', full: '全幅', reset: '既定値に戻す', left: 'コンテンツの左端', right: 'コンテンツの右端' },
     remark: {
       button: '注記', need: '保存するにはタグを選択',
       hint: 'メモ（任意）', save: '保存', remove: '削除', clear: '注記をすべて消去', clearConfirm: 'もう一度クリックして {n} 件の注記を消去',

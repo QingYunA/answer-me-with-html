@@ -4,6 +4,7 @@ export default {
   language: 'en',
   voice: { say: 'en_US', espeak: 'en-us' },
   ui: {
+    width: { title: 'Page width', pixels: 'Width in pixels', full: 'Full width', reset: 'Reset to default', left: 'Left content edge', right: 'Right content edge' },
     remark: {
       button: 'Remark', need: 'Pick a tag to save',
       hint: 'Optional note', save: 'Save', remove: 'Remove', clear: 'Clear all remarks', clearConfirm: 'Click again to clear {n}',

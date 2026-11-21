@@ -5,6 +5,7 @@ export default {
   language: 'tr',
   voice: { say: 'tr_TR', espeak: 'tr' },
   ui: {
+    width: { title: 'Sayfa genişliği', pixels: 'Piksel cinsinden genişlik', full: 'Tam genişlik', reset: 'Varsayılana dön', left: 'İçeriğin sol kenarı', right: 'İçeriğin sağ kenarı' },
     remark: {
       button: 'İşaretle', need: 'Kaydetmek için bir etiket seçin',
       hint: 'İsteğe bağlı not', save: 'Kaydet', remove: 'Kaldır', clear: 'Tüm işaretleri temizle', clearConfirm: '{n} işareti temizlemek için tekrar tıklayın',
