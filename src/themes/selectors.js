@@ -8,7 +8,7 @@ export const THEME_SELECTORS = Object.freeze([
   // A panel: the head (ID, title, meta) and the body that holds the components.
   '.am-panel', '.am-panel--bare', '.am-panel-head', '.am-panel-head h2', '.am-panel-id', '.am-panel-meta', '.am-panel-body',
   // Prose, callouts and key-value tables.
-  '.am-md', '.am-callout', '.am-callout--ok', '.am-callout--warn', '.am-callout--err', '.am-callout-title', '.am-kv',
+  '.am-doc', '.am-md', '.am-callout', '.am-callout--ok', '.am-callout--warn', '.am-callout--err', '.am-callout-title', '.am-kv',
   // The panel comment button (inside the panel head) and its "has a comment" state, so it stays visible on a dark or coloured head.
   '.am-comment-btn', '.am-comment-btn--on',
   // The drawing frame and its rulers (blueprint).
