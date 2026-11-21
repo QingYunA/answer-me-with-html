@@ -62,7 +62,7 @@ Usage:
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
 - Output goes to ~/.answer-me-with-html/pages/ by default (change it with the AM_HOME environment variable).
-- A page with STE or code warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
+- A page with STE, code or ref warnings does not open. Fix the draft and render again with --replace <page>: the earlier page is deleted once the new one is written.
 - Set auto-open, the default theme and more with am config; --open / --no-open apply to this run only.
 - am patch reads the source draft from the page's hidden #am-source, changes only the ## section that --panel names, and writes the page back to the same path.`;
 
@@ -134,6 +134,10 @@ export const LIMIT = 50
 - 10 to ${LONG_CODE_LINES} lines make the point best: a longer block gets a warning, and more than ${MAX_CODE_LINES} lines is an error.
 - Files that hold keys by convention (.env, *.pem, id_rsa, .ssh/, .git/ …) and files with anything that looks like a key or a token are refused.
 - The render lists every embedded file. The page keeps the path; am patch reads the file again, or keeps the page's copy when the file has moved.
+- In the text, a code span that is only a path and a line (\`src/cli.js:42\` or \`src/cli.js:18-30\`) cites the file (also in tree, timeline, kv and ask text;
+  diagram text is not checked). The render checks it against the same
+  folder and prints a refs warning when the file is missing, the lines go past its end, or the range runs backwards; the page then does not open.
+  A missing path is a warning only when its first folder exists here, so a path of another project is not checked.
 
 Diff blocks: show a change
 
@@ -358,13 +362,13 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   }
   const file = outputPath('pages', nameSource(result.meta), opts, ctx, pages);
   if (!file) return 2;
-  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages', pages });
+  const written = emit(result, file, ctx, { fallback: opts.out ? undefined : 'pages', pages, modeFrom: replaced });
   if (!written) return 1;
   if (opts.out && !extname(file)) print('! -o names a file without an extension; use .html for an HTML page');
   // Delete the earlier attempt only now: a render that fails above keeps it.
   if (replaced && replaced !== resolve(written)) removeEarlier(replaced, ctx);
   keepDraft(result, src, from, ctx);
-  // A page with STE, code or math warnings is likely to be rendered again, so it opens only when --open asks for it.
+  // A page with STE, code, ref or math warnings is likely to be rendered again, so it opens only when --open asks for it.
   const held = !opts.open && hasRetryWarnings(result) && shouldOpen(opts, ctx.env, config.values);
   if (held) print(`  Not opened because of the warnings; to render again, add --replace ${written}`);
   return finish(written, held ? { ...opts, 'no-open': true } : opts, config, ctx);
@@ -459,7 +463,7 @@ function reportDraftError(e, src, from, ctx) {
   return code;
 }
 
-const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
+const hasRetryWarnings = (result) => result.warnings.length > 0 || (result.stats.codeWarnings ?? []).length > 0 || (result.stats.refWarnings ?? []).length > 0 || (result.stats.mathWarnings ?? []).length > 0;
 
 // The absolute path of a page, or false when arg does not name a .html file directly inside pages/ of the data directory or of the
 // temporary folder (where a page goes when the data directory is not writable). The file may be gone.
@@ -827,7 +831,8 @@ const inside = (dir, target) => {
 // A page in the managed pages folder (pages/ or pages_dir) is written to a temp file and renamed over the old one, so am serve
 // (src/serve.js) never reloads a half-written page. Elsewhere it is written in place: a rename would replace a symlink with a
 // plain file and drop the file's mode and hard links.
-function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
+// modeFrom: the earlier page that --replace names. The new page usually has a new name (a later stamp), so it takes that page's mode.
+function writePage(file, html, env, pages = join(amHome(env), 'pages'), modeFrom = null) {
   const home = resolve(amHome(env));
   const path = resolve(file);
   if (inside(home, path)) ensureHome(home);
@@ -837,8 +842,9 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   // refuses an existing path, a planted symlink too), and only a temp file this call created is removed.
   const tmp = join(dirname(file), `.${basename(file)}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`);
   // A page being replaced keeps its mode: the temp file starts private (0600) and takes the old page's mode before the rename,
-  // instead of the default 0644 that would open a private page to other users.
-  const mode = statSync(file, { throwIfNoEntry: false })?.mode;
+  // instead of the default 0644 that would open a private page to other users. The old page is the one --replace names, or the
+  // file already at this path.
+  const mode = (modeFrom && modeOf(modeFrom)) ?? statSync(file, { throwIfNoEntry: false })?.mode;
   // Open first, so the temp file counts as ours before any byte is written: a write that fails half way (ENOSPC) still removes it.
   let fd = null;
   let created = false;
@@ -856,12 +862,23 @@ function writePage(file, html, env, pages = join(amHome(env), 'pages')) {
   }
 }
 
+// The mode of the page --replace names. A page this session cannot reach (a folder it may not enter) counts as private, so the
+// fallback in the temporary folder still saves the new page, as 0600.
+function modeOf(path) {
+  try {
+    return statSync(path, { throwIfNoEntry: false })?.mode;
+  } catch (e) {
+    if (!isDenied(e)) throw e;
+    return 0o600;
+  }
+}
+
 // Write the page where it was planned. A session that may not write there (a host sandbox that allows writes only in the workspace
 // and the temporary folder) gets the page in a private folder of the temporary folder instead, but only when fallback ('pages' or
 // 'videos') names the default location's folder: a page the user named with -o, or one patched in place, never moves. Returns
 // { file, notice } with the path actually written, or null after one line that says what to run instead.
-// inPlace: am patch, which takes no -o, so its hint does not name -o.
-function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
+// inPlace: am patch, which takes no -o, so its hint does not name -o. modeFrom: the page --replace names (see writePage).
+function savePage(html, file, { fallback, inPlace, pages, modeFrom }, { fail, env }) {
   const home = amHome(env);
   const pageRoot = pages ?? join(home, 'pages');
   const inHome = inside(home, file);
@@ -873,7 +890,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
   };
   const refuse = (path, e) => fail(`✗ Cannot write the page: permission denied (${e.code}) ${path}. ${hint(path)}`);
   try {
-    writePage(file, html, env, pageRoot);
+    writePage(file, html, env, pageRoot, modeFrom);
     return { file };
   } catch (e) {
     if (!isDenied(e)) throw e;
@@ -881,7 +898,7 @@ function savePage(html, file, { fallback, inPlace, pages }, { fail, env }) {
     const spare = join(tempHome(), fallback, basename(file));
     try {
       checkedTempHome({ create: true });
-      writePage(spare, html, env, join(tempHome(), 'pages'));
+      writePage(spare, html, env, join(tempHome(), 'pages'), modeFrom);
       return { file: spare, notice: `  ! ${home} is not writable (${e.code}): saved in the temporary folder, which the system may clear` };
     } catch (t) {
       if (t instanceof UnsafeTempHome) fail(`✗ Cannot write the page: ${home} is not writable (${e.code}) and ${t.dir} is not a private folder of this user. Give -o a file in a folder this session can write to`);
@@ -904,9 +921,9 @@ function removeEarlier(file, { fail }) {
 
 // Write the page, print the path, a one-line summary (note follows the summary) and writing warnings. Shared by render / video / patch.
 // Returns the path written, or null when the page could not be written (see savePage).
-function emit(result, file, ctx, { note = '', fallback, inPlace, pages } = {}) {
+function emit(result, file, ctx, { note = '', fallback, inPlace, pages, modeFrom } = {}) {
   const { print, env } = ctx;
-  const saved = savePage(result.html, file, { fallback, inPlace, pages }, ctx);
+  const saved = savePage(result.html, file, { fallback, inPlace, pages, modeFrom }, ctx);
   if (!saved) return null;
   print(`✓ ${saved.file}`);
   if (saved.notice) print(saved.notice);
@@ -921,11 +938,20 @@ function emit(result, file, ctx, { note = '', fallback, inPlace, pages } = {}) {
     print(`  code ${count(long.length, 'warning')} (trim the block and run again, or keep it if every line matters):`);
     long.forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
   }
+  printRefWarnings(result.stats.refWarnings, print);
   printComponentWarnings(result.stats.componentWarnings, print);
   printHtmlWarnings(result.stats.htmlWarnings, print);
   printMathWarnings(result.stats.mathWarnings, print);
   printWarnings(result.warnings, print, result.meta.style);
   return saved.file;
+}
+
+// A path:line span in the prose whose file or lines are not in the current folder (src/refs.js). The page is still written.
+function printRefWarnings(notes = [], print) {
+  if (!notes.length) return;
+  print(`  refs ${count(notes.length, 'warning')} (fix the path or the lines and run again; keep it if the path is from another project):`);
+  notes.slice(0, MAX_LISTED_WARNINGS).forEach((w) => print(`  L${w.line} [${w.rule}] ${w.message}`));
+  if (notes.length > MAX_LISTED_WARNINGS) print(`  … ${notes.length - MAX_LISTED_WARNINGS} more`);
 }
 
 // What a component noticed in its own block (a group box that would be empty after a change). The page is still written.

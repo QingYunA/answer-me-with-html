@@ -1,33 +1,33 @@
 {
-  "version": "0.6.1",
+  "version": "0.6.2",
   "en": [
-    "New diagrams: state machines, UML classes and HTTP/RPC contracts",
-    "Copy as image puts the page on the clipboard; pages_dir picks the folder",
-    "am video --voice cmd narrates with edge-tts, piper or another CLI TTS"
+    "Export menu: copy as image, download PNG or save as PDF",
+    "am render checks path:line references against your files",
+    "api blocks can show one change across several endpoints"
   ],
   "zh": [
-    "新增图表：状态机、UML 类图和 HTTP/RPC 接口契约",
-    "「复制为图片」把整页放进剪贴板；pages_dir 指定页面输出目录",
-    "am video --voice cmd 用 edge-tts、piper 等命令行 TTS 配音"
+    "导出菜单：复制为图片、下载 PNG 或保存为 PDF",
+    "am render 核对正文里的 路径:行号 引用",
+    "api 块可以展示一次需求改动涉及的多个接口"
   ],
   "zh-Hant": [
-    "新增圖表：狀態機、UML 類別圖和 HTTP/RPC 介面契約",
-    "「複製為圖片」把整頁放進剪貼簿；pages_dir 指定頁面輸出資料夾",
-    "am video --voice cmd 用 edge-tts、piper 等命令列 TTS 配音"
+    "匯出選單：複製為圖片、下載 PNG 或儲存為 PDF",
+    "am render 核對內文裡的 路徑:行號 引用",
+    "api 區塊可以呈現一次需求改動涉及的多個介面"
   ],
   "ja": [
-    "新しい図：状態遷移図、UML クラス図、HTTP/RPC の API 仕様",
-    "「画像としてコピー」でページをクリップボードへ。出力先は pages_dir",
-    "am video --voice cmd で edge-tts や piper などのコマンド TTS が使えます"
+    "書き出しメニュー：画像としてコピー、PNG をダウンロード、PDF として保存",
+    "am render が本文の パス:行番号 の参照をファイルと照合します",
+    "api ブロックで複数のエンドポイントにまたがる変更を表示できます"
   ],
   "he": [
-    "דיאגרמות חדשות: מכונות מצבים, מחלקות UML וחוזי HTTP/RPC",
-    "העתקה כתמונה שמה את העמוד בלוח; pages_dir קובע את התיקייה",
-    "am video --voice cmd מקריא עם edge-tts, piper או TTS אחר משורת הפקודה"
+    "תפריט ייצוא: העתקה כתמונה, הורדת PNG או שמירה כ-PDF",
+    "am render בודק הפניות path:line מול הקבצים שלך",
+    "בלוק api מציג שינוי אחד בכמה נקודות קצה"
   ],
   "tr": [
-    "Yeni diyagramlar: durum makineleri, UML sınıfları, HTTP/RPC sözleşmeleri",
-    "Görsel olarak kopyala sayfayı panoya alır; klasörü pages_dir seçer",
-    "am video --voice cmd; edge-tts, piper gibi komut satırı TTS ile seslendirir"
+    "Dışa aktar menüsü: görsel olarak kopyala, PNG indir, PDF olarak kaydet",
+    "am render, path:line başvurularını dosyalarınızla karşılaştırır",
+    "api blokları tek bir değişikliği birden çok uç noktada gösterebilir"
   ]
 }

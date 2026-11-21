@@ -15,6 +15,7 @@ import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
 import { renderCode, CodeError } from './code.js';
+import { checkRefs } from './refs.js';
 import { isolateLtrRuns } from './bidi.js';
 import { hasMath } from './math.js';
 import { cspMeta } from './csp.js';
@@ -63,7 +64,9 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
     throw new LintError(warnings);
   }
 
-  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
+  // path:line spans in prose are checked against the folder code blocks read from, when the caller names one (am render, am patch).
+  const refWarnings = codeDir ? checkRefs([...doc.intro, ...doc.panels.flatMap((p) => p.blocks)], { baseDir: codeDir }) : [];
+  const stats = { panels: doc.panels.length, components: {}, code: [], codeWarnings: [], refWarnings, componentWarnings: [], htmlWarnings: [], mathWarnings: [] };
   const ui = language.ui;
   const ctx = { seq: 0, stats, errors, ui, dir: language.dir, scale, images: { baseDir, known: knownImages }, code: { baseDir: codeDir, known: knownCode } };
   // A panel-only component in the intro is an error of its own, and the block renders nothing.
@@ -272,6 +275,26 @@ ${row(t.agentText, false)}
   };
 }
 
+// The Export button and its menu (Copy as image, Download PNG, Save as PDF). Like the new-version notice, the menu is a native popover,
+// so it opens and closes on a click, on Esc and on a click outside with no script; src/runtime/export-menu.js shows the button, fills
+// the reasons an item cannot run, moves focus with the arrow keys and does the work. The button starts hidden because the menu's items
+// need that script. The reason an item is unavailable is the muted second line of the item, never part of the toolbar button.
+function exportMenu(ui) {
+  const t = ui.export;
+  const item = (kind, label) => `<button class="am-export-item" type="button" role="menuitem" data-export="${kind}" aria-describedby="am-export-${kind}-note"><span>${esc(label)}</span><small class="am-export-note" id="am-export-${kind}-note" aria-hidden="true"></small></button>`;
+  const labels = [['working', t.working], ['copied', t.copied], ['saved', t.saved], ['failed', t.failed], ['unavailable-browser', t.unavailableBrowser], ['unavailable-clipboard', t.unavailableClipboard], ['unavailable-policy', t.unavailablePolicy], ['unverified-effect', t.unverifiedEffect]]
+    .map(([key, text]) => `data-${key}="${esc(text)}"`).join(' ');
+  return {
+    button: `<button class="am-btn am-btn--export" type="button" data-am="export" popovertarget="am-export" aria-haspopup="menu" aria-expanded="false" aria-controls="am-export" hidden>${esc(t.button)}</button>`,
+    menu: `<div class="am-export" id="am-export" popover role="menu" aria-label="${esc(t.button)}" ${labels}>
+${item('copy', t.copy)}
+${item('download', t.download)}
+${item('pdf', t.pdf)}
+</div>
+`,
+  };
+}
+
 // The page without its new-version button and popover, for a reader on another device (src/serve.js): the notice is for the person
 // who made the page. Both come before the body, so the first match is the one updateNotice wrote.
 export function withoutUpdateNotice(html) {
@@ -322,6 +345,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const { ui, labelKey } = language;
   const widthLabels = ui.width;
   const notice = updateNotice(ui, update, labelKey);
+  const exporter = exportMenu(ui);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, resize };
@@ -355,9 +379,9 @@ ${scaleButtons(ui)}${resizable ? `\n<button type="button" class="am-btn am-width
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
-<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="${esc(ui.image.working)}" data-done="${esc(ui.image.done)}" data-downloaded="${esc(ui.image.downloaded)}" data-failed="${esc(ui.image.failed)}" aria-label="${esc(ui.image.button)}" title="${esc(ui.image.button)}" hidden>${esc(ui.image.button)}</button>
+${exporter.button}
 </div>
-${notice.popover}${resizable ? (colophon ? withColophon(body, language) : body).replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : (colophon ? withColophon(body, language) : body)}
+${notice.popover}${exporter.menu}${resizable ? (colophon ? withColophon(body, language) : body).replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : (colophon ? withColophon(body, language) : body)}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>${script}</script>
 </body>

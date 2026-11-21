@@ -154,7 +154,7 @@ test('withoutUpdateNotice: takes out the button and the popover and leaves the r
 
 test('render: without a newer version the page carries nothing of the new-version notice', () => {
   const { html } = renderDoc('## A\nx');
-  assert.doesNotMatch(html, /am-update|copy-text|popovertarget/);
+  assert.doesNotMatch(html, /am-update|copy-text|popovertarget="am-update"/);
 });
 
 test('render: the new-version notice speaks the page language and escapes the command', () => {
@@ -708,8 +708,20 @@ test('render: a doc page with fewer than 3 panels has no rail, and outline is no
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n')).html, /<div class="am-head-meta">/);
 });
 
-test('render: the copy-as-image button starts hidden with labels in the page language, and print hides it', () => {
+test('render: the Export button starts hidden and opens a popover menu of three items, in the page language', () => {
   const { html } = renderDoc('---\nlang: zh\n---\n## A\n中文');
-  assert.match(html, /<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="正在生成图片…" data-done="已复制 ✓" data-downloaded="已下载" data-failed="复制失败" aria-label="复制为图片" title="复制为图片" hidden>复制为图片<\/button>/);
-  assert.match(html, /\.am-btn--copy-image \{ display: none !important; \}/);
+  assert.match(html, /<button class="am-btn am-btn--export" type="button" data-am="export" popovertarget="am-export" aria-haspopup="menu" aria-expanded="false" aria-controls="am-export" hidden>导出<\/button>/);
+  const menu = html.match(/<div class="am-export" id="am-export" popover role="menu"[\s\S]*?\n<\/div>/)[0];
+  assert.match(menu, /aria-label="导出"/);
+  assert.match(menu, /data-working="正在生成…" data-copied="已复制 ✓" data-saved="已保存 ✓" data-failed="导出失败"/);
+  assert.match(menu, /data-unavailable-browser="当前浏览器不支持导出图片。" data-unavailable-clipboard="当前浏览器不支持写入剪贴板。" data-unavailable-policy="当前预览窗口未开启剪贴板权限，不支持复制。" data-unverified-effect="当前浏览器导出效果可能不保证。"/);
+  const items = [...menu.matchAll(/<button class="am-export-item" type="button" role="menuitem" data-export="(\w+)" aria-describedby="am-export-\1-note"><span>([^<]*)<\/span><small class="am-export-note" id="am-export-\1-note" aria-hidden="true"><\/small><\/button>/g)];
+  assert.deepEqual(items.map((m) => [m[1], m[2]]), [['copy', '复制为图片'], ['download', '下载 PNG'], ['pdf', '保存为 PDF']]);
+  // The toolbar carries no reason text: a disabled copy must not widen the button, so the page has no data-* labels on it.
+  assert.doesNotMatch(html, /am-btn--copy-image|data-am="copy-image"/);
+});
+
+test('render: print hides the Export button and its menu, open or not', () => {
+  const { html } = renderDoc('---\nlang: en\n---\n## A\nText');
+  assert.match(html, /\.am-btn--export, \.am-export \{ display: none !important; \}/);
 });
