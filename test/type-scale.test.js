@@ -12,7 +12,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (path) => readFileSync(join(ROOT, path), 'utf8');
 
 // The page stylesheets the scale covers. video.css is a fixed 1920x1080 stage and never takes the factor.
-const PAGE_CSS_FILES = ['base.css', 'chart.css', 'update.css', 'delta.css', 'rtl.css', 'diff.css', 'math.css', 'close-after-reply.css'];
+const PAGE_CSS_FILES = ['base.css', 'chart.css', 'image-lightbox.css', 'update.css', 'delta.css', 'rtl.css', 'diff.css', 'math.css', 'close-after-reply.css'];
 const pageCss = () => PAGE_CSS_FILES.map((file) => [file, read(`src/themes/${file}`)]);
 const themeCss = () => themes('page').filter((t) => t.css).map((t) => [t.name, t.css]);
 

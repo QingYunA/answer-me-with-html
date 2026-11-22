@@ -28,7 +28,7 @@ export default {
     },
     closeAfter: { closing: 'Bu sekme {n} sn içinde kapanacak', keep: 'Açık kalsın', closeFailed: 'Yanıt kopyalandı. Bu sekmeyi artık kapatabilirsiniz.' },
     toc: 'İçindekiler', flow: 'Akış şeması', state: 'Durum makinesi diyagramı', sequence: 'Sıralama diyagramı', er: 'Varlık-ilişki diyagramı', class: 'Sınıf diyagramı', colon: ': ', sep: ', ',
-    expand: 'Diyagramı büyüt', close: 'Kapat', diagram: 'Diyagram görüntüleyici',
+    expand: 'Diyagramı büyüt', close: 'Kapat', diagram: 'Diyagram görüntüleyici', image: { open: 'Resmi büyüt', close: 'Resmi kapat' },
     delta: { added: 'eklendi', removed: 'kaldırıldı', changed: 'değişti', view: 'Görünüm', before: 'Önce', changes: 'Değişiklikler', after: 'Sonra' },
     generated: 'Oluşturan:', limits: { value: '{value} / en fazla {limit}', limit: 'en fazla {limit}' },
     chart: { name: 'Grafik', data: 'Veri', value: 'Değer', share: 'Pay' },

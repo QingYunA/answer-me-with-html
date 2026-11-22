@@ -103,6 +103,17 @@ test('render: status words in tables render as badges', () => {
   assert.match(html, /am-table-wrap/);
 });
 
+test('render: embedded images are responsive and open an enlarged view', () => {
+  const { html } = renderDoc('---\nlang: zh\n---\n## A 图片\n![示例](https://example.com/large.png)');
+  assert.match(html, /\.am-md img, \.am-intro img, \.am-panel-body img \{/);
+  assert.match(html, /cursor: zoom-in/);
+  assert.match(html, /am-image-lightbox/);
+  assert.match(html, /data-am-image-open="点击查看大图"/);
+
+  const plain = renderDoc('---\nlang: zh\n---\n## A\n纯文字。').html;
+  assert.doesNotMatch(plain, /am-image-lightbox|data-am-image/);
+});
+
 test('render: a status word may be followed by inline HTML; only a leading word is a status', () => {
   const html = md('| a | b |\n|---|---|\n| ok shared with `page.js` | warn **slow** and *rare* |\n| no see [docs](https://x.org) | noted `x` |\n| uses ok `y` | ✓ |');
   assert.match(html, /<td><span class="am-status am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span><span class="am-status-text">shared with <code>page.js<\/code><\/span><\/span><\/td>/);
@@ -364,8 +375,8 @@ test('render: diagram viewer labels follow the resolved page language and fallba
 });
 
 
-test('render: diagram lightbox behavior — expand opens dialog, Esc, close button and backdrop close it', () => {
-  const code = readFileSync(new URL('../src/runtime/page.js', import.meta.url), 'utf8');
+test('render: lightbox behavior — diagrams and images open and close', () => {
+  const code = `${readFileSync(new URL('../src/runtime/page.js', import.meta.url), 'utf8')}\n${readFileSync(new URL('../src/runtime/image-lightbox.js', import.meta.url), 'utf8')}`;
 
   class MockClassList {
     constructor(el) { this.el = el; }
@@ -619,7 +630,29 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
   `;
   doc.body.append(lb);
 
-  const sandbox = { document: doc, window: win, root: doc.documentElement, console, parseFloat, Math };
+  const toolbar = doc.createElement('div');
+  toolbar.className = 'am-toolbar';
+  toolbar.setAttribute('data-am-image-open', '点击查看大图');
+  toolbar.setAttribute('data-am-image-close', '关闭大图');
+  toolbar.setAttribute('data-am-image-sep', '，');
+  toolbar.scrollWidth = 0;
+  toolbar.clientWidth = 0;
+  doc.body.append(toolbar);
+
+  const image = doc.createElement('img');
+  image.src = 'data:image/png;base64,AAAA';
+  image.alt = '状态截图';
+  const md = doc.createElement('div');
+  md.className = 'am-md';
+  md.append(image);
+  doc.body.append(md);
+
+  const sandbox = {
+    document: doc, window: win, root: doc.documentElement, console, parseFloat, Math,
+    getComputedStyle: () => ({ direction: 'ltr' }),
+    addEventListener: (ev, fn) => win.addEventListener(ev, fn),
+    removeEventListener: (ev, fn) => win.removeEventListener(ev, fn),
+  };
   vm.runInNewContext(code, sandbox);
 
   const expandBtn = diag.querySelector('.am-diagram-expand');
@@ -677,6 +710,36 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
   const backdrop = lb.querySelector('.am-lightbox-backdrop');
   backdrop.click();
   assert.equal(lb.hasAttribute('hidden'), true, 'lightbox closes on backdrop click');
+
+  // 8. An image opens its own dialog, keeps its alt text and closes on every path.
+  const imageBox = doc.body.querySelector('.am-image-lightbox');
+  assert.ok(imageBox, 'image lightbox was created');
+  assert.equal(imageBox.hidden, true, 'image lightbox starts hidden');
+  assert.equal(image.getAttribute('role'), 'button');
+  assert.equal(image.getAttribute('aria-label'), '状态截图，点击查看大图');
+
+  image.click();
+  assert.equal(imageBox.hidden, false, 'image opens on click');
+  assert.equal(doc.activeElement?.className, 'am-image-lightbox-close', 'focus moves to the image close button');
+  assert.equal(imageBox.querySelector('img').src, 'data:image/png;base64,AAAA');
+  assert.equal(imageBox.getAttribute('aria-label'), '状态截图');
+
+  let tabPrevented = false;
+  imageBox.dispatchEvent({ type: 'keydown', key: 'Tab', preventDefault() { tabPrevented = true; } });
+  assert.equal(tabPrevented, true, 'Tab stays inside the image dialog');
+
+  win.dispatchEvent({ type: 'keydown', key: 'Escape' });
+  assert.equal(imageBox.hidden, true, 'image closes on Escape');
+  assert.equal(doc.activeElement, image, 'focus returns to the image');
+
+  image.dispatchEvent({ type: 'keydown', key: 'Enter', preventDefault() {} });
+  assert.equal(imageBox.hidden, false, 'image opens on Enter');
+  imageBox.querySelector('.am-image-lightbox-close').click();
+  assert.equal(imageBox.hidden, true, 'image closes on the close button');
+
+  image.click();
+  imageBox.querySelector('img').click();
+  assert.equal(imageBox.hidden, true, 'image closes on a click on the large image');
 });
 
 // The outline rail of a doc page (#319).
