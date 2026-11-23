@@ -104,3 +104,12 @@ test('sheet: table panels get readable column widths, phones keep cells two word
   assert.match(html, /capDiagrams\(plan\.maxScale\);\s*fitTables\(\);/);
   assert.match(html, /@media print and \(max-width: 1100px\) \{\s*\.am-grid \{ grid-template-columns: minmax\(0, 1fr\); \}\s*\.am-grid > \.am-panel \{ grid-column: auto !important; \}/);
 });
+
+// Below 1100px the CSS grid drops to two columns; a cols: 1 sheet is marked so that rule keeps it at one column.
+// The browser behaviour itself is checked in test/layout-browser.test.js (AM_E2E=1).
+test('sheet: a cols: 1 grid is marked single so the tablet breakpoint keeps one column', () => {
+  const grid = (head) => renderDoc(`---\n${head}\n---\n## A 一\n文字`).html.match(/<div class="(am-grid[^"]*)"/)[1];
+  assert.equal(grid('cols: 1'), 'am-grid am-grid--single');
+  for (const head of ['cols: 2', 'cols: 3', 'title: 默认']) assert.equal(grid(head), 'am-grid', head);
+  assert.match(renderDoc('---\ncols: 1\n---\n## A 一\n文字').html, /@media \(max-width: 1100px\) \{[^@]*\.am-grid\.am-grid--single \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+});
