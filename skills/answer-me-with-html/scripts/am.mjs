@@ -635,6 +635,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .am-grid > .am-panel { grid-column: auto !important; }
   .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }
+  .am-grid.am-grid--single { grid-template-columns: minmax(0, 1fr); } /* cols: 1 stays one column */
 }
 @media (max-width: 760px) {
   .am-sheet, .am-doc { padding: 56px 12px 24px; }
@@ -10122,7 +10123,7 @@ function sheet({ meta, introHtml, panels, language }) {
 ${headHtml(meta, introHtml, language)}
 <div class="am-frame">
 ${ruler("top", nums)}${ruler("bottom", nums)}${ruler("left", letters)}${ruler("right", letters)}
-<div class="am-grid" style="--cols: ${cols}">
+<div class="am-grid${cols === 1 ? " am-grid--single" : ""}" style="--cols: ${cols}">
 ${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span } })).join("\n")}
 </div>
 </div>

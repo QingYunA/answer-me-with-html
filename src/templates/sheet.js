@@ -58,7 +58,7 @@ export function sheet({ meta, introHtml, panels, language }) {
 ${headHtml(meta, introHtml, language)}
 <div class="am-frame">
 ${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}
-<div class="am-grid" style="--cols: ${cols}">
+<div class="am-grid${cols === 1 ? ' am-grid--single' : ''}" style="--cols: ${cols}">
 ${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span } })).join('\n')}
 </div>
 </div>
