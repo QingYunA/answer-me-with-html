@@ -1,5 +1,5 @@
 /* Video player: the 1920×1080 stage scales to the window. All colors come from theme variables.
-   Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
+   Theme-specific video tokens and decorations live in each theme's definition (themes/{name}.js). */
 html[data-video] {
   /* Player controls stay out of the picture and ignore the theme: one fixed set of dark tokens */
   --v-ctl-bg: #0b0d11; --v-ctl-line: #1d2330; --v-ctl-fg: #c9d1dc; --v-ctl-muted: #5b6576;

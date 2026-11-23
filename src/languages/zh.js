@@ -23,7 +23,7 @@ export default {
       unavailablePolicy: '当前预览窗口未开启剪贴板权限，不支持复制。',
       unverifiedEffect: '当前浏览器导出效果可能不保证。',
     },
-    copy: '复制源稿', done: '已复制 ✓', copyCode: '复制',
+    copy: '复制源稿', done: '已复制 ✓', failed: '复制失败', copyCode: '复制',
     update: { button: '新版本 {version}', current: '当前 {current}。生成此页时检测到新版本。', whatsNew: '这次更新：', run: '在终端运行：', agent: '或者告诉 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新内容' },
     live: { updated: '页面已更新', reload: '刷新' },
     reply: {
