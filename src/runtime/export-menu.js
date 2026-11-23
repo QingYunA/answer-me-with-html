@@ -115,6 +115,8 @@
   // that has one gets a data-cp marker; the marker keeps the rule from touching any other node in the picture.
   let cpSeq = 0;
   const pseudoRule = (src, dst, pseudo) => {
+    // The header's spacer keeps text clear of the toolbar (base.css); a picture has no toolbar, so it has no spacer.
+    if (pseudo === '::before' && src.classList.contains('am-head')) return '';
     const cs = getComputedStyle(src, pseudo);
     const content = cs.getPropertyValue('content');
     if (!content || content === 'none' || content === 'normal') return '';

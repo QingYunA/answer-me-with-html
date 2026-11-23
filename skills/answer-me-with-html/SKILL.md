@@ -127,7 +127,7 @@ file: tcp-handshake # when the title has few or no English letters: a short Engl
 cols: 3             # most columns in a sheet row (a whole number), default 3
 source: RFC 9293    # any other key is shown in the page header's meta line
 ---
-Lead: one or two sentences with the core conclusion (optional).
+The core conclusion in one or two sentences (optional): this first paragraph, before any ## heading, is the lead.
 
 ## A Panel title {span=2 meta="small text, top right"}
 Plain Markdown: paragraphs, lists, tables, quotes.

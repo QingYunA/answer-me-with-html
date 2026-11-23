@@ -37,6 +37,11 @@ code, pre, kbd { font-family: var(--font-mono); }
 
 /* ── Header ───────────────────────────────── */
 .am-head { margin: 0 0 20px; padding-inline-end: 300px; }
+/* The toolbar is fixed over the top corner, wider than the 300px reserved here. With the page script (src/runtime/page.js) the header drops that
+   reservation and floats a spacer of the toolbar's measured size instead: only the lines beside the toolbar get shorter, so the colophon never
+   runs under it and a title below it keeps the whole width. Without the script the fixed reservation stays. */
+.am-bar-fit .am-head { padding-inline-end: 0; }
+.am-bar-fit .am-head::before { content: ""; float: inline-end; width: var(--am-bar-w, 0px); height: var(--am-bar-h, 0px); }
 .am-head h1 { margin: 0; font-size: var(--am-fs-title); line-height: 1.25; letter-spacing: -0.01em; }
 .am-sub { margin: 4px 0 0; color: var(--ink-2); }
 .am-head-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: var(--am-fs-small); color: var(--ink-2); }
@@ -351,6 +356,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   border: var(--node-width, var(--bw)) solid var(--node-stroke, var(--line)); background: var(--node-fill, var(--paper)); padding: 6px 14px; text-align: center;
   border-radius: var(--node-radius, var(--radius)); font-weight: 600; color: var(--node-text, inherit); filter: var(--node-shadow, none);
 }
+/* A word longer than its column (an IP, an email, a hash) breaks instead of running over the next column. anywhere, not break-word,
+   so the column's min-content width shrinks too; the wbr breaks that tree.js adds still give the preferred break points. */
+.am-tree-box, .am-tree-list li { overflow-wrap: anywhere; }
 .am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: var(--am-fs-small); }
 /* The root box and a highlighted box are emphasis: they take the highlight tokens. With none set the root box keeps its accent tint and a highlighted box looks like any other. */
 .am-tree-box--root, .am-tree-box--hi { border-color: var(--hi-stroke, var(--node-stroke, var(--line))); color: var(--hi-text, var(--node-text, inherit)); }
@@ -601,6 +609,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-toolbar > * { flex: none; }
   .am-toolbar .am-btn:focus-visible, .am-toolbar .am-pick:focus-within { outline-offset: -2px; }
   .am-head { padding-inline-end: 0; }
+  .am-bar-fit .am-head::before { display: none; }
   .am-grid { grid-template-columns: minmax(0, 1fr); }
   .am-grid > .am-panel.am-span-wide { grid-column: auto !important; }
   /* The rail hugs the viewport edge inside a strip of its own, so it never covers text and never pushes the body down. */
@@ -646,6 +655,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 @media print {
   .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
   .am-btn--export, .am-export { display: none !important; }
+  .am-bar-fit .am-head::before { display: none; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
   /* Paper does not scroll: a diagram shrinks to the page again (also below the phone breakpoint, whose rule lifts max-width), and nothing fades. */
