@@ -73,6 +73,19 @@
       document.body.classList.add('am-width-drag');
     });
     h.addEventListener('focus', () => { focusState = state; });
-    h.addEventListener('keydown', e => { if (e.key === 'Escape') { if (drag) end(true); else { apply(focusState); save(); } return; } let n = box.getBoundingClientRect().width; if (e.key === 'Home') n = min(); else if (e.key === 'End') n = max(); else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') n += (e.key === 'ArrowRight' ? 1 : -1) * (h.dataset.side === 'right' ? 1 : -1) * (e.shiftKey ? 64 : 16); else return; e.preventDefault(); apply(clamp(n)); save(); });
+    h.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        if (drag) end(true); else { apply(focusState); save(); }
+        return;
+      }
+      if (!['Home', 'End', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+      e.preventDefault();
+      if (drag) return;
+      const direction = (e.key === 'ArrowRight' ? 1 : -1) * (h.dataset.side === 'right' ? 1 : -1);
+      const next = e.key === 'Home' ? min() : e.key === 'End' ? max()
+        : box.getBoundingClientRect().width + direction * (e.shiftKey ? 64 : 16);
+      apply(clamp(next));
+      save();
+    });
   }
 })();
