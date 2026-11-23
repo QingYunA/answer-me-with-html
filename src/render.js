@@ -350,7 +350,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
-  const hasImages = body.includes('<img');
+  const hasImages = /<img\b/i.test(body);
   const imageAttrs = hasImages ? ` data-am-image-open="${esc(ui.image.open)}" data-am-image-close="${esc(ui.image.close)}" data-am-image-sep="${esc(ui.colon)}"` : '';
   const script = `\n${RUNTIME_JS}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${hasImages ? IMAGE_LIGHTBOX_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>

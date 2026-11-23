@@ -18,6 +18,7 @@ const IMAGE = fileURLToPath(new URL('../docs/images/text-vs-page.png', import.me
 
 let tmp;
 let file;
+let cardsFile;
 let chrome;
 let cdp;
 let session;
@@ -39,6 +40,24 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'am-image-lightbox-'));
   file = join(tmp, 'page.html');
   writeFileSync(file, renderDoc(`---\nlang: en\n---\n## A Image\n![Text and page](${IMAGE})\n`).html);
+  cardsFile = join(tmp, 'cards.html');
+  writeFileSync(cardsFile, renderDoc(`---
+title: Cards
+lang: en
+---
+## A Pick
+\`\`\`ask cards
+Which landing?
+* Lead with the outcome | the headline states the result
+  :::html
+  <b class="pick-mark">lead</b>
+  :::
+- Open with a visual | a full-width image sets the tone
+  :::html
+  <img class="preview-image" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=" alt="Preview">
+  :::
+\`\`\`
+`).html);
   chrome = spawn(CHROME, ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`, '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
   cdp = await connect(await devtoolsUrl(chrome));
   const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
@@ -107,4 +126,20 @@ test('image lightbox: click, Enter / Space, Esc, close button, backdrop and focu
     closedByBackdrop: true,
     closedByLargeImage: true,
   });
+});
+
+test('image lightbox: a preview image opens without picking the card', { skip: SKIP }, async () => {
+  await load(pathToFileURL(cardsFile).href);
+  const result = await evaluate(`(() => {
+    const image = document.querySelector('.preview-image');
+    const input = image.closest('.am-ask-card').querySelector('input[type="radio"]');
+    image.click();
+    return {
+      open: document.querySelector('.am-image-lightbox')?.hidden === false,
+      picked: input.checked,
+      replyHidden: document.querySelector('.am-reply-bar')?.hidden,
+      closeFocused: document.activeElement === document.querySelector('.am-image-lightbox-close'),
+    };
+  })()`);
+  assert.deepEqual(result, { open: true, picked: false, replyHidden: true, closeFocused: true });
 });

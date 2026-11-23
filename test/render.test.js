@@ -112,6 +112,9 @@ test('render: embedded images are responsive and open an enlarged view', () => {
 
   const plain = renderDoc('---\nlang: zh\n---\n## A\n纯文字。').html;
   assert.doesNotMatch(plain, /am-image-lightbox|data-am-image/);
+
+  const upper = renderDoc('---\nlang: en\n---\n## A\n```html\n<IMG src="data:image/png;base64,AAAA" alt="Upper">\n```').html;
+  assert.match(upper, /am-image-lightbox/);
 });
 
 test('render: a status word may be followed by inline HTML; only a leading word is a status', () => {

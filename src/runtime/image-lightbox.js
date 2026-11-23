@@ -48,7 +48,9 @@
     image.setAttribute('role', 'button');
     image.setAttribute('aria-label', image.alt ? `${image.alt}${labelSeparator}${openLabel}` : openLabel);
     image.addEventListener('click', (event) => {
+      // An image in an ask card preview opens the viewer, not the answer.
       event.preventDefault();
+      event.stopPropagation();
       show(image);
     });
     image.addEventListener('keydown', (event) => {
