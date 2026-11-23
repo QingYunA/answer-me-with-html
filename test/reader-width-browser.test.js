@@ -83,7 +83,7 @@ test('reader width drag, Escape persistence and 900px header', { skip }, async (
     writeFileSync(sheet, renderDoc('---\ntitle: Reflow\ncols: 3\n---\n\n## A First\n\nFirst card content.\n\n## B Second\n\nSecond card content.\n\n## C Third\n\nThird card content.\n\n## D Fourth\n\nFourth card content.', { template: 'sheet' }, {}, { resize: true }).html);
     await open({ path: sheet });
     const geometry = () => evaluate(`(() => {
-      const cards = [...document.querySelectorAll('.am-panel')].map(p => { const r = p.getBoundingClientRect(); return {left:r.left,right:r.right,top:r.top}; });
+      const cards = [...document.querySelectorAll('.am-panel')].map(p => { const r = p.getBoundingClientRect(); return {left:r.left,right:r.right}; });
       const handles = Object.fromEntries([...document.querySelectorAll('.am-width-handle')].map(h => { const r=h.getBoundingClientRect(); return [h.dataset.side, {x:r.left+r.width/2,y:r.top+Math.min(r.height/2,30)}]; }));
       return {cards,handles,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,drag:document.body.classList.contains('am-width-drag')};
     })()`);
@@ -99,7 +99,6 @@ test('reader width drag, Escape persistence and 900px header', { skip }, async (
     };
     for (const side of ['right', 'left']) {
       const wide = await layout(g => g.cards.length === 4 && columns(g) > 1 && g.handles.right.x > g.handles.left.x);
-      assert.ok(wide.cards.length >= 4);
       const h = wide.handles[side];
       const dx = side === 'right' ? -250 : 250;
       await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: h.x, y: h.y });
@@ -108,15 +107,10 @@ test('reader width drag, Escape persistence and 900px header', { skip }, async (
       const narrow = await layout(g => g.drag && columns(g) < columns(wide) &&
         Math.abs(g.handles.left.x - Math.min(...g.cards.map(c => c.left))) < 2 &&
         Math.abs(g.handles.right.x - Math.max(...g.cards.map(c => c.right))) < 2);
-      assert.equal(narrow.drag, true, 'reflow must happen before pointerup');
-      assert.ok(new Set(narrow.cards.map(c => Math.round(c.left))).size < new Set(wide.cards.map(c => Math.round(c.left))).size, JSON.stringify({wide, narrow}));
       assert.ok(narrow.overflow <= 1, JSON.stringify(narrow));
-      assert.ok(Math.abs(narrow.handles.left.x - Math.min(...narrow.cards.map(c => c.left))) < 2, JSON.stringify(narrow));
-      assert.ok(Math.abs(narrow.handles.right.x - Math.max(...narrow.cards.map(c => c.right))) < 2, JSON.stringify(narrow));
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: h.x + dx, y: h.y, button: 'left', buttons: 0, clickCount: 1 });
       // Restore the full-width starting point for the other handle.
       await evaluate("document.querySelector('[data-width=reset]').click()");
-      await geometry();
     }
   } finally {
     cdp?.close();

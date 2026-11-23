@@ -351,6 +351,8 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, resize };
   const widthMain = /<main class="am-(?:doc|sheet)(?=["\s])[^>]*>/;
   const resizable = resize && widthMain.test(body);
+  const content = colophon ? withColophon(body, language) : body;
+  const pageBody = resizable ? content.replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : content;
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
   const script = `\n${RUNTIME_JS}${resizable ? WIDTH_JS : ''}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
@@ -381,7 +383,7 @@ ${scaleButtons(ui)}${resizable ? `\n<button type="button" class="am-btn am-width
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}" data-failed="${esc(ui.failed)}">${esc(ui.copy)}</button>
 ${exporter.button}
 </div>
-${notice.popover}${exporter.menu}${resizable ? (colophon ? withColophon(body, language) : body).replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : (colophon ? withColophon(body, language) : body)}
+${notice.popover}${exporter.menu}${pageBody}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>${script}</script>
 </body>

@@ -11351,6 +11351,8 @@ function shell({ meta, language, body, source, embedded, update: update2, closeA
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, resize };
   const widthMain = /<main class="am-(?:doc|sheet)(?=["\s])[^>]*>/;
   const resizable = resize && widthMain.test(body);
+  const content = colophon2 ? withColophon(body, language) : body;
+  const pageBody = resizable ? content.replace(widthMain, (main2) => main2.slice(0, -1) + " data-am-resizable>" + ["left", "right"].map((side) => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join("")) : content;
   const interactiveTable = body.includes("<table data-am-table=");
   const script = `
 ${RUNTIME_JS}${resizable ? WIDTH_JS : ""}${interactiveTable ? TABLE_JS : ""}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
@@ -11382,7 +11384,7 @@ ${scaleButtons(ui)}${resizable ? `
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}" data-failed="${esc(ui.failed)}">${esc(ui.copy)}</button>
 ${exporter.button}
 </div>
-${notice.popover}${exporter.menu}${resizable ? (colophon2 ? withColophon(body, language) : body).replace(widthMain, (main2) => main2.slice(0, -1) + " data-am-resizable>" + ["left", "right"].map((side) => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join("")) : colophon2 ? withColophon(body, language) : body}
+${notice.popover}${exporter.menu}${pageBody}
 ${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
 <script>${script}</script>
 </body>
