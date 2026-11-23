@@ -149,10 +149,14 @@
     } catch {
       const ta = Object.assign(document.createElement('textarea'), { value: text });
       document.body.append(ta);
-      ta.select();
-      const copied = document.execCommand?.('copy') === true;
-      ta.remove();
-      return copied;
+      try {
+        ta.select();
+        return document.execCommand?.('copy') === true;
+      } catch {
+        return false; // execCommand can throw instead of returning false: that copy failed too
+      } finally {
+        ta.remove();
+      }
     }
   };
   // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is

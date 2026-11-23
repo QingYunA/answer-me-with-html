@@ -145,6 +145,8 @@ const COPY_OUTCOMES = `(async () => {
   };
   const labels = () => Object.fromEntries(Object.entries(buttons).map(([name, btn]) => [name, btn.textContent]));
   const idle = labels();
+  const areas = () => document.querySelectorAll('textarea').length;
+  const ownAreas = areas();
   const denied = () => Promise.reject(new Error('clipboard refused'));
   // run stubs the two clipboard paths, clicks every button and reads the label just after the click and again after the moment.
   const run = async (writeText, execCommand) => {
@@ -157,13 +159,14 @@ const COPY_OUTCOMES = `(async () => {
       shown[name] = btn.textContent;
     }
     await sleep(1700);
-    return { shown, back: labels() };
+    return { shown, back: labels(), leftover: areas() - ownAreas };
   };
   return {
     idle,
     api: await run(async () => {}, () => false),
     fallback: await run(denied, () => true),
     neither: await run(denied, () => false),
+    thrown: await run(denied, () => { throw new Error('execCommand refused'); }),
   };
 })()`;
 
@@ -177,7 +180,10 @@ test('copy: a button says the copy failed, not "Copied ✓", when neither clipbo
   assert.deepEqual(r.fallback.shown, { toolbar: 'Copied ✓', code: 'Copied ✓' }, 'the textarea and execCommand copied');
   // Both failed: the label is the same mark a failed copy on the site shows, and it never claims a copy.
   assert.deepEqual(r.neither.shown, { toolbar: '✗', code: '✗' }, 'a failed copy says so');
-  for (const run of ['api', 'fallback', 'neither']) {
+  // execCommand can throw instead of returning false: that is a failed copy too, and the temporary textarea still goes away.
+  assert.deepEqual(r.thrown.shown, { toolbar: '✗', code: '✗' }, 'a copy whose fallback threw says so');
+  for (const run of ['api', 'fallback', 'neither', 'thrown']) {
     assert.deepEqual(r[run].back, idle, `${run}: the label still comes back to the one the button started from`);
+    assert.equal(r[run].leftover, 0, `${run}: no temporary textarea is left in the page`);
   }
 });
