@@ -61,7 +61,7 @@ test('code: hl= marks lines by their shown number; the language comes from the f
 test('code: a typed block keeps its text escaped, has a copy button and no line numbers unless start= is set', () => {
   const { html } = render(draft('```python', 'print("<x>")'));
   assert.match(html, /<pre class="am-code"><code data-lang="python"><span class="am-ln">print\(&quot;&lt;x&gt;&quot;\)<\/span><\/code><\/pre>/);
-  assert.match(html, /<button class="am-code-copy" type="button" data-am="copy-code" data-done="Copied ✓">Copy<\/button>/);
+  assert.match(html, /<button class="am-code-copy" type="button" data-am="copy-code" data-done="Copied ✓" data-failed="Copy failed">Copy<\/button>/);
   const numbered = render(draft('```ts start=38 hl=39 title="limits.ts · sketch"', 'a()\nb()')).html;
   assert.match(numbered, /<span class="am-code-title">limits.ts · sketch<\/span>/);
   assert.match(numbered, /<span class="am-ln am-ln--hl" data-n="39">b\(\)<\/span>/);
@@ -69,7 +69,7 @@ test('code: a typed block keeps its text escaped, has a copy button and no line 
 
 test('code: the copy label follows the page language', () => {
   const { html } = render(`---\ntitle: 代码\nlang: zh\n---\n## 面板\n\`\`\`bash\nnpm test\n\`\`\`\n`);
-  assert.match(html, /data-done="已复制 ✓">复制<\/button>/);
+  assert.match(html, /data-done="已复制 ✓" data-failed="复制失败">复制<\/button>/);
 });
 
 test('code: the page keeps the path, not a copy in the draft; the embedded code reads back for am patch', () => {

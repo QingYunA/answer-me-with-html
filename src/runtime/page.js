@@ -162,13 +162,13 @@
   // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is
   // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,
   // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and
-  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have). A failed copy shows ✗ instead,
-  // the mark a copy button on the site shows: it is a symbol, so no language has to translate it.
+  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have). A failed copy reads data-failed
+  // instead, in the page language.
   const flasher = (btn) => {
     const idle = btn.textContent;
     let clicks = 0;
     return (copied) => {
-      btn.textContent = copied ? btn.dataset.done : '✗';
+      btn.textContent = copied ? btn.dataset.done : btn.dataset.failed;
       const mine = ++clicks;
       setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);
     };

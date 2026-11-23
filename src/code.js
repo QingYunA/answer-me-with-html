@@ -162,7 +162,7 @@ export function renderCode({ lang, args, text }, { baseDir = process.cwd(), know
   const slice = body.join('\n');
   if (SECRET_TEXT.test(slice)) throw new CodeError(`${opts.src ? `"${opts.src}"` : 'the block'} looks like it holds a key or a token; it is not embedded. Quote other lines or write a sketch`);
 
-  const copyButton = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? 'Copied ✓')}">${esc(ui.copyCode ?? 'Copy')}</button>` : '';
+  const copyButton = copy ? `<button class="am-code-copy" type="button" data-am="copy-code" data-done="${esc(ui.done ?? 'Copied ✓')}" data-failed="${esc(ui.failed ?? 'Copy failed')}">${esc(ui.copyCode ?? 'Copy')}</button>` : '';
   const long = body.length > LONG_CODE_LINES ? [{ rule: 'code-length', message: `the block has ${body.length} lines; readers skim past long code. Pick the 10 to ${LONG_CODE_LINES} lines that make the point` }] : [];
   if (isDiff) return renderDiff(text, opts, { copyButton, long });
 
