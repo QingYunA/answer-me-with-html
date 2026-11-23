@@ -1,6 +1,6 @@
 // Browser seam for the three copy buttons outside the Reply sheet — the toolbar's Copy source, a code block's Copy and the
 // new-version popover's Copy. Each reads data-done for a moment after a click; this is what a second click inside that moment does
-// to the label, which decides whether the button ever says what it is again.
+// to the label, which decides whether the button ever says what it is again, and what the label says when the copy did not happen.
 // Needs Chrome, so it runs only with AM_E2E=1 (CI job `video`) like test/update-browser.test.js.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,5 +130,60 @@ test('copy: the moment starts again on the second click, so the label lasts a fu
     // A timer never fires early, so on a loaded runner this only reads higher. The old behaviour reads ~600 ms here: it cancelled
     // nothing, so the first click's restore arrived 1.4 s after that click, 600 ms after this one.
     assert.ok(m.backAt >= 1300, `${name}: the label lasts a full moment from the second click (${m.backAt} ms)`);
+  }
+});
+
+// A copy that did not happen must not read "Copied ✓": the reader would paste whatever the clipboard already held. Both paths are
+// tried — the async clipboard API, then document.execCommand on a temporary textarea — so each is stubbed here, once succeeding and
+// once failing. The three runs cover the two ways a copy succeeds and the one way it fails; only the page's own buttons are read,
+// since the new-version popover already leaves its label alone when the API refuses (src/runtime/update.js).
+const COPY_OUTCOMES = `(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const buttons = {
+    toolbar: document.querySelector('[data-am="copy"]'),
+    code: document.querySelector('[data-am="copy-code"]'),
+  };
+  const labels = () => Object.fromEntries(Object.entries(buttons).map(([name, btn]) => [name, btn.textContent]));
+  const idle = labels();
+  const areas = () => document.querySelectorAll('textarea').length;
+  const ownAreas = areas();
+  const denied = () => Promise.reject(new Error('clipboard refused'));
+  // run stubs the two clipboard paths, clicks every button and reads the label just after the click and again after the moment.
+  const run = async (writeText, execCommand) => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    document.execCommand = execCommand;
+    const shown = {};
+    for (const [name, btn] of Object.entries(buttons)) {
+      btn.click();
+      await sleep(120);
+      shown[name] = btn.textContent;
+    }
+    await sleep(1700);
+    return { shown, back: labels(), leftover: areas() - ownAreas };
+  };
+  return {
+    idle,
+    api: await run(async () => {}, () => false),
+    fallback: await run(denied, () => true),
+    neither: await run(denied, () => false),
+    thrown: await run(denied, () => { throw new Error('execCommand refused'); }),
+  };
+})()`;
+
+test('copy: a button says the copy failed, not "Copied ✓", when neither clipboard path copied', { skip: SKIP }, async () => {
+  await load(pathToFileURL(file).href);
+  const r = await evaluate(COPY_OUTCOMES);
+  const idle = { toolbar: 'Copy source', code: 'Copy' };
+  assert.deepEqual(r.idle, idle, 'each button starts from its own label');
+  // The two success paths still read the copied label, so the failure label cannot be bought by giving up on either.
+  assert.deepEqual(r.api.shown, { toolbar: 'Copied ✓', code: 'Copied ✓' }, 'the async clipboard API copied');
+  assert.deepEqual(r.fallback.shown, { toolbar: 'Copied ✓', code: 'Copied ✓' }, 'the textarea and execCommand copied');
+  // Both failed: the label is the same mark a failed copy on the site shows, and it never claims a copy.
+  assert.deepEqual(r.neither.shown, { toolbar: '✗', code: '✗' }, 'a failed copy says so');
+  // execCommand can throw instead of returning false: that is a failed copy too, and the temporary textarea still goes away.
+  assert.deepEqual(r.thrown.shown, { toolbar: '✗', code: '✗' }, 'a copy whose fallback threw says so');
+  for (const run of ['api', 'fallback', 'neither', 'thrown']) {
+    assert.deepEqual(r[run].back, idle, `${run}: the label still comes back to the one the button started from`);
+    assert.equal(r[run].leftover, 0, `${run}: no temporary textarea is left in the page`);
   }
 });
