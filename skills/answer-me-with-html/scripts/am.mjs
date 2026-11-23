@@ -34,7 +34,7 @@ import { readFileSync as readFileSync11, writeFileSync as writeFileSync8, mkdirS
 
 // src/assets.js
 var VERSION = "0.6.2";
-var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/<name>.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
+var BASE_CSS = `/* Answer me with HTML base \u2014 uses theme variables only, never hard-coded colors (theme tokens and decorations: themes/{name}.js). Exception: the var() fallbacks of diagrams (flow / sequence) equal the blueprint light tokens, guarded by a test. */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -894,11 +894,7 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 `;
 var RTL_CSS = '/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout\n   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */\n\n/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */\nhtml[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }\nhtml[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }\n\n/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width\n   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */\nhtml[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,\nhtml[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,\nhtml[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,\nhtml[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {\n  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;\n}\nhtml[dir="rtl"] .am-head h1 { letter-spacing: normal; }\n/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */\nhtml[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }\n\n/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */\nhtml[dir="rtl"] .am-diagram svg { direction: rtl; }\n\n/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */\nhtml[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }\nhtml[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }\n\n/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left\n   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the\n   start of its note would otherwise run together as one left-to-right piece. */\nhtml[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }\n\n/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of\n   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */\nhtml[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(var(--am-fs-heading), calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }\n@container (max-width: 560px) {\n  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: var(--am-fs-heading); }\n}\n\n/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.\n   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play\n   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */\nhtml[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-titleblock { text-align: right; }\n/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */\nhtml[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }\nhtml[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-controls { direction: ltr; }\n\n/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */\nhtml[dir="rtl"] pre .am-mark-note { direction: rtl; }\n/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */\nhtml[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }\n';
 var CHART_CSS = '/* Charts (src/components/chart.js). Only a page with a chart carries this file, the way only a page with math carries the math styles.\n   Series colors are the diagram tokens --series-1 to --series-6 (docs/reference.md, "Diagram tokens"): a theme that sets one wins, and\n   the fallbacks are the fixed palette below (Tableau 10 style), a set for light and a set for dark. Bars carry their value, the legend names\n   the series and the data table holds the numbers, so a color is never the only way to read a bar. The axis, grid and labels read the usual\n   tokens, so a theme that sets nothing still gets a chart in its own colors. */\nhtml {\n  --am-ch-1: #4e79a7; --am-ch-2: #f28e2b; --am-ch-3: #e15759; --am-ch-4: #76b7b2; --am-ch-5: #59a14f; --am-ch-6: #b07aa1;\n}\nhtml[data-mode="dark"] {\n  --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n}\n@media (prefers-color-scheme: dark) {\n  html[data-mode="auto"] {\n    --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n  }\n}\n\n.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray (a line is never gray). */\n.am-ch-hi { fill: var(--accent, #1d5fbf); }\n.am-ch-row.is-dim .am-ch-bar, .am-ch-row.is-dim .am-ch-slice, .am-ch-row.is-dim .am-ch-sw { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }\n\n/* A line: a stroke in the series color, a dot on each point; the dot has an outline in the paper color where lines cross. A pie slice has\n   the same outline, which is the gap between slices. */\n.am-ch-line { fill: none; stroke-width: 2.5; stroke-linecap: round; }\n.am-ch-line.am-ch-s1 { stroke: var(--series-1, var(--am-ch-1)); }\n.am-ch-line.am-ch-s2 { stroke: var(--series-2, var(--am-ch-2)); }\n.am-ch-line.am-ch-s3 { stroke: var(--series-3, var(--am-ch-3)); }\n.am-ch-line.am-ch-s4 { stroke: var(--series-4, var(--am-ch-4)); }\n.am-ch-line.am-ch-s5 { stroke: var(--series-5, var(--am-ch-5)); }\n.am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }\n.am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }\n.am-ch-slice { stroke-width: 2; stroke-linejoin: round; }\n.am-ch-guide { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 3 3; }\n\n.am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }\n.am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }\n.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); }\n.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartTick); }\n/* The value labels of a highlighted row in a chart with several series take the color of their series, in a heavier weight to read on it. */\n.am-diagram .am-ch-val.am-ch-s1, .am-diagram .am-ch-val.am-ch-s2, .am-diagram .am-ch-val.am-ch-s3, .am-diagram .am-ch-val.am-ch-s4, .am-diagram .am-ch-val.am-ch-s5, .am-diagram .am-ch-val.am-ch-s6 { font-weight: 600; }\n.am-diagram .am-ch-val.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-diagram .am-ch-val.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-diagram .am-ch-val.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-diagram .am-ch-val.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-diagram .am-ch-val.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-diagram .am-ch-val.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */\n.am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }\n.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); font-variant-numeric: tabular-nums; }\n.am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }\n\n/* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */\n.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: var(--am-fs-text); }\n.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }\n.am-ch-data summary::-webkit-details-marker { display: none; }\n.am-ch-data summary::before { content: ""; width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .15s; }\n.am-ch-data[open] summary::before { transform: rotate(90deg); }\n/* The triangle points to the end side, which is the left on a right-to-left page: it turns the other way to point down. */\nhtml[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }\n@media (prefers-reduced-motion: reduce) { .am-ch-data summary::before { transition: none; } }\n.am-ch-data summary:hover { color: var(--ink); }\n.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: var(--am-fs-text); }\n.am-ch-data thead th { font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }\n.am-ch-data thead th::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; }\n.am-ch-data thead th:nth-child(2)::before { background: var(--series-1, var(--am-ch-1)); }\n.am-ch-data thead th:nth-child(3)::before { background: var(--series-2, var(--am-ch-2)); }\n.am-ch-data thead th:nth-child(4)::before { background: var(--series-3, var(--am-ch-3)); }\n.am-ch-data thead th:nth-child(5)::before { background: var(--series-4, var(--am-ch-4)); }\n.am-ch-data thead th:nth-child(6)::before { background: var(--series-5, var(--am-ch-5)); }\n.am-ch-data thead th:nth-child(7)::before { background: var(--series-6, var(--am-ch-6)); }\n.am-ch-data--pie thead th::before { content: none; }\n.am-ch-data th, .am-ch-data td { padding: 7px 10px; font-variant-numeric: tabular-nums; }\n.am-ch-data th[scope="row"] { text-align: start; font-weight: 400; }\n/* Numbers read left to right in every language and line up on their right edge, under the series name. */\n.am-ch-data td, .am-ch-data thead th { text-align: right; }\n.am-ch-data tbody tr:nth-child(even) > * { background: var(--fill); }\n';
-var MATH_CSS = `/*
-Temml.woff2 is a clone of KaTeX_Script-Regular, except that the code points
-have been changed from ASCII to Unicode Mathematical Alphanumeric Symbols Script capitals,
-Unicode range 1D49C to 1D4B5.
-*/
+var MATH_CSS = `
 
 @font-face {
   font-family: 'Temml';
@@ -918,7 +914,7 @@ math {
   letter-spacing: normal;
   word-wrap: normal;
   direction: ltr;
-  /* Prevent Firefox from omitting the dot on i or j. */
+  
   font-feature-settings: "dtls" off;
 }
 
@@ -926,15 +922,14 @@ math * {
   border-color: currentColor;
 }
 
-/* display: block is necessary in Firefox and Safari.
- * Not in Chromium, which recognizes display: "block math" written inline. */
+
  math.tml-display {
   display: block;
   width: 100%;
 }
 
 *.mathcal {
-  /* NotoSans */
+  
   font-feature-settings: 'ss01';
 }
 
@@ -946,7 +941,7 @@ mo.tml-prime {
   font-family: Temml;
 }
 
-/* Cramped superscripts in WebKit */
+
 mfrac > :nth-child(2),
 msqrt,
 mover > :first-child {
@@ -965,9 +960,9 @@ mover > :first-child {
   left: 0;
   padding: 0.5ex 0ex;
   background-color: currentColor;
-  /* Use the SVG as an alpha mask (painted by background-color) */
-  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><defs><marker id='a' markerHeight='5' markerUnits='strokeWidth' markerWidth='7' orient='auto' refX='7' refY='2.5'><path fill='black' d='m0 0 7 2.5L0 5z'/></marker></defs><line x2='100%25' y1='100%25' stroke='black' stroke-width='.06em' marker-end='url(%23a)' vector-effect='non-scaling-stroke'/></svg>");
-          mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><defs><marker id='a' markerHeight='5' markerUnits='strokeWidth' markerWidth='7' orient='auto' refX='7' refY='2.5'><path fill='black' d='m0 0 7 2.5L0 5z'/></marker></defs><line x2='100%25' y1='100%25' stroke='black' stroke-width='.06em' marker-end='url(%23a)' vector-effect='non-scaling-stroke'/></svg>");
+  
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cmarker id='a' markerHeight='5' markerUnits='strokeWidth' markerWidth='7' orient='auto' refX='7' refY='2.5'%3E%3Cpath fill='black' d='m0 0 7 2.5L0 5z'/%3E%3C/marker%3E%3C/defs%3E%3Cline x2='100%25' y1='100%25' stroke='black' stroke-width='.06em' marker-end='url(%23a)' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cmarker id='a' markerHeight='5' markerUnits='strokeWidth' markerWidth='7' orient='auto' refX='7' refY='2.5'%3E%3Cpath fill='black' d='m0 0 7 2.5L0 5z'/%3E%3C/marker%3E%3C/defs%3E%3Cline x2='100%25' y1='100%25' stroke='black' stroke-width='.06em' marker-end='url(%23a)' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
   -webkit-mask-repeat: no-repeat;
           mask-repeat: no-repeat;
   -webkit-mask-size: 100% 100%;
@@ -977,18 +972,18 @@ mover > :first-child {
 }
 
 @supports (-moz-appearance: none) {
-  /* \\vec w/o italic correction for Firefox */
+  
   .tml-vec {
     transform: scale(0.75)
   }
-  /* Fix \\cancelto in Firefox */
+  
   .ff-narrow {
     width: 0em;
   }
   .ff-nudge-left {
     margin-left: -0.2em;
   }
-  /* Squash hidden mrows in \\bordermatrix. Messes with centering, but necessary to squash. */
+  
   .ff-squash mtd {
     display: block;
     height: 0;
@@ -996,12 +991,12 @@ mover > :first-child {
 }
 
 @supports (not (-moz-appearance: none)) {
-  /* Chromium and WebKit */
-  /* prime vertical alignment */
+  
+  
   mo.tml-prime {
     font-family: Temml;
   }
-  /* Italic correction on superscripts */
+  
   .tml-sml-pad {
     padding-left: 0.05em;
   }
@@ -1014,9 +1009,9 @@ mover > :first-child {
 }
 
 @supports (-webkit-backdrop-filter: blur(1px)) {
-  /* WebKit vertical & italic correction on accents */
+  
   .wbk-acc {
-    /* lower by x-height distance */
+    
     transform: translate(0em, 0.431em);
   }
   .wbk-sml {
@@ -1048,13 +1043,13 @@ mover > :first-child {
   }
 }
 
-/* \\cancel & \\phase use background images. Get them to print. */
+
 menclose {
-  -webkit-print-color-adjust: exact;  /* Chrome & Edge */
+  -webkit-print-color-adjust: exact;  
           print-color-adjust: exact;
 }
 
-/* Array cell justification in Firefox & WebKit */
+
 .tml-right {
   text-align: right;
 }
@@ -1062,12 +1057,12 @@ menclose {
   text-align: left;
 }
 
-/* For CD labels that grow to the left in Firefox and WebKit */
+
 .tml-shift-left { margin-left:-200% }
 
-/* Styles for Chromium only */
+
 @supports (not (-webkit-backdrop-filter: blur(1px))) and (not (-moz-appearance: none)) {
-  /* Italic correction on accents */
+  
   .chr-sml {
     transform: translate(0.07em, 0)
   }
@@ -1087,11 +1082,11 @@ menclose {
     transform: scale(0.75) translate(0.21em, 0)
   }
 
-  /* For CD labels that grow to the left */
+  
   .tml-shift-left { margin-left:-100% }
 
-  /* MathML Core & Chromium do not support the MathML 3.0 element <menclose> attributes. */
-  /* So use styles. */
+  
+  
   menclose {
     position: relative;
     padding: 0.5ex 0ex;
@@ -1189,7 +1184,7 @@ menclose {
     margin-right: 0.03889em;
    }
 
-   /* Stretch \\widetilde */
+   
   .tml-tilde-2 {
     transform: scale(2.0, 1.1)
   }
@@ -1199,7 +1194,7 @@ menclose {
   .tml-tilde-4 {
     transform: scale(4.0, 1.1)
   }
-  /* Stretch \\widehat */
+  
   .tml-hat-1 {
     transform: scale(1.9, 1.0)
   }
@@ -1213,7 +1208,7 @@ menclose {
     transform: scale(7.8, 1.0)
   }
   
-  /* set array cell justification */
+  
   .tml-right {
     text-align: -webkit-right;
   }
@@ -1226,7 +1221,7 @@ menclose {
   font-family: 'STIX TWO', 'Times New Roman', Times, Tinos, serif;
 }
 
-/* flex-wrap for line-breaking in Chromium */
+
 math {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1236,8 +1231,8 @@ math > mrow {
   padding: 0.5ex 0ex;
 }
 
-/* Default mtd top padding is 0.5ex per MathML-Core and user-agent CSS */
-/* We adjust for jot and small */
+
+
 mtable.tml-jot > mtr > mtd {
   padding-top: 0.7ex;
   padding-bottom: 0.7ex;
@@ -1247,17 +1242,17 @@ mtable.tml-small mtd {
   padding-bottom: 0.35ex;
 }
 
-/* Firefox */
+
 @-moz-document url-prefix() {
-  /* Avoid flex-wrap */
+  
   math { display: inline; }
   math > mrow { padding: 0 }
-  /* Adjust Firefox spacing between array rows */
+  
   mtd, mtable.tml-small mtd { padding-top: 0; padding-bottom: 0; }
   mtable.tml-jot > mtr > mtd { padding-top: 0.2ex; padding-bottom: 0.2ex; }
 }
 
-/* AMS environment auto-numbering via CSS counter. */
+
 .tml-eqn::before {
   counter-increment: tmlEqnNo;
   content: "(" counter(tmlEqnNo) ")";
@@ -1357,7 +1352,7 @@ var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src
 })();
 `;
 var VIDEO_CSS = `/* Video player: the 1920\xD71080 stage scales to the window. All colors come from theme variables.
-   Theme-specific video tokens and decorations live in each theme's definition (themes/<name>.js). */
+   Theme-specific video tokens and decorations live in each theme's definition (themes/{name}.js). */
 html[data-video] {
   /* Player controls stay out of the picture and ignore the theme: one fixed set of dark tokens */
   --v-ctl-bg: #0b0d11; --v-ctl-line: #1d2330; --v-ctl-fg: #c9d1dc; --v-ctl-muted: #5b6576;
