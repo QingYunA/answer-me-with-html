@@ -286,6 +286,30 @@ ${fillerEn('B', 1)}
 ${fillerEn('C', 2)}
 `;
 
+// A forest of three trees whose labels hold long words (an IP, an email, a hash): the columns used to be narrower than the words.
+const LONG_TREE = `---
+title: Long tree labels
+cols: 3
+lang: en
+---
+## A Load
+\`\`\`tree
+Exit 1 · 216.36.88.169 | 2 pro100
+  Home 2serein7z@163.com | pro100 · 7d 91% · schedulable
+  Home 2 sriai666@163.com | pro100 · 7d 96% · schedulable
+Exit 2 · 216.36.111.92 | 3 pro100
+  3995719870@qq.com home 1 | pro100 · 7d 0% · schedulable
+  732687813@qq.com | pro100 · 7d 31% · not schedulable
+  token 0123456789abcdef0123456789abcdef0123456789abcdef | 0123456789abcdef0123456789abcdef0123456789abcdef
+Exit 3 · 209.87.95.126 | 2 pro200
+  cyanchan99@qq.com | pro200 · 7d 43% · schedulable
+  cyanchan99@163.com | pro200 · 7d 47% · not schedulable
+\`\`\`
+
+${fillerEn('B', 1)}
+${fillerEn('C', 2)}
+`;
+
 // Everything the checks need, read in the page in one call. A "row" is the set of grid children with the same top edge.
 const MEASURE = `(() => {
   const grid = document.querySelector('.am-grid');
@@ -405,6 +429,9 @@ before(() => {
   const longApi = join(tmp, 'drafts', 'long-api.en.md');
   writeFileSync(longApi, LONG_API);
   special['long-api.en'] = render(longApi, 'long-api.en');
+  const longTree = join(tmp, 'drafts', 'long-tree.en.md');
+  writeFileSync(longTree, LONG_TREE);
+  special['long-tree.en'] = render(longTree, 'long-tree.en');
 });
 
 const launch = async () => {
@@ -673,6 +700,32 @@ test('e2e: a long API target wraps inside its panel instead of sticking out', { 
     })()`);
     assert.ok(box.right <= 1, `@${width}px: the target ends inside its panel, ${box.right}px past it`);
     assert.equal(box.overflow, 0, `@${width}px: the panel does not scroll sideways`);
+  }
+});
+
+test('e2e: long words in a tree wrap inside their box and column instead of running into the next one', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const p = special['long-tree.en'];
+  for (const width of [PHONE, 880, DESKTOP]) {
+    await open(p.file, width);
+    if (width > 760) await waitFor(SETTLED, `long-tree.en to lay out at ${width}px`);
+    // The text of every box, list item and note, measured as the text itself: a box's own rectangle does not grow with text that sticks out.
+    const out = await evaluate(`(() => {
+      const out = [];
+      const walker = document.createTreeWalker(document.querySelector('.am-tree'), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim()) continue;
+        const holder = node.parentElement.closest('.am-tree-box, .am-tree-list li');
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const past = Math.max(...[...range.getClientRects()].map((r) => r.right)) - holder.getBoundingClientRect().right;
+        if (past > 1) out.push(node.textContent.trim() + ' (' + Math.round(past) + 'px)');
+      }
+      const panel = document.querySelector('.am-tree').closest('.am-panel');
+      return { out, panelOverflow: panel.scrollWidth - panel.clientWidth };
+    })()`);
+    assert.deepEqual(out.out, [], `@${width}px: text ends inside its box or list item`);
+    assert.equal(out.panelOverflow, 0, `@${width}px: the panel does not scroll sideways`);
   }
 });
 
@@ -1109,6 +1162,55 @@ for (const [lang, sentences, head] of [
       // No monospace font on a right-to-left page; the sentence takes the font of the page.
       if (rtl) assert.equal(l.font, l.body);
       else assert.notEqual(l.font, l.body);
+    }
+  });
+}
+
+// The toolbar is fixed at the top corner and as wide as its controls (about 540 px, wider with the new-version button). The first line of the
+// header (the colophon, or the title when there is no colophon) must stay clear of it at every width, while a title below the toolbar keeps the
+// full header width. The first line is measured as text (a Range), since its element spans the whole header.
+const BAR_UPDATE = { latest: '0.9.0', current: '0.5.0', command: 'npx skills update answer-me-with-html -y' };
+const LONG_TITLE = 'Account tiers and the load on every exit across the whole fleet this week, what changed since last week, and what to do next about it';
+const FIRST_LINE = `(() => {
+  const bar = document.querySelector('.am-toolbar').getBoundingClientRect();
+  const lines = (el) => { const r = document.createRange(); r.selectNodeContents(el); return [...r.getClientRects()].filter((x) => x.width > 0); };
+  const first = document.querySelector('.am-colophon') ?? document.querySelector('.am-head h1');
+  const title = lines(document.querySelector('.am-head h1'));
+  const head = document.querySelector('.am-head').getBoundingClientRect();
+  return {
+    hits: lines(first).filter((r) => r.left < bar.right && r.right > bar.left && r.top < bar.bottom && r.bottom > bar.top).map((r) => [r.left, r.right, r.top, r.bottom].map(Math.round)),
+    bar: [bar.left, bar.right, bar.top, bar.bottom].map(Math.round),
+    headWidth: head.width,
+    widest: Math.max(...title.map((r) => r.width)),
+    titleTop: Math.min(...title.map((r) => r.top)),
+    barBottom: bar.bottom,
+  };
+})()`;
+const nextFrames = () => evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))');
+
+for (const [name, front, options] of [
+  ['a sheet page', 'lang: en\n', { update: BAR_UPDATE }],
+  ['a doc page', 'lang: en\ntemplate: doc\n', { update: BAR_UPDATE }],
+  ['a right-to-left page', 'lang: he\n', { update: BAR_UPDATE }],
+  ['a page without the update button', 'lang: en\n', {}],
+  ['a page with the colophon off', 'lang: en\n', { colophon: false }],
+]) {
+  test(`e2e: the header's first line stays clear of the toolbar at every width (${name})`, { skip: SKIP, timeout: 90000 }, async () => {
+    if (!cdp) await launch();
+    const { html } = renderDoc(`---\ntitle: ${LONG_TITLE}\n${front}---\n## A Note\nText.\n## B Note\nText.\n## C Note\nText.\n`, {}, {}, options);
+    const file = join(tmp, `toolbar-${name.replace(/\W+/g, '-')}.html`);
+    writeFileSync(file, html);
+    for (const width of [390, 760, 761, 800, 900, 1000, 1100, 1440]) {
+      await open(file, width);
+      if (options.update) await waitFor("!document.querySelector('[data-am=update]').hidden", 'the update button');
+      await nextFrames();
+      const m = await evaluate(FIRST_LINE);
+      assert.deepEqual(m.hits, [], `@${width}px: the first line meets the toolbar ${m.bar}`);
+      // With a colophon the title sits below the toolbar and may use the whole header, not the space left of the toolbar.
+      if (options.colophon !== false && width > 760) {
+        assert.ok(m.titleTop >= m.barBottom, `@${width}px: the title starts below the toolbar (${m.titleTop} vs ${m.barBottom})`);
+        assert.ok(m.widest >= m.headWidth - 170, `@${width}px: the title keeps the header width, its widest line is ${Math.round(m.widest)} of ${Math.round(m.headWidth)}`);
+      }
     }
   });
 }

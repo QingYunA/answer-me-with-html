@@ -115,6 +115,29 @@
     });
   }
 
+  // The toolbar floats over the top corner, and its width changes (the new-version button, a longer language, a phone). The header keeps
+  // its first lines clear of it with a float of the toolbar's own size (base.css, .am-bar-fit .am-head::before): only the lines next to
+  // the toolbar get shorter, and a title below it keeps the whole header. The size is measured here and set as --am-bar-w / --am-bar-h;
+  // without this script the CSS keeps a fixed 300px reservation instead.
+  const head = document.querySelector('.am-head');
+  if (carrier && head) {
+    const GAP = 12;
+    const fit = () => {
+      const bar = carrier.getBoundingClientRect();
+      const box = head.getBoundingClientRect();
+      const toward = getComputedStyle(head).direction === 'rtl' ? bar.right - box.left : box.right - bar.left;
+      // The header's top in the page, not in the window, since the toolbar stays in the window while the page scrolls.
+      const reach = bar.bottom + GAP / 2 - (box.top + scrollY);
+      root.style.setProperty('--am-bar-w', `${toward > 0 && reach > 0 ? Math.ceil(toward + GAP) : 0}px`);
+      root.style.setProperty('--am-bar-h', `${Math.max(0, Math.ceil(reach))}px`);
+    };
+    root.classList.add('am-bar-fit');
+    fit();
+    new ResizeObserver(fit).observe(carrier);
+    addEventListener('resize', fit);
+    document.fonts?.ready.then(fit);
+  }
+
   // True when the text is on the clipboard, false when both paths failed. The async clipboard API is refused on some origins
   // (a page the browser treats as insecure), so the textarea and execCommand are the fallback, and execCommand reports whether
   // it copied anything. A button that says it copied when nothing did is worse than one that admits the copy failed: the reader
