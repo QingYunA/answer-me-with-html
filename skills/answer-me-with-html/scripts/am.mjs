@@ -13143,7 +13143,7 @@ var DEVICE_SCALE = 2;
 var MAX_SLICE = 1800;
 var SETTLE_MS = 400;
 var CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comment-btn, .am-remark-pop,
-.am-update, .am-btn--update, .am-btn--export, .am-export, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
+.am-update, .am-btn--update, .am-btn--export, .am-export, .am-lightbox, .am-image-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
   display: none !important;
 }
 .am-table-sort::after { content: none !important; }
