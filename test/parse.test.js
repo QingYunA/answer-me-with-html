@@ -387,4 +387,5 @@ test('"Lead:" is dropped only at the very start of the first intro block, and th
   assert.equal(parseDoc('没有前缀的导语。\n\n## A\nx').intro[0].text.trim(), '没有前缀的导语。');
   assert.equal(parseDoc('---\ntitle: T\n---\nLead: 结论。\n\n## A\nx').intro[0].line, 4);
   assert.equal(parseDoc('Lead:\n\n## A\nx').intro.length, 0);
+  assert.match(parseDoc('Lead\n\n: Important\n\n## A\nx').intro[0].text, /^Lead\n\n: Important/, 'the label does not cross a blank line');
 });

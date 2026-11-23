@@ -361,7 +361,7 @@ function extractTitle(intro, meta) {
 // An old skill example showed the intro as "Lead: ...", and agents copied the label into their drafts. The intro is the lead already, so a
 // "Lead:" (or "**Lead:**", or a fullwidth colon) at the very start of the first intro block is dropped. Leading blank lines stay, so the
 // block keeps its line numbers; a block that held only the label goes away.
-const LEAD_LABEL = /^((?:[ \t]*\n)*)[ \t]{0,3}(?:\*\*lead\s*[:：]\*\*|\*\*lead\*\*\s*[:：]|lead\s*[:：])[ \t]*/i;
+const LEAD_LABEL = /^((?:[ \t]*\n)*)[ \t]{0,3}(?:\*\*lead[ \t]*[:：]\*\*|\*\*lead\*\*[ \t]*[:：]|lead[ \t]*[:：])[ \t]*/i;
 
 function dropLeadLabel(intro) {
   const [first, ...rest] = intro;

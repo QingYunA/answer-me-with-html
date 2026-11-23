@@ -5222,7 +5222,7 @@ function parseLabel(t) {
   const [label, sub = ""] = fields(hi ? text2.slice(1) : text2);
   return { label, sub, hi, mark };
 }
-var softBreaks = (html) => html.replace(/(<[^>]*>)|([^<]+)/g, (_2, tag, text2) => tag ?? text2.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, "$&<wbr>")));
+var softBreaks = (html) => html.replace(/(<(?:[^>"']|"[^"]*"|'[^']*')*>)|([^<]+)/g, (_2, tag, text2) => tag ?? text2.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, "$&<wbr>")));
 var labelHtml = (label) => softBreaks(mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>'));
 var vattrs = (n) => ` data-key="${esc(n.label)}" data-step="${n.step}"${deltaAttr(n.state)}`;
 var HIDDEN_IN = { before: "added", after: "removed" };
@@ -9980,7 +9980,7 @@ function extractTitle(intro, meta) {
   if (!remaining.some((l3) => l3.trim())) return rest;
   return [{ ...first, text: remaining.join("\n"), line: first.line + idx + 1 }, ...rest];
 }
-var LEAD_LABEL = /^((?:[ \t]*\n)*)[ \t]{0,3}(?:\*\*lead\s*[:：]\*\*|\*\*lead\*\*\s*[:：]|lead\s*[:：])[ \t]*/i;
+var LEAD_LABEL = /^((?:[ \t]*\n)*)[ \t]{0,3}(?:\*\*lead[ \t]*[:：]\*\*|\*\*lead\*\*[ \t]*[:：]|lead[ \t]*[:：])[ \t]*/i;
 function dropLeadLabel(intro) {
   const [first, ...rest] = intro;
   if (first?.type !== "md" || !LEAD_LABEL.test(first.text)) return intro;

@@ -90,8 +90,8 @@ function parseLabel(t) {
 
 // A long unbroken word (an IP, an email, a URL, a path) lets a column break after . @ / _ : instead of in the middle of a number or a name.
 // Only text between tags changes, so a tag, an attribute (an autolinked email's href) and an entity stay whole; <wbr> adds no character,
-// so copied text is the same (the same idea as identifier() in api.js). Words shorter than 12 characters are left alone.
-const softBreaks = (html) => html.replace(/(<[^>]*>)|([^<]+)/g, (_, tag, text) => tag ?? text.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, '$&<wbr>')));
+// so copied text is the same (the same idea as identifier() in api.js). A tag ends at the first > outside quotes, so a quoted > in an href stays in it. Words shorter than 12 characters are left alone.
+const softBreaks = (html) => html.replace(/(<(?:[^>"']|"[^"]*"|'[^']*')*>)|([^<]+)/g, (_, tag, text) => tag ?? text.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, '$&<wbr>')));
 
 // When a label starts with inline code followed by text (e.g. `Section 1` Words), the code part becomes a grey number tag.
 const labelHtml = (label) => softBreaks(mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>'));

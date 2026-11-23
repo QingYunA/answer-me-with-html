@@ -60,6 +60,8 @@ test('tree: a long unbroken label or note can wrap after . @ / _ :, and tags, at
   assert.match(html, /<li[^>]*><span class="am-tree-label">short\.txt<\/span><span class="am-tree-sub">a\.b<\/span>/, 'a short word gets no break');
   assert.match(html, /data-key="出口 1 · 216\.36\.88\.169"/, 'the video key keeps the raw label');
   assert.doesNotMatch(html, /<[^>]*<wbr>[^>]*>/, 'no break inside a tag');
+  const quoted = render('tree', '根\n  <a href="https://example.com/a>b/long_resource">Download</a>');
+  assert.match(quoted, /href="https:\/\/example\.com\/a>b\/long_resource"/, 'a quoted > in an attribute does not end the tag');
 });
 
 test('tree: error on empty content', () => {
