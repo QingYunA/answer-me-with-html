@@ -351,6 +351,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   border: var(--node-width, var(--bw)) solid var(--node-stroke, var(--line)); background: var(--node-fill, var(--paper)); padding: 6px 14px; text-align: center;
   border-radius: var(--node-radius, var(--radius)); font-weight: 600; color: var(--node-text, inherit); filter: var(--node-shadow, none);
 }
+/* A word longer than its column (an IP, an email, a hash) breaks instead of running over the next column. anywhere, not break-word,
+   so the column's min-content width shrinks too; the <wbr> that tree.js adds still gives the preferred break points. */
+.am-tree-box, .am-tree-list li { overflow-wrap: anywhere; }
 .am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: var(--am-fs-small); }
 /* The root box and a highlighted box are emphasis: they take the highlight tokens. With none set the root box keeps its accent tint and a highlighted box looks like any other. */
 .am-tree-box--root, .am-tree-box--hi { border-color: var(--hi-stroke, var(--node-stroke, var(--line))); color: var(--hi-text, var(--node-text, inherit)); }

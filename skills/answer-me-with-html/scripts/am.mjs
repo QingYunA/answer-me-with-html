@@ -387,6 +387,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   border: var(--node-width, var(--bw)) solid var(--node-stroke, var(--line)); background: var(--node-fill, var(--paper)); padding: 6px 14px; text-align: center;
   border-radius: var(--node-radius, var(--radius)); font-weight: 600; color: var(--node-text, inherit); filter: var(--node-shadow, none);
 }
+/* A word longer than its column (an IP, an email, a hash) breaks instead of running over the next column. anywhere, not break-word,
+   so the column's min-content width shrinks too; the <wbr> that tree.js adds still gives the preferred break points. */
+.am-tree-box, .am-tree-list li { overflow-wrap: anywhere; }
 .am-tree-box small { display: block; font-weight: 400; color: var(--ink-2); font-size: var(--am-fs-small); }
 /* The root box and a highlighted box are emphasis: they take the highlight tokens. With none set the root box keeps its accent tint and a highlighted box looks like any other. */
 .am-tree-box--root, .am-tree-box--hi { border-color: var(--hi-stroke, var(--node-stroke, var(--line))); color: var(--hi-text, var(--node-text, inherit)); }
@@ -5212,7 +5215,8 @@ function parseLabel(t) {
   const [label, sub = ""] = fields(hi ? text2.slice(1) : text2);
   return { label, sub, hi, mark };
 }
-var labelHtml = (label) => mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>');
+var softBreaks = (html) => html.replace(/(<[^>]*>)|([^<]+)/g, (_2, tag, text2) => tag ?? text2.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, "$&<wbr>")));
+var labelHtml = (label) => softBreaks(mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>'));
 var vattrs = (n) => ` data-key="${esc(n.label)}" data-step="${n.step}"${deltaAttr(n.state)}`;
 var HIDDEN_IN = { before: "added", after: "removed" };
 function lineAttrs(siblings, i, cols) {
@@ -5227,7 +5231,7 @@ function lineAttrs(siblings, i, cols) {
   }).join("");
 }
 var dropAttrs = (children) => Object.entries(HIDDEN_IN).map(([view, hidden]) => children.every((c) => c.state === hidden) ? ` data-line-${view}="none"` : "").join("");
-var boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${mdInline(n.sub)}</small>` : ""}`;
+var boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${softBreaks(mdInline(n.sub))}</small>` : ""}`;
 function rootBox(root, ui, solo = false) {
   const drop = solo ? "" : dropAttrs(root.children);
   return `<div class="am-tree-root${solo ? " am-tree-root--solo" : ""}"${deltaAttr(root.state)}${drop}><div class="am-tree-box am-tree-box--root"${vattrs(root)}>${boxInner(root, ui)}</div></div>`;
@@ -5244,7 +5248,7 @@ function listHtml(nodes, ui) {
   return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, nodes, i)).join("")}</ul>`;
 }
 function liHtml(n, ui, siblings, i) {
-  const sub = n.sub ? `<span class="am-tree-sub">${mdInline(n.sub)}</span>` : "";
+  const sub = n.sub ? `<span class="am-tree-sub">${softBreaks(mdInline(n.sub))}</span>` : "";
   const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k)).join("")}</ul>` : "";
   return `<li${n.hi ? ' class="am-tree-hi"' : ""}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
 }

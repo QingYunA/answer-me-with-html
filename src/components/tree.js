@@ -88,8 +88,13 @@ function parseLabel(t) {
   return { label, sub, hi, mark };
 }
 
+// A long unbroken word (an IP, an email, a URL, a path) lets a column break after . @ / _ : instead of in the middle of a number or a name.
+// Only text between tags changes, so a tag, an attribute (an autolinked email's href) and an entity stay whole; <wbr> adds no character,
+// so copied text is the same (the same idea as identifier() in api.js). Words shorter than 12 characters are left alone.
+const softBreaks = (html) => html.replace(/(<[^>]*>)|([^<]+)/g, (_, tag, text) => tag ?? text.replace(/\S{12,}/g, (word) => word.replace(/[.@/_:]+(?=[^.@/_:])/g, '$&<wbr>')));
+
 // When a label starts with inline code followed by text (e.g. `Section 1` Words), the code part becomes a grey number tag.
-const labelHtml = (label) => mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>');
+const labelHtml = (label) => softBreaks(mdInline(label).replace(/^<code>([^<]*)<\/code>(?=\s*\S)/, '<span class="am-tree-tag">$1</span>'));
 
 // data-key / data-step are for video mode: same-named nodes morph across scenes, appearing step by step by source line.
 // data-delta is the node's change state; the root wrapper and the column carry it too, so a view can hide their connector lines with the node.
@@ -118,7 +123,7 @@ function lineAttrs(siblings, i, cols) {
 // The line from a root down to its columns has nothing to reach in a view that hides every column.
 const dropAttrs = (children) => Object.entries(HIDDEN_IN).map(([view, hidden]) => (children.every((c) => c.state === hidden) ? ` data-line-${view}="none"` : '')).join('');
 
-const boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${mdInline(n.sub)}</small>` : ''}`;
+const boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${softBreaks(mdInline(n.sub))}</small>` : ''}`;
 
 function rootBox(root, ui, solo = false) {
   const drop = solo ? '' : dropAttrs(root.children);
@@ -141,7 +146,7 @@ function listHtml(nodes, ui) {
 }
 
 function liHtml(n, ui, siblings, i) {
-  const sub = n.sub ? `<span class="am-tree-sub">${mdInline(n.sub)}</span>` : '';
+  const sub = n.sub ? `<span class="am-tree-sub">${softBreaks(mdInline(n.sub))}</span>` : '';
   const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k)).join('')}</ul>` : '';
   return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
 }

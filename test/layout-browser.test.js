@@ -286,6 +286,30 @@ ${fillerEn('B', 1)}
 ${fillerEn('C', 2)}
 `;
 
+// A forest of three trees whose labels hold long words (an IP, an email, a hash): the columns used to be narrower than the words.
+const LONG_TREE = `---
+title: Long tree labels
+cols: 3
+lang: en
+---
+## A Load
+\`\`\`tree
+Exit 1 · 216.36.88.169 | 2 pro100
+  Home 2serein7z@163.com | pro100 · 7d 91% · schedulable
+  Home 2 sriai666@163.com | pro100 · 7d 96% · schedulable
+Exit 2 · 216.36.111.92 | 3 pro100
+  3995719870@qq.com home 1 | pro100 · 7d 0% · schedulable
+  732687813@qq.com | pro100 · 7d 31% · not schedulable
+  token 0123456789abcdef0123456789abcdef0123456789abcdef | 0123456789abcdef0123456789abcdef0123456789abcdef
+Exit 3 · 209.87.95.126 | 2 pro200
+  cyanchan99@qq.com | pro200 · 7d 43% · schedulable
+  cyanchan99@163.com | pro200 · 7d 47% · not schedulable
+\`\`\`
+
+${fillerEn('B', 1)}
+${fillerEn('C', 2)}
+`;
+
 // Everything the checks need, read in the page in one call. A "row" is the set of grid children with the same top edge.
 const MEASURE = `(() => {
   const grid = document.querySelector('.am-grid');
@@ -405,6 +429,9 @@ before(() => {
   const longApi = join(tmp, 'drafts', 'long-api.en.md');
   writeFileSync(longApi, LONG_API);
   special['long-api.en'] = render(longApi, 'long-api.en');
+  const longTree = join(tmp, 'drafts', 'long-tree.en.md');
+  writeFileSync(longTree, LONG_TREE);
+  special['long-tree.en'] = render(longTree, 'long-tree.en');
 });
 
 const launch = async () => {
@@ -673,6 +700,32 @@ test('e2e: a long API target wraps inside its panel instead of sticking out', { 
     })()`);
     assert.ok(box.right <= 1, `@${width}px: the target ends inside its panel, ${box.right}px past it`);
     assert.equal(box.overflow, 0, `@${width}px: the panel does not scroll sideways`);
+  }
+});
+
+test('e2e: long words in a tree wrap inside their box and column instead of running into the next one', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const p = special['long-tree.en'];
+  for (const width of [PHONE, 880, DESKTOP]) {
+    await open(p.file, width);
+    if (width > 760) await waitFor(SETTLED, `long-tree.en to lay out at ${width}px`);
+    // The text of every box, list item and note, measured as the text itself: a box's own rectangle does not grow with text that sticks out.
+    const out = await evaluate(`(() => {
+      const out = [];
+      const walker = document.createTreeWalker(document.querySelector('.am-tree'), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim()) continue;
+        const holder = node.parentElement.closest('.am-tree-box, .am-tree-list li');
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const past = Math.max(...[...range.getClientRects()].map((r) => r.right)) - holder.getBoundingClientRect().right;
+        if (past > 1) out.push(node.textContent.trim() + ' (' + Math.round(past) + 'px)');
+      }
+      const panel = document.querySelector('.am-tree').closest('.am-panel');
+      return { out, panelOverflow: panel.scrollWidth - panel.clientWidth };
+    })()`);
+    assert.deepEqual(out.out, [], `@${width}px: text ends inside its box or list item`);
+    assert.equal(out.panelOverflow, 0, `@${width}px: the panel does not scroll sideways`);
   }
 });
 

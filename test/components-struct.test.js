@@ -49,6 +49,19 @@ test('tree: a tab indent equals two spaces', () => {
   assert.match(html, /--n: 2/);
 });
 
+test('tree: a long unbroken label or note can wrap after . @ / _ :, and tags, attributes and entities stay intact', () => {
+  const html = render('tree', '出口 1 · 216.36.88.169 | 2 个 pro100\n  家宽 2serein7z@163.com | https://a.example.com/very/long_path\n  Tom&Jerry-and-friends.txt\n    short.txt | a.b');
+  assert.match(html, /216\.<wbr>36\.<wbr>88\.<wbr>169/, 'an IP breaks after its dots');
+  assert.match(html, /2serein7z@<wbr>163\.<wbr>com<\/a>/, 'an email breaks after @ and the dot');
+  assert.match(html, /<a href="mailto:2serein7z@163\.com">/, 'the autolink target has no break');
+  assert.match(html, /<a href="https:\/\/a\.example\.com\/very\/long_path">/, 'a link target has no break');
+  assert.match(html, /https:\/\/<wbr>a\.<wbr>example\.<wbr>com\/<wbr>very\/<wbr>long_<wbr>path/, 'a URL note breaks after its separators');
+  assert.match(html, /Tom&amp;Jerry-and-friends\.<wbr>txt/, 'an entity is not split');
+  assert.match(html, /<li[^>]*><span class="am-tree-label">short\.txt<\/span><span class="am-tree-sub">a\.b<\/span>/, 'a short word gets no break');
+  assert.match(html, /data-key="出口 1 · 216\.36\.88\.169"/, 'the video key keeps the raw label');
+  assert.doesNotMatch(html, /<[^>]*<wbr>[^>]*>/, 'no break inside a tag');
+});
+
 test('tree: error on empty content', () => {
   throwsAt(() => render('tree', '\n  \n'), 1);
 });
