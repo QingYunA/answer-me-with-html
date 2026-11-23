@@ -20,7 +20,8 @@ const CHROME_CSS = `.am-toolbar, .am-reply, .am-reply-bar, .am-comment, .am-comm
 .am-update, .am-btn--update, .am-btn--export, .am-export, .am-lightbox, .am-code-copy, .am-diagram-expand, .am-toc, .am-delta-switch, .am-table-controls {
   display: none !important;
 }
-.am-table-sort::after { content: none !important; }`;
+.am-table-sort::after { content: none !important; }
+.am-head::before { display: none !important; }`;
 
 // Where to cut a page of pageHeight CSS px into slices no taller than maxHeight, without cutting through a panel or the
 // header when a gap exists. boxes are the page's block boxes ({top, bottom} in CSS px). A cut is moved up to the top of

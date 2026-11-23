@@ -1165,3 +1165,52 @@ for (const [lang, sentences, head] of [
     }
   });
 }
+
+// The toolbar is fixed at the top corner and as wide as its controls (about 540 px, wider with the new-version button). The first line of the
+// header (the colophon, or the title when there is no colophon) must stay clear of it at every width, while a title below the toolbar keeps the
+// full header width. The first line is measured as text (a Range), since its element spans the whole header.
+const BAR_UPDATE = { latest: '0.9.0', current: '0.5.0', command: 'npx skills update answer-me-with-html -y' };
+const LONG_TITLE = 'Account tiers and the load on every exit across the whole fleet this week, what changed since last week, and what to do next about it';
+const FIRST_LINE = `(() => {
+  const bar = document.querySelector('.am-toolbar').getBoundingClientRect();
+  const lines = (el) => { const r = document.createRange(); r.selectNodeContents(el); return [...r.getClientRects()].filter((x) => x.width > 0); };
+  const first = document.querySelector('.am-colophon') ?? document.querySelector('.am-head h1');
+  const title = lines(document.querySelector('.am-head h1'));
+  const head = document.querySelector('.am-head').getBoundingClientRect();
+  return {
+    hits: lines(first).filter((r) => r.left < bar.right && r.right > bar.left && r.top < bar.bottom && r.bottom > bar.top).map((r) => [r.left, r.right, r.top, r.bottom].map(Math.round)),
+    bar: [bar.left, bar.right, bar.top, bar.bottom].map(Math.round),
+    headWidth: head.width,
+    widest: Math.max(...title.map((r) => r.width)),
+    titleTop: Math.min(...title.map((r) => r.top)),
+    barBottom: bar.bottom,
+  };
+})()`;
+const nextFrames = () => evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))');
+
+for (const [name, front, options] of [
+  ['a sheet page', 'lang: en\n', { update: BAR_UPDATE }],
+  ['a doc page', 'lang: en\ntemplate: doc\n', { update: BAR_UPDATE }],
+  ['a right-to-left page', 'lang: he\n', { update: BAR_UPDATE }],
+  ['a page without the update button', 'lang: en\n', {}],
+  ['a page with the colophon off', 'lang: en\n', { colophon: false }],
+]) {
+  test(`e2e: the header's first line stays clear of the toolbar at every width (${name})`, { skip: SKIP, timeout: 90000 }, async () => {
+    if (!cdp) await launch();
+    const { html } = renderDoc(`---\ntitle: ${LONG_TITLE}\n${front}---\n## A Note\nText.\n## B Note\nText.\n## C Note\nText.\n`, {}, {}, options);
+    const file = join(tmp, `toolbar-${name.replace(/\W+/g, '-')}.html`);
+    writeFileSync(file, html);
+    for (const width of [390, 760, 761, 800, 900, 1000, 1100, 1440]) {
+      await open(file, width);
+      if (options.update) await waitFor("!document.querySelector('[data-am=update]').hidden", 'the update button');
+      await nextFrames();
+      const m = await evaluate(FIRST_LINE);
+      assert.deepEqual(m.hits, [], `@${width}px: the first line meets the toolbar ${m.bar}`);
+      // With a colophon the title sits below the toolbar and may use the whole header, not the space left of the toolbar.
+      if (options.colophon !== false && width > 760) {
+        assert.ok(m.titleTop >= m.barBottom, `@${width}px: the title starts below the toolbar (${m.titleTop} vs ${m.barBottom})`);
+        assert.ok(m.widest >= m.headWidth - 170, `@${width}px: the title keeps the header width, its widest line is ${Math.round(m.widest)} of ${Math.round(m.headWidth)}`);
+      }
+    }
+  });
+}
