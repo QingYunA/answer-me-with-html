@@ -178,10 +178,10 @@ test('copy: a button says the copy failed, not "Copied ✓", when neither clipbo
   // The two success paths still read the copied label, so the failure label cannot be bought by giving up on either.
   assert.deepEqual(r.api.shown, { toolbar: 'Copied ✓', code: 'Copied ✓' }, 'the async clipboard API copied');
   assert.deepEqual(r.fallback.shown, { toolbar: 'Copied ✓', code: 'Copied ✓' }, 'the textarea and execCommand copied');
-  // Both failed: the label is the same mark a failed copy on the site shows, and it never claims a copy.
-  assert.deepEqual(r.neither.shown, { toolbar: '✗', code: '✗' }, 'a failed copy says so');
+  // Both failed: the button says so in the page language, and it never claims a copy.
+  assert.deepEqual(r.neither.shown, { toolbar: 'Copy failed', code: 'Copy failed' }, 'a failed copy says so');
   // execCommand can throw instead of returning false: that is a failed copy too, and the temporary textarea still goes away.
-  assert.deepEqual(r.thrown.shown, { toolbar: '✗', code: '✗' }, 'a copy whose fallback threw says so');
+  assert.deepEqual(r.thrown.shown, { toolbar: 'Copy failed', code: 'Copy failed' }, 'a copy whose fallback threw says so');
   for (const run of ['api', 'fallback', 'neither', 'thrown']) {
     assert.deepEqual(r[run].back, idle, `${run}: the label still comes back to the one the button started from`);
     assert.equal(r[run].leftover, 0, `${run}: no temporary textarea is left in the page`);
