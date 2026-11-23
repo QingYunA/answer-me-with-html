@@ -22,7 +22,7 @@ export default {
       unavailablePolicy: 'This preview does not allow copying.',
       unverifiedEffect: 'Export may not work correctly in this browser.',
     },
-    copy: 'Copy source', done: 'Copied ✓', copyCode: 'Copy',
+    copy: 'Copy source', done: 'Copied ✓', failed: 'Copy failed', copyCode: 'Copy',
     update: { button: 'New version {version}', current: 'You have {current}. Found when this page was made.', whatsNew: "What's new:", run: 'Run in a terminal:', agent: 'Or tell your agent:', agentText: 'Update answer-me-with-html', notes: "See what's new" },
     live: { updated: 'Page updated', reload: 'Reload' },
     reply: {

@@ -115,26 +115,60 @@
     });
   }
 
+  // The toolbar floats over the top corner, and its width changes (the new-version button, a longer language, a phone). The header keeps
+  // its first lines clear of it with a float of the toolbar's own size (base.css, .am-bar-fit .am-head::before): only the lines next to
+  // the toolbar get shorter, and a title below it keeps the whole header. The size is measured here and set as --am-bar-w / --am-bar-h;
+  // without this script the CSS keeps a fixed 300px reservation instead.
+  const head = document.querySelector('.am-head');
+  if (carrier && head) {
+    const GAP = 12;
+    const fit = () => {
+      const bar = carrier.getBoundingClientRect();
+      const box = head.getBoundingClientRect();
+      const toward = getComputedStyle(head).direction === 'rtl' ? bar.right - box.left : box.right - bar.left;
+      // The header's top in the page, not in the window, since the toolbar stays in the window while the page scrolls.
+      const reach = bar.bottom + GAP / 2 - (box.top + scrollY);
+      root.style.setProperty('--am-bar-w', `${toward > 0 && reach > 0 ? Math.ceil(toward + GAP) : 0}px`);
+      root.style.setProperty('--am-bar-h', `${Math.max(0, Math.ceil(reach))}px`);
+    };
+    root.classList.add('am-bar-fit');
+    fit();
+    new ResizeObserver(fit).observe(carrier);
+    addEventListener('resize', fit);
+    document.fonts?.ready.then(fit);
+  }
+
+  // True when the text is on the clipboard, false when both paths failed. The async clipboard API is refused on some origins
+  // (a page the browser treats as insecure), so the textarea and execCommand are the fallback, and execCommand reports whether
+  // it copied anything. A button that says it copied when nothing did is worse than one that admits the copy failed: the reader
+  // pastes whatever the clipboard already held.
   const copyText = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
+      return true;
     } catch {
       const ta = Object.assign(document.createElement('textarea'), { value: text });
       document.body.append(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
+      try {
+        ta.select();
+        return document.execCommand?.('copy') === true;
+      } catch {
+        return false; // execCommand can throw instead of returning false: that copy failed too
+      } finally {
+        ta.remove();
+      }
     }
   };
   // A button reads its label from data-done for a moment after a copy, then comes back to the label it started from. That label is
   // read once, here: a second click inside the moment would otherwise read the copied label off the button and restore that instead,
   // and the label would never come back. The moment starts again on each click: the timer of the previous one is left to fire and
-  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have).
+  // does nothing (a token, so this needs no timer bookkeeping the page scripts do not already have). A failed copy reads data-failed
+  // instead, in the page language.
   const flasher = (btn) => {
     const idle = btn.textContent;
     let clicks = 0;
-    return () => {
-      btn.textContent = btn.dataset.done;
+    return (copied) => {
+      btn.textContent = copied ? btn.dataset.done : btn.dataset.failed;
       const mine = ++clicks;
       setTimeout(() => { if (mine === clicks) btn.textContent = idle; }, 1400);
     };
@@ -145,8 +179,7 @@
     const flash = flasher(copyBtn);
     copyBtn.addEventListener('click', async () => {
       const nodes = document.querySelectorAll('#am-source');
-      await copyText(nodes[nodes.length - 1]?.value ?? '');
-      flash();
+      flash(await copyText(nodes[nodes.length - 1]?.value ?? ''));
     });
   }
 
@@ -155,8 +188,7 @@
     const flash = flasher(btn);
     btn.addEventListener('click', async () => {
       const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];
-      await copyText([...lines].map((l) => l.textContent).join('\n'));
-      flash();
+      flash(await copyText([...lines].map((l) => l.textContent).join('\n')));
     });
   }
 

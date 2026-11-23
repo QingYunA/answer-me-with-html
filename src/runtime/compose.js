@@ -8,26 +8,7 @@ export { unexport };
 // page gets rtl-letter.js itself in front of reply-view.js and the import line is dropped.
 const unimport = (code) => code.replace(/^import \{[^}]*\} from '\.\/[\w-]+\.js';\r?\n/gm, '');
 
-export function composeRuntime(read, { resize = false } = {}) {
-  if (resize) {
-    const originalRead = read;
-    read = file => {
-      const code = originalRead(file);
-      if (file !== 'layout-dom.js') return code;
-      const entry = "  addEventListener('resize', later);";
-      if (!code.includes(entry)) throw new Error('Missing layout resize entry');
-      return code.replace(entry, `${entry}
-  let widthFrame = 0;
-  addEventListener('am-reader-width', () => {
-    if (widthFrame) return;
-    clearTimeout(timer);
-    widthFrame = requestAnimationFrame(() => {
-      widthFrame = 0;
-      justify();
-    });
-  });`);
-    };
-  }
+export function composeRuntime(read) {
   const scripts = `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${unexport(read('rtl-letter.js'))}\n${unimport(unexport(read('reply-view.js')))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('remark-text.js'))}\n${read('remark.js')}})();\n(() => {\n${unexport(read('layout-plan.js'))}\n${read('layout-dom.js')}})();\n${read('outline.js')}\n${read('export-menu.js')}`;
   // math-text.js is read by the reply script and by the remark script, so it sits around both.
   return `(() => {\n${unexport(read('math-text.js'))}\n${scripts}})();\n`;

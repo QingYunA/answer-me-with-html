@@ -19,7 +19,6 @@ export const inlineAssets = {
         `export const WIDTH_CSS = ${JSON.stringify(read('../src/themes/reader-width.css'))};`,
         `export const WIDTH_JS = ${JSON.stringify(read('../src/runtime/reader-width.js'))};`,
         `export const RUNTIME_JS = ${JSON.stringify(composeRuntime((file) => read(`../src/runtime/${file}`)))};`,
-        `export const RESIZABLE_RUNTIME_JS = ${JSON.stringify(composeRuntime((file) => read(`../src/runtime/${file}`), { resize: true }))};`,
         `export const TABLE_JS = ${JSON.stringify(read('../src/runtime/table.js'))};`,
         `export const TABLE_CSS = ${JSON.stringify(read('../src/themes/table.css'))};`,
         `export const DIFF_CSS = ${JSON.stringify(read('../src/themes/diff.css'))};`,

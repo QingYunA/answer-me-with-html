@@ -28,7 +28,7 @@ On a repository too large to read in this context: once the modules in scope are
 Render from the repository root, so `src=` and the spans resolve against it.
 
 - **Frontmatter:** `commit:` set to `git rev-parse --short HEAD`, with `+dirty` appended when `git status --porcelain` prints anything. The page header shows it, so the reader knows which code the page describes.
-- **Lead:** the answer in two or three sentences.
+- The first paragraph, before any `##` heading: the answer in two or three sentences.
 - **Modules:** a `tree`, one line per module, `folder/ | job`.
 - **Main path:** a `flow` for how parts connect, or a `sequence` for calls between parts over time. Use the same names as the module tree.
 - **Key code:** code blocks with `src=` and `lines=` for the few spots the main path turns on.

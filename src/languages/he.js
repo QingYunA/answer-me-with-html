@@ -28,7 +28,7 @@ export default {
       unavailablePolicy: 'התצוגה המקדימה הזו אינה מאפשרת העתקה.',
       unverifiedEffect: 'ייתכן שהייצוא לא יעבוד כראוי בדפדפן הזה.',
     },
-    copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',
+    copy: 'העתקת המקור', done: 'הועתק ✓', failed: 'ההעתקה נכשלה', copyCode: 'העתקה',
     update: { button: 'גרסה חדשה {version}', current: 'הגרסה שלכם {current}. הגרסה החדשה נמצאה כשהדף נוצר.', whatsNew: 'מה חדש בגרסה:', run: 'הריצו בטרמינל:', agent: 'או בקשו מה-Agent:', agentText: 'עדכן את answer-me-with-html', notes: 'מה חדש' },
     live: { updated: 'הדף עודכן', reload: 'רענון' },
     reply: {

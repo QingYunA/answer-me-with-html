@@ -30,7 +30,7 @@ export default {
       unavailablePolicy: 'このプレビューではクリップボード権限がないためコピーできません。',
       unverifiedEffect: 'このブラウザでは書き出し結果が保証されません。',
     },
-    copy: '原稿をコピー', done: 'コピーしました ✓', copyCode: 'コピー',
+    copy: '原稿をコピー', done: 'コピーしました ✓', failed: 'コピーできません', copyCode: 'コピー',
     update: { button: '新バージョン {version}', current: '現在は {current}。このページの作成時に見つかりました。', whatsNew: '今回の更新：', run: 'ターミナルで実行：', agent: 'または Agent に伝える：', agentText: 'answer-me-with-html を更新して', notes: '更新内容を見る' },
     live: { updated: 'ページが更新されました', reload: '再読み込み' },
     reply: {

@@ -29,7 +29,7 @@ export default {
       unavailablePolicy: '目前預覽視窗未開啟剪貼簿權限，不支援複製。',
       unverifiedEffect: '目前瀏覽器匯出效果可能不保證。',
     },
-    copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',
+    copy: '複製源稿', done: '已複製 ✓', failed: '複製失敗', copyCode: '複製',
     update: { button: '新版本 {version}', current: '目前 {current}。產生此頁時偵測到新版本。', whatsNew: '這次更新：', run: '在終端機執行：', agent: '或者告訴 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新內容' },
     live: { updated: '頁面已更新', reload: '重新整理' },
     reply: {

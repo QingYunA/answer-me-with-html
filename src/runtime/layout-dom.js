@@ -243,6 +243,15 @@ if (panels.length > 1) {
   };
   justify();
   addEventListener('resize', later);
+  let widthFrame = 0;
+  addEventListener('am-reader-width', () => {
+    if (widthFrame) return;
+    clearTimeout(timer);
+    widthFrame = requestAnimationFrame(() => {
+      widthFrame = 0;
+      justify();
+    });
+  });
   // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.
   addEventListener('am-scale', later);
   addEventListener('beforeprint', () => {

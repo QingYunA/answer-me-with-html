@@ -12,7 +12,6 @@ export const BASE_CSS = read('./themes/base.css');
 export const WIDTH_CSS = read('./themes/reader-width.css');
 export const WIDTH_JS = read('./runtime/reader-width.js');
 export const RUNTIME_JS = composeRuntime((file) => read(`./runtime/${file}`));
-export const RESIZABLE_RUNTIME_JS = composeRuntime((file) => read(`./runtime/${file}`), { resize: true });
 export const TABLE_JS = read('./runtime/table.js');
 export const TABLE_CSS = read('./themes/table.css');
 export const DIFF_CSS = read('./themes/diff.css');

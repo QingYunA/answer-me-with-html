@@ -10,7 +10,7 @@ import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
 import { SCALE } from './themes/type-scale.js';
-import { VERSION, RUNTIME_JS, RESIZABLE_RUNTIME_JS, TABLE_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS, WIDTH_CSS, WIDTH_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS, WIDTH_CSS, WIDTH_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -353,7 +353,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const resizable = resize && widthMain.test(body);
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
-  const script = `\n${resizable ? RESIZABLE_RUNTIME_JS + WIDTH_JS : RUNTIME_JS}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
+  const script = `\n${RUNTIME_JS}${resizable ? WIDTH_JS : ''}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -370,15 +370,15 @@ ${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--dif
 <div class="am-toolbar"${rootCarrierAttrs(root)}>
 ${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
-${scaleButtons(ui)}${resizable ? `\n<button type="button" class="am-btn am-width-trigger" popovertarget="am-width-options">${widthLabels.title}</button>
-<div class="am-width-panel" id="am-width-options" popover aria-label="${widthLabels.title}">
-<label>${widthLabels.pixels}<input type="number" min="320" step="1"></label>
-<input type="range" min="320" step="1" aria-label="${widthLabels.title}">
-<div class="am-width-actions"><button class="am-btn" type="button" data-width="full">${widthLabels.full}</button><button class="am-btn" type="button" data-width="reset">${widthLabels.reset}</button></div>
+${scaleButtons(ui)}${resizable ? `\n<button type="button" class="am-btn am-width-trigger" popovertarget="am-width-options">${esc(widthLabels.title)}</button>
+<div class="am-width-panel" id="am-width-options" popover aria-label="${esc(widthLabels.title)}">
+<label>${esc(widthLabels.pixels)}<input type="number" min="320" step="1"></label>
+<input type="range" min="320" step="1" aria-label="${esc(widthLabels.title)}">
+<div class="am-width-actions"><button class="am-btn" type="button" data-width="full">${esc(widthLabels.full)}</button><button class="am-btn" type="button" data-width="reset">${esc(widthLabels.reset)}</button></div>
 </div>` : ''}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
-<button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
+<button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}" data-failed="${esc(ui.failed)}">${esc(ui.copy)}</button>
 ${exporter.button}
 </div>
 ${notice.popover}${exporter.menu}${resizable ? (colophon ? withColophon(body, language) : body).replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : (colophon ? withColophon(body, language) : body)}
