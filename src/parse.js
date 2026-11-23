@@ -95,7 +95,7 @@ export function parseDocLoose(source, { defaults = {}, choices = {} } = {}) {
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults }, { ...CHOICES, ...choices });
   const errors = [];
   const sections = splitSections(lines, bodyStart, errors);
-  const intro = extractTitle(sections.intro, meta);
+  const intro = dropLeadLabel(extractTitle(sections.intro, meta));
   const panels = assignIds(sections.panels);
   return { doc: { meta, intro, panels }, errors };
 }
@@ -356,6 +356,18 @@ function extractTitle(intro, meta) {
   const remaining = lines.slice(idx + 1);
   if (!remaining.some((l) => l.trim())) return rest;
   return [{ ...first, text: remaining.join('\n'), line: first.line + idx + 1 }, ...rest];
+}
+
+// An old skill example showed the intro as "Lead: ...", and agents copied the label into their drafts. The intro is the lead already, so a
+// "Lead:" (or "**Lead:**", or a fullwidth colon) at the very start of the first intro block is dropped. Leading blank lines stay, so the
+// block keeps its line numbers; a block that held only the label goes away.
+const LEAD_LABEL = /^((?:[ \t]*\n)*)[ \t]{0,3}(?:\*\*lead\s*[:：]\*\*|\*\*lead\*\*\s*[:：]|lead\s*[:：])[ \t]*/i;
+
+function dropLeadLabel(intro) {
+  const [first, ...rest] = intro;
+  if (first?.type !== 'md' || !LEAD_LABEL.test(first.text)) return intro;
+  const text = first.text.replace(LEAD_LABEL, '$1');
+  return text.trim() ? [{ ...first, text }, ...rest] : rest;
 }
 
 function assignIds(panels) {

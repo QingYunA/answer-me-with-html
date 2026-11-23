@@ -364,3 +364,27 @@ test('render: a ::: callout draft gives the same page as the fenced draft', () =
   assert.ok(colon.includes('am-callout--ok'));
   assert.equal(colon, main(`## A\n${BT}callout ok Done\nIt works.\n${BT}\n`));
 });
+
+test('a "Lead:" label at the start of the intro is dropped, so the page shows the lead only', () => {
+  for (const [source, text] of [
+    ['Lead: 结论在这里。\n\n## A\nx', '结论在这里。'],
+    ['lead：结论在这里。\n\n## A\nx', '结论在这里。'],
+    ['LEAD:   结论在这里。\n\n## A\nx', '结论在这里。'],
+    ['**Lead:** 结论在这里。\n\n## A\nx', '结论在这里。'],
+    ['**Lead**: 结论在这里。\n\n## A\nx', '结论在这里。'],
+    ['# 标题\nLead: 结论在这里。\n## A\nx', '结论在这里。'],
+  ]) {
+    assert.equal(parseDoc(source).intro[0].text.trim(), text, source);
+  }
+});
+
+test('"Lead:" is dropped only at the very start of the first intro block, and the block keeps its line', () => {
+  const kept = parseDoc('第一段。\n\nLead: 不是开头。\n\n## A\nLead: 面板里的。');
+  assert.match(kept.intro[0].text, /Lead: 不是开头/);
+  assert.match(kept.panels[0].blocks[0].text, /^Lead: 面板里的。/);
+  assert.equal(parseDoc('Leading text.\n\n## A\nx').intro[0].text.trim(), 'Leading text.');
+  assert.equal(parseDoc('Lead is a word.\n\n## A\nx').intro[0].text.trim(), 'Lead is a word.');
+  assert.equal(parseDoc('没有前缀的导语。\n\n## A\nx').intro[0].text.trim(), '没有前缀的导语。');
+  assert.equal(parseDoc('---\ntitle: T\n---\nLead: 结论。\n\n## A\nx').intro[0].line, 4);
+  assert.equal(parseDoc('Lead:\n\n## A\nx').intro.length, 0);
+});
