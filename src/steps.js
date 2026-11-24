@@ -1,7 +1,8 @@
-// The steps block: it links the diagram and the code block of one panel. This file reads the steps and writes the markup that
-// ties them together; src/steps-panel.js decides which blocks of a panel belong to the pair. Every step is numbered in the markup
-// (a badge on its diagram item, a number beside its first line, a numbered list under the pair), so print, image export and a
-// page with no JavaScript show the steps; the page runtime (src/runtime/steps.js) adds the bar, the boxes and the clicks on top.
+// The steps block: it links the diagram and the code block of one panel, or, with no code block, a diagram and an explanation per
+// step (explain mode). This file reads the steps and writes the markup that ties them together; src/steps-panel.js decides which
+// blocks of a panel belong to the pair. Every step is numbered in the markup (a badge on its diagram item, a number beside its first
+// line, a numbered list under the pair), so print, image export and a page with no JavaScript show the steps; the page runtime
+// (src/runtime/steps.js) adds the bar, the boxes and the clicks on top.
 import { ComponentError, contentLines } from './components/error.js';
 import { mdInline } from './markdown.js';
 import { esc } from './svg/text.js';
@@ -9,13 +10,17 @@ import { f } from './svg/shapes.js';
 import en from './languages/en.js';
 
 const FORM = '<item> <line or range>: <note>';
+const EXPLAIN_FORM = '<item>: <explanation>';
 // The list is built after the page's images are embedded, so a local image in a step would stay a relative path.
 const IMAGE = /!\[[^\]]*\]\(|<img\b/i;
+const noImage = (text, line) => {
+  if (IMAGE.test(text.replace(/`[^`]*`/g, ''))) throw new ComponentError('steps: a step holds text, not an image; show the picture in its own block', line);
+};
 
 // "Write to clipboard 146-147: Try the API first." → { item, head, from, to, note, line }. The first colon ends the item and its lines;
 // the lines are the last number or range (spaces around the dash are fine) before it, so an item may hold digits ("Step 2 3: ..."). line is 1-based inside the block.
 function parseStep(text, line) {
-  if (IMAGE.test(text.replace(/`[^`]*`/g, ''))) throw new ComponentError('steps: a step holds text, not an image; show the picture in its own block', line);
+  noImage(text, line);
   const colon = text.indexOf(':');
   if (colon < 0) throw new ComponentError(`steps: write each step as ${FORM}, for example "Start 10-12: Begin here."`, line);
   const head = text.slice(0, colon).trim();
@@ -31,9 +36,22 @@ function parseStep(text, line) {
   return { item, head, from, to, note: text.slice(colon + 1).trim(), line };
 }
 
-export function parseSteps(text) {
-  const steps = contentLines(text).map((l) => parseStep(l.text, l.line));
-  if (!steps.length) throw new ComponentError(`steps: write at least one step, as ${FORM}`, 1);
+// Explain mode (no code block): "Place order: The customer pays." → { item, head, note, line }. There are no line numbers, so the item is
+// everything before the first colon, and it may end in a number ("Step 2").
+function parseExplained(text, line) {
+  noImage(text, line);
+  const colon = text.indexOf(':');
+  if (colon < 0) throw new ComponentError(`steps: write each step as ${EXPLAIN_FORM}, for example "Start: Begin here."`, line);
+  const item = text.slice(0, colon).trim();
+  if (!item) throw new ComponentError(`steps: write the item before its explanation; ${EXPLAIN_FORM}`, line);
+  return { item, head: item, note: text.slice(colon + 1).trim(), line };
+}
+
+// mode: 'code' (a step names lines of the code block) or 'explain' (a step is an item and its explanation).
+export function parseSteps(text, mode = 'code') {
+  const parse = mode === 'explain' ? parseExplained : parseStep;
+  const steps = contentLines(text).map((l) => parse(l.text, l.line));
+  if (!steps.length) throw new ComponentError(`steps: write at least one step, as ${mode === 'explain' ? EXPLAIN_FORM : FORM}`, 1);
   return steps;
 }
 
@@ -97,11 +115,23 @@ export function stepsList(steps, ui) {
   return `<ol class="am-steps-list" aria-label="${esc(t.list)}">${items.join('')}</ol>`;
 }
 
+// Explain mode: the list is the other side of the pair. Each entry is the step's lead ("1. Item" in bold) and its explanation; the live
+// page makes the entry a button, so a page with no script keeps a plain list. The numbers are text, not list markers (src/themes/steps.css).
+export function explainList(steps, ui) {
+  const t = labels(ui);
+  const items = steps.map((s, i) => `<li><div class="am-steps-entry" data-link="${i}"><strong class="am-steps-lead">${i + 1}. <span class="am-steps-item">${mdInline(s.item)}</span></strong>${s.note ? ` <span class="am-steps-text">${mdInline(s.note)}</span>` : ''}</div></li>`);
+  return `<ol class="am-steps-list am-steps-list--explain" aria-label="${esc(t.list)}">${items.join('')}</ol>`;
+}
+
 // The pair (or the code alone, for a walkthrough) with its list. The labels the runtime needs for its bar come along as data-.
-export function stepsBlock(pair, steps, ui) {
+// mode 'explain': the pair already holds the list, and the hint is the one for a list instead of code.
+export function stepsBlock(pair, steps, ui, mode = 'code') {
   const t = labels(ui);
   const m = steps.length;
-  return `<div class="am-steps" data-steps="${m}" data-count="${esc(t.count)}" data-idle="${esc(fill(t.idle, { m }))}" data-prev="${esc(t.prev)}" data-next="${esc(t.next)}" data-hint="${esc(t.hint)}" data-bar="${esc(t.bar)}"><div class="am-steps-pair">${pair}</div>${stepsList(steps, ui)}</div>`;
+  const explain = mode === 'explain';
+  const hint = explain ? t.hintExplain ?? en.ui.steps.hintExplain : t.hint;
+  const after = explain ? '' : stepsList(steps, ui);
+  return `<div class="am-steps"${explain ? ' data-mode="explain"' : ''} data-steps="${m}" data-count="${esc(t.count)}" data-idle="${esc(fill(t.idle, { m }))}" data-prev="${esc(t.prev)}" data-next="${esc(t.next)}" data-hint="${esc(hint)}" data-bar="${esc(t.bar)}"><div class="am-steps-pair">${pair}</div>${after}</div>`;
 }
 
 // The lines a step covers, for a message: "line 9" or "lines 14-16".

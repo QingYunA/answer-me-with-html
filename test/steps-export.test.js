@@ -41,13 +41,34 @@ End 12: Finish.
 \`\`\`
 `;
 
+const EXPLAIN = `---
+lang: en
+style: off
+---
+## Explain
+
+\`\`\`flow TB
+Start -> Middle
+Middle -> End
+\`\`\`
+
+\`\`\`steps
+Start: Begin here.
+Middle: The middle part.
+End: Finish.
+\`\`\`
+`;
+
 let tmp;
 let file;
+let explainFile;
 before(() => {
   if (SKIP) return;
   tmp = mkdtempSync(join(tmpdir(), 'am-steps-export-'));
   file = join(tmp, 'page.html');
   writeFileSync(file, renderDoc(DRAFT, {}, {}).html);
+  explainFile = join(tmp, 'explain.html');
+  writeFileSync(explainFile, renderDoc(EXPLAIN, {}, {}).html);
 });
 after(() => { if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }); });
 
@@ -131,6 +152,55 @@ test('Copy as image: the clone has the numbers and the list, no bar, no note, an
     assert.ok(!r.svg.includes('am-steps-bar') && !r.svg.includes('am-steps-note'), 'no bar or note in the picture');
     assert.equal(r.live, true, 'the page is live again after the picture');
     assert.equal(r.boxed, 1, 'and keeps the reader\'s step');
+  } finally {
+    await chrome.close();
+  }
+});
+
+// What a picture of an explain-mode page shows: the badges, the numbered list, no bar, and no entry marked current.
+const EXPLAIN_LOOK = `(() => {
+  const root = document.querySelector('.am-steps');
+  const shown = (sel) => { const el = root.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none'; };
+  return {
+    live: root.classList.contains('am-steps--live'),
+    bar: root.querySelector('.am-steps-bar') ? shown('.am-steps-bar') : false,
+    badge: shown('.am-step-badge'),
+    list: shown('.am-steps-list'),
+    lead: root.querySelector('.am-steps-lead')?.textContent ?? null,
+    marked: [...root.querySelectorAll('.am-steps-entry')].filter((e) => getComputedStyle(e).borderInlineStartColor !== 'rgba(0, 0, 0, 0)').length,
+  };
+})()`;
+
+test('explain mode, PNG export: badges and the numbered list show, no bar, and the selected entry is not marked', { skip: SKIP, timeout: 120000 }, async () => {
+  const chrome = await openPage(pathToFileURL(explainFile).href, { width: 1000, height: 900 });
+  try {
+    await chrome.evaluate("document.querySelector('.am-steps-entry[data-link=\"1\"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))");
+    assert.equal(await chrome.evaluate("document.querySelectorAll('.am-steps-entry.am-step-current').length"), 1, 'the step is selected before the export');
+    assert.equal((await chrome.evaluate(EXPLAIN_LOOK)).marked, 1, 'and its entry is marked');
+    const out = join(tmp, 'explain-png');
+    const written = await writePngSlices(chrome, explainFile, out);
+    assert.ok(written.length >= 1);
+    const look = await chrome.evaluate(EXPLAIN_LOOK);
+    assert.equal(look.live, false);
+    assert.equal(look.bar, false);
+    assert.equal(look.badge, true);
+    assert.equal(look.list, true);
+    assert.equal(look.lead, '1. Start');
+    assert.equal(look.marked, 0, 'the picture has no entry marked');
+  } finally {
+    await chrome.close();
+  }
+});
+
+test('explain mode, PDF export: print media shows the badges and the list, no bar, no entry marked', { skip: SKIP, timeout: 120000 }, async () => {
+  const chrome = await openPage(pathToFileURL(explainFile).href, { width: 1000, height: 900, media: 'print' });
+  try {
+    await chrome.evaluate("document.querySelector('.am-steps-entry[data-link=\"1\"]').dispatchEvent(new MouseEvent('click', { bubbles: true }))");
+    const look = await chrome.evaluate(EXPLAIN_LOOK);
+    assert.equal(look.bar, false);
+    assert.equal(look.badge, true);
+    assert.equal(look.list, true);
+    assert.equal(look.marked, 0);
   } finally {
     await chrome.close();
   }

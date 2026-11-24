@@ -24,6 +24,15 @@ const PANEL = `${CODE}\n\n${FLOW}\n\n${STEPS}`;
 // style: off would also drop the sheet's page style in the multi-panel fixtures below, so only the plain page uses it.
 const page = (head, panel) => `---\nlang: en\n${head ? '' : 'style: off\n'}${head}---\n## A Panel ${panel}\n\n${PANEL}\n`;
 
+// Explain mode: a diagram and an explanation per step, no code block.
+const EXPLAIN = '```steps\nStart: Begin here.\nMiddle: The middle part.\nEnd: Finish.\n```';
+const explain = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${FLOW}\n\n${EXPLAIN}\n`;
+
+// A long explanation: 24 steps down one column, so the current entry leaves the screen as Next moves on.
+const LONG_FLOW = `\`\`\`flow TB\n${Array.from({ length: 23 }, (_, i) => `S${i + 1} -> S${i + 2}`).join('\n')}\n\`\`\``;
+const LONG_STEPS = `\`\`\`steps\n${Array.from({ length: 24 }, (_, i) => `S${i + 1}: Step number ${i + 1} of the long walk.`).join('\n')}\n\`\`\``;
+const longExplain = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${LONG_FLOW}\n\n${LONG_STEPS}\n`;
+
 const flowFirst = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${FLOW}\n\n${CODE}\n\n${STEPS}\n`;
 // One step only: Next and Previous are both disabled as soon as the step is selected.
 const one = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${CODE}\n\n${FLOW}\n\n\`\`\`steps\nStart 10-11: Only step.\n\`\`\`\n`;
@@ -100,6 +109,8 @@ before(async () => {
     flowFirst: renderDoc(flowFirst, {}, {}).html,
     he: renderDoc(hebrew, {}, {}).html,
     one: renderDoc(one, {}, {}).html,
+    explain: renderDoc(explain, {}, {}).html,
+    longExplain: renderDoc(longExplain, {}, {}).html,
     two: renderDoc(`${page('template: sheet\ncols: 2\n', '')}\n## Beside\n\n${PANEL}\n`, {}, {}).html,
     wide: renderDoc(page('template: sheet\ncols: 2\n', '{span=2}'), {}, {}).html,
   })) {
@@ -392,4 +403,162 @@ test('no JavaScript: every step is numbered on its item and its first line, with
   assert.notEqual(s.list, 'none');
   assert.equal(s.items, 3);
   assert.deepEqual(s.numbers, ['10:1', '11:2', '14:3']);
+});
+
+// ── explain mode ──
+const ENTRIES = `(() => {
+  const root = document.querySelector('.am-steps');
+  return {
+    current: [...root.querySelectorAll('.am-steps-entry')].map((e) => e.classList.contains('am-step-current') && e.getAttribute('aria-current') === 'step'),
+    count: root.querySelector('.am-steps-count')?.textContent ?? null,
+    note: !!root.querySelector('.am-steps-note'),
+    sel: [...root.querySelectorAll('.am-node.am-step-sel')].map((n) => n.dataset.link),
+    edges: root.querySelectorAll('.am-edge.am-step-edge').length,
+  };
+})()`;
+
+test('explain: the list stays on the live page; its entries are buttons; the hint is the explain one', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('explain', { width: 1100 });
+  const r = await evaluate(`(() => {
+    const entries = [...document.querySelectorAll('.am-steps-entry')];
+    return {
+      shown: getComputedStyle(document.querySelector('.am-steps-list')).display !== 'none',
+      badges: [...document.querySelectorAll('.am-step-badge')].filter((b) => getComputedStyle(b).display !== 'none').length,
+      roles: entries.map((e) => e.getAttribute('role') + ':' + e.tabIndex),
+      hint: document.querySelector('.am-steps-hint').textContent,
+      bar: !!document.querySelector('.am-steps-bar'),
+    };
+  })()`);
+  assert.equal(r.shown, true);
+  assert.equal(r.badges, 0, 'live, the diagram badges give way to the list');
+  assert.deepEqual(r.roles, ['button:0', 'button:0', 'button:0']);
+  assert.equal(r.hint, 'Click an item or a step; ← → to move, Esc to clear');
+  assert.equal(r.bar, true);
+  const idle = await evaluate(ENTRIES);
+  assert.deepEqual(idle.current, [false, false, false]);
+});
+
+test('explain: a click on a diagram item marks its entry and lights the item and its edges; there is no note', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('explain', { width: 1100 });
+  await click('.am-steps .am-node[data-link="1"]');
+  const r = await evaluate(ENTRIES);
+  assert.deepEqual(r.current, [false, true, false]);
+  assert.deepEqual(r.sel, ['1']);
+  assert.equal(r.edges, 2, 'both edges of Middle');
+  assert.equal(r.note, false);
+  assert.match(r.count, /^Step 2 of 3: Middle$/);
+});
+
+test('explain: a click on an entry lights its diagram item, and clicking the selected entry again keeps it selected', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('explain', { width: 1100 });
+  await click('.am-steps-entry[data-link="2"]');
+  let r = await evaluate(ENTRIES);
+  assert.deepEqual(r.current, [false, false, true]);
+  assert.deepEqual(r.sel, ['2']);
+  assert.equal(r.edges, 1);
+  await click('.am-steps-entry[data-link="2"]');
+  r = await evaluate(ENTRIES);
+  assert.deepEqual(r.current, [false, false, true], 'selected again, still selected');
+});
+
+test('explain: a real mouse click on an entry, then the arrow keys move and Esc clears', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('explain', { width: 1100 });
+  await mouseAt('.am-steps-entry[data-link="0"]', 20);
+  assert.deepEqual((await evaluate(ENTRIES)).current, [true, false, false]);
+  await key('ArrowRight');
+  let r = await evaluate(ENTRIES);
+  assert.deepEqual(r.current, [false, true, false]);
+  assert.deepEqual(r.sel, ['1']);
+  assert.equal(await evaluate("document.activeElement.dataset.link + ':' + document.activeElement.className.includes('am-steps-entry')"), '1:true', 'the focus follows to the new entry');
+  await key('ArrowLeft');
+  assert.deepEqual((await evaluate(ENTRIES)).current, [true, false, false]);
+  await key('Escape');
+  r = await evaluate(ENTRIES);
+  assert.deepEqual(r.current, [false, false, false]);
+  assert.deepEqual(r.sel, []);
+  assert.equal(r.edges, 0);
+});
+
+test('explain: Enter on a focused entry or item selects it; Previous and Next move', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('explain', { width: 1100 });
+  await focus('.am-steps-entry[data-link="1"]');
+  await press('Enter');
+  assert.deepEqual((await evaluate(ENTRIES)).current, [false, true, false]);
+  await focus('.am-steps .am-node[data-link="2"]');
+  await key('Enter');
+  assert.deepEqual((await evaluate(ENTRIES)).current, [false, false, true]);
+  await click('.am-steps-bar [data-steps="prev"]');
+  assert.deepEqual((await evaluate(ENTRIES)).current, [false, true, false]);
+  await click('.am-steps-bar [data-steps="next"]');
+  assert.deepEqual((await evaluate(ENTRIES)).current, [false, false, true]);
+});
+
+test('explain: side by side from 720px, stacked at 390px with the diagram first and centred', { skip: SKIP, timeout: 120000 }, async () => {
+  const layout = () => evaluate(`(() => {
+    const list = document.querySelector('.am-steps-list').getBoundingClientRect();
+    const box = document.querySelector('.am-steps-diagram').getBoundingClientRect();
+    const svg = [...document.querySelectorAll('.am-steps-diagram svg')].pop().getBoundingClientRect();
+    return {
+      side: list.top < box.bottom && box.top < list.bottom && list.left !== box.left,
+      diagramFirst: box.top < list.top,
+      offCentre: Math.abs((svg.left + svg.right) / 2 - (box.left + box.right) / 2),
+    };
+  })()`);
+  await load('explain', { width: 1100 });
+  assert.equal((await layout()).side, true);
+  await load('explain', { width: 390 });
+  const narrow = await layout();
+  assert.equal(narrow.side, false);
+  assert.equal(narrow.diagramFirst, true);
+  assert.ok(narrow.offCentre <= 1, `the drawing is centred under the expand button (${narrow.offCentre}px off)`);
+});
+
+test('stacked code mode: the drawing is centred too, not pushed aside by the expand button', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('flowFirst', { width: 390 });
+  const off = await evaluate(`(() => {
+    const box = document.querySelector('.am-steps-diagram').getBoundingClientRect();
+    const svg = [...document.querySelectorAll('.am-steps-diagram svg')].pop().getBoundingClientRect();
+    return Math.abs((svg.left + svg.right) / 2 - (box.left + box.right) / 2);
+  })()`);
+  assert.ok(off <= 1, `${off}px off centre`);
+});
+
+test('explain: Next brings the current entry into view in a long list', { skip: SKIP, timeout: 120000 }, async () => {
+  for (const width of [700, 1300]) {
+    await load('longExplain', { width });
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    for (let i = 0; i < 20; i++) await click('.am-steps-bar [data-steps="next"]');
+    const r = await evaluate(`(() => {
+      const e = document.querySelector('.am-steps-entry.am-step-current').getBoundingClientRect();
+      return { link: document.querySelector('.am-steps-entry.am-step-current').dataset.link, top: e.top, bottom: e.bottom, vh: innerHeight };
+    })()`);
+    assert.equal(r.link, '19');
+    assert.ok(r.top >= -1 && r.bottom <= r.vh + 1, `entry 20 is on screen at ${width}px (${r.top}..${r.bottom} of ${r.vh})`);
+  }
+});
+
+test('explain: no horizontal scroll at 1440, 900 and 390', { skip: SKIP, timeout: 120000 }, async () => {
+  for (const width of [1440, 900, 390]) {
+    await load('explain', { width });
+    await click('.am-steps-entry[data-link="1"]');
+    const over = await evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth');
+    assert.ok(over <= 0, `no sideways scroll at ${width}px (${over})`);
+  }
+});
+
+test('explain: print and no JavaScript show the badges and the numbered list, no bar', { skip: SKIP, timeout: 120000 }, async () => {
+  const look = () => evaluate(`(() => {
+    const shown = (sel) => [...document.querySelectorAll(sel)].some((el) => getComputedStyle(el).display !== 'none');
+    return { bar: shown('.am-steps-bar'), badge: shown('.am-step-badge'), list: shown('.am-steps-list'), lead: document.querySelector('.am-steps-lead').textContent };
+  })()`);
+  await load('explain', { width: 1100, scripts: false });
+  const bare = await look();
+  assert.deepEqual({ ...bare, lead: undefined }, { bar: false, badge: true, list: true, lead: undefined });
+  assert.equal(bare.lead, '1. Start');
+  await load('explain', { width: 1100, media: 'print' });
+  await click('.am-steps-entry[data-link="1"]');
+  const print = await look();
+  assert.equal(print.bar, false);
+  assert.equal(print.badge, true);
+  assert.equal(print.list, true);
 });
