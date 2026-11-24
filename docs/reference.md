@@ -174,7 +174,36 @@ To show a change, paste a unified diff in a `diff` fence and the CLI draws it:
 - `hl=` uses new-side numbers. `diff --git`, `---`, `+++` and `\ No newline at end of file` lines are accepted and not drawn.
 - A line that does not start with `+`, `-`, a space or `@@` is an error, and so is a cut (`...`): split the diff into two hunks. A hunk whose counts do not match its `@@` header is a warning. `src=` is not supported with `diff`: paste the diff. The limits are the same as for other code blocks.
 
-Full syntax: `am help code`.
+To link a diagram and a code block, put both in one panel with a `steps` block:
+
+````markdown
+```js start=1
+const request = receive(input);
+const user = authenticate(request);
+const result = await service.run(user);
+respond(result);
+```
+
+```flow LR
+Gateway -> Auth -> Service
+```
+
+```steps
+Gateway 1: The request comes in.
+Auth 2: The user is checked.
+Service 3-4: The service runs, then the answer goes back.
+```
+````
+
+- Each step is `<item> <line or range>: <note>`. The item is the text of a `flow` node, a `state` or a `tree` entry, written as the diagram writes it. The lines are the last number or range before the first colon.
+- Line numbers are the ones the code block shows: the file's own with `src=` and `lines=`, else from `start=`, else from 1. A linked code block always shows its numbers.
+- On the page, a click on an item (or Enter or Space on it) boxes its lines, shows the note above them and marks the item and its edges. A click on a line number picks the step that covers it; a click on the code text does nothing. The bar above the pair has Previous and Next and says "Step 2 of 3". The arrow keys move and Esc clears.
+- The pair sits side by side from about 720px of block width and stacks below it, the diagram first. Long lines wrap, so the code never scrolls sideways.
+- In print, a PNG or PDF, and with no script, there is no bar and no box. Every step is numbered on its item and beside its first line, and a numbered list of the steps follows the pair.
+- Leave the diagram out and the block is a walkthrough of the code: the items are names for the steps.
+- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, a range outside the code or two ranges that overlap, a panel with no code block or with more than one code block or diagram, a second `steps` block, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
+
+Full syntax: `am help code`, `am help steps`.
 
 ## Images
 

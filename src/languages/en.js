@@ -41,6 +41,7 @@ export default {
     chart: { name: 'Chart', data: 'Data', value: 'Value', share: 'Share' },
     api: { path: 'Path parameters', query: 'Query parameters', headers: 'Headers', request: 'Request', response: 'Response', field: 'Field', type: 'Type', description: 'Description', requirement: 'Requirement', required: 'Required', optional: 'Optional' },
     table: { filter: 'Filter table' },
+    steps: { prev: 'Previous step', next: 'Next step', count: 'Step {n} of {m}', idle: '{m} steps', node: 'Step {n}: {item}', list: 'Steps', line: 'Line {n}', lines: 'Lines {from}-{to}' },
   },
   // Player labels. drawn..duration are the title block cells; sheet is the scene header, with {n} and {total} the zero-padded numbers.
   videoUi: {

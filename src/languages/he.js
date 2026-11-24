@@ -47,6 +47,7 @@ export default {
     chart: { name: 'תרשים', data: 'נתונים', value: 'ערך', share: 'חלק' },
     api: { path: 'פרמטרים בנתיב', query: 'פרמטרים בשאילתה', headers: 'כותרות', request: 'בקשה', response: 'תגובה', field: 'שדה', type: 'טיפוס', description: 'תיאור', requirement: 'דרישה', required: 'חובה', optional: 'רשות' },
     table: { filter: 'סינון הטבלה' },
+    steps: { prev: 'השלב הקודם', next: 'השלב הבא', count: 'שלב {n} מתוך {m}', idle: '{m} שלבים', node: 'שלב {n}: {item}', list: 'שלבים', line: 'שורה {n}', lines: 'שורות {from}-{to}' },
   },
   // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.
   metaKeys: {
