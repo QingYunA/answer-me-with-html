@@ -10,7 +10,7 @@ import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
 import { SCALE } from './themes/type-scale.js';
-import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS, WIDTH_CSS, WIDTH_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, STEPS_JS, UPDATE_JS, CLOSE_AFTER_JS, WIDTH_CSS, WIDTH_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -19,6 +19,7 @@ import { checkRefs } from './refs.js';
 import { isolateLtrRuns } from './bidi.js';
 import { hasMath } from './math.js';
 import { cspMeta } from './csp.js';
+import { renderPanel } from './steps-panel.js';
 
 
 export class RenderError extends Error {
@@ -75,7 +76,8 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
     errors.push(new RenderError(`${b.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: b.line, component: b.lang, example: COMPONENTS.get(b.lang).example }));
   }
   const introHtml = renderBlocks(doc.intro.filter((b) => !loose.includes(b)), ctx);
-  const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
+  const host = { renderBlocks, renderBlock, RenderError };
+  const panels = doc.panels.map((p) => ({ ...p, html: renderPanel(p.blocks, ctx, host) }));
   raiseAll(errors);
   const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language });
   // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).
@@ -186,13 +188,13 @@ function renderFence(block, ctx) {
   }
   const comp = COMPONENTS.get(lang);
   if (!comp) return codeBlock(block, ctx);
-  if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
+  if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; ${comp.pageOnlyReason ?? 'a video cannot show it'}`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
     const html = comp.render(text, {
       args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn, line,
-      render: (blocks) => renderBlocks(blocks, ctx),
+      render: (blocks) => renderBlocks(blocks, ctx), link: block.link,
     });
     // A component's own svg is measured in viewBox units at fixed text sizes, so the whole box takes the factor. Raw svg / html blocks
     // bypass this function, and a video never scales. A component that renders nested blocks scales each one itself, so its output
@@ -306,6 +308,9 @@ export function withoutUpdateNotice(html) {
 // A diagram with change markers carries a count row; only then the page needs the delta styles and script.
 export const hasDelta = (html) => html.includes('class="am-delta-bar"');
 
+// A steps block (src/steps-panel.js) needs its own styles and script: the bar, the boxes and the clicks.
+export const hasSteps = (html) => html.includes('class="am-steps"');
+
 // A chart (src/components/chart.js) needs its own styles, as a formula needs the math ones.
 export const hasChart = (html) => html.includes('class="am-diagram am-chart"');
 
@@ -355,7 +360,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const pageBody = resizable ? content.replace(widthMain, main => main.slice(0, -1) + ' data-am-resizable>' + ['left', 'right'].map(side => `<div class="am-width-handle" data-side="${side}" role="separator" aria-orientation="vertical" aria-label="${esc(widthLabels[side])}" tabindex="0"></div>`).join('')) : content;
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
-  const script = `\n${RUNTIME_JS}${resizable ? WIDTH_JS : ''}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
+  const script = `\n${RUNTIME_JS}${resizable ? WIDTH_JS : ''}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${hasSteps(body) ? STEPS_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -365,7 +370,7 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), table: interactiveTable, update: Boolean(update), closeAfter, scale })}${resizable ? '\n' + WIDTH_CSS : ''}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), steps: hasSteps(body), table: interactiveTable, update: Boolean(update), closeAfter, scale })}${resizable ? '\n' + WIDTH_CSS : ''}
 </style>
 </head>
 <body>

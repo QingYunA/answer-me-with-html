@@ -167,6 +167,8 @@ export async function writePngSlices(page, htmlFile, folder, onWarn = () => {}, 
   await page.page('Emulation.setEmulatedMedia', { media: 'screen' });
   await settle(page);
   const layout = await page.evaluate(`(async () => {
+    // A steps block in a picture shows its numbers and its list, not the bar and the boxes of a reader's selection.
+    for (const el of document.querySelectorAll('.am-steps--live')) el.classList.remove('am-steps--live');
     await document.fonts.ready;
     await new Promise((r) => setTimeout(r, ${SETTLE_MS}));
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));

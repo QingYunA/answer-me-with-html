@@ -135,10 +135,10 @@ export function readEmbeddedCode(html) {
   ]));
 }
 
-// block: { lang, args, text }. code: { baseDir, known } where relative src paths are read and the fallback for moved files.
+// block: { lang, args, text, linked }. code: { baseDir, known } where relative src paths are read and the fallback for moved files.
 // Returns { html, file, warnings } where file names the embedded slice ("path:18-30"), or is null, and warnings are
 // [{ rule, message }] for a long block or a diff hunk that does not add up (the page is still written).
-export function renderCode({ lang, args, text }, { baseDir = process.cwd(), known = new Map(), ui = {}, copy = true } = {}) {
+export function renderCode({ lang, args, text, linked = false }, { baseDir = process.cwd(), known = new Map(), ui = {}, copy = true } = {}) {
   const isDiff = lang === 'diff';
   const opts = parseCodeArgs(args, isDiff);
   if (isDiff && opts.src) throw new CodeError('a diff block takes the diff you paste; src= is not supported for it yet, so paste the diff into the block', 0, DIFF_EXAMPLE);
@@ -172,7 +172,8 @@ export function renderCode({ lang, args, text }, { baseDir = process.cwd(), know
   if (outside !== undefined) throw new CodeError(`hl=${opts.hl}: line ${outside} is not in the block (lines ${first}-${last})`);
 
   const shownLang = lang || (opts.src ? extname(opts.src).slice(1).toLowerCase() : '');
-  const numbered = Boolean(opts.src || opts.start);
+  // A block that a steps block links always shows its line numbers: the steps name lines by those numbers.
+  const numbered = Boolean(opts.src || opts.start || linked);
   const where = opts.src ? `${opts.src}${range ? `:${range.from === range.to ? range.from : `${range.from}-${range.to}`}` : ''}` : '';
   const title = opts.title ?? where;
   const lines = body.map((l, i) => {

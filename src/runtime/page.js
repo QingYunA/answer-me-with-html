@@ -65,7 +65,7 @@
     const setScale = (next, remember = false) => {
       value = Math.min(max, Math.max(min, Number((Math.round(next / step) * step).toFixed(2))));
       root.style.setProperty('--am-scale', String(value));
-      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg[role="img"]')) {
+      for (const svg of document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas) > svg:is([role="img"], [role="group"])')) {
         const box = svg.viewBox?.baseVal;
         if (!box || !(box.width > 0) || !(box.height > 0)) continue;
         svg.setAttribute('width', String(Math.ceil(box.width * value)));
@@ -261,6 +261,11 @@
       if (titleText) titleText.textContent = panelTitle;
 
       const clone = svg.cloneNode(true);
+      // A linked diagram (a steps block) is a still picture here: its listeners live on its block, not on the viewer.
+      clone.querySelectorAll('[data-link]').forEach((el) => {
+        for (const attr of ['data-link', 'tabindex', 'role', 'aria-label']) el.removeAttribute(attr);
+      });
+      clone.querySelectorAll('[data-ends]').forEach((el) => el.removeAttribute('data-ends'));
       const defElements = clone.querySelectorAll('[id]');
       if (defElements.length) {
         const idMap = new Map();

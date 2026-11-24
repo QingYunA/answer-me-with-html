@@ -1181,7 +1181,7 @@ function cmdList({ print, fail, themes }) {
 
 // Every component's example plus a table, so one page shows how a theme looks on all of them.
 function specimenDraft(name, mode) {
-  const sections = [...COMPONENTS.values()].map((c) => `## ${c.name}\n${c.example}`);
+  const sections = [...COMPONENTS.values()].map((c) => `## ${c.name}\n${c.specimen ?? c.example}`);
   const table = '## table\n| Check | Status |\n|---|---|\n| Approved | ok passes |\n| Rejected | no fails |\n| Pending | warn needs a look |';
   return `---\ntitle: Theme ${name} (${mode})\nlang: en\n---\n${[...sections, table].join('\n\n')}\n`;
 }
@@ -1245,7 +1245,7 @@ function cmdHelp(name, { print, fail }) {
     fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, export, patch, theme`);
     return 2;
   }
-  print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);
+  print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.specimen ?? comp.example}`);
   return 0;
 }
 

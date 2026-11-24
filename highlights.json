@@ -1,33 +1,33 @@
 {
-  "version": "0.6.2",
+  "version": "0.6.4",
   "en": [
-    "Export menu: copy as image, download PNG or save as PDF",
-    "am render checks path:line references against your files",
-    "api blocks can show one change across several endpoints"
+    "steps without code: one explanation per step beside the diagram",
+    "Click an item or its explanation and both light up; arrows move",
+    "A stacked steps diagram is centred again on narrow screens"
   ],
   "zh": [
-    "导出菜单：复制为图片、下载 PNG 或保存为 PDF",
-    "am render 核对正文里的 路径:行号 引用",
-    "api 块可以展示一次需求改动涉及的多个接口"
+    "steps 不写代码也行：图旁边每一步一句讲解",
+    "点节点或讲解，两边一起高亮；方向键逐步切换",
+    "窄屏上下排时，steps 里的图重新居中"
   ],
   "zh-Hant": [
-    "匯出選單：複製為圖片、下載 PNG 或儲存為 PDF",
-    "am render 核對內文裡的 路徑:行號 引用",
-    "api 區塊可以呈現一次需求改動涉及的多個介面"
+    "steps 不寫程式碼也行：圖旁邊每一步一句講解",
+    "點節點或講解，兩邊一起高亮；方向鍵逐步切換",
+    "窄螢幕上下排時，steps 裡的圖重新置中"
   ],
   "ja": [
-    "書き出しメニュー：画像としてコピー、PNG をダウンロード、PDF として保存",
-    "am render が本文の パス:行番号 の参照をファイルと照合します",
-    "api ブロックで複数のエンドポイントにまたがる変更を表示できます"
+    "steps はコードなしでも使える：図の横に各ステップの説明",
+    "項目か説明をクリックすると両方が強調され、矢印キーで移動",
+    "狭い画面で縦に並ぶとき、steps の図が中央に戻ります"
   ],
   "he": [
-    "תפריט ייצוא: העתקה כתמונה, הורדת PNG או שמירה כ-PDF",
-    "am render בודק הפניות path:line מול הקבצים שלך",
-    "בלוק api מציג שינוי אחד בכמה נקודות קצה"
+    "steps גם בלי קוד: הסבר לכל שלב לצד התרשים",
+    "לחיצה על פריט או על ההסבר שלו מדגישה את שניהם; החיצים מעבירים שלב",
+    "במסך צר, התרשים של steps שוב ממורכז"
   ],
   "tr": [
-    "Dışa aktar menüsü: görsel olarak kopyala, PNG indir, PDF olarak kaydet",
-    "am render, path:line başvurularını dosyalarınızla karşılaştırır",
-    "api blokları tek bir değişikliği birden çok uç noktada gösterebilir"
+    "Kodsuz steps: diyagramın yanında her adım için bir açıklama",
+    "Bir öğeye ya da açıklamasına tıklayın, ikisi de vurgulanır; oklar ilerletir",
+    "Dar ekranda alt alta dizilen steps diyagramı yeniden ortalanır"
   ]
 }

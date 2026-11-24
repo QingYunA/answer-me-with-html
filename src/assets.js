@@ -22,6 +22,8 @@ export const MATH_CSS = composeMathCss(read('./themes/math.css'));
 // A theme's own font face, by the name its `font` field gives (src/themes/font-css.js).
 export const FONT_CSS = Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)]));
 export const DELTA_JS = read('./runtime/delta.js');
+export const STEPS_CSS = read('./themes/steps.css');
+export const STEPS_JS = read('./runtime/steps.js');
 export const UPDATE_CSS = read('./themes/update.css');
 export const UPDATE_JS = read('./runtime/update.js');
 export const LIVE_JS = read('./runtime/live.js');
