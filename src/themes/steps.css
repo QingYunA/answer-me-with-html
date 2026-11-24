@@ -7,7 +7,6 @@
 .am-steps-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .am-steps-pair > * { margin: 0; min-width: 0; }
 .am-steps:focus { outline: none; }
-.am-steps .am-diagram { display: flex; justify-content: center; }
 .am-steps .am-diagram svg { max-width: 100%; height: auto; }
 /* The pair is in the order of the draft. Stacked, the diagram always comes first; side by side the order of the draft shows. */
 .am-steps-pair > .am-steps-diagram { order: -1; }
@@ -83,15 +82,12 @@ span.am-step-badge {
   .am-steps--live .am-steps-note strong { margin-inline-end: 0.35em; }
   .am-steps--live .am-steps-note code { background: transparent; color: inherit; }
 
-  /* Explain mode, live: the entries of the list are buttons; the current one has an accent edge and tint. The diagram stays in view beside a long list. */
+  /* Explain mode, live: the entries of the list are buttons; the current one has an accent edge and tint, and its text the full ink colour so it keeps its contrast on the tint. */
   .am-steps--live .am-steps-entry { cursor: pointer; }
-  .am-steps--live .am-steps-entry:hover { background: var(--accent-bg); }
+  .am-steps--live .am-steps-entry:hover { background: var(--accent-bg); color: var(--ink); }
   .am-steps--live .am-steps-entry:focus { outline: none; }
   .am-steps--live .am-steps-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .am-steps--live .am-steps-entry.am-step-current { border-inline-start-color: var(--accent); background: var(--accent-bg); }
-  @container (min-width: 720px) {
-    .am-steps--live[data-mode="explain"] .am-steps-diagram { position: sticky; top: 56px; max-height: calc(100vh - 72px); overflow-y: auto; }
-  }
+  .am-steps--live .am-steps-entry.am-step-current { border-inline-start-color: var(--accent); background: var(--accent-bg); color: var(--ink); }
 
   /* The items of the diagram a step names are buttons. */
   .am-steps--live .am-node[data-link], .am-steps--live .am-tree-box[data-link], .am-steps--live .am-tree-label[data-link] { cursor: pointer; }

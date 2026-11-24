@@ -444,6 +444,19 @@ test('explain mode: a step written with lines is the item "Item 3-4", which is n
   assert.deepEqual(errorsOf(draft('```flow TB\nStep 1 -> Step 2\n```', '```steps\nStep 1: a\nStep 2: b\n```')), []);
 });
 
+test('explain mode: a label that ends in a number with no space before it gets no line-number hint', () => {
+  const err = errorsOf(draft('```flow TB\nHTTP/1.1 -> Done\n```', '```steps\nHTTP/2: x\n```'))[0];
+  assert.match(err.message, /"HTTP\/2" is not an item of the diagram/);
+  assert.doesNotMatch(err.message, /line numbers/);
+});
+
+test('an error in explain mode shows an example with no line numbers; code mode keeps its own', () => {
+  const explainErr = errorsOf(draft(FLOW, '```steps\nNowhere: x\n```'))[0];
+  assert.match(explainErr.example, /```steps\nCart: /);
+  assert.doesNotMatch(explainErr.example, /^\w+ \d/m);
+  assert.equal(errorsOf(draft('```steps\nNowhere: x\n```'))[0].example, COMPONENTS.get('steps').example);
+});
+
 test('explain mode: the diagram errors apply, each at its step line', () => {
   const dup = draft(FLOW, '```steps\nStart: a\nStart: b\n```');
   assert.match(errorsOf(dup)[0].message, /"Start" is already step 1/);

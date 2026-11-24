@@ -220,7 +220,7 @@ Ship: The warehouse sends the parcel.
 
 - The item is everything before the first colon, written as the diagram writes it, with no line numbers: an item may end in a number (`Step 2: ...`). The explanation is inline Markdown and may be empty.
 - The pair is the diagram and a numbered list of the steps, each with a bold `n. item` lead and its explanation, in the order you wrote the diagram and the `steps` block. It sits side by side from about 720px of block width and stacks below it, the diagram first.
-- On the page the list stays visible. A click on a diagram item or a list entry (or Enter or Space on either) lights the item and its edges and marks the entry as current; Previous, Next and the arrow keys move, Esc clears. There is no note bar, because the list carries the explanation. On a wide screen the diagram stays in view beside a long list.
+- On the page the list stays visible. A click on a diagram item or a list entry (or Enter or Space on either) lights the item and its edges and marks the entry as current; Previous, Next and the arrow keys move, Esc clears. There is no note bar, because the list carries the explanation.
 - In print, a PNG or PDF, and with no script, every step is numbered on its item and the numbered list sits beside or under the diagram. There is no bar.
 - Errors are the diagram errors above. A step written with lines (`Item 3-4: ...`) is read as the item `Item 3-4`, so it reports that it is not an item of the diagram and says that a step has no line numbers. A panel with neither a code block nor a diagram is an error.
 

@@ -98,7 +98,7 @@
         if (text) note.append(' ', ...text.cloneNode(true).childNodes);
         boxed[0].before(note);
       }
-      if (scroll) (note ?? boxed[0])?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
+      if (scroll) (note ?? boxed[0] ?? of(entries, i)[0])?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
     }
     const step = (by) => { if (by > 0 || current >= 0) select(Math.min(total - 1, Math.max(0, current + by))); };
 

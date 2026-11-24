@@ -30,13 +30,18 @@ function pickBlocks(rest, first, problem) {
   return { code, diagram };
 }
 
+// The example an error shows in explain mode: the steps there have no line numbers.
+const EXPLAIN_EXAMPLE = '```flow\nCart -> Pay -> Ship\n```\n\n```steps\nCart: The customer fills the cart.\nPay: The payment goes through.\nShip: The warehouse sends the parcel.\n```';
+
 // host: { renderBlocks, renderBlock, RenderError } from src/render.js, which holds the ordinary path of a block.
 export function renderPanel(blocks, ctx, host) {
   const { renderBlocks, RenderError } = host;
   const [first, ...extra] = blocks.filter((b) => isFence(b, 'steps'));
   if (!first || ctx.video) return renderBlocks(blocks, ctx);
 
-  const example = COMPONENTS.get('steps').example;
+  const rest = blocks.filter((b) => !isFence(b, 'steps'));
+  const explain = !rest.some(isCode) && rest.some((b) => b.type === 'fence' && DIAGRAMS.has(b.lang));
+  const example = explain ? EXPLAIN_EXAMPLE : COMPONENTS.get('steps').example;
   const problem = (message, line) => {
     const err = new RenderError(message, { line, component: 'steps', example });
     if (!ctx.errors) throw err;
@@ -46,7 +51,6 @@ export function renderPanel(blocks, ctx, host) {
   ctx.stats.components.steps = (ctx.stats.components.steps ?? 0) + 1;
   for (const b of extra) problem('steps: one steps block per panel; put the second one under its own ## heading, with its own code block', b.line);
 
-  const rest = blocks.filter((b) => !isFence(b, 'steps'));
   const picked = pickBlocks(rest, first, problem);
   if (!picked) return renderBlocks(rest, ctx);
   let steps;
@@ -108,9 +112,9 @@ function colonLabel(step, labels) {
   return labels.map(normalize).find((l) => starts.some((prefix) => l.startsWith(prefix)));
 }
 
-// With no code block, a step that ends in a number or a range was probably written with lines.
+// With no code block, a step that ends in a separate number or range ("Order 1-2", not "HTTP/2") was probably written with lines.
 const LINES_HINT = '; with no code block, a step has no line numbers';
-const endsInNumber = (text) => /\d(?:\s*-\s*\d+)?$/.test(text);
+const endsInNumber = (text) => /\s\d+(?:\s*-\s*\d+)?$/.test(text);
 
 // One problem at most per step, in the order a reader fixes them: the item, then the lines, then the overlap with an earlier step.
 // codeHtml is null in explain mode: the steps have no lines to check.
