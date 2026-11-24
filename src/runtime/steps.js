@@ -3,6 +3,8 @@
 // This script makes the block live: a bar with Previous, Next and the step count; a click on an item or on a line number boxes the lines of its
 // step and shows the note above them; the arrow keys move and Esc clears. The css hides the static numbers and the list while am-steps--live is on,
 // on screen only, so print and image export show the numbers. The block can take focus (tabindex -1), so a click on a line number leaves the keys working.
+// Explain mode (data-mode="explain", no code): the list stays on the page and is the other side of the pair. Its entries become buttons, the
+// selected step marks its entry (aria-current="step"), and there is no note. The page is not scrolled to the entry; focus() scrolls it when a key moved the focus.
 (() => {
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fill = (text, values) => text.replace(/\{(\w+)\}/g, (m, key) => (key in values ? String(values[key]) : m));
@@ -12,6 +14,11 @@
     const linked = [...root.querySelectorAll('[data-link]')].filter((el) => !el.closest('.am-steps-list'));
     const lines = linked.filter((el) => el.classList.contains('am-ln'));
     const items = linked.filter((el) => !el.classList.contains('am-ln'));
+    const entries = [...root.querySelectorAll('.am-steps-entry[data-link]')];
+    for (const entry of entries) {
+      entry.setAttribute('role', 'button');
+      entry.tabIndex = 0;
+    }
     const groups = [...root.querySelectorAll('g[data-ends]')].map((g) => ({ ends: g.dataset.ends.split(' '), edge: g.querySelector('.am-edge') }));
 
     const button = (kind, label) => {
@@ -44,7 +51,7 @@
     let current = -1;
     let note = null;
     const of = (list, i) => list.filter((el) => el.dataset.link === String(i));
-    const listed = (i, part) => root.querySelector(`.am-steps-list li[data-link="${i}"] .am-steps-${part}`);
+    const listed = (i, part) => root.querySelector(`.am-steps-list [data-link="${i}"] .am-steps-${part}`);
 
     // A button that has the focus keeps the keys of the block only while it is enabled: the browser moves the focus of a disabled one out of the block.
     const enable = (button, on) => {
@@ -55,6 +62,10 @@
     function select(i, { scroll = true } = {}) {
       for (const el of root.querySelectorAll('.am-step-on')) el.classList.remove('am-step-on', 'am-step-first', 'am-step-last');
       for (const el of items) el.classList.remove('am-step-sel');
+      for (const el of entries) {
+        el.classList.remove('am-step-current');
+        el.removeAttribute('aria-current');
+      }
       for (const { edge } of groups) edge?.classList.remove('am-step-edge');
       note?.remove();
       note = null;
@@ -71,6 +82,10 @@
       boxed[0]?.classList.add('am-step-first');
       boxed.at(-1)?.classList.add('am-step-last');
       for (const el of of(items, i)) el.classList.add('am-step-sel');
+      for (const el of of(entries, i)) {
+        el.classList.add('am-step-current');
+        el.setAttribute('aria-current', 'step');
+      }
       for (const { ends, edge } of groups) if (ends.includes(String(i))) edge?.classList.add('am-step-edge');
       if (boxed[0]) {
         note = document.createElement('span');
@@ -99,7 +114,7 @@
       const pressed = e.target.closest('.am-steps-bar button');
       if (pressed) return step(pressed.dataset.steps === 'next' ? 1 : -1);
       const el = e.target.closest('[data-link]');
-      if (!el || el.closest('.am-steps-list')) return;
+      if (!el || (el.closest('.am-steps-list') && !el.classList.contains('am-steps-entry')) || e.target.closest('a')) return;
       const isLine = el.classList.contains('am-ln');
       if (isLine && !inGutter(el, e)) return;
       select(Number(el.dataset.link), { scroll: !isLine });
@@ -108,7 +123,8 @@
     root.addEventListener('keydown', (e) => {
       if (e.target.closest('input, textarea, select') || e.altKey || e.ctrlKey || e.metaKey) return;
       const el = e.target.closest('[data-link]');
-      const item = el && !el.classList.contains('am-ln') && !el.closest('.am-steps-list') ? el : null;
+      const pickable = el && !el.classList.contains('am-ln') && (!el.closest('.am-steps-list') || el.classList.contains('am-steps-entry'));
+      const item = pickable && !e.target.closest('a') ? el : null;
       if (item && (e.key === 'Enter' || e.key === ' ')) {
         e.preventDefault();
         select(Number(item.dataset.link));
@@ -116,7 +132,7 @@
         e.preventDefault();
         const rtl = getComputedStyle(root).direction === 'rtl';
         step((e.key === 'ArrowRight') !== rtl ? 1 : -1);
-        if (item) of(items, current)[0]?.focus();
+        if (item) (item.classList.contains('am-steps-entry') ? of(entries, current) : of(items, current))[0]?.focus();
       } else if (e.key === 'Escape') {
         select(-1);
       }

@@ -201,7 +201,28 @@ Service 3-4: The service runs, then the answer goes back.
 - The pair sits side by side from about 720px of block width, in the order you wrote the two blocks, and stacks below it, the diagram first. Long lines wrap, so the code never scrolls sideways.
 - In print, a PNG or PDF, and with no script, there is no bar and no box. Every step is numbered on its item and beside its first line, and a numbered list of the steps follows the pair.
 - Leave the diagram out and the block is a walkthrough of the code: the items are names for the steps.
-- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, an item that ends with `-` or that holds a colon in the diagram, a range outside the code or two ranges that overlap, a panel with no code block or with more than one code block or diagram, a second `steps` block, a `steps` block inside an `ask` option, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
+- A panel with a diagram and no code block is in explain mode, below.
+- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, an item that ends with `-` or that holds a colon in the diagram, a range outside the code or two ranges that overlap, a panel with neither a code block nor a diagram or with more than one code block or diagram, a second `steps` block, a `steps` block inside an `ask` option, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
+
+To walk a reader through a diagram with no code, leave the code block out and write each step as `<item>: <explanation>`:
+
+````markdown
+```flow LR
+Order -> Pay -> Ship
+```
+
+```steps
+Order: The customer places the order.
+Pay: The payment is taken.
+Ship: The warehouse sends the parcel.
+```
+````
+
+- The item is everything before the first colon, written as the diagram writes it, with no line numbers: an item may end in a number (`Step 2: ...`). The explanation is inline Markdown and may be empty.
+- The pair is the diagram and a numbered list of the steps, each with a bold `n. item` lead and its explanation, in the order you wrote the diagram and the `steps` block. It sits side by side from about 720px of block width and stacks below it, the diagram first.
+- On the page the list stays visible. A click on a diagram item or a list entry (or Enter or Space on either) lights the item and its edges and marks the entry as current; Previous, Next and the arrow keys move, Esc clears. There is no note bar, because the list carries the explanation. On a wide screen the diagram stays in view beside a long list.
+- In print, a PNG or PDF, and with no script, every step is numbered on its item and the numbered list sits beside or under the diagram. There is no bar.
+- Errors are the diagram errors above. A step written with lines (`Item 3-4: ...`) is read as the item `Item 3-4`, so it reports that it is not an item of the diagram and says that a step has no line numbers. A panel with neither a code block nor a diagram is an error.
 
 Full syntax: `am help code`, `am help steps`.
 

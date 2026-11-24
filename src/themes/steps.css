@@ -1,4 +1,4 @@
-/* Steps block (only on pages that have one): a diagram and a code block linked by numbered steps (src/steps.js).
+/* Steps block (only on pages that have one): a diagram and a code block (or, in explain mode, a list of explanations) linked by numbered steps (src/steps.js).
    The default look is the static one that print, an image export and a page with no JavaScript show: every step is numbered on its
    diagram item (a badge) and beside its first line (a gutter number), and a numbered list of the steps follows the pair.
    The page runtime (src/runtime/steps.js) adds the class am-steps--live; only then, and only on screen, the numbers and the list give way
@@ -49,6 +49,11 @@ span.am-step-badge {
 .am-steps-item { font-weight: 600; color: var(--ink); }
 .am-steps-lines { font: var(--am-fs-small) var(--font-mono); color: var(--ink-3); margin-inline: 4px; }
 
+/* Explain mode (no code block): the list is the other side of the pair. Its numbers are text ("1. Item"), so it has no markers. */
+.am-steps-list--explain { list-style: none; margin: 0; padding: 0; }
+.am-steps-list--explain li { margin: 2px 0; }
+.am-steps-entry { padding: 6px 10px; border-inline-start: 3px solid transparent; border-radius: var(--radius); }
+
 /* The bar and the note are for the live page on screen: a page with no script has none, and a picture or print never shows them. */
 .am-steps-bar, .am-steps-note { display: none; }
 
@@ -57,7 +62,7 @@ span.am-step-badge {
 
 /* Live: on screen only. */
 @media screen {
-  .am-steps--live .am-step-badge, .am-steps--live .am-ln[data-sn]::after, .am-steps--live .am-steps-list { display: none; }
+  .am-steps--live .am-step-badge, .am-steps--live .am-ln[data-sn]::after, .am-steps--live:not([data-mode="explain"]) .am-steps-list { display: none; }
   .am-steps--live .am-steps-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font: var(--am-fs-small)/1.3 var(--font-sans); color: var(--ink-2); }
   .am-steps-bar .am-btn { padding: 5px 9px; }
   .am-steps-bar .am-btn:disabled { opacity: .5; cursor: default; }
@@ -77,6 +82,16 @@ span.am-step-badge {
   }
   .am-steps--live .am-steps-note strong { margin-inline-end: 0.35em; }
   .am-steps--live .am-steps-note code { background: transparent; color: inherit; }
+
+  /* Explain mode, live: the entries of the list are buttons; the current one has an accent edge and tint. The diagram stays in view beside a long list. */
+  .am-steps--live .am-steps-entry { cursor: pointer; }
+  .am-steps--live .am-steps-entry:hover { background: var(--accent-bg); }
+  .am-steps--live .am-steps-entry:focus { outline: none; }
+  .am-steps--live .am-steps-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .am-steps--live .am-steps-entry.am-step-current { border-inline-start-color: var(--accent); background: var(--accent-bg); }
+  @container (min-width: 720px) {
+    .am-steps--live[data-mode="explain"] .am-steps-diagram { position: sticky; top: 56px; max-height: calc(100vh - 72px); overflow-y: auto; }
+  }
 
   /* The items of the diagram a step names are buttons. */
   .am-steps--live .am-node[data-link], .am-steps--live .am-tree-box[data-link], .am-steps--live .am-tree-label[data-link] { cursor: pointer; }
