@@ -1,33 +1,33 @@
 {
-  "version": "0.6.3",
+  "version": "0.6.4",
   "en": [
-    "steps: click a diagram item to box its code lines, with a note",
-    "Copy buttons say Copy failed when the clipboard refuses",
-    "Pages keep their styling in viewers that sanitize HTML"
+    "steps without code: one explanation per step beside the diagram",
+    "Click an item or its explanation and both light up; arrows move",
+    "A stacked steps diagram is centred again on narrow screens"
   ],
   "zh": [
-    "steps：点图中的节点，框出对应的代码行并显示说明",
-    "剪贴板拒绝时，复制按钮显示“复制失败”",
-    "在会清理 HTML 的查看器里，页面也保留样式"
+    "steps 不写代码也行：图旁边每一步一句讲解",
+    "点节点或讲解，两边一起高亮；方向键逐步切换",
+    "窄屏上下排时，steps 里的图重新居中"
   ],
   "zh-Hant": [
-    "steps：點圖中的節點，框出對應的程式碼行並顯示說明",
-    "剪貼簿拒絕時，複製按鈕顯示「複製失敗」",
-    "在會清理 HTML 的檢視器裡，頁面也保留樣式"
+    "steps 不寫程式碼也行：圖旁邊每一步一句講解",
+    "點節點或講解，兩邊一起高亮；方向鍵逐步切換",
+    "窄螢幕上下排時，steps 裡的圖重新置中"
   ],
   "ja": [
-    "steps：図の項目をクリックすると、対応するコード行を囲み説明を表示",
-    "クリップボードが拒否したとき、コピーボタンが「コピーできません」と表示",
-    "HTML をサニタイズするビューアでもページのスタイルが保たれます"
+    "steps はコードなしでも使える：図の横に各ステップの説明",
+    "項目か説明をクリックすると両方が強調され、矢印キーで移動",
+    "狭い画面で縦に並ぶとき、steps の図が中央に戻ります"
   ],
   "he": [
-    "steps: לחיצה על פריט בתרשים מסמנת את שורות הקוד שלו, עם הערה",
-    "כפתורי ההעתקה מציגים ״ההעתקה נכשלה״ כשהלוח מסרב",
-    "הדפים שומרים על העיצוב גם בצופים שמנקים HTML"
+    "steps גם בלי קוד: הסבר לכל שלב לצד התרשים",
+    "לחיצה על פריט או על ההסבר שלו מדגישה את שניהם; החיצים מעבירים שלב",
+    "במסך צר, התרשים של steps שוב ממורכז"
   ],
   "tr": [
-    "steps: diyagramda bir öğeye tıklayın, kod satırları notuyla çerçevelenir",
-    "Pano reddettiğinde kopyalama düğmeleri Kopyalanamadı der",
-    "Sayfalar, HTML'i temizleyen görüntüleyicilerde de stilini korur"
+    "Kodsuz steps: diyagramın yanında her adım için bir açıklama",
+    "Bir öğeye ya da açıklamasına tıklayın, ikisi de vurgulanır; oklar ilerletir",
+    "Dar ekranda alt alta dizilen steps diyagramı yeniden ortalanır"
   ]
 }
