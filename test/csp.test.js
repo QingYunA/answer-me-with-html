@@ -56,7 +56,7 @@ test('csp: the page carries a policy right after the charset, with no unsafe-inl
 });
 
 test('csp: every executable inline script of a page has its hash in the policy', () => {
-  for (const options of [{}, { closeAfter: true }, { update: { latest: '9.9.9', current: '0.0.0', command: 'x', highlights: {} } }]) {
+  for (const options of [{}, { resize: true }, { closeAfter: true }, { update: { latest: '9.9.9', current: '0.0.0', command: 'x', highlights: {} } }]) {
     const { html } = renderDoc(DRAFT, {}, {}, options);
     const scripts = executable(html);
     assert.ok(scripts.length >= 1);

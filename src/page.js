@@ -11,8 +11,8 @@ const AUDIO_OPEN = '<audio id="amv-audio"';
 // a left-to-right page keeps the root tag it always had.
 // voice is written only on voiced video pages (elevenlabs / local / cmd / system / audio-map); patch keeps the same voice.
 // scale is the reader's text size (src/themes/type-scale.js); 1 is the default, so the tag carries it only when it differs.
-export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false }) {
-  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
+export function rootTag({ lang, dir, theme, mode, style, scale = 1, resize = false, voice, video = false }) {
+  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${resize ? ' data-resize' : ''}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
 }
 
 // Copies of the root settings, written on the toolbar. A host that serves the page inside its own document leaves the real <html>
@@ -53,6 +53,7 @@ export function readPage(html) {
     mode: attr('data-mode'),
     style: attr('data-style'),
     scale: readScale(attr('data-scale')),
+    resize: /\sdata-resize(?:\s|>)/.test(root),
     lang: attr('lang'),
     voice: attr('data-voice'),
     voiced: video && before.endsWith('</audio>') && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf('<textarea'),

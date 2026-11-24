@@ -6,6 +6,7 @@ export default {
   script: 'Hans',
   voice: { say: 'zh_CN', espeak: 'cmn' },
   ui: {
+    width: { title: '页面宽度', pixels: '宽度（像素）', full: '全宽', reset: '恢复默认', left: '内容左边框', right: '内容右边框' },
     remark: {
       button: '标注', need: '选择标签后才能保存',
       hint: '批注（可选）', save: '保存', remove: '删除', clear: '清除所有标注', clearConfirm: '再次点击以清除 {n} 条标注',

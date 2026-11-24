@@ -11,6 +11,7 @@ export default {
     serif: '"Songti TC", "PMingLiU", "MingLiU", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "Songti SC"',
   },
   ui: {
+    width: { title: '頁面寬度', pixels: '寬度（像素）', full: '全寬', reset: '恢復預設', left: '內容左邊框', right: '內容右邊框' },
     remark: {
       button: '標註', need: '選擇標籤後才能儲存',
       hint: '批註（可選）', save: '儲存', remove: '刪除', clear: '清除所有標註', clearConfirm: '再次點擊以清除 {n} 處標註',

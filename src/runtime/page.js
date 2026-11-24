@@ -133,7 +133,10 @@
     };
     root.classList.add('am-bar-fit');
     fit();
-    new ResizeObserver(fit).observe(carrier);
+    const reserve = new ResizeObserver(fit);
+    reserve.observe(carrier);
+    const reader = document.querySelector('main[data-am-resizable]');
+    if (reader) reserve.observe(reader);
     addEventListener('resize', fit);
     document.fonts?.ready.then(fit);
   }

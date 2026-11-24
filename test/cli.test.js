@@ -487,6 +487,20 @@ test('cli config: set / get / reset, changed values are marked with *', async ()
   assert.equal((await run(['config', 'get', 'theme'])).out.trim(), 'auto');
 });
 
+test('cli patch: keeps reader resizing from the generated page', async (t) => {
+  t.after(() => run(['config', 'reset', 'resize']));
+  const stdin = '## A\nFirst paragraph.\n\n## B\nSecond paragraph.\n';
+  assert.equal((await run(['config', 'set', 'resize', 'on'])).code, 0);
+  assert.equal((await run(['render', '-', '--template', 'doc', '-o', 'resizable.html'], { stdin })).code, 0);
+  assert.equal((await run(['config', 'set', 'resize', 'off'])).code, 0);
+  const patched = await run(['patch', 'resizable.html', '--panel', 'B'], { stdin: 'Updated paragraph.\n' });
+  assert.equal(patched.code, 0, patched.err);
+  const html = readFileSync(join(dir, 'resizable.html'), 'utf8');
+  assert.match(html, /<html[^>]* data-resize>/);
+  assert.match(html, /popovertarget="am-width-options"/);
+  assert.match(html, /Updated paragraph/);
+});
+
 test('cli patch: keeps the page scale even when the config scale changed', async (t) => {
   t.after(() => run(['config', 'reset', 'scale']));
   // An older page has no data-scale: it stays at 1 even when config now says 1.25.
