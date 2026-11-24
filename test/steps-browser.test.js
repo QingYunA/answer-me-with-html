@@ -25,6 +25,8 @@ const PANEL = `${CODE}\n\n${FLOW}\n\n${STEPS}`;
 const page = (head, panel) => `---\nlang: en\n${head ? '' : 'style: off\n'}${head}---\n## A Panel ${panel}\n\n${PANEL}\n`;
 
 const flowFirst = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${FLOW}\n\n${CODE}\n\n${STEPS}\n`;
+// One step only: Next and Previous are both disabled as soon as the step is selected.
+const one = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${CODE}\n\n${FLOW}\n\n\`\`\`steps\nStart 10-11: Only step.\n\`\`\`\n`;
 // The same panel on a right-to-left page: its steps text is the same, the labels and the keys mirror.
 const hebrew = `---\nlang: he\nstyle: off\n---\n## A Panel\n\n${PANEL}\n`;
 
@@ -79,6 +81,17 @@ const key = async (name) => {
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: code });
 };
 
+// A real key press that reaches a focused button as a click: keyDown with its text makes the keypress that Enter activates a button with.
+const press = async (name) => {
+  const code = { Enter: 13 }[name];
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: name, code: name, windowsVirtualKeyCode: code, text: '\r' });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code: name, windowsVirtualKeyCode: code });
+  // The browser moves the focus out of a disabled control at its next rendering update.
+  await evaluate('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))');
+};
+const focus = (selector) => evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+const focused = () => evaluate("document.activeElement.classList.contains('am-steps') ? 'block' : (document.activeElement.dataset.steps ?? document.activeElement.tagName)");
+
 before(async () => {
   if (SKIP) return;
   tmp = mkdtempSync(join(tmpdir(), 'am-steps-'));
@@ -86,6 +99,7 @@ before(async () => {
     page: renderDoc(page('', ''), {}, {}).html,
     flowFirst: renderDoc(flowFirst, {}, {}).html,
     he: renderDoc(hebrew, {}, {}).html,
+    one: renderDoc(one, {}, {}).html,
     two: renderDoc(`${page('template: sheet\ncols: 2\n', '')}\n## Beside\n\n${PANEL}\n`, {}, {}).html,
     wide: renderDoc(page('template: sheet\ncols: 2\n', '{span=2}'), {}, {}).html,
   })) {
@@ -231,6 +245,54 @@ test('Previous, Next, the arrow keys, Enter and Esc', { skip: SKIP, timeout: 120
   const s = await evaluate(STATE);
   assert.deepEqual(s.on, []);
   assert.match(s.count, /3 steps/);
+});
+
+test('a one-step block: Enter on Next disables both buttons and the keys still work in the block', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('one');
+  await focus('[data-steps="next"]');
+  await press('Enter');
+  assert.match((await evaluate(STATE)).count, /Step 1 of 1/);
+  assert.equal(await evaluate("document.querySelector('[data-steps=\"next\"]').disabled && document.querySelector('[data-steps=\"prev\"]').disabled"), true);
+  assert.equal(await focused(), 'block', 'the focus stays in the block');
+  await key('ArrowRight');
+  assert.deepEqual((await evaluate(STATE)).on, [10, 11], 'ArrowRight at the only step changes nothing');
+  await key('Escape');
+  assert.deepEqual((await evaluate(STATE)).on, [], 'Esc still clears it');
+});
+
+test('the buttons at both ends: the focus stays in the block when Next or Previous disables itself', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('page');
+  await focus('[data-steps="next"]');
+  for (let i = 0; i < 3; i++) await press('Enter');
+  assert.match((await evaluate(STATE)).count, /Step 3 of 3/);
+  assert.equal(await focused(), 'block', 'Next was disabled at the last step');
+  await key('ArrowLeft');
+  assert.match((await evaluate(STATE)).count, /Step 2 of 3/, 'the arrow keys work after the last step');
+  await focus('[data-steps="prev"]');
+  await press('Enter');
+  assert.match((await evaluate(STATE)).count, /Step 1 of 3/);
+  assert.equal(await focused(), 'block', 'Previous was disabled at the first step');
+  await key('ArrowRight');
+  assert.match((await evaluate(STATE)).count, /Step 2 of 3/, 'the arrow keys work after the first step');
+  await key('Escape');
+  assert.deepEqual((await evaluate(STATE)).on, []);
+});
+
+test('the expanded diagram viewer shows a still picture: no step buttons, and a click on it changes nothing', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('page');
+  await click('.am-node[data-link="0"]');
+  await click('.am-steps .am-diagram-expand');
+  assert.equal(await evaluate("document.querySelector('.am-lightbox').hasAttribute('hidden')"), false, 'the viewer is open');
+  const viewer = await evaluate(`(() => {
+    const c = document.querySelector('.am-lightbox-canvas');
+    return { nodes: c.querySelectorAll('.am-node').length, linked: c.querySelectorAll('[data-link], [data-ends]').length, buttons: c.querySelectorAll('[role="button"]').length, tabbable: c.querySelectorAll('[tabindex]').length };
+  })()`);
+  assert.deepEqual(viewer, { nodes: 3, linked: 0, buttons: 0, tabbable: 0 });
+  const before = await evaluate(STATE);
+  await click('.am-lightbox-canvas .am-node');
+  assert.deepEqual(await evaluate(STATE), before);
+  // The block under it keeps its own buttons.
+  assert.equal(await evaluate("document.querySelectorAll('.am-steps .am-node[role=\"button\"][tabindex=\"0\"]').length"), 3);
 });
 
 test('an unlinked diagram item is not a target', { skip: SKIP, timeout: 120000 }, async () => {

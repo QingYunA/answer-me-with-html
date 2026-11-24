@@ -46,6 +46,12 @@
     const of = (list, i) => list.filter((el) => el.dataset.link === String(i));
     const listed = (i, part) => root.querySelector(`.am-steps-list li[data-link="${i}"] .am-steps-${part}`);
 
+    // A button that has the focus keeps the keys of the block only while it is enabled: the browser moves the focus of a disabled one out of the block.
+    const enable = (button, on) => {
+      if (!on && document.activeElement === button) root.focus({ preventScroll: true });
+      button.disabled = !on;
+    };
+
     function select(i, { scroll = true } = {}) {
       for (const el of root.querySelectorAll('.am-step-on')) el.classList.remove('am-step-on', 'am-step-first', 'am-step-last');
       for (const el of items) el.classList.remove('am-step-sel');
@@ -53,8 +59,8 @@
       note?.remove();
       note = null;
       current = i;
-      prev.disabled = i <= 0;
-      next.disabled = i >= total - 1;
+      enable(prev, i > 0);
+      enable(next, i < total - 1);
       if (i < 0) {
         count.textContent = root.dataset.idle;
         return;

@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openPage } from '../src/chrome.js';
 import { writePngSlices } from '../src/export.js';
@@ -54,7 +54,7 @@ after(() => { if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3
 // What a picture of the page would show: computed display of the live parts and the static parts.
 const LOOK = `(() => {
   const root = document.querySelector('.am-steps');
-  const shown = (sel) => { const el = root.querySelector(sel); return !el || getComputedStyle(el).display !== 'none'; };
+  const shown = (sel) => { const el = root.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none'; };
   return {
     live: root.classList.contains('am-steps--live'),
     bar: root.querySelector('.am-steps-bar') ? shown('.am-steps-bar') : false,
@@ -74,7 +74,7 @@ test('PNG export: a selected step is cleared from the picture, and the numbers a
     const out = join(tmp, 'png');
     const written = await writePngSlices(chrome, file, out);
     assert.ok(written.length >= 1);
-    assert.deepEqual(readdirSync(out).sort(), written.map((f) => f.split('/').pop()).sort());
+    assert.deepEqual(readdirSync(out).sort(), written.map((f) => basename(f)).sort());
     const look = await chrome.evaluate(LOOK);
     assert.equal(look.live, false, 'the export takes the live class off');
     assert.equal(look.bar, false);

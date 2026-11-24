@@ -9,10 +9,13 @@ import { f } from './svg/shapes.js';
 import en from './languages/en.js';
 
 const FORM = '<item> <line or range>: <note>';
+// The list is built after the page's images are embedded, so a local image in a step would stay a relative path.
+const IMAGE = /!\[[^\]]*\]\(|<img\b/i;
 
 // "Write to clipboard 146-147: Try the API first." → { item, head, from, to, note, line }. The first colon ends the item and its lines;
 // the lines are the last number or range (spaces around the dash are fine) before it, so an item may hold digits ("Step 2 3: ..."). line is 1-based inside the block.
 function parseStep(text, line) {
+  if (IMAGE.test(text.replace(/`[^`]*`/g, ''))) throw new ComponentError('steps: a step holds text, not an image; show the picture in its own block', line);
   const colon = text.indexOf(':');
   if (colon < 0) throw new ComponentError(`steps: write each step as ${FORM}, for example "Start 10-12: Begin here."`, line);
   const head = text.slice(0, colon).trim();
@@ -76,14 +79,12 @@ export const stepBadgeSvg = (n, x, y) => `<g class="am-step-badge" transform="tr
 export const stepBadgeHtml = (n) => `<span class="am-step-badge" aria-hidden="true">${n}</span>`;
 
 // Each line of a step carries the step as data-link; the first line also carries the step number, which print shows in its gutter.
+// The work follows the lines the block shows, never the range a step asks for: a step may name a billion lines.
 export function markCodeLines(html, steps) {
-  const byLine = new Map();
-  steps.forEach((s, i) => {
-    for (let n = s.from; n <= s.to; n++) byLine.set(n, { i, first: n === s.from });
-  });
   return html.replace(/<span class="am-ln([^"]*)" data-n="(\d+)">/g, (whole, cls, n) => {
-    const hit = byLine.get(Number(n));
-    return hit ? `<span class="am-ln${cls}" data-n="${n}" data-link="${hit.i}"${hit.first ? ` data-sn="${hit.i + 1}"` : ''}>` : whole;
+    const line = Number(n);
+    const i = steps.findLastIndex((s) => line >= s.from && line <= s.to);
+    return i < 0 ? whole : `<span class="am-ln${cls}" data-n="${n}" data-link="${i}"${line === steps[i].from ? ` data-sn="${i + 1}"` : ''}>`;
   });
 }
 

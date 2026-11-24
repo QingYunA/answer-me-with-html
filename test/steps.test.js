@@ -222,6 +222,28 @@ test('a range outside the lines of the code block is an error', () => {
   assert.equal(errorsOf(before)[0].line, lineOf(before, 'Start 9'));
 });
 
+test('a huge range is reported at once, and the code lines are not walked for it', () => {
+  const text = draft('```js start=1\nconst a = 1;\nconst b = 2;\n```', '```steps\nRead 1-1000000000: Read it.\n```');
+  const started = Date.now();
+  const [err, ...more] = errorsOf(text);
+  assert.ok(Date.now() - started < 3000, 'finishes fast');
+  assert.equal(more.length, 0);
+  assert.equal(err.line, lineOf(text, 'Read 1-1000000000'));
+  assert.match(err.message, /lines 1-1000000000 are not all in the code block \(lines 1-2\)/);
+});
+
+test('an image in a step is an error at its step line, for a Markdown image and for an img tag; code stays text', () => {
+  for (const step of ['Start 10: see ![shot](shot.png)', 'Start 10: see <img src="shot.png">', '![x](x.png) 10: item']) {
+    const text = draft(CODE, FLOW, `\`\`\`steps\nMiddle 11: ok\n${step}\n\`\`\``);
+    const [err, ...more] = errorsOf(text);
+    assert.equal(more.length, 0, step);
+    assert.equal(err.line, lineOf(text, step), step);
+    assert.equal(err.component, 'steps');
+    assert.match(err.message, /holds text, not an image/);
+  }
+  assert.deepEqual(errorsOf(draft(CODE, FLOW, '```steps\nStart 10: write `<img>` or `![a](b)` as text\n```')), []);
+});
+
 test('two steps whose ranges overlap are an error at the second', () => {
   const text = draft(CODE, FLOW, '```steps\nStart 10-12: a\nEnd 12-13: b\n```');
   const [err] = errorsOf(text);
