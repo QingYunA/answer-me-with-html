@@ -5,6 +5,7 @@ import { f, smoothPath, arrowDefs, svgOpen, textLines, diagramLabel } from '../s
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, innerMarkMessage } from './delta.js';
 import { badgeSvg, edgeText, nodeSize, nodeState, runLayout } from './flow.js';
+import { stepBadgeSvg } from '../steps.js';
 import { LOOP_LABEL, LOOP_OUT, LOOP_STEP, clipToBox, loopBeside, loopBelow, loopPath, loopRoom } from '../svg/loop.js';
 
 const LH = 17; // the line height runLayout measured each state label with
@@ -45,10 +46,10 @@ Polling -> Open: reply
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked state with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram.
   - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a state ("A -> + B"), is an error: write it at the start, "+ A -> B".`,
   example: '```state LR\n[*] -> Idle\nIdle -> Connecting: connect()\nConnecting -> Open: SYN-ACK\nConnecting -> Closed: RST\nOpen -> Open: retransmit\nOpen -> Closed: close()\nClosed -> [*]\n```',
-  render(text, { args, uid, ui, video, dir: pageDir = 'ltr' }) {
+  render(text, { args, uid, ui, video, link, dir: pageDir = 'ltr' }) {
     const model = parseState(text);
     const dir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-state">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui, pageDir, video)}</figure>`;
+    const html = `<figure class="am-diagram am-state">${layout(model, DIRS.has(dir) ? dir : 'TB', uid(), ui, pageDir, video, link)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -140,7 +141,8 @@ function checkTransitions(edges, nodes) {
   }
 }
 
-function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false) {
+// link: the steps of a steps block (src/steps.js); the states it names become buttons with a number, and each edge learns the steps at its ends.
+function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false, link) {
   const { nodes, edges, lines } = model;
   const rtl = pageDir === 'rtl';
   const side = rtl ? -1 : 1;
@@ -198,11 +200,17 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false) {
     const data = g.edge({ v: key.get(e.from), w: key.get(e.to), name: `e${i}` });
     return { e, data, points: clipEnds(data.points, e, centre, boxes, room, nodes) };
   });
+  // The start and end dots are not states a step can name, so an edge to one of them has no step at that end.
+  const endsOf = (e) => {
+    if (!link) return '';
+    const label = (id) => (nodes.get(id).kind === 'state' ? nodes.get(id).label : null);
+    return link.ends(label(e.from), label(e.to));
+  };
   const edgeSvg = drawn.map(({ e, data, points }) => {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
     const path = `<path class="am-edge" d="${smoothPath(points)}" marker-end="url(#${head})"/>`;
     const text = e.label ? edgeLabelSvg(e.label, data.x, data.y, pageDir) : '';
-    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text}</g>`;
+    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}${endsOf(e)}>${path}${text}</g>`;
   });
 
   // A self-transition lies beside its box; with the ranks running sideways (LR, RL) the edges leave by that side, so the loop
@@ -224,7 +232,7 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false) {
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
     const path = `<path class="am-edge" d="${loopPath(spec)}" marker-end="url(#${head})"/>`;
     const text = e.label && spec.label ? edgeLabelSvg(e.label, spec.label.x, spec.label.y, pageDir) : '';
-    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>${path}${text}</g>`;
+    return `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}${endsOf(e)}>${path}${text}</g>`;
   });
 
   const nodeSvg = [...nodes.values()].map((n) => {
@@ -234,10 +242,13 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', video = false) {
     const badgeStep = n.state === 'changed' ? stepOf.get(n.tildeLine ?? n.line) : undefined;
     const badge = badgeSvg(n.state, rtl ? x - box.width / 2 : x + box.width / 2, y - box.height / 2, badgeStep);
     const keyAttr = n.kind === 'state' ? ` data-key="${esc(n.label)}"` : '';
-    const open = `<g class="am-node am-node--state${n.kind === 'state' ? '' : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>`;
+    const step = n.kind === 'state' ? link?.node(n.label) : null;
+    const open = `<g class="am-node am-node--state${n.kind === 'state' ? '' : ` am-node--${n.kind}`}"${keyAttr} data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}${step?.attrs ?? ''}>`;
+    // The step number takes the corner opposite the change badge.
+    const number = step ? stepBadgeSvg(step.n, rtl ? x + box.width / 2 : x - box.width / 2, y - box.height / 2) : '';
     if (n.kind === 'initial') return `${open}<circle class="am-state-dot" cx="${f(x)}" cy="${f(y)}" r="${DOT_R}"/>${badge}</g>`;
     if (n.kind === 'final') return `${open}<circle class="am-state-ring" cx="${f(x)}" cy="${f(y)}" r="${DOT_R}"/><circle class="am-state-core" cx="${f(x)}" cy="${f(y)}" r="2.8"/>${badge}</g>`;
-    return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y, LH, ' class="am-node-text"', pageDir)}${badge}</g>`;
+    return `${open}<rect class="am-node-shape" x="${f(x - box.width / 2)}" y="${f(y - box.height / 2)}" width="${f(box.width)}" height="${f(box.height)}" rx="8"/>${textLines(box.lines, x, y, LH, ' class="am-node-text"', pageDir)}${badge}${number}</g>`;
   });
 
   // The drawing is as big as everything drawn on it: dagre sizes the ranks, but a loop and its label sit outside the box, so

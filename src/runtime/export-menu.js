@@ -132,8 +132,8 @@
     return `[data-cp="${mark}"]${pseudo}{${css}}\n`;
   };
 
-  // The page's chrome means nothing in a picture: remove the controls and the navigational rail from the clone.
-  const CHROME = '.am-code-copy, .am-diagram-expand, .am-table-controls, [class*="delta-switch"], .am-toc, .am-remark-hover, .am-mark-note';
+  // The page's chrome means nothing in a picture: remove the controls and the navigational rail from the clone; a runtime-made control opts out with data-export-skip.
+  const CHROME = '.am-code-copy, .am-diagram-expand, .am-table-controls, [class*="delta-switch"], .am-toc, .am-remark-hover, .am-mark-note, [data-export-skip]';
 
   function buildSvg(width, height) {
     const clone = main.cloneNode(true);
@@ -200,10 +200,21 @@
 
   async function rasterize() {
     await document.fonts?.ready;
-    const rect = main.getBoundingClientRect();
-    const width = Math.max(1, Math.ceil(Math.max(rect.width, main.scrollWidth)));
-    const height = Math.max(1, Math.ceil(Math.max(rect.height, main.scrollHeight)));
-    const svg = buildSvg(width, height);
+    // A steps block that is live on screen shows its static look in a picture, not the reader's selection (src/export.js does the same
+    // for image export); the page goes live again right after.
+    const live = [...document.querySelectorAll('.am-steps--live')];
+    for (const el of live) el.classList.remove('am-steps--live');
+    let width;
+    let height;
+    let svg;
+    try {
+      const rect = main.getBoundingClientRect();
+      width = Math.max(1, Math.ceil(Math.max(rect.width, main.scrollWidth)));
+      height = Math.max(1, Math.ceil(Math.max(rect.height, main.scrollHeight)));
+      svg = buildSvg(width, height);
+    } finally {
+      for (const el of live) el.classList.add('am-steps--live');
+    }
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     const image = new Image();
     image.decoding = 'async';

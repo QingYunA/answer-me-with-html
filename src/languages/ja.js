@@ -49,6 +49,7 @@ export default {
     chart: { name: 'グラフ', data: 'データ', value: '値', share: '割合' },
     api: { path: 'パスパラメーター', query: 'クエリパラメーター', headers: 'ヘッダー', request: 'リクエスト', response: 'レスポンス', field: 'フィールド', type: '型', description: '説明', requirement: '必須・任意', required: '必須', optional: '任意' },
     table: { filter: '表を絞り込む' },
+    steps: { prev: '← 前へ', next: '次へ →', count: 'ステップ {n} / {m}：{item}', hint: '項目か行番号をクリック。← → で移動、Esc で解除', bar: 'ステップの操作', idle: '全 {m} ステップ', node: 'ステップ {n}：{item}', list: 'ステップ', line: '{n} 行目', lines: '{from}-{to} 行目' },
   },
   videoUi: {
     play: '再生', pause: '一時停止', chapters: '章', speed: '速度', export: '書き出し',

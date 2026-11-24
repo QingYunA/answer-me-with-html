@@ -26,6 +26,8 @@ export const inlineAssets = {
         `export const MATH_CSS = ${JSON.stringify(composeMathCss(read('../src/themes/math.css')))};`,
         `export const FONT_CSS = ${JSON.stringify(Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)])))};`,
         `export const DELTA_JS = ${JSON.stringify(read('../src/runtime/delta.js'))};`,
+        `export const STEPS_CSS = ${JSON.stringify(read('../src/themes/steps.css'))};`,
+        `export const STEPS_JS = ${JSON.stringify(read('../src/runtime/steps.js'))};`,
         `export const UPDATE_CSS = ${JSON.stringify(read('../src/themes/update.css'))};`,
         `export const UPDATE_JS = ${JSON.stringify(read('../src/runtime/update.js'))};`,
         `export const LIVE_JS = ${JSON.stringify(read('../src/runtime/live.js'))};`,

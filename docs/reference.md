@@ -136,7 +136,7 @@ Which cache do we use?
 
 - The first line is the question. Each option starts with `*` (the suggestion, shown with a tag; every option starts unselected) or `-`. Write 2 to 6 options.
 - One choice needs exactly one `*`. `ask multi` lets the reader pick several; `*` marks the options you suggest; they start unselected too.
-- An option may carry one preview: indent a `:::` block under it. The block takes any component, plus `html` and `svg`; add it only when a picture helps. `ask cards` lays the options out in a grid, so each preview becomes a card canvas.
+- An option may carry one preview: indent a `:::` block under it. The block takes any component except `steps`, plus `html` and `svg`; add it only when a picture helps. `ask cards` lays the options out in a grid, so each preview becomes a card canvas.
 - The reply says for each decision whether the reader changed it, confirmed the suggestion, or did not answer it. Comment text and remark notes come back quoted with `>`.
 
 Full syntax: `am help ask`.
@@ -174,7 +174,36 @@ To show a change, paste a unified diff in a `diff` fence and the CLI draws it:
 - `hl=` uses new-side numbers. `diff --git`, `---`, `+++` and `\ No newline at end of file` lines are accepted and not drawn.
 - A line that does not start with `+`, `-`, a space or `@@` is an error, and so is a cut (`...`): split the diff into two hunks. A hunk whose counts do not match its `@@` header is a warning. `src=` is not supported with `diff`: paste the diff. The limits are the same as for other code blocks.
 
-Full syntax: `am help code`.
+To link a diagram and a code block, put both in one panel with a `steps` block:
+
+````markdown
+```js start=1
+const request = receive(input);
+const user = authenticate(request);
+const result = await service.run(user);
+respond(result);
+```
+
+```flow LR
+Gateway -> Auth -> Service
+```
+
+```steps
+Gateway 1: The request comes in.
+Auth 2: The user is checked.
+Service 3-4: The service runs, then the answer goes back.
+```
+````
+
+- Each step is `<item> <line or range>: <note>`. The item is the text of a `flow` node, a `state` or a `tree` entry, written as the diagram writes it. The lines are the last number or range before the first colon. The first colon ends the item, so an item cannot contain a colon: to link a `tree` entry such as `Part 1: Writing rules`, rename the entry in the diagram so it has no colon.
+- Line numbers are the ones the code block shows: the file's own with `src=` and `lines=`, else from `start=`, else from 1. A linked code block always shows its numbers.
+- On the page, a click on an item (or Enter or Space on it) boxes its lines, shows the note above them and marks the item and its edges. A click on a line number picks the step that covers it; a click on the code text does nothing. The bar above the pair has Previous and Next, says "Step 2 of 3" and shows a short hint; the note above the boxed lines starts with the step number and item. The arrow keys move and Esc clears.
+- The pair sits side by side from about 720px of block width, in the order you wrote the two blocks, and stacks below it, the diagram first. Long lines wrap, so the code never scrolls sideways.
+- In print, a PNG or PDF, and with no script, there is no bar and no box. Every step is numbered on its item and beside its first line, and a numbered list of the steps follows the pair.
+- Leave the diagram out and the block is a walkthrough of the code: the items are names for the steps.
+- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, an item that ends with `-` or that holds a colon in the diagram, a range outside the code or two ranges that overlap, a panel with no code block or with more than one code block or diagram, a second `steps` block, a `steps` block inside an `ask` option, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
+
+Full syntax: `am help code`, `am help steps`.
 
 ## Images
 

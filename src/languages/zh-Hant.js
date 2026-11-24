@@ -48,6 +48,7 @@ export default {
     chart: { name: '圖表', data: '資料', value: '數值', share: '占比' },
     api: { path: '路徑參數', query: '查詢參數', headers: '請求標頭', request: '請求', response: '回應', field: '欄位', type: '型別', description: '說明', requirement: '必填性', required: '必填', optional: '選填' },
     table: { filter: '篩選表格' },
+    steps: { prev: '← 上一步', next: '下一步 →', count: '第 {n} 步，共 {m} 步：{item}', hint: '點節點或行號；← → 切換，Esc 取消', bar: '步驟控制', idle: '共 {m} 步', node: '第 {n} 步：{item}', list: '步驟', line: '第 {n} 行', lines: '第 {from}-{to} 行' },
   },
   videoUi: {
     play: '播放', pause: '暫停', chapters: '章節', speed: '速度', export: '匯出',
