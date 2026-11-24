@@ -43,7 +43,7 @@ export default {
     chart: { name: '图表', data: '数据', value: '数值', share: '占比' },
     api: { path: '路径参数', query: '查询参数', headers: '请求头', request: '请求', response: '响应', field: '字段', type: '类型', description: '说明', requirement: '必填性', required: '必填', optional: '可选' },
     table: { filter: '筛选表格' },
-    steps: { prev: '上一步', next: '下一步', count: '第 {n} 步，共 {m} 步', idle: '共 {m} 步', node: '第 {n} 步：{item}', list: '步骤', line: '第 {n} 行', lines: '第 {from}-{to} 行' },
+    steps: { prev: '← 上一步', next: '下一步 →', count: '第 {n} 步，共 {m} 步：{item}', hint: '点节点或行号；← → 切换，Esc 取消', bar: '步骤控制', idle: '共 {m} 步', node: '第 {n} 步：{item}', list: '步骤', line: '第 {n} 行', lines: '第 {from}-{to} 行' },
   },
   videoUi: {
     play: '播放', pause: '暂停', chapters: '章节', speed: '速度', export: '导出',

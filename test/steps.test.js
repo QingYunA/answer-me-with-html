@@ -9,6 +9,7 @@ import { renderDoc, RenderError } from '../src/render.js';
 import { DraftErrors } from '../src/parse.js';
 import { COMPONENTS } from '../src/components/index.js';
 import { parseSteps } from '../src/steps.js';
+import { renderVideo } from '../src/video/render.js';
 
 const CODE = '```js start=10\nconst a = 1;\nconst b = 2;\nconst c = 3;\nconst d = 4;\nconst e = 5;\n```';
 const FLOW = '```flow TB\nStart -> Middle\nMiddle -> End\n```';
@@ -43,6 +44,12 @@ test('parseSteps: blank lines are skipped, the note may hold a colon, and the fi
     { item: 'A', from: 1, to: 1, note: 'note: with a colon', line: 2 },
     { item: 'B', from: 2, to: 3, note: '', line: 4 },
   ]);
+});
+
+test('parseSteps: spaces around the dash of a range are fine; an item that ends with a dash is an error', () => {
+  const [step] = parseSteps('Go 1 - 2: a\n');
+  assert.deepEqual([step.item, step.from, step.to], ['Go', 1, 2]);
+  assert.throws(() => parseSteps('A 1: ok\nGo - 3: a'), (e) => e.line === 2 && /cannot end with "-"/.test(e.message));
 });
 
 test('parseSteps: a line that does not follow the form names the line', () => {
@@ -91,14 +98,17 @@ test('a flow diagram and a code block are linked: numbers, boxes and the list ar
   assert.equal(html.match(/<ol class="am-steps-list"/g).length, 1);
 });
 
-test('the pair sits where the first of the diagram and the code block was written, diagram first', () => {
-  const text = draft('Before.', FLOW, 'Between.', CODE, STEPS, 'After.');
-  const { html } = renderDoc(text);
-  const at = (s) => html.indexOf(s);
-  assert.ok(at('Before.') < at('<div class="am-steps"'));
-  assert.ok(at('<div class="am-steps"') < at('am-flow') && at('am-flow') < at('<figure class="am-codeblock'));
+test('the pair sits where the first of the diagram and the code block was written, in the order they were written', () => {
+  const at = (html, s) => html.indexOf(s);
+  const diagramFirst = renderDoc(draft('Before.', FLOW, 'Between.', CODE, STEPS, 'After.')).html;
+  assert.ok(at(diagramFirst, 'Before.') < at(diagramFirst, '<div class="am-steps"'));
+  assert.ok(at(diagramFirst, '<div class="am-steps"') < at(diagramFirst, 'am-flow') && at(diagramFirst, 'am-flow') < at(diagramFirst, '<figure class="am-codeblock'));
   // The text written between the two moves behind the pair; the steps block itself leaves no trace where it was written.
-  assert.ok(at('am-steps-list') < at('Between.') && at('Between.') < at('After.'));
+  assert.ok(at(diagramFirst, 'am-steps-list') < at(diagramFirst, 'Between.') && at(diagramFirst, 'Between.') < at(diagramFirst, 'After.'));
+  // Code written first stays first in the markup; the stylesheet puts the diagram on top only when the pair is stacked.
+  const codeFirst = renderDoc(draft(CODE, FLOW, STEPS)).html;
+  assert.ok(at(codeFirst, '<figure class="am-codeblock') < at(codeFirst, '<div class="am-steps-diagram"'));
+  assert.ok(at(diagramFirst, '<div class="am-steps-diagram"') < at(diagramFirst, '<figure class="am-codeblock'));
 });
 
 test('a linked code block always shows its line numbers, also with no language and no start=', () => {
@@ -162,9 +172,17 @@ test('steps run in the written order, not the diagram order', () => {
 
 test('the labels of the page language come with the block; a right-to-left page puts the badge on the other corner', () => {
   const zh = renderDoc(draft(CODE, FLOW, STEPS).replace('lang: en', 'lang: zh')).html;
-  assert.match(zh, /data-count="第 \{n\} 步，共 \{m\} 步"/);
+  assert.match(zh, /data-count="第 \{n\} 步，共 \{m\} 步：\{item\}"/);
+  assert.match(zh, /data-prev="← 上一步"/);
+  assert.match(zh, /data-next="下一步 →"/);
+  assert.match(zh, /data-hint="点节点或行号；← → 切换，Esc 取消"/);
+  assert.match(zh, /data-bar="步骤控制"/);
   const en = renderDoc(draft(CODE, FLOW, STEPS)).html;
-  assert.match(en, /data-count="Step \{n\} of \{m\}"/);
+  assert.match(en, /data-count="Step \{n\} of \{m\}: \{item\}"/);
+  assert.match(en, /data-prev="← Previous"/);
+  assert.match(en, /data-next="Next →"/);
+  assert.match(en, /data-hint="Click an item or a line number; ← → to move, Esc to clear"/);
+  assert.match(en, /data-bar="Step controls"/);
   const badge = (html) => Number(html.match(/<g class="am-step-badge" transform="translate\(([-\d.]+),/)[1]);
   const he = renderDoc(draft(CODE, FLOW, STEPS).replace('lang: en', 'lang: he')).html;
   const nodeBox = (html) => html.match(/data-key="Start"[^>]*>[\s\S]*?<rect class="am-node-shape" x="([-\d.]+)" y="[-\d.]+" width="([-\d.]+)"/);
@@ -172,7 +190,8 @@ test('the labels of the page language come with the block; a right-to-left page 
   assert.ok(Math.abs(badge(en) - Number(x)) < 1, 'left to right: the badge is on the left corner');
   const [, hx, hw] = nodeBox(he);
   assert.ok(Math.abs(badge(he) - (Number(hx) + Number(hw))) < 1, 'right to left: the badge is on the right corner');
-  assert.ok(w > 0);
+  assert.ok(Number(w) > 0 && Number(hw) > 0, 'the node box has a real width');
+  assert.ok(Number(hw) === Number(w), 'the same box in both directions');
 });
 
 // ── errors ──
@@ -227,8 +246,10 @@ test('a steps block in a panel with no code block is an error', () => {
 test('a panel with more than one code block, or more than one diagram, is an error', () => {
   const two = draft(CODE, CODE, FLOW, STEPS);
   assert.match(errorsOf(two)[0].message, /one code block, not 2/);
+  assert.equal(errorsOf(two)[0].line, lineOf(two, '```steps'));
   const flows = draft(CODE, FLOW, '```state\nA -> B\n```', STEPS);
   assert.match(errorsOf(flows)[0].message, /one diagram, not 2/);
+  assert.equal(errorsOf(flows)[0].line, lineOf(flows, '```steps'));
 });
 
 test('a diagram type that is not linked yet is an error that names the types that are', () => {
@@ -242,13 +263,44 @@ test('a diagram type that is not linked yet is an error that names the types tha
 test('a diff block is not linked', () => {
   const text = draft('```diff\n--- a/x.js\n+++ b/x.js\n@@ -1,1 +1,1 @@\n-a\n+b\n```', FLOW, '```steps\nStart 1: a\n```');
   assert.match(errorsOf(text)[0].message, /diff/);
+  assert.equal(errorsOf(text)[0].line, lineOf(text, '```steps'));
 });
 
-test('a second steps block in one panel is an error', () => {
-  const text = draft(CODE, FLOW, STEPS, '```steps\nStart 10: again\n```');
-  const errs = errorsOf(text);
-  assert.equal(errs[0].line, text.split('\n').lastIndexOf('```steps') + 1);
-  assert.match(errs[0].message, /one steps block/);
+test('an item that holds a colon in the diagram cannot be linked, and the error says to rename the entry', () => {
+  const text = draft(CODE, '```tree\nsrc\n  Part 1: Writing rules\n  other\n```', '```steps\nPart 1: Writing rules 10-11: the rules\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'Part 1: Writing rules 10'));
+  assert.match(err.message, /cannot contain a colon/);
+  assert.match(err.message, /"Part 1: Writing rules"/);
+  // An entry with a colon is not offered as a suggestion for another item.
+  const other = draft(CODE, '```tree\nsrc\n  Part 1: Writing rules\n  other\n```', '```steps\nNowhere 10: x\n```');
+  assert.doesNotMatch(errorsOf(other)[0].message, /Part 1: Writing rules/);
+});
+
+test('the duplicate check reads an item the way matching does: backticks and runs of spaces do not tell two items apart', () => {
+  const text = draft(CODE, FLOW, '```steps\n`Start` 10: a\nStart   12: b\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'Start   12'));
+  assert.match(err.message, /already step 1/);
+});
+
+test('a video draft is refused with the reason for a steps block, which is not the reason for an ask block', async () => {
+  const video = `---\ntitle: T\nlang: en\n---\n> Intro.\n\n## First\n${CODE}\n\n${FLOW}\n\n${STEPS}\n> One line.\n`;
+  await assert.rejects(renderVideo(video), (e) => e instanceof RenderError && /steps works on a page only; a video cannot click through steps/.test(e.message) && e.line === lineOf(video, '```steps'));
+  assert.match(COMPONENTS.get('ask').pageOnlyReason, /answers/);
+});
+
+test('a steps block inside another block, such as an ask option, is an error', () => {
+  assert.throws(() => COMPONENTS.get('steps').render('Start 10: a', { lang: 'en', ui: {} }), (e) => /cannot go inside another block/.test(e.message));
+});
+
+test('a linked diagram is a group, not a picture, and keeps its name; the list sets its item as Markdown', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, '```steps\n`Start` 10: a\nMiddle 11: b\n```'));
+  const svg = html.match(/<div class="am-steps-diagram">[\s\S]*?<svg [^>]*>/)[0];
+  assert.match(svg, /role="group"/);
+  assert.doesNotMatch(svg, /role="img"/);
+  assert.match(svg, /aria-label="[^"]+"/);
+  assert.match(html, /<li data-link="0">[\s\S]*?<code>Start<\/code>/);
 });
 
 test('a steps block belongs in a panel and needs a page', () => {
@@ -265,7 +317,8 @@ test('every error of a panel is reported in one run', () => {
 
 // ── the page ──
 test('a page without a steps block carries nothing of the feature', () => {
-  const { html } = renderDoc(draft(CODE, FLOW));
+  // The export menu names the live class it strips from a picture; that is the one mention.
+  const html = renderDoc(draft(CODE, FLOW)).html.replaceAll("'.am-steps--live'", '').replaceAll("'am-steps--live'", '');
   assert.doesNotMatch(html, /am-steps/);
   assert.doesNotMatch(html, /am-step-badge/);
   assert.doesNotMatch(html, /data-link=/);
@@ -274,8 +327,8 @@ test('a page without a steps block carries nothing of the feature', () => {
 test('a page with a steps block carries the runtime and the styles once, inside the one script', () => {
   const { html } = renderDoc(draft(CODE, FLOW, STEPS));
   assert.equal(html.match(/<script>\n/g).length, 1);
-  assert.equal(html.match(/am-steps--live/g)?.length > 0, true);
-  assert.equal(html.match(/@container/g)?.length > 0, true);
+  assert.equal(html.split('.am-steps-pair {').length - 1, 1, 'the styles once');
+  assert.equal(html.split('root.dataset.hint').length - 1, 1, 'the runtime once');
 });
 
 test('the component documents itself: summary, syntax, an example that renders and a full specimen', () => {

@@ -195,13 +195,13 @@ Service 3-4: The service runs, then the answer goes back.
 ```
 ````
 
-- Each step is `<item> <line or range>: <note>`. The item is the text of a `flow` node, a `state` or a `tree` entry, written as the diagram writes it. The lines are the last number or range before the first colon.
+- Each step is `<item> <line or range>: <note>`. The item is the text of a `flow` node, a `state` or a `tree` entry, written as the diagram writes it. The lines are the last number or range before the first colon. The first colon ends the item, so an item cannot contain a colon: to link a `tree` entry such as `Part 1: Writing rules`, rename the entry in the diagram so it has no colon.
 - Line numbers are the ones the code block shows: the file's own with `src=` and `lines=`, else from `start=`, else from 1. A linked code block always shows its numbers.
-- On the page, a click on an item (or Enter or Space on it) boxes its lines, shows the note above them and marks the item and its edges. A click on a line number picks the step that covers it; a click on the code text does nothing. The bar above the pair has Previous and Next and says "Step 2 of 3". The arrow keys move and Esc clears.
-- The pair sits side by side from about 720px of block width and stacks below it, the diagram first. Long lines wrap, so the code never scrolls sideways.
+- On the page, a click on an item (or Enter or Space on it) boxes its lines, shows the note above them and marks the item and its edges. A click on a line number picks the step that covers it; a click on the code text does nothing. The bar above the pair has Previous and Next, says "Step 2 of 3" and shows a short hint; the note above the boxed lines starts with the step number and item. The arrow keys move and Esc clears.
+- The pair sits side by side from about 720px of block width, in the order you wrote the two blocks, and stacks below it, the diagram first. Long lines wrap, so the code never scrolls sideways.
 - In print, a PNG or PDF, and with no script, there is no bar and no box. Every step is numbered on its item and beside its first line, and a numbered list of the steps follows the pair.
 - Leave the diagram out and the block is a walkthrough of the code: the items are names for the steps.
-- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, a range outside the code or two ranges that overlap, a panel with no code block or with more than one code block or diagram, a second `steps` block, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
+- `am render` reports, with the draft line: an item that is not in the diagram or that matches more than one, the same item in two steps, an item that ends with `-` or that holds a colon in the diagram, a range outside the code or two ranges that overlap, a panel with no code block or with more than one code block or diagram, a second `steps` block, a `steps` block inside an `ask` option, a `diff` block, and a diagram type that is not linked yet (v1 links `flow`, `state` and `tree`).
 
 Full syntax: `am help code`, `am help steps`.
 

@@ -24,6 +24,10 @@ const PANEL = `${CODE}\n\n${FLOW}\n\n${STEPS}`;
 // style: off would also drop the sheet's page style in the multi-panel fixtures below, so only the plain page uses it.
 const page = (head, panel) => `---\nlang: en\n${head ? '' : 'style: off\n'}${head}---\n## A Panel ${panel}\n\n${PANEL}\n`;
 
+const flowFirst = `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${FLOW}\n\n${CODE}\n\n${STEPS}\n`;
+// The same panel on a right-to-left page: its steps text is the same, the labels and the keys mirror.
+const hebrew = `---\nlang: he\nstyle: off\n---\n## A Panel\n\n${PANEL}\n`;
+
 let tmp;
 let chrome;
 let cdp;
@@ -80,6 +84,8 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'am-steps-'));
   for (const [name, html] of Object.entries({
     page: renderDoc(page('', ''), {}, {}).html,
+    flowFirst: renderDoc(flowFirst, {}, {}).html,
+    he: renderDoc(hebrew, {}, {}).html,
     two: renderDoc(`${page('template: sheet\ncols: 2\n', '')}\n## Beside\n\n${PANEL}\n`, {}, {}).html,
     wide: renderDoc(page('template: sheet\ncols: 2\n', '{span=2}'), {}, {}).html,
   })) {
@@ -133,6 +139,35 @@ test('a click on a diagram item boxes its lines, shows the note and highlights t
   assert.equal(s.edges, 2, 'Middle has an edge in and an edge out');
   // The note sits above the first boxed line.
   assert.equal(await evaluate("document.querySelector('.am-steps-note').nextElementSibling.dataset.n"), '11');
+  // The note starts with the step number and the item in bold, then the note; the count names the item too.
+  assert.equal(await evaluate("document.querySelector('.am-steps-note strong').textContent"), '2. Middle');
+  assert.match(s.note, /^2\. Middle\s+The middle part\./);
+  assert.equal(s.count, 'Step 2 of 3: Middle');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.am-steps-note')).userSelect"), 'none');
+});
+
+test('the bar: arrows on the buttons, a name for the group, a hint after the buttons', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('page');
+  const bar = await evaluate(`(() => {
+    const b = document.querySelector('.am-steps-bar');
+    return {
+      label: b.getAttribute('aria-label'),
+      role: b.getAttribute('role'),
+      buttons: [...b.querySelectorAll('button')].map((x) => [x.textContent, x.getAttribute('aria-label')]),
+      last: b.lastElementChild.className,
+      hint: b.querySelector('.am-steps-hint').textContent,
+    };
+  })()`);
+  assert.equal(bar.role, 'group');
+  assert.equal(bar.label, 'Step controls');
+  assert.deepEqual(bar.buttons, [['← Previous', 'Previous'], ['Next →', 'Next']]);
+  assert.equal(bar.last, 'am-steps-hint');
+  assert.equal(bar.hint, 'Click an item or a line number; ← → to move, Esc to clear');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.am-steps-hint')).display"), 'block');
+  assert.equal(await evaluate("document.querySelectorAll('.am-steps-diagram svg[role=\"group\"]').length > 0 && document.querySelectorAll('.am-steps-diagram svg[role=\"img\"]').length"), 0);
+  await load('page', { width: 390 });
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.am-steps-hint')).display"), 'none', 'the hint leaves a narrow bar');
+  assert.ok(await evaluate("document.documentElement.scrollWidth - innerWidth") <= 1);
 });
 
 test('a click on a line number selects the step; text and unlinked lines change nothing', { skip: SKIP, timeout: 120000 }, async () => {
@@ -146,6 +181,33 @@ test('a click on a line number selects the step; text and unlinked lines change 
   assert.deepEqual((await evaluate(STATE)).on, [14], 'a line with no step keeps the selection');
   await mouseAt('.am-ln[data-n="11"]', 8);
   assert.deepEqual((await evaluate(STATE)).on, [11, 12]);
+});
+
+test('after a click on a line number the arrow keys and Esc work', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('page');
+  await mouseAt('.am-ln[data-n="11"]', 8);
+  assert.deepEqual((await evaluate(STATE)).on, [11, 12]);
+  assert.equal(await evaluate("document.activeElement === document.querySelector('.am-steps')"), true, 'the block has the focus, so the keys reach it');
+  await key('ArrowRight');
+  assert.deepEqual((await evaluate(STATE)).on, [14]);
+  await key('ArrowLeft');
+  assert.deepEqual((await evaluate(STATE)).on, [11, 12]);
+  await key('Escape');
+  assert.deepEqual((await evaluate(STATE)).on, []);
+});
+
+test('on a right-to-left page the Hebrew labels and the arrow keys mirror', { skip: SKIP, timeout: 120000 }, async () => {
+  await load('he');
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('.am-steps')).direction"), 'rtl');
+  assert.equal(await evaluate("document.querySelector('[data-steps=\"next\"]').textContent"), 'הבא ←');
+  await mouseAt('.am-ln[data-n="10"]', 8); // code stays left to right, so its numbers keep their side
+  assert.deepEqual((await evaluate(STATE)).on, [10]);
+  await key('ArrowLeft');
+  assert.deepEqual((await evaluate(STATE)).on, [11, 12], 'ArrowLeft goes forward');
+  await key('ArrowRight');
+  assert.deepEqual((await evaluate(STATE)).on, [10], 'ArrowRight goes back');
+  await key('Escape');
+  assert.deepEqual((await evaluate(STATE)).on, []);
 });
 
 test('Previous, Next, the arrow keys, Enter and Esc', { skip: SKIP, timeout: 120000 }, async () => {
@@ -181,14 +243,22 @@ test('the layout follows the block width: side by side from 720px, stacked below
   const layout = () => evaluate(`(() => {
     const code = document.querySelector('.am-steps .am-codeblock').getBoundingClientRect();
     const diagram = document.querySelector('.am-steps .am-diagram').getBoundingClientRect();
-    return { side: Math.abs(code.top - diagram.top) < 8 || (code.top < diagram.bottom && diagram.top < code.bottom && code.left !== diagram.left), diagramFirst: diagram.top < code.top };
+    return { side: Math.abs(code.top - diagram.top) < 8 || (code.top < diagram.bottom && diagram.top < code.bottom && code.left !== diagram.left), diagramFirst: diagram.top < code.top, codeLeft: code.left < diagram.left };
   })()`);
   await load('page', { width: 1100 });
   assert.equal((await layout()).side, true);
+  await load('page', { width: 1440 });
+  const wide = await layout();
+  assert.equal(wide.side, true);
+  assert.equal(wide.codeLeft, true, 'written code first, the code is on the left');
+  await load('flowFirst', { width: 1440 });
+  assert.equal((await layout()).codeLeft, false, 'written diagram first, the diagram is on the left');
   await load('page', { width: 600 });
   const narrow = await layout();
   assert.equal(narrow.side, false);
   assert.equal(narrow.diagramFirst, true, 'stacked, the diagram comes first');
+  await load('flowFirst', { width: 600 });
+  assert.equal((await layout()).diagramFirst, true, 'stacked, the diagram comes first in either draft order');
   // Same window, different block: the container query decides, not the viewport.
   await load('two', { width: 1300 });
   assert.equal((await layout()).side, false, 'a half-width panel in a wide window is stacked');

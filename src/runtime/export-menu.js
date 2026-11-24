@@ -200,10 +200,10 @@
 
   async function rasterize() {
     await document.fonts?.ready;
-    // A block that is interactive on screen (its root carries a --live class) shows its static look in a picture, not the reader's selection;
-    // the page goes live again right after.
-    const live = [...document.querySelectorAll('[class*="--live"]')].map((el) => [el, [...el.classList].filter((c) => c.endsWith('--live'))]);
-    for (const [el, names] of live) el.classList.remove(...names);
+    // A steps block that is live on screen shows its static look in a picture, not the reader's selection (src/export.js does the same
+    // for image export); the page goes live again right after.
+    const live = [...document.querySelectorAll('.am-steps--live')];
+    for (const el of live) el.classList.remove('am-steps--live');
     let width;
     let height;
     let svg;
@@ -213,7 +213,7 @@
       height = Math.max(1, Math.ceil(Math.max(rect.height, main.scrollHeight)));
       svg = buildSvg(width, height);
     } finally {
-      for (const [el, names] of live) el.classList.add(...names);
+      for (const el of live) el.classList.add('am-steps--live');
     }
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     const image = new Image();

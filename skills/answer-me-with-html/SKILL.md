@@ -165,6 +165,7 @@ Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); 
 | Multi-dimension comparison, can / cannot list | Markdown table | write ok / no / warn in the status column |
 | What a real screen, photo or render looks like, as an existing file | image | `![what it shows](/absolute/path.png)` alone on a line |
 | Code that exists in the project | code block that quotes the file | ```` ```ts src=path/to/file.ts lines=18-30 hl=22 ```` and an empty block |
+| Walk through code with a diagram: click an item to see its lines | `steps` | in a panel with one code block and one `flow`, `state` or `tree`: `Item 12-15: note`; the item is the diagram's text, written without a colon |
 | A plan, refactor or PR summary that changes structure | `flow`, `state`, `tree`, `er` or `api` with change markers | start a line with `+ ` added, `- ` removed, `~ ` changed (a node, field, entity, state, endpoint or section only): `+ A -> B`, `- A -> B`, `~ Node`, tree `+ file.js`, `- dir/`, er `+ Coupon`, `  + phone string`, `+ User 1--* Coupon` |
 | A change to code | diff block | ```` ```diff file=path/to/file.ts ```` and the unified diff inside |
 | Code that does not exist yet, or a command | code block | ```` ```ts title="name · sketch" ```` with the code inside |

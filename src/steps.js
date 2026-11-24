@@ -10,21 +10,22 @@ import en from './languages/en.js';
 
 const FORM = '<item> <line or range>: <note>';
 
-// "Write to clipboard 146-147: Try the API first." → { item, from, to, note, line }. The first colon ends the item and its lines;
-// the lines are the last number or range before it, so an item may hold digits ("Step 2 3: ..."). line is 1-based inside the block.
+// "Write to clipboard 146-147: Try the API first." → { item, head, from, to, note, line }. The first colon ends the item and its lines;
+// the lines are the last number or range (spaces around the dash are fine) before it, so an item may hold digits ("Step 2 3: ..."). line is 1-based inside the block.
 function parseStep(text, line) {
   const colon = text.indexOf(':');
   if (colon < 0) throw new ComponentError(`steps: write each step as ${FORM}, for example "Start 10-12: Begin here."`, line);
   const head = text.slice(0, colon).trim();
-  const at = head.match(/(?:^|\s)(\d+)(?:-(\d+))?$/);
+  const at = head.match(/(?:^|\s)(\d+)(?:\s*-\s*(\d+))?$/);
   if (!at) throw new ComponentError(`steps: "${head}" has no line number before the colon; write ${FORM}`, line);
   const item = head.slice(0, at.index).trim();
   if (!item) throw new ComponentError(`steps: write the item before its lines; ${FORM}`, line);
+  if (item.endsWith('-')) throw new ComponentError(`steps: an item cannot end with "-", which reads as a range; write the item, then the lines as N or N-M`, line);
   const from = Number(at[1]);
   const to = at[2] === undefined ? from : Number(at[2]);
   if (from < 1) throw new ComponentError(`steps: line numbers start at 1; write 1 or more, not ${from}`, line);
   if (to < from) throw new ComponentError(`steps: the range ${from}-${to} ends before it starts; the first line must not be after the last`, line);
-  return { item, from, to, note: text.slice(colon + 1).trim(), line };
+  return { item, head, from, to, note: text.slice(colon + 1).trim(), line };
 }
 
 export function parseSteps(text) {
@@ -67,6 +68,9 @@ export function makeLink(steps, ui) {
   };
 }
 
+// A drawing whose items are buttons is a group: role="img" would hide them from a screen reader. The aria-label stays.
+export const groupSvg = (html) => html.replace(/(<svg [^>]*?) role="img"/, '$1 role="group"');
+
 // The number on a diagram item: a disc on the item's corner in svg, a small tag in a tree. The page hides it while it is live.
 export const stepBadgeSvg = (n, x, y) => `<g class="am-step-badge" transform="translate(${f(x)},${f(y)})"><circle r="8"/><text text-anchor="middle" dominant-baseline="central">${n}</text></g>`;
 export const stepBadgeHtml = (n) => `<span class="am-step-badge" aria-hidden="true">${n}</span>`;
@@ -88,7 +92,7 @@ const linesText = (s, t) => (s.from === s.to ? fill(t.line, { n: s.from }) : fil
 // The numbered list of the steps: item, its lines, the note. Print, an image and a page with no JavaScript show it under the pair; the live page hides it.
 export function stepsList(steps, ui) {
   const t = labels(ui);
-  const items = steps.map((s, i) => `<li data-link="${i}"><span class="am-steps-item">${esc(s.item)}</span> <span class="am-steps-lines">${esc(linesText(s, t))}</span>${s.note ? ` <span class="am-steps-text">${mdInline(s.note)}</span>` : ''}</li>`);
+  const items = steps.map((s, i) => `<li data-link="${i}"><span class="am-steps-item">${mdInline(s.item)}</span> <span class="am-steps-lines">${esc(linesText(s, t))}</span>${s.note ? ` <span class="am-steps-text">${mdInline(s.note)}</span>` : ''}</li>`);
   return `<ol class="am-steps-list" aria-label="${esc(t.list)}">${items.join('')}</ol>`;
 }
 
@@ -96,7 +100,7 @@ export function stepsList(steps, ui) {
 export function stepsBlock(pair, steps, ui) {
   const t = labels(ui);
   const m = steps.length;
-  return `<div class="am-steps" data-steps="${m}" data-count="${esc(t.count)}" data-idle="${esc(fill(t.idle, { m }))}" data-prev="${esc(t.prev)}" data-next="${esc(t.next)}"><div class="am-steps-pair">${pair}</div>${stepsList(steps, ui)}</div>`;
+  return `<div class="am-steps" data-steps="${m}" data-count="${esc(t.count)}" data-idle="${esc(fill(t.idle, { m }))}" data-prev="${esc(t.prev)}" data-next="${esc(t.next)}" data-hint="${esc(t.hint)}" data-bar="${esc(t.bar)}"><div class="am-steps-pair">${pair}</div>${stepsList(steps, ui)}</div>`;
 }
 
 // The lines a step covers, for a message: "line 9" or "lines 14-16".

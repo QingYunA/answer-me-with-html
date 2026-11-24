@@ -31,7 +31,7 @@ Render from the repository root, so `src=` and the spans resolve against it.
 - The first paragraph, before any `##` heading: the answer in two or three sentences.
 - **Modules:** a `tree`, one line per module, `folder/ | job`.
 - **Main path:** a `flow` for how parts connect, or a `sequence` for calls between parts over time. Use the same names as the module tree.
-- **Key code:** code blocks with `src=` and `lines=` for the few spots the main path turns on.
+- **Key code:** code blocks with `src=` and `lines=` for the few spots the main path turns on; a `steps` block in the diagram's panel links one of them to it.
 - **Module table:** module, its files, its job, what it depends on.
 - **Data model,** when the question is about data: an `er` or `class` diagram.
 

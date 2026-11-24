@@ -15,6 +15,8 @@ test('every component provides name / summary / syntax / example, and the exampl
     const m = c.example.match(/^```(\S+)[ \t]*(.*)\n([\s\S]*?)\n```$/);
     assert.ok(m, `${name}.example must be one complete fenced block`);
     assert.equal(m[1], name);
+    // A block with a specimen is drawn with its panel, not alone (test/steps.test.js renders it); on its own it is an error.
+    if (c.specimen) continue;
     assert.ok(c.render(m[3], ctx(m[2])).length > 0);
   }
 });

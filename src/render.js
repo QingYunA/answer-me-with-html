@@ -188,13 +188,13 @@ function renderFence(block, ctx) {
   }
   const comp = COMPONENTS.get(lang);
   if (!comp) return codeBlock(block, ctx);
-  if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; a video cannot take answers`, { line, component: lang, example: comp.example });
+  if (comp.pageOnly && ctx.video) throw new RenderError(`${lang} works on a page only; ${comp.pageOnlyReason ?? 'a video cannot show it'}`, { line, component: lang, example: comp.example });
   ctx.stats.components[lang] = (ctx.stats.components[lang] ?? 0) + 1;
   try {
     const warn = ({ line: at = 0, message }) => ctx.stats.componentWarnings?.push({ line: line + at, component: lang, message });
     const html = comp.render(text, {
       args, uid: () => `am${++ctx.seq}`, ui: ctx.ui, dir: ctx.dir ?? 'ltr', video: ctx.video, warn, line,
-      render: (blocks) => renderBlocks(blocks, ctx), link: ctx.link,
+      render: (blocks) => renderBlocks(blocks, ctx), link: block.link,
     });
     // A component's own svg is measured in viewBox units at fixed text sizes, so the whole box takes the factor. Raw svg / html blocks
     // bypass this function, and a video never scales. A component that renders nested blocks scales each one itself, so its output
