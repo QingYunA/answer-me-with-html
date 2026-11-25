@@ -23,10 +23,10 @@ Voices and models suit different languages and tastes, so pick your own:
 
 | Variable | What it sets | If you do not set it |
 | :--- | :--- | :--- |
-| `ELEVENLABS_VOICE_ID` | The voice. Copy the ID from your ElevenLabs voices page | `bIHbv24MWmeRgasZH58o` (Will, a premade voice) |
+| `ELEVENLABS_VOICE_ID` | The voice. Copy the ID from your ElevenLabs voices page | `7QN34D2r3hCNwbOYIeK0` (Warren, a premade voice) |
 | `ELEVENLABS_MODEL_ID` | The model, such as `eleven_v4_turbo`, `eleven_flash_v2_5` or `eleven_multilingual_v2` | `eleven_v4_turbo` |
 
-The defaults work on the free plan with English and Chinese text. Will is an English voice; ElevenLabs lists Chinese as a verified language for it only under `eleven_multilingual_v2`. For Chinese that sounds native, choose a Chinese voice yourself. See the [model list](https://elevenlabs.io/docs/overview/models) for what each model supports.
+The defaults work on the free plan with English and Chinese text. Warren is an English voice; ElevenLabs lists Chinese as a verified language for it only under `eleven_multilingual_v2`. For Chinese that sounds native, choose a Chinese voice yourself. See the [model list](https://elevenlabs.io/docs/overview/models) for what each model supports.
 
 A voice from the public voice library needs a paid plan. On the free plan the API answers `402 paid_plan_required`.
 
