@@ -15,7 +15,7 @@ export function doc({ meta, introHtml, panels, ui, language }) {
   const withToc = panels.length >= 3;
   const where = meta.outline === 'left' ? 'start' : 'end';
   const toc = withToc ? outlineRail(panels, where, ui?.toc ?? 'Contents') : '';
-  return `<main class="am-doc">
+  return `<main class="am-doc" style="max-width: var(--am-doc-max, 916px)">
 ${headHtml(meta, introHtml, language)}
 <div class="am-doc-layout${withToc ? ` am-doc-layout--rail-${where}` : ''}">
 ${toc}<div class="am-doc-body">
