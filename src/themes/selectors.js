@@ -13,4 +13,6 @@ export const THEME_SELECTORS = Object.freeze([
   '.am-comment-btn', '.am-comment-btn--on',
   // The drawing frame and its rulers (blueprint).
   '.am-frame', '.am-ruler',
+  // The doc template container.
+  '.am-doc',
 ]);
