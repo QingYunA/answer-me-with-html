@@ -8,6 +8,7 @@ import { crossingWarnings } from './flow-check.js';
 import { ComponentError, contentLines } from './error.js';
 import { splitMarker, markState, deltaAttr, withDelta, SIGN, innerMarkMessage } from './delta.js';
 import { DRAWING } from '../themes/type-scale.js';
+import { stepBadgeSvg } from '../steps.js';
 
 const FS = DRAWING.node;
 const LH = 17;
@@ -77,11 +78,11 @@ Client -> Gateway
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the diagram: Before and After show the diagram as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. A marker inside the line, before a node ("A -> + B"), is an error: write it at the start, "+ A -> B". To keep a node name that starts with "- ", write it in brackets: [- Gateway].`,
   example: '```flow LR\n(User) -> Gateway: HTTPS\nGateway -> Auth & *Service\nService -> [(Database)]\ngroup Backend: Auth, Service\n```',
-  render(text, { args, uid, ui, warn, video, dir: pageDir = 'ltr' }) {
+  render(text, { args, uid, ui, warn, video, link, dir: pageDir = 'ltr' }) {
     const model = parseFlow(text);
     model.warnings.forEach((w) => warn?.(w));
     const flowDir = (args.match(/\b(TB|LR|BT|RL)\b/i)?.[1] ?? 'TB').toUpperCase();
-    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir, video ? undefined : warn)}</figure>`;
+    const html = `<figure class="am-diagram am-flow">${layout(model, DIRS.has(flowDir) ? flowDir : 'TB', uid(), ui, pageDir, video ? undefined : warn, link)}</figure>`;
     return withDelta(html, [...model.nodes.values(), ...model.edges, ...model.groups].map((x) => x.state ?? null), { ui, video });
   },
 };
@@ -469,7 +470,8 @@ export function reservedLayout(model, rankdir, rtl, widths) {
   return { run, spots, reserve };
 }
 
-function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
+// link: the steps of a steps block (src/steps.js); the items it names become buttons with a number, and each edge learns the steps at its ends.
+function layout(model, rankdir, id, ui, pageDir = 'ltr', warn, link) {
   const { nodes, edges, groups } = model;
   const rtl = pageDir === 'rtl';
   const widths = groups.map((grp) => labelWidth(grp.name, pageDir));
@@ -496,7 +498,8 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
     const pts = clipEnds(data.points, g.node(key.get(e.from)), nodes.get(e.from).shape, g.node(key.get(e.to)), nodes.get(e.to).shape);
     const head = e.state ? `${id}-arrow-${e.state}` : `${id}-arrow`;
     const path = `<path class="am-edge${e.dashed ? ' am-edge--dashed' : ''}" d="${smoothPath(pts)}" marker-end="url(#${head})"/>`;
-    const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}>`;
+    const ends = link ? link.ends(nodes.get(e.from).label, nodes.get(e.to).label) : '';
+    const open = `<g data-step="${stepOf.get(e.line)}"${deltaAttr(e.state)}${ends}>`;
     if (!e.label) return `${open}${path}</g>`;
     const { lines, width: w, height: h } = edgeText(e.label);
     return `${open}${path}<g class="am-edge-label"><rect x="${f(data.x - w / 2)}" y="${f(data.y - h / 2)}" width="${f(w)}" height="${f(h)}" rx="3"/>${textLines(lines, data.x, data.y, LH, '', pageDir)}</g></g>`;
@@ -506,7 +509,10 @@ function layout(model, rankdir, id, ui, pageDir = 'ltr', warn) {
     const { x, y } = g.node(key.get(n.id));
     const { width: w, height: h, lines } = sizes.get(n.id);
     const badge = badgeSvg(n.state, ...badgePoint(n.shape, x, y, w, h, rtl));
-    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH, ' class="am-node-text"', pageDir)}${badge}</g>`;
+    const step = link?.node(n.label);
+    // The step number takes the corner opposite the change badge.
+    const number = step ? stepBadgeSvg(step.n, ...badgePoint(n.shape, x, y, w, h, !rtl)) : '';
+    return `<g class="am-node am-node--${n.shape}${n.hi ? ' am-node--hi' : ''}" data-key="${esc(n.label)}" data-step="${stepOf.get(n.line)}"${deltaAttr(n.state)}${step?.attrs ?? ''}>${shapeSvg(n.shape, x, y, w, h)}${textLines(lines, x, y + (n.shape === 'db' ? 4 : 0), LH, ' class="am-node-text"', pageDir)}${badge}${number}</g>`;
   });
 
   const { width, height } = g.graph();
@@ -523,7 +529,7 @@ export function badgeSvg(state, x, y, step) {
 }
 
 // Where the badge sits: the top right corner (top left on a right-to-left page), pulled in where the shape has no corner there.
-function badgePoint(shape, x, y, w, h, rtl = false) {
+export function badgePoint(shape, x, y, w, h, rtl = false) {
   const s = rtl ? -1 : 1;
   if (shape === 'diamond') return [x + s * (w / 4), y - h / 4];
   if (shape === 'round') return [x + s * (w / 2 - h * 0.15), y - h / 2 + h * 0.15];

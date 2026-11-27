@@ -90,6 +90,7 @@ export default {
   name: 'ask',
   summary: 'A decision the reader makes on the page (collected by Reply)',
   pageOnly: true,
+  pageOnlyReason: 'a video cannot take answers',
   panelOnly: true,
   // Preview blocks are rendered with the page's scale, so the ask output must not take the factor again.
   scalesOwnSvg: true,

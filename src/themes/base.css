@@ -599,6 +599,7 @@ body.am-has-reply-bar { padding-block-end: 72px; }
   .am-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .am-grid > .am-panel { grid-column: auto !important; }
   .am-grid > .am-panel.am-span-wide { grid-column: 1 / -1 !important; }
+  .am-grid.am-grid--single { grid-template-columns: minmax(0, 1fr); } /* cols: 1 stays one column */
 }
 @media (max-width: 760px) {
   .am-sheet, .am-doc { padding: 56px 12px 24px; }

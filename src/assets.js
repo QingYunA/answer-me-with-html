@@ -22,6 +22,8 @@ export const MATH_CSS = composeMathCss(read('./themes/math.css'));
 export const FONT_CSS = Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)]));
 export const DELTA_JS = read('./runtime/delta.js');
 export const IMAGE_LIGHTBOX_JS = read('./runtime/image-lightbox.js');
+export const STEPS_CSS = read('./themes/steps.css');
+export const STEPS_JS = read('./runtime/steps.js');
 export const UPDATE_CSS = read('./themes/update.css');
 export const UPDATE_JS = read('./runtime/update.js');
 export const LIVE_JS = read('./runtime/live.js');

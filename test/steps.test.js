@@ -1,0 +1,490 @@
+// The steps block (#440): it links the diagram and the code block of one panel. Parsing, every error with its draft line, the
+// static markup (numbers, list) that print, no-JS and image export show, and that a page without a steps block stays as it was.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { renderDoc, RenderError } from '../src/render.js';
+import { DraftErrors } from '../src/parse.js';
+import { COMPONENTS } from '../src/components/index.js';
+import { parseSteps } from '../src/steps.js';
+import { renderVideo } from '../src/video/render.js';
+
+const CODE = '```js start=10\nconst a = 1;\nconst b = 2;\nconst c = 3;\nconst d = 4;\nconst e = 5;\n```';
+const FLOW = '```flow TB\nStart -> Middle\nMiddle -> End\n```';
+const STEPS = '```steps\nStart 10: Begin here.\nMiddle 11-12: The `middle` part.\nEnd 13-14: Finish.\n```';
+const draft = (...blocks) => `---\nlang: en\nstyle: off\n---\n## A Panel\n\n${blocks.join('\n\n')}\n`;
+const lineOf = (text, snippet) => text.split('\n').findIndex((l) => l.includes(snippet)) + 1;
+
+// Every error of a draft as a list: one error is thrown as itself, several as DraftErrors.
+function errorsOf(text, ...rest) {
+  try {
+    renderDoc(text, ...rest);
+  } catch (err) {
+    return err instanceof DraftErrors ? err.errors : [err];
+  }
+  return [];
+}
+
+const lines = (html) => new Map([...html.matchAll(/<span class="am-ln[^"]*"([^>]*)>/g)].map(([, attrs]) => [Number(attrs.match(/data-n="(\d+)"/)?.[1]), attrs]));
+
+test('parseSteps: an item, a line or a range, then the note', () => {
+  const steps = parseSteps('Write to clipboard 146-147: Try the API first.\nReturn true 148: Done.\nStep 2 3: the item may hold digits\n');
+  assert.deepEqual(steps.map(({ item, from, to, note, line }) => ({ item, from, to, note, line })), [
+    { item: 'Write to clipboard', from: 146, to: 147, note: 'Try the API first.', line: 1 },
+    { item: 'Return true', from: 148, to: 148, note: 'Done.', line: 2 },
+    { item: 'Step 2', from: 3, to: 3, note: 'the item may hold digits', line: 3 },
+  ]);
+});
+
+test('parseSteps: blank lines are skipped, the note may hold a colon, and the first colon ends the item', () => {
+  const steps = parseSteps('\nA 1: note: with a colon\n\nB 2-3:\n');
+  assert.deepEqual(steps.map(({ item, from, to, note, line }) => ({ item, from, to, note, line })), [
+    { item: 'A', from: 1, to: 1, note: 'note: with a colon', line: 2 },
+    { item: 'B', from: 2, to: 3, note: '', line: 4 },
+  ]);
+});
+
+test('parseSteps: spaces around the dash of a range are fine; an item that ends with a dash is an error', () => {
+  const [step] = parseSteps('Go 1 - 2: a\n');
+  assert.deepEqual([step.item, step.from, step.to], ['Go', 1, 2]);
+  assert.throws(() => parseSteps('A 1: ok\nGo - 3: a'), (e) => e.line === 2 && /cannot end with "-"/.test(e.message));
+});
+
+test('parseSteps: a line that does not follow the form names the line', () => {
+  for (const [text, line, pattern] of [
+    ['A 1: ok\nno colon here', 2, /<item> <line or range>: <note>/],
+    ['A: no numbers', 1, /line number/],
+    ['1-2: no item', 1, /item/],
+    ['A 5-3: backwards', 1, /after/],
+    ['A 0: zero', 1, /1 or more/],
+  ]) {
+    assert.throws(() => parseSteps(text), (e) => e.line === line && pattern.test(e.message), text);
+  }
+  assert.throws(() => parseSteps('  \n'), (e) => /at least one step/.test(e.message));
+});
+
+test('a flow diagram and a code block are linked: numbers, boxes and the list are in the markup', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, STEPS));
+  assert.equal(html.match(/<div class="am-steps"/g).length, 1);
+  assert.match(html, /<div class="am-steps"[^>]*data-steps="3"/);
+  // Each step covers its lines; the first line of a step carries the step number for print.
+  const code = lines(html);
+  assert.match(code.get(10), /data-link="0"/);
+  assert.match(code.get(10), /data-sn="1"/);
+  assert.match(code.get(11), /data-link="1"/);
+  assert.match(code.get(11), /data-sn="2"/);
+  assert.match(code.get(12), /data-link="1"/);
+  assert.doesNotMatch(code.get(12), /data-sn/);
+  assert.match(code.get(14), /data-link="2"/);
+  // Each linked diagram item is a button with the step in its name, and carries a numbered badge for print.
+  for (const [key, i] of [['Start', 0], ['Middle', 1], ['End', 2]]) {
+    const node = html.match(new RegExp(`<g class="am-node[^"]*" data-key="${key}"[^>]*>`))[0];
+    assert.match(node, new RegExp(`data-link="${i}"`));
+    assert.match(node, /tabindex="0"/);
+    assert.match(node, /role="button"/);
+    assert.match(node, new RegExp(`aria-label="Step ${i + 1}: ${key}`));
+  }
+  assert.equal(html.match(/class="am-step-badge"/g).length, 3);
+  // The edges know which steps they join, so the page can mark the edges of the selected item.
+  assert.equal(html.match(/<g data-step="\d+" data-ends="[^"]+">/g).length, 2);
+  assert.match(html, /data-ends="0 1"/);
+  // The list under the pair: every step, its item, its lines and its note (inline Markdown works).
+  const list = html.match(/<ol class="am-steps-list"[^>]*>([\s\S]*?)<\/ol>/)[1];
+  assert.equal(list.match(/<li /g).length, 3);
+  assert.match(list, /Middle[\s\S]*11[^<]*12[\s\S]*The <code>middle<\/code> part\./);
+  // The steps fence draws nothing of its own.
+  assert.equal(html.match(/<ol class="am-steps-list"/g).length, 1);
+});
+
+test('the pair sits where the first of the diagram and the code block was written, in the order they were written', () => {
+  const at = (html, s) => html.indexOf(s);
+  const diagramFirst = renderDoc(draft('Before.', FLOW, 'Between.', CODE, STEPS, 'After.')).html;
+  assert.ok(at(diagramFirst, 'Before.') < at(diagramFirst, '<div class="am-steps"'));
+  assert.ok(at(diagramFirst, '<div class="am-steps"') < at(diagramFirst, 'am-flow') && at(diagramFirst, 'am-flow') < at(diagramFirst, '<figure class="am-codeblock'));
+  // The text written between the two moves behind the pair; the steps block itself leaves no trace where it was written.
+  assert.ok(at(diagramFirst, 'am-steps-list') < at(diagramFirst, 'Between.') && at(diagramFirst, 'Between.') < at(diagramFirst, 'After.'));
+  // Code written first stays first in the markup; the stylesheet puts the diagram on top only when the pair is stacked.
+  const codeFirst = renderDoc(draft(CODE, FLOW, STEPS)).html;
+  assert.ok(at(codeFirst, '<figure class="am-codeblock') < at(codeFirst, '<div class="am-steps-diagram"'));
+  assert.ok(at(diagramFirst, '<div class="am-steps-diagram"') < at(diagramFirst, '<figure class="am-codeblock'));
+});
+
+test('a linked code block always shows its line numbers, also with no language and no start=', () => {
+  const { html } = renderDoc(draft('```\nline one\nline two\n```', FLOW, '```steps\nStart 1: first\nEnd 2: second\n```'));
+  assert.match(html, /<pre class="am-code am-code--num">/);
+  assert.deepEqual([...lines(html).keys()], [1, 2]);
+});
+
+test('a code block from a file is linked by its file line numbers', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'am-steps-'));
+  try {
+    writeFileSync(join(dir, 'f.js'), Array.from({ length: 20 }, (_, i) => `line ${i + 1}`).join('\n'));
+    const text = draft('```js src=f.js lines=5-9\n```', FLOW, '```steps\nStart 5-6: a\nEnd 9: b\n```');
+    const { html } = renderDoc(text, {}, {}, { codeDir: dir });
+    const code = lines(html);
+    assert.deepEqual([...code.keys()], [5, 6, 7, 8, 9]);
+    assert.match(code.get(5), /data-link="0"/);
+    assert.match(code.get(9), /data-link="1"/);
+    assert.doesNotMatch(code.get(7), /data-link/);
+    assert.deepEqual(errorsOf(draft('```js src=f.js lines=5-9\n```', FLOW, '```steps\nStart 4: a\n```'), {}, {}, { codeDir: dir }).map((e) => e.line), [lineOf(draft('```js src=f.js lines=5-9\n```', FLOW, '```steps\nStart 4: a\n```'), 'Start 4')]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('with no diagram the steps block is a step-by-step walkthrough of the code', () => {
+  const { html } = renderDoc(draft(CODE, '```steps\nSet up 10-11: Make the values.\nUse them 12-14: Read them.\n```'));
+  assert.match(html, /<div class="am-steps"[^>]*data-steps="2"/);
+  assert.doesNotMatch(html.slice(html.indexOf('<div class="am-steps"')), /class="am-step-badge"/);
+  assert.match(lines(html).get(10), /data-sn="1"/);
+  assert.match(html, /<li data-link="1">[\s\S]*Use them[\s\S]*Read them\./);
+});
+
+test('state and tree items link too', () => {
+  const state = '```state\n[*] -> Idle\nIdle -> Busy: start\nBusy -> Idle: done\n```';
+  const a = renderDoc(draft(CODE, state, '```steps\nIdle 10: wait\nBusy 11-12: work\n```')).html;
+  assert.match(a, /<g class="am-node am-node--state" data-key="Idle"[^>]*data-link="0"[^>]*role="button"/);
+  assert.match(a, /<g class="am-node am-node--state" data-key="Busy"[^>]*data-link="1"/);
+  assert.doesNotMatch(a, /<g class="am-node am-node--state am-node--initial"[^>]*data-link/);
+  assert.match(a, /data-ends="0 1"/);
+  const tree = '```tree\nsrc\n  runtime\n  themes\n```';
+  const b = renderDoc(draft(CODE, tree, '```steps\nruntime 10-11: scripts\nthemes 12: styles\n```')).html;
+  assert.match(b, /<div class="am-tree-box"[^>]*data-key="runtime"[^>]*data-link="0"/);
+  assert.match(b, /<div class="am-tree-box"[^>]*data-key="themes"[^>]*data-link="1"/);
+  const list = renderDoc(draft(CODE, '```tree list\nsrc\n  runtime\n  themes\n    deep\n```', '```steps\ndeep 10: d\nruntime 11: r\n```')).html;
+  assert.match(list, /<span class="am-tree-label"[^>]*data-link="0"/);
+  assert.match(list, /<span class="am-tree-label"[^>]*data-link="1"/);
+});
+
+test('a diagram item with no step is not clickable', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, '```steps\nStart 10: only this one\n```'));
+  assert.doesNotMatch(html.match(/<g class="am-node[^"]*" data-key="Middle"[^>]*>/)[0], /data-link|tabindex/);
+  assert.equal(html.match(/class="am-step-badge"/g).length, 1);
+});
+
+test('steps run in the written order, not the diagram order', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, '```steps\nEnd 10: first\nStart 11: second\n```'));
+  assert.match(html.match(/<g class="am-node[^"]*" data-key="End"[^>]*>/)[0], /data-link="0"/);
+  assert.match(html.match(/<g class="am-node[^"]*" data-key="Start"[^>]*>/)[0], /data-link="1"/);
+});
+
+test('the labels of the page language come with the block; a right-to-left page puts the badge on the other corner', () => {
+  const zh = renderDoc(draft(CODE, FLOW, STEPS).replace('lang: en', 'lang: zh')).html;
+  assert.match(zh, /data-count="第 \{n\} 步，共 \{m\} 步：\{item\}"/);
+  assert.match(zh, /data-prev="← 上一步"/);
+  assert.match(zh, /data-next="下一步 →"/);
+  assert.match(zh, /data-hint="点节点或行号；← → 切换，Esc 取消"/);
+  assert.match(zh, /data-bar="步骤控制"/);
+  const en = renderDoc(draft(CODE, FLOW, STEPS)).html;
+  assert.match(en, /data-count="Step \{n\} of \{m\}: \{item\}"/);
+  assert.match(en, /data-prev="← Previous"/);
+  assert.match(en, /data-next="Next →"/);
+  assert.match(en, /data-hint="Click an item or a line number; ← → to move, Esc to clear"/);
+  assert.match(en, /data-bar="Step controls"/);
+  const badge = (html) => Number(html.match(/<g class="am-step-badge" transform="translate\(([-\d.]+),/)[1]);
+  const he = renderDoc(draft(CODE, FLOW, STEPS).replace('lang: en', 'lang: he')).html;
+  const nodeBox = (html) => html.match(/data-key="Start"[^>]*>[\s\S]*?<rect class="am-node-shape" x="([-\d.]+)" y="[-\d.]+" width="([-\d.]+)"/);
+  const [, x, w] = nodeBox(en);
+  assert.ok(Math.abs(badge(en) - Number(x)) < 1, 'left to right: the badge is on the left corner');
+  const [, hx, hw] = nodeBox(he);
+  assert.ok(Math.abs(badge(he) - (Number(hx) + Number(hw))) < 1, 'right to left: the badge is on the right corner');
+  assert.ok(Number(w) > 0 && Number(hw) > 0, 'the node box has a real width');
+  assert.ok(Number(hw) === Number(w), 'the same box in both directions');
+});
+
+// ── errors ──
+test('an item that is not in the diagram is an error at its step line', () => {
+  const text = draft(CODE, FLOW, '```steps\nStart 10: ok\nNowhere 11: x\n```');
+  const [err, ...more] = errorsOf(text);
+  assert.equal(more.length, 0);
+  assert.ok(err instanceof RenderError);
+  assert.equal(err.line, lineOf(text, 'Nowhere'));
+  assert.equal(err.component, 'steps');
+  assert.match(err.message, /"Nowhere" is not an item of the diagram/);
+  assert.match(err.example, /^```steps/);
+});
+
+test('an item that matches more than one entry of the diagram is an error', () => {
+  const text = draft(CODE, '```tree list\nsrc\n  index\nlib\n  index\n```', '```steps\nindex 10: which one?\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'index 10'));
+  assert.match(err.message, /"index" matches 2 items/);
+});
+
+test('a range outside the lines of the code block is an error', () => {
+  const text = draft(CODE, FLOW, '```steps\nStart 10: ok\nEnd 14-16: past the end\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'End 14-16'));
+  assert.match(err.message, /lines 14-16.*10-14/);
+  const before = draft(CODE, FLOW, '```steps\nStart 9: before the start\n```');
+  assert.equal(errorsOf(before)[0].line, lineOf(before, 'Start 9'));
+});
+
+test('a huge range is reported at once, and the code lines are not walked for it', () => {
+  const text = draft('```js start=1\nconst a = 1;\nconst b = 2;\n```', '```steps\nRead 1-1000000000: Read it.\n```');
+  const started = Date.now();
+  const [err, ...more] = errorsOf(text);
+  assert.ok(Date.now() - started < 3000, 'finishes fast');
+  assert.equal(more.length, 0);
+  assert.equal(err.line, lineOf(text, 'Read 1-1000000000'));
+  assert.match(err.message, /lines 1-1000000000 are not all in the code block \(lines 1-2\)/);
+});
+
+test('an image in a step is an error at its step line, for a Markdown image and for an img tag; code stays text', () => {
+  for (const step of ['Start 10: see ![shot](shot.png)', 'Start 10: see <img src="shot.png">', '![x](x.png) 10: item']) {
+    const text = draft(CODE, FLOW, `\`\`\`steps\nMiddle 11: ok\n${step}\n\`\`\``);
+    const [err, ...more] = errorsOf(text);
+    assert.equal(more.length, 0, step);
+    assert.equal(err.line, lineOf(text, step), step);
+    assert.equal(err.component, 'steps');
+    assert.match(err.message, /holds text, not an image/);
+  }
+  assert.deepEqual(errorsOf(draft(CODE, FLOW, '```steps\nStart 10: write `<img>` or `![a](b)` as text\n```')), []);
+});
+
+test('two steps whose ranges overlap are an error at the second', () => {
+  const text = draft(CODE, FLOW, '```steps\nStart 10-12: a\nEnd 12-13: b\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'End 12-13'));
+  assert.match(err.message, /overlaps/);
+});
+
+test('the same item in two steps is an error', () => {
+  const text = draft(CODE, FLOW, '```steps\nStart 10: a\nStart 12: b\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'Start 12'));
+  assert.match(err.message, /"Start" is already step 1/);
+});
+
+test('a steps block in a panel with neither a code block nor a diagram is an error', () => {
+  const text = draft('Only text.', '```steps\nStart: a\n```');
+  const [err, ...more] = errorsOf(text);
+  assert.equal(more.length, 0);
+  assert.equal(err.line, lineOf(text, '```steps'));
+  assert.match(err.message, /needs a code block or a diagram in the same panel/);
+});
+
+test('a panel with more than one code block, or more than one diagram, is an error', () => {
+  const two = draft(CODE, CODE, FLOW, STEPS);
+  assert.match(errorsOf(two)[0].message, /one code block, not 2/);
+  assert.equal(errorsOf(two)[0].line, lineOf(two, '```steps'));
+  const flows = draft(CODE, FLOW, '```state\nA -> B\n```', STEPS);
+  assert.match(errorsOf(flows)[0].message, /one diagram, not 2/);
+  assert.equal(errorsOf(flows)[0].line, lineOf(flows, '```steps'));
+});
+
+test('a diagram type that is not linked yet is an error that names the types that are', () => {
+  const text = draft(CODE, '```er\nUser\n  id PK\n```', '```steps\nUser 10: u\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, '```steps'));
+  assert.match(err.message, /er diagram/);
+  assert.match(err.message, /flow, state and tree/);
+});
+
+test('a diff block is not linked', () => {
+  const text = draft('```diff\n--- a/x.js\n+++ b/x.js\n@@ -1,1 +1,1 @@\n-a\n+b\n```', FLOW, '```steps\nStart 1: a\n```');
+  assert.match(errorsOf(text)[0].message, /diff/);
+  assert.equal(errorsOf(text)[0].line, lineOf(text, '```steps'));
+});
+
+test('an item that holds a colon in the diagram cannot be linked, and the error says to rename the entry', () => {
+  const text = draft(CODE, '```tree\nsrc\n  Part 1: Writing rules\n  other\n```', '```steps\nPart 1: Writing rules 10-11: the rules\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'Part 1: Writing rules 10'));
+  assert.match(err.message, /cannot contain a colon/);
+  assert.match(err.message, /"Part 1: Writing rules"/);
+  // An entry with a colon is not offered as a suggestion for another item.
+  const other = draft(CODE, '```tree\nsrc\n  Part 1: Writing rules\n  other\n```', '```steps\nNowhere 10: x\n```');
+  assert.doesNotMatch(errorsOf(other)[0].message, /Part 1: Writing rules/);
+});
+
+test('the duplicate check reads an item the way matching does: backticks and runs of spaces do not tell two items apart', () => {
+  const text = draft(CODE, FLOW, '```steps\n`Start` 10: a\nStart   12: b\n```');
+  const [err] = errorsOf(text);
+  assert.equal(err.line, lineOf(text, 'Start   12'));
+  assert.match(err.message, /already step 1/);
+});
+
+test('a video draft is refused with the reason for a steps block, which is not the reason for an ask block', async () => {
+  const video = `---\ntitle: T\nlang: en\n---\n> Intro.\n\n## First\n${CODE}\n\n${FLOW}\n\n${STEPS}\n> One line.\n`;
+  await assert.rejects(renderVideo(video), (e) => e instanceof RenderError && /steps works on a page only; a video cannot click through steps/.test(e.message) && e.line === lineOf(video, '```steps'));
+  assert.match(COMPONENTS.get('ask').pageOnlyReason, /answers/);
+});
+
+test('a steps block inside another block, such as an ask option, is an error', () => {
+  assert.throws(() => COMPONENTS.get('steps').render('Start 10: a', { lang: 'en', ui: {} }), (e) => /cannot go inside another block/.test(e.message));
+});
+
+test('a linked diagram is a group, not a picture, and keeps its name; the list sets its item as Markdown', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, '```steps\n`Start` 10: a\nMiddle 11: b\n```'));
+  const svg = html.match(/<div class="am-steps-diagram">[\s\S]*?<svg [^>]*>/)[0];
+  assert.match(svg, /role="group"/);
+  assert.doesNotMatch(svg, /role="img"/);
+  assert.match(svg, /aria-label="[^"]+"/);
+  assert.match(html, /<li data-link="0">[\s\S]*?<code>Start<\/code>/);
+});
+
+test('a steps block belongs in a panel and needs a page', () => {
+  const intro = `---\nlang: en\n---\n${STEPS}\n\n## A\ntext\n`;
+  const [err] = errorsOf(intro);
+  assert.match(err.message, /belongs in a panel/);
+  assert.ok(COMPONENTS.get('steps').pageOnly);
+});
+
+test('every error of a panel is reported in one run', () => {
+  const text = draft(CODE, FLOW, '```steps\nNowhere 10: x\nEnd 40: y\n```');
+  assert.equal(errorsOf(text).length, 2);
+});
+
+// ── the page ──
+test('a page without a steps block carries nothing of the feature', () => {
+  // The export menu names the live class it strips from a picture; that is the one mention.
+  const html = renderDoc(draft(CODE, FLOW)).html.replaceAll("'.am-steps--live'", '').replaceAll("'am-steps--live'", '');
+  assert.doesNotMatch(html, /am-steps/);
+  assert.doesNotMatch(html, /am-step-badge/);
+  assert.doesNotMatch(html, /data-link=/);
+});
+
+test('a page with a steps block carries the runtime and the styles once, inside the one script', () => {
+  const { html } = renderDoc(draft(CODE, FLOW, STEPS));
+  assert.equal(html.match(/<script>\n/g).length, 1);
+  assert.equal(html.split('.am-steps-pair {').length - 1, 1, 'the styles once');
+  assert.equal(html.split('root.dataset.hint').length - 1, 1, 'the runtime once');
+});
+
+test('the component documents itself: summary, syntax, an example that renders and a full specimen', () => {
+  const c = COMPONENTS.get('steps');
+  assert.ok(c.summary && c.syntax && c.example && c.specimen);
+  assert.equal(c.panelOnly, true);
+  assert.doesNotThrow(() => renderDoc(`---\nlang: en\n---\n## steps\n${c.specimen}\n`));
+});
+
+// ── explain mode: a diagram and an explanation per step, no code block ──
+const EXPLAIN = '```steps\nStart: Begin here.\nMiddle: The `middle` part.\nEnd:\n```';
+
+test('parseSteps in explain mode: the item is everything before the first colon, and no line numbers are read', () => {
+  const steps = parseSteps('Place order: The customer pays.\nStep 2: ends in a number\nItem 3-4: not a range\nEmpty:\nURL: see a: b\n', 'explain');
+  assert.deepEqual(steps.map(({ item, note, line }) => ({ item, note, line })), [
+    { item: 'Place order', note: 'The customer pays.', line: 1 },
+    { item: 'Step 2', note: 'ends in a number', line: 2 },
+    { item: 'Item 3-4', note: 'not a range', line: 3 },
+    { item: 'Empty', note: '', line: 4 },
+    { item: 'URL', note: 'see a: b', line: 5 },
+  ]);
+  assert.ok(steps.every((s) => s.from === undefined && s.to === undefined));
+});
+
+test('parseSteps in explain mode: a line with no colon, an empty item or an image is an error at its line', () => {
+  for (const [text, line, pattern] of [
+    ['A: ok\nno colon here', 2, /<item>: <explanation>/],
+    [': no item', 1, /item before its explanation/],
+    ['A: see ![x](x.png)', 1, /not an image/],
+  ]) {
+    assert.throws(() => parseSteps(text, 'explain'), (e) => e.line === line && pattern.test(e.message), text);
+  }
+  assert.throws(() => parseSteps(' \n', 'explain'), (e) => /at least one step, as <item>: <explanation>/.test(e.message));
+});
+
+test('explain mode: a diagram with no code block gets the list as its other side, with n. item leads and no line marks', () => {
+  const { html } = renderDoc(draft(FLOW, EXPLAIN));
+  const root = html.match(/<div class="am-steps"[^>]*>/)[0];
+  assert.match(root, /data-mode="explain"/);
+  assert.match(root, /data-steps="3"/);
+  assert.match(root, /data-hint="Click an item or a step; ← → to move, Esc to clear"/);
+  // The list is inside the pair, once, and the code-mode list is not added after it.
+  assert.equal(html.match(/<ol class="am-steps-list/g).length, 1);
+  const pair = html.match(/<div class="am-steps-pair">([\s\S]*?)<\/ol><\/div><\/div>/)[1];
+  assert.match(pair, /<ol class="am-steps-list am-steps-list--explain"/);
+  const entries = [...pair.matchAll(/<div class="am-steps-entry" data-link="(\d)">([\s\S]*?)<\/div>/g)];
+  assert.deepEqual(entries.map((m) => m[1]), ['0', '1', '2']);
+  assert.match(entries[0][2], /<strong class="am-steps-lead">1\. <span class="am-steps-item">Start<\/span><\/strong> <span class="am-steps-text">Begin here\.<\/span>/);
+  assert.match(entries[1][2], /2\. [\s\S]*The <code>middle<\/code> part\./);
+  assert.doesNotMatch(entries[2][2], /am-steps-text/, 'an empty explanation leaves only the lead');
+  // The diagram items are linked and numbered as in code mode; there are no code lines.
+  for (const [key, i] of [['Start', 0], ['Middle', 1], ['End', 2]]) {
+    assert.match(html.match(new RegExp(`<g class="am-node[^"]*" data-key="${key}"[^>]*>`))[0], new RegExp(`data-link="${i}"[^>]*role="button"`));
+  }
+  assert.equal(html.match(/class="am-step-badge"/g).length, 3);
+  const block = html.slice(html.indexOf('<div class="am-steps"'), html.indexOf('<script', html.indexOf('<div class="am-steps"')));
+  assert.doesNotMatch(block, /am-code|data-sn=|am-steps-lines/);
+});
+
+test('explain mode: the list and the diagram follow the draft order of the diagram and the steps block', () => {
+  const at = (html, s) => html.indexOf(s);
+  const diagramFirst = renderDoc(draft(FLOW, EXPLAIN)).html;
+  assert.ok(at(diagramFirst, 'class="am-steps-diagram"') < at(diagramFirst, 'class="am-steps-list'));
+  const listFirst = renderDoc(draft(EXPLAIN, FLOW)).html;
+  assert.ok(at(listFirst, 'class="am-steps-list') < at(listFirst, 'class="am-steps-diagram"'));
+  // The pair sits where the first of the two was written; text between them follows it.
+  const text = renderDoc(draft('Before.', EXPLAIN, 'Between.', FLOW, 'After.')).html;
+  assert.ok(at(text, 'Before.') < at(text, '<div class="am-steps"') && at(text, '<div class="am-steps"') < at(text, 'Between.') && at(text, 'Between.') < at(text, 'After.'));
+});
+
+test('explain mode links state and tree items too', () => {
+  const state = renderDoc(draft('```state\n[*] -> Idle\nIdle -> Busy: start\n```', '```steps\nIdle: wait\nBusy: work\n```')).html;
+  assert.match(state, /data-key="Busy"[^>]*data-link="1"/);
+  const tree = renderDoc(draft('```tree\nsrc\n  runtime\n```', '```steps\nruntime: scripts\n```')).html;
+  assert.match(tree, /<span class="am-tree-label" data-link="0"[^>]*role="button"/);
+});
+
+test('explain mode: a step written with lines is the item "Item 3-4", which is not in the diagram, and the error says a step has no line numbers', () => {
+  for (const [step, shown] of [['Start 3-4: x', 'Start 3-4'], ['Start 3: x', 'Start 3'], ['Start 3 - 4: x', 'Start 3 - 4']]) {
+    const text = draft(FLOW, `\`\`\`steps\nMiddle: ok\n${step}\n\`\`\``);
+    const [err, ...more] = errorsOf(text);
+    assert.equal(more.length, 0, step);
+    assert.equal(err.line, lineOf(text, step), step);
+    assert.match(err.message, new RegExp(`"${shown}" is not an item of the diagram`));
+    assert.match(err.message, /; with no code block, a step has no line numbers$/);
+  }
+  // An item that does not end in a number gets no such hint, and an item that does end in one is fine when the diagram has it.
+  const plain = errorsOf(draft(FLOW, '```steps\nNowhere: x\n```'))[0];
+  assert.doesNotMatch(plain.message, /line numbers/);
+  assert.deepEqual(errorsOf(draft('```flow TB\nStep 1 -> Step 2\n```', '```steps\nStep 1: a\nStep 2: b\n```')), []);
+});
+
+test('explain mode: a label that ends in a number with no space before it gets no line-number hint', () => {
+  const err = errorsOf(draft('```flow TB\nHTTP/1.1 -> Done\n```', '```steps\nHTTP/2: x\n```'))[0];
+  assert.match(err.message, /"HTTP\/2" is not an item of the diagram/);
+  assert.doesNotMatch(err.message, /line numbers/);
+});
+
+test('an error in explain mode shows an example with no line numbers; code mode keeps its own', () => {
+  const explainErr = errorsOf(draft(FLOW, '```steps\nNowhere: x\n```'))[0];
+  assert.match(explainErr.example, /```steps\nCart: /);
+  assert.doesNotMatch(explainErr.example, /^\w+ \d/m);
+  assert.equal(errorsOf(draft('```steps\nNowhere: x\n```'))[0].example, COMPONENTS.get('steps').example);
+});
+
+test('explain mode: the diagram errors apply, each at its step line', () => {
+  const dup = draft(FLOW, '```steps\nStart: a\nStart: b\n```');
+  assert.match(errorsOf(dup)[0].message, /"Start" is already step 1/);
+  assert.equal(errorsOf(dup)[0].line, lineOf(dup, 'Start: b'));
+  const many = draft('```tree list\nsrc\n  index\nlib\n  index\n```', '```steps\nindex: which?\n```');
+  assert.match(errorsOf(many)[0].message, /"index" matches 2 items/);
+  const colon = draft('```tree\nsrc\n  Part 1: Rules\n  other\n```', '```steps\nPart 1: Rules: the rules\n```');
+  assert.match(errorsOf(colon)[0].message, /not an item|cannot contain a colon/);
+  const er = draft('```er\nUser\n  id PK\n```', '```steps\nUser: u\n```');
+  assert.match(errorsOf(er)[0].message, /er diagram[\s\S]*flow, state and tree/);
+  const two = draft(FLOW, '```state\nA -> B\n```', EXPLAIN);
+  assert.match(errorsOf(two)[0].message, /one diagram, not 2/);
+  assert.match(errorsOf(draft(FLOW, '```steps\nStart ok\n```'))[0].message, /<item>: <explanation>/);
+});
+
+test('explain mode: a video draft is refused, and the labels come in the page language', async () => {
+  const video = `---\ntitle: T\nlang: en\n---\n> Intro.\n\n## First\n${FLOW}\n\n${EXPLAIN}\n> One line.\n`;
+  await assert.rejects(renderVideo(video), (e) => e instanceof RenderError && /steps works on a page only/.test(e.message));
+  const zh = renderDoc(draft(FLOW, EXPLAIN).replace('lang: en', 'lang: zh')).html;
+  assert.match(zh, /data-hint="点节点或讲解；← → 切换，Esc 取消"/);
+  const code = renderDoc(draft(CODE, FLOW, STEPS)).html;
+  assert.doesNotMatch(code.match(/<div class="am-steps"[^>]*>/)[0], /data-mode=/, 'code mode is marked nothing');
+  assert.match(code, /data-hint="Click an item or a line number; ← → to move, Esc to clear"/);
+});
+
+test('every language has a hint for explain mode', async () => {
+  for (const lang of ['en', 'zh', 'zh-Hant', 'ja', 'he', 'tr']) {
+    const { default: l } = await import(`../src/languages/${lang}.js`);
+    assert.ok(l.ui.steps.hintExplain && l.ui.steps.hintExplain !== l.ui.steps.hint, lang);
+  }
+});

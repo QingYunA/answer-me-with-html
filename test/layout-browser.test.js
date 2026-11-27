@@ -310,6 +310,26 @@ ${fillerEn('B', 1)}
 ${fillerEn('C', 2)}
 `;
 
+// `cols: 1` sheets: one panel, and three panels. Between the single-column and the two-column breakpoints they stay one column.
+const ONE_COLUMN = {
+  'one-column-single.en': `---
+title: One column
+cols: 1
+lang: en
+---
+## A Panel
+Some text.
+`,
+  'one-column-three.en': `---
+title: One column, three panels
+cols: 1
+lang: en
+---
+${fillerEn('A', 1)}
+${fillerEn('B', 2)}
+${fillerEn('C', 3)}`,
+};
+
 // Everything the checks need, read in the page in one call. A "row" is the set of grid children with the same top edge.
 const MEASURE = `(() => {
   const grid = document.querySelector('.am-grid');
@@ -432,6 +452,11 @@ before(() => {
   const longTree = join(tmp, 'drafts', 'long-tree.en.md');
   writeFileSync(longTree, LONG_TREE);
   special['long-tree.en'] = render(longTree, 'long-tree.en');
+  for (const [name, text] of Object.entries(ONE_COLUMN)) {
+    const src = join(tmp, 'drafts', `${name}.md`);
+    writeFileSync(src, text);
+    special[name] = render(src, name);
+  }
 });
 
 const launch = async () => {
@@ -755,6 +780,29 @@ test('e2e: with JavaScript off the sheet keeps its CSS grid', { skip: SKIP, time
   } finally {
     await page('Emulation.setScriptExecutionDisabled', { value: false });
   }
+});
+
+test('e2e: a cols: 1 sheet stays one column at tablet widths, with and without JavaScript', { skip: SKIP, timeout: 60000 }, async () => {
+  if (!cdp) await launch();
+  const wrong = [];
+  for (const scripts of [true, false]) {
+    await page('Emulation.setScriptExecutionDisabled', { value: !scripts });
+    try {
+      for (const name of Object.keys(ONE_COLUMN)) {
+        for (const width of [TABLET, 800]) {
+          await open(special[name].file, width);
+          await sleep(300); // longer than the script's resize delay, so a layout pass has run
+          const m = await measure();
+          if (!m.panelWidths.every((w) => Math.abs(w - m.width) <= 1)) {
+            wrong.push(`${name} @${width}px (${scripts ? 'script' : 'no script'}): panel widths ${m.panelWidths.map(Math.round).join(', ')} in a ${m.width}px grid`);
+          }
+        }
+      }
+    } finally {
+      await page('Emulation.setScriptExecutionDisabled', { value: false });
+    }
+  }
+  assert.deepEqual(wrong, [], 'every panel takes the full grid width');
 });
 
 test('e2e: a late resize or media change cannot lay the page out again between beforeprint and afterprint', { skip: SKIP, timeout: 60000 }, async () => {

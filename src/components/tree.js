@@ -3,6 +3,7 @@ import { mdInline } from '../markdown.js';
 import { ComponentError, fields } from './error.js';
 import { esc } from '../svg/text.js';
 import { splitMarker, markState, deltaAttr, deltaBadge, withDelta } from './delta.js';
+import { stepBadgeHtml } from '../steps.js';
 
 export default {
   name: 'tree',
@@ -30,24 +31,25 @@ src/
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the tree: Before and After show the tree as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a label that starts with "- ", write \\- item.`,
   example: '```tree\nASD-STE100 | Simplified Technical English\n  Part 1: Writing rules\n    `Section 1` Words\n  Part 2: Dictionary\n    Approved words | one word, one meaning\n```',
-  render(text, { args, ui, video }) {
+  render(text, { args, ui, video, link }) {
     const roots = buildTree(text);
     if (!roots.length) throw new ComponentError('tree needs at least one node', 1);
-    return withDelta(treeHtml(roots, /\blist\b/.test(args), ui), statesOf(roots), { ui, video });
+    return withDelta(treeHtml(roots, /\blist\b/.test(args), ui, link), statesOf(roots), { ui, video });
   },
 };
 
-function treeHtml(roots, listMode, ui) {
+// link: the steps of a steps block (src/steps.js); the entries it names become buttons with a number.
+function treeHtml(roots, listMode, ui, link) {
   if (roots.length === 1) {
     const [root] = roots;
     const n = root.children.length;
-    if (!listMode && n >= 2 && n <= 4) return orgHtml(root, ui);
-    return `<div class="am-tree">${rootBox(root, ui, true)}${listHtml(root.children, ui)}</div>`;
+    if (!listMode && n >= 2 && n <= 4) return orgHtml(root, ui, link);
+    return `<div class="am-tree">${rootBox(root, ui, link, true)}${listHtml(root.children, ui, link)}</div>`;
   }
   if (!listMode && roots.length <= 4) {
-    return `<div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${colsHtml(roots, ui)}</div></div>`;
+    return `<div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${colsHtml(roots, ui, link)}</div></div>`;
   }
-  return `<div class="am-tree">${listHtml(roots, ui)}</div>`;
+  return `<div class="am-tree">${listHtml(roots, ui, link)}</div>`;
 }
 
 const statesOf = (nodes) => nodes.flatMap((n) => [n.state, ...statesOf(n.children)]);
@@ -123,30 +125,39 @@ function lineAttrs(siblings, i, cols) {
 // The line from a root down to its columns has nothing to reach in a view that hides every column.
 const dropAttrs = (children) => Object.entries(HIDDEN_IN).map(([view, hidden]) => (children.every((c) => c.state === hidden) ? ` data-line-${view}="none"` : '')).join('');
 
-const boxInner = (n, ui) => `${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${softBreaks(mdInline(n.sub))}</small>` : ''}`;
+// What a step adds to one entry: the attributes that make it a button, and the number that print shows.
+const stepOf = (n, link) => {
+  const step = link?.node(n.label);
+  return { attrs: step?.attrs ?? '', badge: step ? stepBadgeHtml(step.n) : '' };
+};
 
-function rootBox(root, ui, solo = false) {
+const boxInner = (n, ui, badge = '') => `${badge}${deltaBadge(n.state, ui)}${labelHtml(n.label)}${n.sub ? `<small>${softBreaks(mdInline(n.sub))}</small>` : ''}`;
+
+function rootBox(root, ui, link, solo = false) {
   const drop = solo ? '' : dropAttrs(root.children);
-  return `<div class="am-tree-root${solo ? ' am-tree-root--solo' : ''}"${deltaAttr(root.state)}${drop}><div class="am-tree-box am-tree-box--root"${vattrs(root)}>${boxInner(root, ui)}</div></div>`;
+  const step = stepOf(root, link);
+  return `<div class="am-tree-root${solo ? ' am-tree-root--solo' : ''}"${deltaAttr(root.state)}${drop}><div class="am-tree-box am-tree-box--root"${vattrs(root)}${step.attrs}>${boxInner(root, ui, step.badge)}</div></div>`;
 }
 
-function colHtml(node, ui, siblings, i) {
-  const children = node.children.length ? listHtml(node.children, ui) : '';
-  return `<div class="am-tree-col"${deltaAttr(node.state)}${lineAttrs(siblings, i, true)}><div class="am-tree-box${node.hi ? ' am-tree-box--hi' : ''}"${vattrs(node)}>${boxInner(node, ui)}</div>${children}</div>`;
+function colHtml(node, ui, link, siblings, i) {
+  const children = node.children.length ? listHtml(node.children, ui, link) : '';
+  const step = stepOf(node, link);
+  return `<div class="am-tree-col"${deltaAttr(node.state)}${lineAttrs(siblings, i, true)}><div class="am-tree-box${node.hi ? ' am-tree-box--hi' : ''}"${vattrs(node)}${step.attrs}>${boxInner(node, ui, step.badge)}</div>${children}</div>`;
 }
 
-const colsHtml = (nodes, ui) => nodes.map((n, i) => colHtml(n, ui, nodes, i)).join('');
+const colsHtml = (nodes, ui, link) => nodes.map((n, i) => colHtml(n, ui, link, nodes, i)).join('');
 
-function orgHtml(root, ui) {
-  return `<div class="am-tree">${rootBox(root, ui)}<div class="am-tree-cols" style="--n: ${root.children.length}">${colsHtml(root.children, ui)}</div></div>`;
+function orgHtml(root, ui, link) {
+  return `<div class="am-tree">${rootBox(root, ui, link)}<div class="am-tree-cols" style="--n: ${root.children.length}">${colsHtml(root.children, ui, link)}</div></div>`;
 }
 
-function listHtml(nodes, ui) {
-  return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, nodes, i)).join('')}</ul>`;
+function listHtml(nodes, ui, link) {
+  return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, link, nodes, i)).join('')}</ul>`;
 }
 
-function liHtml(n, ui, siblings, i) {
+function liHtml(n, ui, link, siblings, i) {
+  const step = stepOf(n, link);
   const sub = n.sub ? `<span class="am-tree-sub">${softBreaks(mdInline(n.sub))}</span>` : '';
-  const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k)).join('')}</ul>` : '';
-  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
+  const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, link, n.children, k)).join('')}</ul>` : '';
+  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label"${step.attrs}>${step.badge}${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
 }

@@ -34,6 +34,7 @@ export default {
     chart: { name: 'Grafik', data: 'Veri', value: 'Değer', share: 'Pay' },
     api: { path: 'Yol parametreleri', query: 'Sorgu parametreleri', headers: 'Başlıklar', request: 'İstek', response: 'Yanıt', field: 'Alan', type: 'Tür', description: 'Açıklama', requirement: 'Gereklilik', required: 'Zorunlu', optional: 'İsteğe bağlı' },
     table: { filter: 'Tabloyu filtrele' },
+    steps: { prev: '← Önceki', next: 'Sonraki →', count: 'Adım {n} / {m}: {item}', hint: 'Bir öğeye veya satır numarasına tıklayın; ← → ile gezin, Esc ile temizleyin', hintExplain: 'Bir öğeye veya adıma tıklayın; ← → ile gezin, Esc ile temizleyin', bar: 'Adım denetimleri', idle: '{m} adım', node: 'Adım {n}: {item}', list: 'Adımlar', line: 'Satır {n}', lines: 'Satır {from}-{to}' },
     export: {
       button: 'Dışa aktar', copy: 'Görsel olarak kopyala', download: 'PNG indir', pdf: 'PDF olarak kaydet',
       working: 'Hazırlanıyor…', copied: 'Kopyalandı ✓', saved: 'Kaydedildi ✓', failed: 'Dışa aktarılamadı',

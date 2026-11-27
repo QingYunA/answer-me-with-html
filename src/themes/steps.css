@@ -1,0 +1,106 @@
+/* Steps block (only on pages that have one): a diagram and a code block (or, in explain mode, a list of explanations) linked by numbered steps (src/steps.js).
+   The default look is the static one that print, an image export and a page with no JavaScript show: every step is numbered on its
+   diagram item (a badge) and beside its first line (a gutter number), and a numbered list of the steps follows the pair.
+   The page runtime (src/runtime/steps.js) adds the class am-steps--live; only then, and only on screen, the numbers and the list give way
+   to the bar, the boxes and the note. The layout follows the block's own width, not the window's. */
+.am-steps { container-type: inline-size; margin: 10px 0; --steps-pad: 24px; }
+.am-steps-pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+.am-steps-pair > * { margin: 0; min-width: 0; }
+.am-steps:focus { outline: none; }
+.am-steps .am-diagram svg { max-width: 100%; height: auto; }
+/* The pair is in the order of the draft. Stacked, the diagram always comes first; side by side the order of the draft shows. */
+.am-steps-pair > .am-steps-diagram { order: -1; }
+/* Side by side from about 720px of block width: the diagram takes what it needs, up to 45%; a walkthrough (no diagram) stays one column. */
+@container (min-width: 720px) {
+  .am-steps-pair > .am-steps-diagram { order: 0; }
+  .am-steps-pair:has(> .am-steps-diagram:first-child) { grid-template-columns: fit-content(45%) minmax(0, 1fr); }
+  .am-steps-pair:has(> .am-steps-diagram:last-child) { grid-template-columns: minmax(0, 1fr) fit-content(45%); }
+}
+
+/* A long line wraps under its own text, so the linked code never scrolls sideways; the number stays in the gutter (a hanging indent). */
+.am-steps .am-code code { min-width: 0; }
+.am-steps .am-ln {
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  padding-inline-start: calc(var(--steps-pad) + 3.5ch + 12px); text-indent: calc(-3.5ch - 12px);
+}
+.am-steps .am-code--num .am-ln::before { text-indent: 0; }
+.am-steps .am-ln[data-sn] { position: relative; }
+.am-steps .am-ln[data-sn]::after {
+  content: attr(data-sn); position: absolute; inset-inline-start: 3px; top: 0.75em; transform: translateY(-50%); text-indent: 0; white-space: normal;
+  box-sizing: border-box; min-width: var(--am-ln-treeBadge); height: var(--am-ln-treeBadge); padding: 0 3px; border-radius: 50%;
+  background: var(--ink); color: var(--paper); font: 600 var(--am-fs-label)/var(--am-ln-treeBadge) var(--font-sans); text-align: center;
+}
+
+/* The numbers on the diagram: a disc on an svg item, a tag on a tree entry. */
+g.am-step-badge circle { fill: var(--ink); stroke: var(--paper); stroke-width: 1.5; }
+g.am-step-badge text { fill: var(--paper); font: 600 var(--am-fs-d-badge) var(--font-sans, sans-serif); }
+.am-steps .am-tree-box { position: relative; }
+span.am-step-badge {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; flex: none; min-width: var(--am-ln-treeBadge); height: var(--am-ln-treeBadge);
+  border-radius: 50%; background: var(--ink); color: var(--paper); font: 600 var(--am-fs-label)/1 var(--font-sans); text-indent: 0;
+}
+.am-tree-box > span.am-step-badge { position: absolute; top: -8px; inset-inline-start: -8px; }
+.am-tree-label > span.am-step-badge { margin-inline-end: 6px; vertical-align: 1px; }
+
+/* The list under the pair. */
+.am-steps-list { margin: 12px 0 0; padding-inline-start: 1.8em; font-size: var(--am-fs-text); color: var(--ink-2); }
+.am-steps-list li { margin: 3px 0; }
+.am-steps-item { font-weight: 600; color: var(--ink); }
+.am-steps-lines { font: var(--am-fs-small) var(--font-mono); color: var(--ink-3); margin-inline: 4px; }
+
+/* Explain mode (no code block): the list is the other side of the pair. Its numbers are text ("1. Item"), so it has no markers. */
+.am-steps-list--explain { list-style: none; margin: 0; padding: 0; }
+.am-steps-list--explain li { margin: 2px 0; }
+.am-steps-entry { padding: 6px 10px; border-inline-start: 3px solid transparent; border-radius: var(--radius); }
+
+/* The bar and the note are for the live page on screen: a page with no script has none, and a picture or print never shows them. */
+.am-steps-bar, .am-steps-note { display: none; }
+
+/* The hint is the first thing to go when the block is narrow: it would wrap under the buttons. */
+@container (max-width: 560px) { .am-steps-hint { display: none; } }
+
+/* Live: on screen only. */
+@media screen {
+  .am-steps--live .am-step-badge, .am-steps--live .am-ln[data-sn]::after, .am-steps--live:not([data-mode="explain"]) .am-steps-list { display: none; }
+  .am-steps--live .am-steps-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; font: var(--am-fs-small)/1.3 var(--font-sans); color: var(--ink-2); }
+  .am-steps-bar .am-btn { padding: 5px 9px; }
+  .am-steps-bar .am-btn:disabled { opacity: .5; cursor: default; }
+  .am-steps-count { min-width: 7em; text-align: center; font-variant-numeric: tabular-nums; }
+  .am-steps-hint { font-size: var(--am-fs-label); color: var(--ink-3); }
+
+  /* The lines of the selected step: a box, with its note above the first line. */
+  .am-steps--live .am-ln[data-link]::before { cursor: pointer; }
+  .am-steps--live .am-ln[data-link]:hover::before { color: var(--accent); }
+  .am-steps--live .am-ln.am-step-on { background: var(--accent-bg); box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent); }
+  .am-steps--live .am-ln.am-step-first { box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent), inset 0 2px 0 var(--accent); }
+  .am-steps--live .am-ln.am-step-last { box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent), inset 0 -2px 0 var(--accent); }
+  .am-steps--live .am-ln.am-step-first.am-step-last { box-shadow: inset 0 0 0 2px var(--accent); }
+  .am-steps--live .am-steps-note {
+    display: block; box-sizing: border-box; margin: 6px 8px 4px; padding: 6px 10px; border-radius: var(--radius); text-indent: 0; white-space: normal;
+    background: var(--accent); color: var(--paper); font: var(--am-fs-small)/1.45 var(--font-sans); user-select: none;
+  }
+  .am-steps--live .am-steps-note strong { margin-inline-end: 0.35em; }
+  .am-steps--live .am-steps-note code { background: transparent; color: inherit; }
+
+  /* Explain mode, live: the entries of the list are buttons; the current one has an accent edge and tint, and its text the full ink colour so it keeps its contrast on the tint. */
+  .am-steps--live .am-steps-entry { cursor: pointer; }
+  .am-steps--live .am-steps-entry:hover { background: var(--accent-bg); color: var(--ink); }
+  .am-steps--live .am-steps-entry:focus { outline: none; }
+  .am-steps--live .am-steps-entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .am-steps--live .am-steps-entry.am-step-current { border-inline-start-color: var(--accent); background: var(--accent-bg); color: var(--ink); }
+
+  /* The items of the diagram a step names are buttons. */
+  .am-steps--live .am-node[data-link], .am-steps--live .am-tree-box[data-link], .am-steps--live .am-tree-label[data-link] { cursor: pointer; }
+  .am-steps--live .am-node[data-link]:hover .am-node-shape { stroke: var(--accent); }
+  .am-steps--live .am-node[data-link]:focus { outline: none; }
+  .am-steps--live .am-node[data-link]:focus-visible .am-node-shape { stroke: var(--accent); stroke-width: 3; }
+  .am-steps--live .am-tree-box[data-link]:hover { border-color: var(--accent); }
+  .am-steps--live .am-tree-box[data-link]:focus-visible, .am-steps--live .am-tree-label[data-link]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .am-steps--live .am-node.am-step-sel .am-node-shape { fill: var(--accent-bg); stroke: var(--accent); stroke-width: 2.5; }
+  .am-steps--live .am-node.am-step-sel .am-node-text { fill: var(--accent); font-weight: 600; }
+  .am-steps--live .am-tree-box.am-step-sel { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+  .am-steps--live .am-tree-label.am-step-sel { color: var(--accent); font-weight: 600; }
+  .am-steps--live .am-edge.am-step-edge { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4; animation: am-step-flow 0.9s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .am-steps--live .am-edge.am-step-edge { animation: none; } }
+}
+@keyframes am-step-flow { to { stroke-dashoffset: -20; } }
