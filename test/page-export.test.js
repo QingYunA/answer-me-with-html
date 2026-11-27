@@ -32,6 +32,11 @@ async function run(args, { env = {} } = {}) {
   return { code, out: out.text, err: err.text };
 }
 
+test('export: the image viewer is hidden from PNG and PDF', () => {
+  const source = readFileSync(new URL('../src/export.js', import.meta.url), 'utf8');
+  assert.match(source, /CHROME_CSS = `[^]*\.am-image-lightbox/);
+});
+
 test('slicePoints: no blocks cuts at the limit', () => {
   assert.deepEqual(slicePoints(4500, [], 1800), [1800, 3600]);
   assert.deepEqual(slicePoints(1800, [], 1800), []);

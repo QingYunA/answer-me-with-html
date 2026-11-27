@@ -16,10 +16,12 @@ export const DIFF_CSS = read('./themes/diff.css');
 export const DELTA_CSS = read('./themes/delta.css');
 export const RTL_CSS = read('./themes/rtl.css');
 export const CHART_CSS = read('./themes/chart.css');
+export const IMAGE_LIGHTBOX_CSS = read('./themes/image-lightbox.css');
 export const MATH_CSS = composeMathCss(read('./themes/math.css'));
 // A theme's own font face, by the name its `font` field gives (src/themes/font-css.js).
 export const FONT_CSS = Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)]));
 export const DELTA_JS = read('./runtime/delta.js');
+export const IMAGE_LIGHTBOX_JS = read('./runtime/image-lightbox.js');
 export const STEPS_CSS = read('./themes/steps.css');
 export const STEPS_JS = read('./runtime/steps.js');
 export const UPDATE_CSS = read('./themes/update.css');

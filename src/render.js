@@ -10,7 +10,7 @@ import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
 import { SCALE } from './themes/type-scale.js';
-import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, STEPS_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, TABLE_JS, DELTA_JS, IMAGE_LIGHTBOX_JS, STEPS_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -355,7 +355,9 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
-  const script = `\n${RUNTIME_JS}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${hasSteps(body) ? STEPS_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
+  const hasImages = /<img\b/i.test(body);
+  const imageAttrs = hasImages ? ` data-am-image-open="${esc(ui.image.open)}" data-am-image-close="${esc(ui.image.close)}" data-am-image-sep="${esc(ui.colon)}"` : '';
+  const script = `\n${RUNTIME_JS}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${hasSteps(body) ? STEPS_JS : ''}${hasImages ? IMAGE_LIGHTBOX_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -365,11 +367,11 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), steps: hasSteps(body), table: interactiveTable, update: Boolean(update), closeAfter, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), steps: hasSteps(body), image: hasImages, table: interactiveTable, update: Boolean(update), closeAfter, scale })}
 </style>
 </head>
 <body>
-<div class="am-toolbar"${rootCarrierAttrs(root)}>
+<div class="am-toolbar"${rootCarrierAttrs(root)}${imageAttrs}>
 ${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 ${scaleButtons(ui)}
