@@ -147,7 +147,7 @@ if (replyBtn) {
       refreshBar();
     });
     btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));
-    if (box.value.trim()) show(true);
+    if (ui.commentsOpen || box.value.trim()) show(true);
     (panel.querySelector('.am-panel-head') ?? panel).append(btn);
     panel.append(wrap);
     boxes.set(id, box);
